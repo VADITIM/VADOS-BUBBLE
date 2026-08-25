@@ -97,7 +97,7 @@
     left: 0;
     right: 0;
     margin-inline: auto;
-    width: calc(var(--pill-width) - var(--chip-tax, 0px));
+    width: var(--pill-width);
     height: var(--pill-height);
     /* Half the height, never 999px: a radius animating down from 999 stays clamped
        to half the height for most of the travel and then squares off all at once.
@@ -121,7 +121,7 @@
       top var(--grow-ms) var(--ease-grow),
       /* Late, so the two moves read in order: the bubble pulls its width in, and
          only once it is narrower does it step aside for what is arriving. */
-      translate var(--grow-ms) var(--ease-grow) var(--shift-delay, 0ms),
+      translate var(--shift-ms, var(--grow-ms)) var(--ease-grow) var(--shift-delay, 0ms),
       transform 350ms linear,
       border-color 220ms ease;
     transform-origin: 50% 0;
@@ -156,6 +156,19 @@
   #pill.picture { width: 340px; height: var(--picture-height, 320px); border-radius: 26px; }
   #pill.history { width: 340px; height: var(--history-height, 320px); border-radius: 26px; }
 
+  /* The bubble taking something in. Written as `scale` rather than as a transform,
+     because the transform is the hold's and the translate is the row's place: one
+     property, one owner. Under the goo layer this reads as the row swallowing the
+     circle rather than as a box changing size, which is the whole reason it is a
+     squash and a stretch and not a fade. */
+  #pill.knocked { animation: pill-knock 460ms var(--ease-grow); }
+  @keyframes pill-knock {
+    0% { scale: 1 1; }
+    30% { scale: 1.05 0.93; }
+    62% { scale: 0.985 1.03; }
+    100% { scale: 1 1; }
+  }
+
   /* Everything the closed bubble is: the bubble and whatever has split off it — a
      plain container, so the satellites sit in the bubble's coordinate space. */
   #assembly { position: absolute; inset: 0; }
@@ -180,13 +193,17 @@
     top: 0;
     /* Only as tall as the row can ever be, hold included: a filter costs its region,
        and the region is the one thing here that is free to be small. */
-    height: calc(var(--grab, 0px) + var(--pill-height) * 1.2 + 16px);
+    height: calc(var(--grab, 0px) + var(--liquid-tall, calc(var(--pill-height) * 1.2 + 16px)));
     display: none;
     pointer-events: none;
   }
   html.liquid #liquid { display: block; }
-  /* The bubble stops painting itself the moment the skin does it instead. */
-  html.liquid #pill, html.liquid .satellite {
+  /* The bubble stops painting itself the moment the skin does it instead. Every bubble
+     on the row is in this rule, the Now bubble included: it was left out and went on
+     painting its own opaque edge on top of the skin, which is why the one bubble whose
+     background came from the same custom property as everyone else's still read as a
+     different alpha — the rim was solid where the others were glass. */
+  html.liquid #pill, html.liquid .satellite, html.liquid #now {
     background: transparent;
     border-color: transparent;
   }
@@ -296,6 +313,20 @@
      than across it, lands on the left with the split's own overshoot, and the
      bubble opens out only because something turned up at its edge. */
   .glyph.entering { animation: glyph-enter var(--enter-ms, 300ms) var(--ease-split); }
+  /* The arrival of a mod pulled in off a swipe, from either side, and it cannot be the
+     entrance above. That one starts from the middle of the bubble; this glyph is
+     already on screen — it is in the circle that just became this bubble — so an
+     entrance would first teleport it somewhere it never was and then move it. What it
+     takes instead is the knock of the arrival: a shove from where it stands, carrying
+     on the way the row was travelling, and back. No fade either, because it never went
+     anywhere. The sign is the direction it came from: pulled in from the left it is
+     knocked right, pulled in from the right it is knocked left. */
+  .glyph.bumping { animation: glyph-bump var(--enter-ms, 300ms) var(--ease-grow); }
+  @keyframes glyph-bump {
+    0% { transform: translateX(0); }
+    30% { transform: translateX(var(--bump, 14px)); }
+    100% { transform: translateX(0); }
+  }
   @keyframes glyph-enter {
     from {
       transform: translateX(var(--enter-from)) scale(0.66);
@@ -1235,6 +1266,14 @@
   /* Nearest the bubble first, counting outwards. */
   #dots-left { flex-direction: row-reverse; }
   .dots span { width: 6px; height: 6px; border-radius: 999px; background: var(--section-color); }
+  /* Only a dot that has just been counted. It comes in from the left because that is
+     the direction it arrived from — it was the circle on the far side of the bubble,
+     and it went through the bubble to get here. */
+  .dots span.arriving { animation: dot-in 320ms var(--ease-grow); }
+  @keyframes dot-in {
+    0% { opacity: 0; transform: translateX(-12px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
   .dragging .dots { transition: none; }
 
   .sat-bars {
@@ -1278,6 +1317,174 @@
     transform-origin: 50% 100%;
   }
   .satellite.live .sat-clock::after { animation: sweep 12s steps(12, end) infinite; }
+
+  /* #endregion ───────────────────────────────────────────────────────────── */
+  /* #region ── the Now bubble ─────────────────────────────────────────────── */
+
+  /* The torch's bubble, standing out by the clock rather than at the cutout. It used
+     to be a page in a window of its own and is drawn here instead for one reason: a
+     shared blur reaches exactly as far as the surface it is drawn on, so a bubble in
+     a second window can never merge with this row. It is the same bubble as any
+     other — same height, same line, same motion — it simply rests somewhere else,
+     and it is still born at the punch hole and thrown out along the bar to get here.
+
+     One UI 8.5 draws a flashlight chip of its own in the Now bar beside the clock and
+     gives no way to turn it off, so this stands on that spot instead of saying the
+     same thing twice along one bar. */
+  #now {
+    position: absolute;
+    z-index: 3;
+    top: var(--grab, 0px);
+    /* The stop the pill flies into, measured from the left edge of the screen. Mirrors
+       NOW_LEFT in BubbleService, which measures it off One UI's own chip. */
+    left: var(--now-left, 16px);
+    width: var(--now-width, var(--pill-height));
+    height: var(--pill-height);
+    box-sizing: border-box;
+    border-radius: calc(var(--pill-height) / 2);
+    background: var(--pill-background);
+    /* The row's own hairline and nothing else — same property, same alpha, same skin as
+       every other bubble here, because it is every other bubble here. The white halo it
+       used to wear was drawn on the element itself and so never went through the filter:
+       it stayed a crisp pill outline while the liquid behind it necked and stretched,
+       which is what made the drop read as a separate object flying home rather than as
+       one being absorbed, and it is 7px of light all round, which is why this bubble
+       looked taller than the one at the cutout when both are exactly --pill-height. The
+       light says what it is with a white glyph on white content instead. */
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.4rem 0 var(--glyph-inset);
+    overflow: hidden;
+    opacity: 0;
+    /* Where the pill is along its flight, and how big it is while making it: born a
+       small drop at the hole, arriving full size here where --now-fly is nothing. */
+    transform: translateX(var(--now-fly, 0px)) scale(var(--now-pop, 0.5));
+    transition:
+      width var(--now-width-ms, var(--grow-ms)) var(--now-width-ease, var(--ease-grow)),
+      height var(--grow-ms) var(--ease-grow),
+      border-radius var(--grow-ms) ease-out,
+      opacity var(--now-fade-ms, 180ms) ease,
+      transform var(--now-fly-ms, 320ms) var(--now-fly-ease, var(--ease-split)),
+      scale 240ms var(--ease-grow);
+  }
+  #now.lit { opacity: 1; }
+  /* Above the row whatever it is doing. Nothing else on this page asks for a z at all —
+     the bubble, the satellites and the dots are all auto — so one is enough to put the
+     light in front of every one of them, and the markup order backs it up. */
+  /* The growth under the finger. Written as `scale` rather than as part of the
+     transform, because the transform is the flight out and home and has an owner
+     already — two writers on one property is one of them losing. */
+  #now.pressing { scale: 1.08; }
+  /* Open, it stands in the middle of the screen and in front of everything else on the
+     bar: it is the thing being interacted with, and nothing on the row outranks that.
+     One surface, so this is a z-index — it used to be a window being removed and added
+     back to reorder it. Nothing else here goes past 2. */
+  #now.open {
+    /* The one size, set from NOW_PANEL in the script: the glass and the touch proxy are
+       given it in device pixels and this is the same number, so it cannot be written
+       twice. */
+    width: var(--now-panel-width);
+    height: var(--now-panel-height);
+    border-radius: 26px;
+    --grow-ms: 420ms;
+    padding: 0;
+    justify-content: center;
+    /* Far above everything, not one step above it. This is the bubble being interacted
+       with and nothing on the bar outranks that — and a panel that is only just in front
+       loses to the next thing that ever needs a z of its own. */
+    z-index: 30;
+  }
+  .now-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--now-face-fade, 0ms) ease;
+  }
+  .now-face.showing { opacity: 1; pointer-events: auto; }
+  #now-closed { justify-content: space-between; padding: 0 0.4rem 0 var(--glyph-inset); }
+  #now-panel { flex-direction: column; justify-content: center; gap: 0.75rem; }
+
+  #now-glyph { width: var(--mod-glyph); height: var(--mod-glyph); display: grid; place-items: center; }
+  #now-glyph svg { width: 82%; height: 82%; fill: #ffffff; display: block; }
+  /* Breathing, because a torch left on is a thing worth being reminded of. */
+  #now.lit:not(.open) #now-glyph svg { animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.55; } }
+
+  /* The glyph leads the way home: it pulls out ahead, the pill is dragged after it,
+     and it is back in place by the time the drop reaches the punch hole. The glyph is
+     the thing with the meaning in it, so it is the thing with the momentum — the same
+     reason it is the glyph that arrives and the width that follows. */
+  #now-glyph.dragging { animation: now-glyph-drag var(--now-drag-ms, 340ms) var(--ease-grow); }
+  @keyframes now-glyph-drag {
+    0% { transform: translateX(0); }
+    28% { transform: translateX(14px); }
+    100% { transform: translateX(0); }
+  }
+
+  #now-reading {
+    font-size: 0.62rem;
+    letter-spacing: 0.02rem;
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+    transition: opacity 380ms ease, transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
+  }
+  /* While the pill is still on its way out it carries nothing else: the reading
+     belongs to width that has not been asked for yet. */
+  html.now-flying #now-reading, .now-face:not(.showing) #now-reading {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: none;
+  }
+
+  #now-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.19rem;
+    text-transform: uppercase;
+    color: #ffffff;
+  }
+
+  /* A dot on a rail of squircles, and the dot is liquid: reaching a step it runs
+     together with it rather than lighting it up underneath. A fixed deviation is
+     right here and nowhere else on this page — these shapes never rest close
+     together, so there is no resting row for a strong blur to weld into a bar. */
+  #now-slider { position: relative; height: calc(var(--now-slot) + 4px); touch-action: none; }
+  #now-rail, #now-flow { position: absolute; inset: 0; }
+  #now-rail { opacity: 0.24; }
+  /* The same filter the quick-settings switches use, because it is the same liquid
+     and the same case for a constant: these shapes are never a hair's breadth apart. */
+  #now-flow { filter: url(#switch-goo); }
+
+  .now-slot {
+    position: absolute;
+    top: 2px;
+    /* Told by the script, which is the side that lays the slots out along the rail. */
+    width: var(--now-slot);
+    height: var(--now-slot);
+    margin-left: calc(var(--now-slot) / -2);
+    border-radius: 0.62rem;
+    background: #ffffff;
+    transform: scale(var(--near, 0));
+  }
+  #now-rail .now-slot { transform: none; }
+
+  .now-dot {
+    position: absolute;
+    top: calc(var(--now-slot) / 4 + 2px);
+    width: calc(var(--now-slot) / 2);
+    height: calc(var(--now-slot) / 2);
+    margin-left: calc(var(--now-slot) / -4);
+    border-radius: 999px;
+    background: #ffffff;
+  }
+
+  #now-slider:not(.dragging) .now-slot, #now-slider:not(.dragging) .now-dot {
+    transition: left 260ms var(--ease-grow), transform 260ms var(--ease-grow);
+  }
 
   /* #endregion ───────────────────────────────────────────────────────────── */
 
@@ -1414,6 +1621,25 @@
     <div id="camera-dot" class="indicator"></div>
   </div>
 </div>
+<!-- The Now bubble, out by the clock. In this page rather than a window of its own so
+     that it reaches the same goo layer everything else on the row is drawn in — and
+     last, after the bubble, because an open panel has to be drawn over the row and a
+     z-index alone was not enough: the bubble's own content was still coming out on top
+     of it. Later in the markup is later in the paint, whatever else is going on. -->
+<div id="now">
+  <div class="now-face showing" id="now-closed">
+    <div id="now-glyph"></div>
+    <span id="now-reading"></span>
+  </div>
+  <div class="now-face" id="now-panel">
+    <span id="now-label">Taschenlampe</span>
+    <div id="now-slider">
+      <div id="now-rail"></div>
+      <div id="now-flow"></div>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <!-- Blur the layer, then push the alpha back to a hard edge: shapes whose blurs
@@ -1462,6 +1688,7 @@
     mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, setTorchLit() {},
     setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
     openNotification() {}, dismissNotification() {}, timerAction() {},
+    setTorch() {}, setNowBlur() {}, setNowProxy() {}, note() {},
   };
 
   // The host window tracks the bubble in both directions. It sits above the status
@@ -1508,6 +1735,18 @@
    * out exactly as the satellite finishes leaving.
    */
   const SAT_GAP = 8;
+  /**
+   * The same gap while the Now bubble is out. The row has the right-hand half of the bar
+   * to fit into and the pair reads as one group standing aside, so the circle sits in
+   * closer — which is also what leaves the light the room it needs at the other end.
+   */
+  const SAT_GAP_ASIDE = 4;
+  /**
+   * How much further right than the bare minimum the row stands while the light is out.
+   * The minimum is the glyph clearing the punch hole and nothing more, and a row parked
+   * exactly on that minimum leaves the light a hair short of the clock it has to cover.
+   */
+  const CHIP_ROOM = 12;
 
   /**
    * How far the skin runs together, weakest and strongest. The weak end has to leave
@@ -1698,7 +1937,7 @@
     // the bubble briefly growing out one side and then snapping back.
     const seen = handOff || box;
 
-    bridge.setBlurBounds(
+    sendBlur(
       handOff ? handOff.width : width,
       height,
       CORNERS[size] === undefined ? Math.round(height / 2) : CORNERS[size],
@@ -1708,7 +1947,7 @@
       // The wrapping satellite is never mid-trade, so it stays a circle. Glass cannot
       // fade, so it shrinks instead: by the time the circle is invisible its pane has
       // closed to nothing, and neither is left hanging over the wallpaper.
-      live > 2 ? Math.round(compact.height * seen.farFade) : 0,
+      live > 2 && satelliteLimit() > 1 ? Math.round(compact.height * seen.farFade) : 0,
       Math.round(seen.farX),
       // A hand-off is not a journey: it is the same pixels under a new name, so the
       // glass has to be put there outright. Any duration at all and it slides across
@@ -1721,6 +1960,33 @@
       dragging || handOff ? 0 : Math.round(splitMillis()),
       dragging || handOff ? 0 : Math.round(splitDelay())
     );
+  }
+
+  /**
+   * The glass, handed over on the frame the bubble's own change is drawn on.
+   *
+   * The two live in different processes and start on different clocks: a style written
+   * here does not take effect until the page renders its next frame, while a bridge
+   * call is on the host's looper and its animator starts the moment it is posted. So
+   * the glass set the same way round as the CSS *led* it — it began moving a frame or
+   * more before the shape it belongs to, which is exactly the seam you can see on a
+   * fast state change. Held to the next animation frame it starts with the paint it
+   * belongs to instead.
+   *
+   * Only the last call of a frame is sent, which is also the only one that frame can
+   * draw: a drag paints on every touch move and was posting a bridge call for each.
+   */
+  let blurPending = null;
+
+  function sendBlur() {
+    const waiting = blurPending !== null;
+    blurPending = Array.prototype.slice.call(arguments);
+    if (waiting) return;
+    requestAnimationFrame(() => {
+      const sending = blurPending;
+      blurPending = null;
+      bridge.setBlurBounds.apply(bridge, sending);
+    });
   }
 
   /** The states the bubble rests in: bare, or under a mod. */
@@ -1740,8 +2006,13 @@
     fill: document.getElementById('liquid-fill'),
   };
 
-  /** One blob a layer for each box the row is made of, made once and kept. */
-  const blobs = ['main', 'left', 'right'].map(name => ({
+  /**
+   * One blob a layer for each box the row is made of, made once and kept. The Now
+   * bubble is one of them: that is the whole point of it being drawn in this page
+   * rather than in a window of its own, and it is why the drop can be seen leaving
+   * the bubble at the punch hole instead of simply appearing out by the clock.
+   */
+  const blobs = ['main', 'left', 'right', 'now'].map(name => ({
     name,
     edge: liquidLayers.edge.appendChild(document.createElement('div')),
     fill: liquidLayers.fill.appendChild(document.createElement('div')),
@@ -1754,7 +2025,9 @@
 
   /** Which box each blob is the skin of. */
   function sourceOf(name) {
-    return name === 'main' ? pill : satellites[name];
+    if (name === 'main') return pill;
+    if (name === 'now') return nowPill;
+    return satellites[name];
   }
 
   /**
@@ -1765,7 +2038,12 @@
    * filter, which erases it rather than dimming it.
    */
   function isSkinned(name) {
-    return name === 'main' || Boolean(satellites[name].dataset.mod);
+    if (name === 'main') return true;
+    // The Now bubble has a skin only while the light is on. Dark it is still in the
+    // page, a zero-opacity box standing at its spot, and a blob mirrored off it would
+    // be a permanent lump of liquid out by the clock.
+    if (name === 'now') return nowPill.classList.contains('lit');
+    return Boolean(satellites[name].dataset.mod);
   }
 
   /** Every rect first, every write after: one layout per frame instead of three. */
@@ -1892,8 +2170,13 @@
   /** The mods that get a dot rather than a circle, nearest the bubble first. */
   function dotted() {
     const spread = { right: [], left: [] };
-    liveMods().slice(3).forEach((mod, index) => {
-      spread[index % 2 === 0 ? satSide : otherSide(satSide)].push(mod);
+    // Whatever is past the circles the row is allowed. With the Now bubble out that is
+    // one circle rather than two, so the mod that had been the far satellite becomes the
+    // first dot — counted onto the satellite's own side, because with one circle there
+    // is no other side to alternate onto.
+    const limit = satelliteLimit();
+    liveMods().slice(1 + limit).forEach((mod, index) => {
+      spread[limit > 1 && index % 2 !== 0 ? otherSide(satSide) : satSide].push(mod);
     });
     return spread;
   }
@@ -1976,34 +2259,101 @@
     return box.mainX - box.main / 2 + satSize() / 2;
   }
 
-  /** The bubble at rest, which gives up real width once it has split something off. */
   /**
-   * How much the closed bubble gives up while the torch chip is out on the left.
-   * Two pills on one status bar is more than that bar has to spare, and the bubble
-   * is the one that can afford it: the chip is standing on a fixed spot it does not
-   * own and cannot move off.
+   * True while the Now bubble is standing out on the bar.
+   *
+   * It used to mean one small thing — the closed bubble gave up a little width so that
+   * two pills fitted on one status bar — and it means something larger now: the bar is
+   * the Now bubble's as well, so the row stands aside for it rather than shaving
+   * itself. Everything below reads this: where the row stands, how many circles it is
+   * allowed, and how wide the Now bubble may grow.
    */
-  const CHIP_TAX = 24;
-  let chipTax = 0;
+  let chipOut = false;
+
+  /** How long the row takes to stand aside for the light, or to come back. */
+  const SHIFT_HOME = 100;
+  /** True while that move is the one being painted, so the ordinary curve stays out of it. */
+  let shiftingHome = false;
+  let shiftTimer = null;
 
   window.onTorchChip = out => {
-    chipTax = out ? CHIP_TAX : 0;
-    root.style.setProperty('--chip-tax', chipTax + 'px');
+    if (chipOut === out) return;
+    chipOut = out;
+    // Standing aside is not a growth and does not take a growth's time. The row is not
+    // changing shape here — it is the same row in a different place — and at the growth's
+    // length it read as the bubbles wandering back rather than snapping into the space
+    // the light had just left. No delay either: the delay exists to hold a step aside
+    // until a width has come in, and there is no width moving here.
+    shiftingHome = true;
+    clearTimeout(shiftTimer);
+    shiftTimer = setTimeout(() => { shiftingHome = false; }, SHIFT_HOME + 40);
+    // The row's whole shape depends on this — its place, its satellites, its dots — so
+    // it is repainted rather than nudged, and the glass and the window go with it.
+    // Nothing here is worked out by the CSS: the glass is a region of the host's window
+    // and the proxy is a window of its own, and both keep whatever they were last told.
     if (state === 'idle') toClosed();
-    // The CSS takes the tax off the bubble on its own, which means nothing else
-    // hears about it: the glass is a region of the host's window and only knows what
-    // it is told. Told here, or it stays the old width and hangs out either side.
+    else {
+      paintSatellites();
+      ensureClosedWindow();
+    }
     paintBlur();
   };
+
+  /**
+   * How far right the closed row stands. Nothing while the bar is the row's own; with
+   * the Now bubble out, exactly enough to bring the bubble's left edge to the punch
+   * hole — which is the bare bubble's left edge, since the bare bubble is the one drawn
+   * around the hole. A mod then grows to the right from the hole instead of out either
+   * side of it, and everything hanging off the bubble travels with it.
+   */
+  /**
+   * The camera's own hole, plus the margin nothing is allowed inside. Measured off the
+   * phone rather than mirrored from anywhere: it is a hole in the glass.
+   */
+  const HOLE_WIDTH = 34;
+
+  function rowShift(resting) {
+    // A bare bubble has no glyph to protect and is the bubble drawn around the hole in
+    // the first place, so it does not move at all — it is the mods that are pushed.
+    if (!chipOut || !liveMods().length) return 0;
+    // Mirrors --mod-glyph and --glyph-inset in the CSS above, which are the same two
+    // numbers off the same bubble height.
+    const glyph = compact.height - 10;
+    const inset = (compact.height - glyph) / 2 - 1;
+    // The left edge that stands the glyph's far side exactly on the hole's near one:
+    // the mod's icon is the first thing in the bubble, and it is what the hole eats.
+    const clear = window.innerWidth / 2 - HOLE_WIDTH / 2 - glyph - inset + CHIP_ROOM;
+    return Math.max(0, clear - (window.innerWidth / 2 - resting / 2));
+  }
+
+  /** The closed row's left edge, which is what the Now bubble grows up to. */
+  function rowLeftEdge() {
+    const resting = restingMain();
+    return window.innerWidth / 2 - resting / 2 + rowShift(resting);
+  }
+
+  /**
+   * How many circles may stand beside the bubble. One while the Now bubble is out: the
+   * bar it has left is not wide enough for two, and a row that overflows into the punch
+   * hole is worse than a row that counts.
+   */
+  function satelliteLimit() {
+    return chipOut ? 1 : 2;
+  }
+
+  /** How far the circle stands off the bubble, which depends on how much bar there is. */
+  function satGap() {
+    return chipOut ? SAT_GAP_ASIDE : SAT_GAP;
+  }
 
   function restingMain() {
     // Mid-merge the bubble is the bare closed bubble and nothing else, whatever is
     // still true: the mod that is coming has not arrived yet, and the bubble must
     // not already be the width of something it is not yet carrying.
-    if (mergeHold) return compact.width - chipTax;
+    if (mergeHold) return compact.width;
     const live = liveMods();
-    if (!live.length) return compact.width - chipTax;
-    return compact.width - chipTax + MOD_WIDTH + 4 - (live.length > 1 ? SPLIT_SHRINK : 0);
+    if (!live.length) return compact.width;
+    return compact.width + MOD_WIDTH + 4 - (live.length > 1 ? SPLIT_SHRINK : 0);
   }
 
   /**
@@ -2018,10 +2368,11 @@
   function layout() {
     const live = liveMods();
     const resting = restingMain();
+    const push = rowShift(resting);
     if (live.length < 2) {
       return {
-        main: resting, sat: satSize(), mainX: 0, satX: 0,
-        inSide: satSide, farX: 0, farFade: 1, edge: 0, reach: 0,
+        main: resting, sat: satSize(), mainX: push, satX: push,
+        inSide: satSide, farX: push, farFade: 1, edge: 0, reach: 0, push,
       };
     }
     const traded = (resting - satSize()) * swap;
@@ -2031,28 +2382,30 @@
     // Only a drag in progress can move it off the resting side. A direction left over
     // from a drag that was abandoned used to survive into the next paint, and the two
     // circles were drawn on each other's sides while nothing was being dragged at all.
-    const inSide = live.length > 2 && swapDir < 0 && root.classList.contains('dragging')
+    const inSide = live.length > 2 && satelliteLimit() > 1 && swapDir < 0 &&
+      root.classList.contains('dragging')
       ? otherSide(satSide)
       : satSide;
     const edge = inSide === 'right' ? 1 : -1;
     // Half of both widths plus the gap: the same whichever of them is the big one,
     // which is why this is a constant and not a function of the drag.
-    const reach = (resting + satSize()) / 2 + SAT_GAP;
+    const reach = (resting + satSize()) / 2 + satGap();
     // Past halfway the swap is decided, so the far one is drawn where it will land.
     const crossed = swap > 0.5;
     const shoved = crossed ? (1 - swap) * 2 : swap * 2;
     return {
       main: resting - traded,
       sat: satSize() + traded,
-      mainX: -edge * swap * reach,
-      satX: edge * (1 - swap) * reach,
+      mainX: push - edge * swap * reach,
+      satX: push + edge * (1 - swap) * reach,
       inSide,
+      push,
       // The one on the far side, when a third mod is true. It is the only piece that
       // has to end up at the other end of the row, and a circle flying the whole way
       // across the bubble to get there reads as a glitch. So it is shoved further out
       // by the bubble arriving over it, fading as it goes, and is already gone by the
       // halfway mark — where it changes sides and comes back in from the other edge.
-      farX: (crossed ? edge : -edge) * (reach + FAR_PUSH * shoved),
+      farX: push + (crossed ? edge : -edge) * (reach + FAR_PUSH * shoved),
       farFade: Math.min(1, Math.abs(swap - 0.5) * 2),
       edge,
       reach,
@@ -2078,11 +2431,14 @@
     // this window during a drag, and a window that had to be resized under the finger
     // cancels the touch.
     const counted = Math.max(dotRoom(spread.right.length), dotRoom(spread.left.length));
-    const room = live.length > 1 ? 2 * (satSize() + SAT_GAP + counted) : 0;
+    const room = live.length > 1 ? 2 * (satSize() + satGap() + counted) : 0;
     return {
       width: restingMain() + room,
       height: -1,
-      shift: 0,
+      // The row stands aside for the Now bubble, and every pixel of it that can be
+      // touched is in this window — so the window stands aside too, or the bubble is
+      // being aimed at through a hole in the wrong place.
+      shift: box.push,
       // What the bubble itself is drawing, which the blur follows.
       main: box.main,
     };
@@ -2094,7 +2450,12 @@
    * a third side.
    */
   function paintSatellites() {
+    // The bar left of the bubble belongs to the Now bubble while it is out, so a
+    // satellite that a swap has left standing there moves over. It is not hidden and it
+    // is not forbidden — it simply has one side to be on.
+    if (chipOut && satSide === 'left') satSide = 'right';
     layoutSatellites();
+    fitNowWidth();
     stirLiquid();
     // Under a finger the skin cannot be a frame behind what it is the skin of: the
     // content would slide out of its own fill. Everything else has a transition to
@@ -2121,7 +2482,13 @@
       // 120ms left the new bubble standing at the width it had just taken, off its own
       // centre, for exactly that long before it slid over: read as the bubble being
       // wider on one side for a moment and then correcting itself.
-      root.style.setProperty('--shift-delay', root.classList.contains('dragging') ? '0ms' : '120ms');
+      root.style.setProperty(
+        '--shift-delay',
+        root.classList.contains('dragging') || shiftingHome ? '0ms' : '120ms'
+      );
+      root.style.setProperty(
+        '--shift-ms', shiftingHome ? SHIFT_HOME + 'ms' : 'var(--grow-ms)'
+      );
       // The glass moves with them, and it is one region per bubble.
       paintBlur();
     }
@@ -2137,7 +2504,11 @@
       clearSatellite('left');
       return;
     }
-    if (live.length === 2) {
+    // One circle, whether that is because one mod is beside the bubble or because the
+    // Now bubble is out and the row is allowed only one. The far one is not hidden: it
+    // is aimed at the bubble and run into it, which is what clearSatellite does, and the
+    // bubble takes the knock. What it turns into is the dot paintDots has already drawn.
+    if (live.length === 2 || satelliteLimit() === 1) {
       clearSatellite(otherSide(satSide));
       paintTrader(satellites[satSide], live[1], box);
       return;
@@ -2259,6 +2630,7 @@
       return;
     }
     element.dataset.leaving = '1';
+    knockBubble();
     // Whatever it was doing, it has stopped being true — the bars and the sweeping
     // hand are claims about something that is no longer happening.
     element.classList.remove('live');
@@ -2269,6 +2641,18 @@
     // Nothing is left to open out around it — the bubble is going bare and staying
     // there — so the journey is the whole of it.
     if (!mergeHold) scheduleRetire(MERGE_TRAVEL);
+  }
+
+  /**
+   * The bubble taking a circle in. It is the same knock whatever sent the circle home —
+   * a mod ending, or the Now bubble coming out and leaving the row room for one circle
+   * instead of two — because to the bubble it is the same event: something ran into it.
+   */
+  function knockBubble() {
+    pill.classList.remove('knocked');
+    void pill.offsetWidth;
+    pill.classList.add('knocked');
+    stirLiquid(MERGE_TRAVEL + 460);
   }
 
   /** Onto the bubble's glyph slot, wherever the bubble currently has it. */
@@ -2402,6 +2786,9 @@
    * there through a drag — a dot is a count, and the count does not change while the
    * row rotates.
    */
+  /** How many dots each side was last drawn with, so an arrival can be told from a repaint. */
+  const dotsSeen = { right: 0, left: 0 };
+
   function paintDots(box) {
     const spread = dotted();
     for (const side of ['right', 'left']) {
@@ -2410,17 +2797,24 @@
       group.textContent = '';
       if (!mods.length) {
         group.classList.remove('showing');
+        dotsSeen[side] = 0;
         continue;
       }
       for (const mod of mods) {
         const dot = document.createElement('span');
         dot.style.background = accentOf(mod);
+        // The group is rebuilt on every paint, so a plain CSS animation on the element
+        // would replay on every drag frame. Only a count that has grown is an arrival.
+        if (mods.length > dotsSeen[side]) dot.classList.add('arriving');
         group.appendChild(dot);
       }
+      dotsSeen[side] = mods.length;
       const edge = side === 'right' ? 1 : -1;
       const width = mods.length * DOT_SIZE + (mods.length - 1) * DOT_GAP;
       const start = box.reach + satSize() / 2 + DOT_GAP;
-      group.style.setProperty('--dots-x', (edge * (start + width / 2)) + 'px');
+      group.style.setProperty(
+        '--dots-x', (box.push + edge * (start + width / 2)) + 'px'
+      );
       group.classList.add('showing');
     }
   }
@@ -2473,6 +2867,10 @@
     const box = layout();
     const flanked = liveMods().length > 2;
     const dir = swapDir;
+    // The side the incoming satellite is standing on, read before the commit swaps
+    // the names over. With two satellites the finger picked one; with one there is
+    // only the one it can be.
+    enterFrom(flanked ? box.inSide : satSide);
     swap = 0;
     swapDir = 1;
     bridge.triggerHaptic('tap');
@@ -2492,8 +2890,16 @@
     // boxes where the finger left them, so from here they only travel to rest.
     requestAnimationFrame(() => {
       root.classList.remove('dragging');
-      paintSatellites();
+      // Cleared *before* the paint, never after. settling exists to stop this row
+      // being painted at its destination while the hand-off is still standing it
+      // where the finger left it — and the hand-off is over by the time this frame
+      // runs, so leaving the flag up here suppressed the one paint that was supposed
+      // to carry it home. The bubble then kept the part-way width and the sideways
+      // offset the release froze it at, off the cutout, until some unrelated repaint
+      // — a media tick, a timer second — happened along and fixed it by accident.
+      // Which is exactly what "it sometimes rearranges itself" was.
       settling = false;
+      paintSatellites();
     });
   }
 
@@ -2526,6 +2932,9 @@
     rotate(1);
     satSide = otherSide(satSide);
 
+    // Whatever picture the circle was holding has to be in the bubble's own copy of
+    // it before the bubble is asked to show it. See carryArt().
+    carryArt();
     // Faces and window first, while nothing can animate.
     toClosed();
 
@@ -2553,6 +2962,7 @@
   function commitRotation(box, dir) {
     rotate(dir);
 
+    carryArt();
     toClosed();
 
     root.style.setProperty('--main-width', box.sat + 'px');
@@ -2654,15 +3064,34 @@
     call: { paint: () => paintCall(), face: 'call', size: 'calling', room: closedTarget },
   };
 
+  /**
+   * Which side the mod is arriving from, which decides how its glyph gets there.
+   *
+   * 'hole' is a mod taking a bare bubble: it comes up out of the middle, because that
+   * is the punch hole and everything here is born there. A side is a mod arriving off a
+   * swipe, which did not come from the middle at all — it came from the satellite the
+   * finger pulled in, so it is knocked on from where it already stands and the side
+   * says which way.
+   */
+  let enterSide = 'hole';
+  function enterFrom(side) {
+    enterSide = side;
+  }
+
   /** Plays the glyph's arrival: up out of the middle and onto the left. */
   function flyGlyphIn(name) {
     const glyph = faces[name] && faces[name].querySelector('.glyph');
     if (!glyph) return;
-    glyph.classList.remove('entering');
+    glyph.classList.remove('entering', 'bumping');
     // Without this the class is added in the same frame it was removed and the
     // animation is never restarted — the glyph simply appears where it lands.
     void glyph.offsetWidth;
-    glyph.classList.add('entering');
+    if (enterSide === 'hole') {
+      glyph.classList.add('entering');
+      return;
+    }
+    glyph.style.setProperty('--bump', (enterSide === 'left' ? 14 : -14) + 'px');
+    glyph.classList.add('bumping');
   }
 
   /**
@@ -2758,6 +3187,9 @@
       MOD_CLOSED[owner].paint();
       showFace(MOD_CLOSED[owner].face);
       root.classList.add('entering');
+      // No satellite brought this one, so it comes up out of the middle: the punch
+      // hole, which is where everything on this screen is born.
+      enterFrom('hole');
       flyGlyphIn(MOD_CLOSED[owner].face);
       setSize(MOD_CLOSED[owner].size, { width: -1, height: -1, shift: 0 }, true);
       claimRoom(owner);
@@ -3014,6 +3446,32 @@
       swapArt(mediaArt, art, 220);
       swapArt(playerArt, art, 420);
     });
+  }
+
+  /**
+   * The same picture, moved into the bubble's own copy without a slide.
+   *
+   * A swap hands the bubble to whatever the satellite was carrying, and for media
+   * that picture is already on screen — in the circle. It has to be in the bubble's
+   * own <img> before that face is shown, because the two are different elements and
+   * only one of them is drawing at a time. It was not: `shownArt` records what the
+   * page last *asked* for, and a satellite's art is set straight onto its own element
+   * without going through here, so the bubble's copy could be stale or still hidden
+   * while shownArt claimed it was current. paintArt() then skipped, the face was
+   * shown, and the picture had to be fetched and painted after the fact — which is
+   * the flicker that read as the image re-rendering at the moment of the swap.
+   *
+   * No slide, deliberately: a swap is the same song arriving in a different box, and
+   * a picture that slides out and back would say the song had changed.
+   */
+  function carryArt() {
+    const art = (media && media.artBase64) || '';
+    shownArt = art;
+    if (!art) return;
+    for (const element of [mediaArt, playerArt]) {
+      element.classList.remove('leaving-art', 'entering-art', 'hidden-art');
+      if (element.getAttribute('src') !== art) element.src = art;
+    }
   }
 
   /** Out to the left, back in from the left, at whatever pace suits the size. */
@@ -4046,8 +4504,692 @@
    * listener — the host window is only as big as the bubble — so it is the window
    * manager's ACTION_OUTSIDE, which reports the touch without swallowing it.
    */
-  window.onOutsideTap = () => {
+  window.onOutsideTap = (x, y) => {
+    // Every proxy reports a touch outside *its own* bounds, and there is more than one
+    // proxy — so a tap on an open panel is an outside tap as far as the Now bubble's
+    // proxy is concerned. Closing on it shut the panel on the way down, and the tap's
+    // own click then landed on the bubble that had taken its place and opened it again:
+    // a tap on an open bubble replayed the opening instead of closing it, and a hold on
+    // one never got the chance to start because the panel was gone before the finger
+    // had been down a tenth of a second. The point is hit-tested here rather than in
+    // Kotlin, because the page is the only side that knows where anything is.
+    const hit = document.elementFromPoint(x, y);
+    if (hit && (pill.contains(hit) || nowPill.contains(hit))) return;
     if (state === 'active') toClosed();
+    // The Now bubble's panel closes on the same tap, and for the same reason: it is
+    // one page now, so one message closes whatever on it is open.
+    if (nowOpen) closeNowPanel();
+  };
+
+  // #endregion ────────────────────────────────────────────────────────────────
+  // #region ── the Now bubble ─────────────────────────────────────────────────
+
+  /**
+   * The torch's bubble, out by the clock. It was a page in a window of its own until
+   * the canvas made one surface of the whole bar; everything here is that page, moved
+   * across so that this bubble is in the same goo layer as the rest of the row and
+   * can therefore actually merge with it. Nothing that used to be a message to the
+   * host is one any more — the width the bubble gives up for it, and which of the two
+   * stands in front, are now this page talking to itself.
+   */
+  const nowPill = document.getElementById('now');
+  const nowGlyph = document.getElementById('now-glyph');
+  const nowReading = document.getElementById('now-reading');
+  const nowSlider = document.getElementById('now-slider');
+  const nowRail = document.getElementById('now-rail');
+  const nowFlow = document.getElementById('now-flow');
+  const nowFaces = {
+    closed: document.getElementById('now-closed'),
+    panel: document.getElementById('now-panel'),
+  };
+
+  /** A beam rather than a bulb: a cone says the light is pointed somewhere. */
+  nowGlyph.innerHTML =
+    '<svg viewBox="0 0 24 24"><path d="M8.4 2h7.2a1 1 0 0 1 .97 1.24l-.9 3.6a1 1 0 0 1-.97.76H9.3a1 1 0 0 1-.97-.76l-.9-3.6A1 1 0 0 1 8.4 2zm1.1 7.6h5a1 1 0 0 1 1 1V21a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V10.6a1 1 0 0 1 1-1zm1.5 3.4a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2z"/></svg>';
+
+  /** Kept in step with the CSS above: five slots and four gaps. */
+  const NOW_SLOT = 40;
+  const NOW_SLOT_GAP = 14;
+  // The slot's size is a layout the script owns — it places every slot along the rail
+  // from this number — so the CSS is given it rather than holding a second copy.
+  root.style.setProperty('--now-slot', NOW_SLOT + 'px');
+  const NOW_PANEL = { width: 300, height: 132, ms: 420 };
+  // The CSS is told the panel's size rather than repeating it: this is the number the
+  // host is given for the glass and for the proxy, and three copies of it is three
+  // chances to move one and not the others.
+  root.style.setProperty('--now-panel-width', NOW_PANEL.width + 'px');
+  root.style.setProperty('--now-panel-height', NOW_PANEL.height + 'px');
+
+  /**
+   * How wide the pill rests, mirroring RESTING_WIDTH in BubbleService. Not the closed
+   * bubble's width: this pill's whole job is to stand on top of One UI's own
+   * flashlight chip, and that chip is wider than the bubble. Matched to the bubble
+   * instead, Samsung's blue pill was left sticking out past its right edge.
+   */
+  /**
+   * The narrowest the light is ever drawn: enough to cover One UI's own flashlight chip,
+   * which is the thing it is standing on. Measured off that chip and nothing else — if a
+   * One UI update makes theirs wider, theirs shows past the end of ours and this is the
+   * number to move. It is a floor and not a width: with a mod on the row the light
+   * reaches further, up to the row's own edge.
+   */
+  const NOW_RESTING = 116;
+  /**
+   * The gap the Now bubble leaves between itself and the bubble at the hole. Read it
+   * against meltBy(): the melt is MELT_MAX less half the gap, and two shapes run together
+   * at about twice the melt, so four pixels apart is a bridge of eight — the pair stands
+   * there permanently necked, which is the merge being visible at rest without the two
+   * of them reading as one welded pill.
+   */
+  const NOW_REACH = 4;
+  /**
+   * The narrowest it may stand at. One UI's clock is under its left half and its chip
+   * under the right, and a pill that closes to less than this hands back a piece of the
+   * bar it is there to be instead of. Only the flight home goes below it, and by then it
+   * is a drop and on its way out.
+   */
+  const NOW_COVER = 128;
+
+  /** Where its left edge rests, told by the host, which is the side that measures. */
+  let nowLeft = 53;
+
+  /**
+   * The flight out and the flight home, the share of the way at which the pill is
+   * actually against its stop — the split curve overshoots and settles back, so that
+   * is under halfway and not the end — and the opening out that hitting it causes.
+   */
+  const NOW_TRAVEL = 420;
+  /* Longer than the flight out, on purpose. Going out, the drop separating from the
+     bubble is the whole of what there is to see and it is over the moment the pill
+     hits its stop; coming home it is the last stretch that matters — the two shapes
+     necking and running together — and at the outward speed that stretch was three
+     frames and the light was simply gone. */
+  const NOW_RETURN = 560;
+  const NOW_LAND = 0.42;
+  const NOW_EXPAND = 300;
+  /**
+   * The share of the flight after which the pill is clear of the bubble at the cutout.
+   * That is when the bubble pulls its width in, not when the light came on: one drop
+   * leaves, the other closes behind it.
+   */
+  const NOW_CLEAR = 0.2;
+  /** The width given back before the pill is allowed to leave its spot. */
+  const NOW_COLLAPSE = 260;
+
+  let torch = null;
+  let nowOpen = false;
+  let nowDot = null;
+  let nowDotAt = 0;
+  let nowSliding = false;
+  let nowWidth = 46;
+  /** Where the glass has been sent, so a width change does not drag it back home. */
+  let nowFlyAt = 0;
+
+  /** One flight is a run of steps, and a second light cancels the first outright. */
+  let nowTimers = [];
+  function nowAfter(milliseconds, step) {
+    nowTimers.push(setTimeout(step, milliseconds));
+  }
+  function stopNowFlight() {
+    nowTimers.forEach(clearTimeout);
+    nowTimers = [];
+  }
+
+  function showNowFace(name) {
+    for (const [key, face] of Object.entries(nowFaces)) {
+      face.classList.toggle('showing', key === name);
+    }
+  }
+
+  /**
+   * How wide the Now bubble stands once it has arrived: as far as the row's own left
+   * edge, less the gap the skin needs to neck across. The row moves aside for it
+   * (rowShift) and it takes what the row gave up, so the two grow and shrink against
+   * each other and the neck between them holds.
+   */
+  function nowResting() {
+    return Math.max(NOW_RESTING, NOW_COVER, rowLeftEdge() - nowLeft - NOW_REACH);
+  }
+
+  /**
+   * The Now bubble taking whatever the row has left it. Called from the row's own paint
+   * rather than worked out once on arrival, because the edge it grows up to moves: a
+   * mod arriving pushes the row further right and this fills the gap that opens behind
+   * it. Nothing here while it is flying or open — the flight owns the width on the way
+   * out, and the panel is a size of its own.
+   */
+  function fitNowWidth() {
+    if (!nowPill.classList.contains('lit')) return;
+    if (nowOpen || root.classList.contains('now-flying')) return;
+    const next = nowResting();
+    if (Math.abs(next - nowWidth) < 1) return;
+    setNowWidth(next, NOW_EXPAND, 'var(--ease-split)');
+    fitNowProxy();
+  }
+
+  /** Flying, the pill is a drop: as wide as it is tall, a circle. */
+  function nowDrop() { return compact.height; }
+
+  /**
+   * How far the punch hole is from this spot. The page can answer this itself now
+   * that it is drawn across the whole screen — it used to be told, because a window
+   * the size of the pill had no idea how wide the screen was.
+   */
+  function nowFlight() {
+    return window.innerWidth / 2 - nowDrop() / 2 - nowLeft;
+  }
+
+  function setNowFly(next, milliseconds, ease) {
+    root.style.setProperty('--now-fly', next + 'px');
+    root.style.setProperty('--now-fly-ms', milliseconds + 'ms');
+    root.style.setProperty('--now-fly-ease', ease);
+    if (!nowOpen) paintNowBlur(nowWidth, next, milliseconds);
+    stirLiquid(milliseconds + 120);
+  }
+
+  function setNowWidth(next, milliseconds, ease) {
+    nowWidth = next;
+    root.style.setProperty('--now-width', next + 'px');
+    root.style.setProperty('--now-width-ms', milliseconds + 'ms');
+    root.style.setProperty('--now-width-ease', ease);
+    if (!nowOpen) paintNowBlur(next, nowFlyAt, milliseconds);
+    stirLiquid(milliseconds + 120);
+  }
+
+  /**
+   * The glass, which is the host's and not the page's — nothing a WebView draws
+   * reaches pixels it does not own. Same contract as everywhere else here: the page
+   * says where the shape is going and how long it is taking, and the host runs the
+   * same curve on the blurred region.
+   */
+  function paintNowBlur(width, offset, milliseconds) {
+    nowFlyAt = offset;
+    // Same clock as the row's glass, and for the same reason — see sendBlur.
+    sendNowBlur(
+      Math.round(width),
+      compact.height,
+      Math.round(compact.height / 2),
+      Math.round(nowLeft + offset),
+      Math.round(milliseconds)
+    );
+  }
+
+  let nowBlurPending = null;
+
+  function sendNowBlur() {
+    const waiting = nowBlurPending !== null;
+    nowBlurPending = Array.prototype.slice.call(arguments);
+    if (waiting) return;
+    requestAnimationFrame(() => {
+      const sending = nowBlurPending;
+      nowBlurPending = null;
+      bridge.setNowBlur.apply(bridge, sending);
+    });
+  }
+
+  /** The proxy is exactly what can be touched, and nothing else on this bar can. */
+  function fitNowProxy() {
+    if (!nowPill.classList.contains('lit')) {
+      bridge.setNowProxy(0, 0, 0);
+      return;
+    }
+    if (nowOpen) {
+      bridge.setNowProxy(
+        NOW_PANEL.width, NOW_PANEL.height, Math.round(nowLeft + nowPanelShift())
+      );
+      return;
+    }
+    bridge.setNowProxy(Math.round(nowWidth), compact.height, Math.round(nowLeft));
+  }
+
+  function paintNowReading() {
+    nowReading.textContent = torch && torch.dimmable ? torch.step + '/' + torch.steps : '';
+  }
+
+  /**
+   * The light coming on. The pill is born a small drop in the true middle of the
+   * screen — inside the punch hole, inside the bubble drawn around it — and thrown out
+   * along the bar to its spot. It hits that spot, the bubble at the cutout closes up
+   * behind it, and the pill opens out to the right off the stop it ran into. The width
+   * is the consequence; the arrival is the cause.
+   *
+   * Both shapes are in one goo layer now, so the drop genuinely separates from the
+   * bubble on the way out and is genuinely taken back into it on the way home. That is
+   * the thing two windows could never do, and the reason this page is the way it is.
+   */
+  function lightNow() {
+    stopNowFlight();
+    paintNowReading();
+    root.classList.add('now-flying');
+    setNowWidth(nowDrop(), 0, 'linear');
+    setNowFly(nowFlight(), 0, 'linear');
+    // Born at the hole and no bigger than it, then let go on the next frame — the
+    // starting point has to be a frame the browser has actually drawn, or there is
+    // nothing to move away from.
+    root.style.setProperty('--now-pop', 0.5);
+    void nowPill.offsetWidth;
+    requestAnimationFrame(() => {
+      nowPill.classList.add('lit');
+      root.style.setProperty('--now-pop', 1);
+      setNowFly(0, NOW_TRAVEL, 'var(--ease-split)');
+      fitNowProxy();
+    });
+    nowAfter(NOW_TRAVEL * NOW_CLEAR, () => window.onTorchChip(true));
+    nowAfter(NOW_TRAVEL * NOW_LAND, () => {
+      setNowWidth(nowResting(), NOW_EXPAND, 'var(--ease-split)');
+      // The knock of hitting the stop, which is also what opens the pill out.
+      bridge.triggerHaptic('tap');
+    });
+    // The reading is the last thing in: it belongs to width, and until the pill has
+    // finished opening out there is no width for it to belong to.
+    nowAfter(NOW_TRAVEL * NOW_LAND + NOW_EXPAND, () => {
+      root.classList.remove('now-flying');
+      fitNowProxy();
+    });
+  }
+
+  /**
+   * The light going out, the same journey backwards. The pill gives its width back
+   * first, then leaves its spot and falls home into the punch hole, and the bubble
+   * there opens up again as it arrives — because it is the thing arriving.
+   */
+  function douseNow() {
+    stopNowFlight();
+    if (nowOpen) closeNowPanel();
+    // First, before the width goes: the reading belongs to width the pill is about to
+    // give back, and left on it was squeezed into the drop and carried home in place of
+    // the glyph — which is the one thing that has to survive the journey, because it is
+    // what the whole flight is about.
+    root.classList.add('now-flying');
+    setNowWidth(nowDrop(), NOW_COLLAPSE, 'var(--ease-split)');
+    nowAfter(NOW_COLLAPSE * 0.35, () => {
+      root.style.setProperty('--now-pop', 0.5);
+      // The glyph leaves first and the pill is pulled after it, the same way the glyph
+      // is what arrives and the width only follows. It is the thing with the meaning
+      // in it, so it is the thing with the momentum.
+      nowGlyph.classList.remove('dragging');
+      void nowGlyph.offsetWidth;
+      root.style.setProperty('--now-drag-ms', NOW_RETURN + 'ms');
+      nowGlyph.classList.add('dragging');
+      setNowFly(nowFlight(), NOW_RETURN, 'var(--ease-grow)');
+      // `lit` stays on for the whole way home, and that is the point: it is what the
+      // skin reads to decide this bubble is one of the shapes in the row, so taking it
+      // off at the start of the return — which is what it used to do — meant the drop
+      // spent the entire journey outside the liquid and arrived at the bubble as a
+      // separate object that simply faded out on top of it. It goes out on arrival
+      // instead, and it does not fade on the way: a drop coming home is absorbed, and
+      // a half-transparent shape is erased by the alpha contrast rather than merged.
+      fitNowProxy();
+      // The bubble at the cutout opens up as the drop falls back into it.
+      // At the start of the return and not part-way through it. The row is not waiting
+      // for the drop to arrive — the bar is free the moment the light leaves its spot —
+      // and anything else reads as the bubbles hanging back before remembering to move.
+      window.onTorchChip(false);
+      nowAfter(NOW_RETURN + 60, () => {
+        // Home, dark, and put back on its spot ready to be thrown out again. It goes
+        // out on the spot rather than fading, because by now it is inside the bubble
+        // and there is nothing left to see it happen against.
+        root.style.setProperty('--now-fade-ms', '0ms');
+        nowPill.classList.remove('lit');
+        nowGlyph.classList.remove('dragging');
+        setNowFly(0, 0, 'linear');
+        fitNowProxy();
+        // A transparent view goes on blurring, so the glass is taken off by hand.
+        sendNowBlur(0, 0, 0, 0, 0);
+        requestAnimationFrame(() => root.style.removeProperty('--now-fade-ms'));
+      });
+    });
+  }
+
+  function nowSlotX(index) {
+    return index * (NOW_SLOT + NOW_SLOT_GAP) + NOW_SLOT / 2;
+  }
+
+  function buildNowSlider() {
+    const count = torch && torch.dimmable ? torch.steps : 1;
+    if (nowFlow.children.length === count + 1) return;
+    nowRail.textContent = '';
+    nowFlow.textContent = '';
+    for (let index = 0; index < count; index += 1) {
+      for (const layer of [nowRail, nowFlow]) {
+        const slot = document.createElement('div');
+        slot.className = 'now-slot';
+        slot.style.left = nowSlotX(index) + 'px';
+        layer.appendChild(slot);
+      }
+    }
+    nowDot = document.createElement('div');
+    nowDot.className = 'now-dot';
+    nowFlow.appendChild(nowDot);
+    nowSlider.style.width =
+      (count * NOW_SLOT + (count - 1) * NOW_SLOT_GAP) + 'px';
+  }
+
+  /**
+   * The dot where it is, and every step swollen by how near the dot is to it. A step
+   * the dot has reached is full size; one a whole step away is nothing at all; in
+   * between, both are part-grown and the blur bridges them — which is the liquid.
+   */
+  function paintNowSlider() {
+    if (!nowDot) return;
+    nowDot.style.left = nowSlotX(nowDotAt) + 'px';
+    Array.from(nowFlow.querySelectorAll('.now-slot')).forEach((slot, index) => {
+      slot.style.setProperty('--near', Math.max(0, 1 - Math.abs(nowDotAt - index)));
+    });
+  }
+
+  function nowSlideTo(clientX) {
+    const count = nowFlow.querySelectorAll('.now-slot').length;
+    const box = nowSlider.getBoundingClientRect();
+    const at = (clientX - box.left - NOW_SLOT / 2) / (NOW_SLOT + NOW_SLOT_GAP);
+    return Math.min(count - 1, Math.max(0, at));
+  }
+
+  nowSlider.addEventListener('touchstart', event => {
+    if (!torch || !torch.dimmable) return;
+    nowSliding = true;
+    nowSlider.classList.add('dragging');
+    nowDotAt = nowSlideTo(event.touches[0].clientX);
+    paintNowSlider();
+  }, { passive: true });
+
+  nowSlider.addEventListener('touchmove', event => {
+    if (!nowSliding) return;
+    nowDotAt = nowSlideTo(event.touches[0].clientX);
+    paintNowSlider();
+  }, { passive: true });
+
+  nowSlider.addEventListener('touchend', () => {
+    if (!nowSliding) return;
+    nowSliding = false;
+    nowSlider.classList.remove('dragging');
+    nowDotAt = Math.round(nowDotAt);
+    paintNowSlider();
+    bridge.setTorch(nowDotAt + 1);
+    bridge.triggerHaptic('tap');
+  });
+
+  nowSlider.addEventListener('click', event => event.stopPropagation());
+
+  /**
+   * How far this bubble has to travel to stand in the middle of the screen. An open
+   * bubble is centred wherever its closed one stood — the media tab does it and so
+   * does every other Active state — and this one starts out by the clock, so being
+   * centred is a move rather than a width. It is written as the flight offset the
+   * pill already owns rather than as a second transform: one property, one owner,
+   * and the way home is the same offset going back to nothing.
+   */
+  function nowPanelShift() {
+    return window.innerWidth / 2 - NOW_PANEL.width / 2 - nowLeft;
+  }
+
+  function openNowPanel() {
+    nowOpen = true;
+    buildNowSlider();
+    if (!nowSliding) nowDotAt = (torch ? torch.step : 1) - 1;
+    paintNowSlider();
+    const shift = nowPanelShift();
+    nowFlyAt = shift;
+    root.style.setProperty('--now-fly', shift + 'px');
+    root.style.setProperty('--now-fly-ms', NOW_PANEL.ms + 'ms');
+    root.style.setProperty('--now-fly-ease', 'var(--ease-grow)');
+    fitNowProxy();
+    sendNowBlur(
+      NOW_PANEL.width, NOW_PANEL.height, 24, Math.round(nowLeft + shift), NOW_PANEL.ms
+    );
+    // The skin is mirrored off this box every frame and the loop only runs while
+    // something says it is moving. A class that changes the size says nothing, so
+    // without this the blob stayed at the size it had when the panel opened and the
+    // shape left standing there afterwards was the panel's, not the pill's.
+    stirLiquid(NOW_PANEL.ms + 120);
+    // The filter's region is the layer's own box, so a shape taller than the layer is
+    // cut off at its edge rather than drawn: the panel is twice the height of the row
+    // it is standing in and the layer has to make room for it before it opens.
+    root.style.setProperty('--liquid-tall', (NOW_PANEL.height + 24) + 'px');
+    requestAnimationFrame(() => {
+      nowPill.classList.add('open');
+      showNowFace('panel');
+    });
+  }
+
+  function closeNowPanel() {
+    nowOpen = false;
+    nowPill.classList.remove('open');
+    showNowFace('closed');
+    // Back to its spot by the clock, which paints the glass and stirs the skin on the
+    // same curve — the panel was centred by this same offset on the way out.
+    setNowFly(0, NOW_PANEL.ms, 'var(--ease-grow)');
+    fitNowProxy();
+    stirLiquid(NOW_PANEL.ms + 120);
+    // Back to the row's own height once the panel has finished coming in, and not
+    // before: a filter region that shrinks mid-collapse clips what is still moving.
+    nowAfter(NOW_PANEL.ms + 40, () => root.style.removeProperty('--liquid-tall'));
+  }
+
+  /**
+   * A tap on the open panel closes it, exactly as a tap on an open bubble does. The panel
+   * is the one part of this bubble reached the ordinary way — the rail inside it is
+   * dragged — so this is a listener rather than a branch in nowTouch, and the rail's own
+   * handler stops the click before it gets here.
+   */
+  nowPill.addEventListener('click', () => {
+    if (!nowOpen) return;
+    bridge.triggerHaptic('tap');
+    closeNowPanel();
+  });
+
+  /**
+   * Whether a point on the bar belongs to this bubble.
+   *
+   * Its own box and nothing else — not the proxy that heard the touch, not what the DOM
+   * has stacked over it. Both proxies carry a grab margin, the two bubbles rest six
+   * pixels apart, and the light now reaches most of the way to the punch hole, so the
+   * margins overlap and the window that hears a finger is a race. Where the finger
+   * landed is not.
+   */
+  function nowHolds(x, y) {
+    if (!nowPill.classList.contains('lit')) return false;
+    const box = nowPill.getBoundingClientRect();
+    return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+  }
+
+  /**
+   * The light's own Tap and Haptic, driven straight from the forwarded stream rather
+   * than from listeners on the element.
+   *
+   * Everything else on this page is reached by rebuilding the DOM events the browser
+   * would have made and dispatching them at whatever is under the point, which is right
+   * for the row: it is a dozen elements deep and every one of them has its own reason to
+   * hear a finger. This bubble is one shape with two gestures, and going the long way
+   * round for it meant a tap could be answered by the row instead — hit-testing, event
+   * bubbling and a retargeted click are three places for that to go wrong and there was
+   * nothing to gain from any of them. The panel is the exception and still gets real
+   * events: the intensity rail is dragged, and that is the DOM's own to handle.
+   */
+  let nowHeld = false;
+  let nowHoldTimer = null;
+  let nowDownAt = null;
+
+  function nowTouch(action, x, y) {
+    if (action === 'down') {
+      nowHeld = false;
+      nowDownAt = { x, y };
+      nowPill.classList.add('pressing');
+      clearTimeout(nowHoldTimer);
+      nowHoldTimer = setTimeout(() => {
+        nowHeld = true;
+        nowPill.classList.remove('pressing');
+        bridge.triggerHaptic('expand');
+        // There is no app behind this one to leave for — the torch is the camera
+        // service and has no face of its own — so the hold opens what the bubble owns,
+        // and what it adds over the tap is the growth and the buzz that say the finger
+        // was heard before anything happened.
+        if (!nowOpen) openNowPanel();
+      }, HOLD_MILLIS);
+      return;
+    }
+    if (action === 'move') {
+      // The same wander that calls off the row's hold calls off this one.
+      if (nowDownAt && Math.hypot(x - nowDownAt.x, y - nowDownAt.y) > PROXY_TAP_SLOP) {
+        clearTimeout(nowHoldTimer);
+        nowPill.classList.remove('pressing');
+      }
+      return;
+    }
+    clearTimeout(nowHoldTimer);
+    nowPill.classList.remove('pressing');
+    const travelled = nowDownAt ? Math.hypot(x - nowDownAt.x, y - nowDownAt.y) : Infinity;
+    nowDownAt = null;
+    if (action !== 'up' || nowHeld || travelled >= PROXY_TAP_SLOP) return;
+    bridge.triggerHaptic('expand');
+    if (nowOpen) closeNowPanel();
+    else openNowPanel();
+  }
+
+  /** Where its left edge rests: the host measures it off One UI's own chip. */
+  window.setNowLeft = value => {
+    nowLeft = value;
+    root.style.setProperty('--now-left', value + 'px');
+  };
+
+  window.onTorchUpdate = payload => {
+    const wasLit = Boolean(torch);
+    torch = payload;
+    if (torch && !wasLit) lightNow();
+    else if (!torch && wasLit) douseNow();
+    else if (torch) {
+      paintNowReading();
+      if (nowOpen && !nowSliding) {
+        nowDotAt = torch.step - 1;
+        buildNowSlider();
+        paintNowSlider();
+      }
+    }
+  };
+
+  // #endregion ────────────────────────────────────────────────────────────────
+  // #region ── forwarded touch ────────────────────────────────────────────────
+
+  /**
+   * The window this page is drawn in takes no touches at all — it spans the whole
+   * status bar so that every bubble is on one surface and can merge with the others,
+   * and a touchable window that wide would leave nowhere for the shade swipe to start.
+   * The finger lands on a small proxy window instead, and the host forwards where it
+   * was touched.
+   *
+   * Nothing below reimplements a gesture. It rebuilds the events the DOM would have
+   * produced and dispatches them at whatever is under the point, so every listener on
+   * this page — the pill's own drag, a history row's swipe, a button's click — keeps
+   * working without knowing the touch came the long way round.
+   */
+  let proxyTarget = null;
+  let proxyDown = null;
+  let proxySource = 'main';
+  /** True for the whole of a touch the Now bubble answered on its own. */
+  let nowOwnsTouch = false;
+  /** Far enough that the release is a drag's end rather than a tap. Mirrors HOLD_SLOP. */
+  const PROXY_TAP_SLOP = 22;
+
+  /** An element, short enough to read off a debug line. */
+  function describe(element) {
+    if (!element) return 'nothing';
+    return (element.id || element.className || element.tagName) +
+      (pill.contains(element) ? ' (in the bubble)' : '') +
+      (nowPill.contains(element) ? ' (in the light)' : '');
+  }
+
+  function proxyEvent(type, target, x, y, isEnd) {
+    const touch = new Touch({ identifier: 1, target, clientX: x, clientY: y, pageX: x, pageY: y });
+    target.dispatchEvent(new TouchEvent(type, {
+      touches: isEnd ? [] : [touch],
+      targetTouches: isEnd ? [] : [touch],
+      changedTouches: [touch],
+      bubbles: true,
+      cancelable: true,
+    }));
+  }
+
+  /**
+   * What a touch from this proxy is allowed to land on. A proxy is placed over one
+   * bubble and nothing else, so a touch it heard belongs to that bubble however the
+   * page happens to be stacked at that moment — a grown panel is drawn across most of
+   * the bar and sits above the Now bubble in the DOM, so without this every tap and
+   * every hold aimed at the light was answered by whatever mod owned the main bubble.
+   */
+  function proxyPoint(x, y, source) {
+    const hit = document.elementFromPoint(x, y);
+    // Where it landed decides, not which window heard it and not what is stacked over
+    // it. The two proxies each carry a grab margin and the two bubbles now stand a few
+    // pixels apart, so their margins lie over each other: a touch on the light was
+    // being answered by the main bubble whenever the main proxy heard it first, and a
+    // touch on the main bubble's left edge was being eaten by the light whenever the
+    // Now proxy did. The one thing neither window knows is where the shapes are.
+    // The closed light never gets here — it answers its own touches, see nowTouch. This
+    // is the open panel, which is drawn across the bar and above everything on it: a
+    // touch inside it is the panel's whatever the DOM has stacked where the finger fell.
+    if (!nowOpen || !nowHolds(x, y)) return hit;
+    return hit && nowPill.contains(hit) ? hit : nowPill;
+  }
+
+  window.onProxyTouch = (action, x, y, source) => {
+    if (action !== 'move') {
+      const box = nowPill.getBoundingClientRect();
+      bridge.note(
+        'page: ' + action + ' at ' + Math.round(x) + ', ' + Math.round(y) +
+        ' — the light is ' + (nowPill.classList.contains('lit') ? 'lit' : 'dark') +
+        ' at ' + Math.round(box.left) + '–' + Math.round(box.right) +
+        ', ' + Math.round(box.top) + '–' + Math.round(box.bottom) +
+        ' — owner ' + (nowHolds(x, y) && !nowOpen ? 'the light' : 'the row') +
+        ' — under it ' + describe(document.elementFromPoint(x, y))
+      );
+    }
+    // The light first, and by geometry alone. Its panel is the exception: the rail in
+    // there is dragged, so once it is open the touches go the ordinary way and reach the
+    // elements that know what to do with them.
+    // A touch this window heard is this bubble's, whatever the coordinates work out to:
+    // the window is placed over the light and over nothing else, which is the same thing
+    // that made this simple when the light was a page in a window of its own. The row's
+    // window can hear one too — the two stand six pixels apart — and that one is decided
+    // by where it landed, which is all the row's window can tell us.
+    if (action === 'down') {
+      nowOwnsTouch = !nowOpen &&
+        (source === 'now' || (nowHolds(x, y) && CLOSED.has(size)));
+    }
+    if (nowOwnsTouch) {
+      nowTouch(action, x, y);
+      if (action === 'up' || action === 'cancel') nowOwnsTouch = false;
+      return;
+    }
+    if (action === 'down') {
+      // Everything after a down goes to the element the down landed on, exactly as a
+      // real touch stream does: a finger that slides off a row still belongs to it.
+      proxySource = source;
+      proxyTarget = proxyPoint(x, y, source);
+      proxyDown = { x, y };
+      if (proxyTarget) proxyEvent('touchstart', proxyTarget, x, y, false);
+      return;
+    }
+    if (!proxyTarget) return;
+    if (action === 'move') {
+      proxyEvent('touchmove', proxyTarget, x, y, false);
+      return;
+    }
+    proxyEvent(action === 'up' ? 'touchend' : 'touchcancel', proxyTarget, x, y, true);
+    // A real touch that did not travel is followed by a click, and half this page is
+    // listening for one. It is sent to what is under the finger *now* rather than to
+    // the down's target, because a panel that opened under the release did not get
+    // the down and would otherwise never be clickable.
+    const travelled = proxyDown
+      ? Math.hypot(x - proxyDown.x, y - proxyDown.y)
+      : Infinity;
+    if (action === 'up' && travelled < PROXY_TAP_SLOP) {
+      const released = proxyPoint(x, y, proxySource) || proxyTarget;
+      released.dispatchEvent(new MouseEvent('click', {
+        clientX: x, clientY: y, bubbles: true, cancelable: true,
+      }));
+    }
+    proxyTarget = null;
+    proxyDown = null;
   };
 
   // #endregion ────────────────────────────────────────────────────────────────

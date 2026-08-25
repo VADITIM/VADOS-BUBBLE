@@ -49,13 +49,19 @@ re-sends that app's last real notification — image and all — because a made-
 shape the real layout has to survive.
 Each screen owns its accent and its own diagonal slices, which slide in from the side it belongs to.
 
-Both surfaces are WebViews so the identity is one implementation, not two:
+Every surface is a WebView so the identity is one implementation, not several:
 
 - `assets/dna.css` — the token layer: faces, palette, panel primitive, micro-label, bar-sweep reveal.
 - `assets/panel.html` — the control panel.
-- `assets/pill.html` — the bubble itself.
+- `assets/pill.html` — every bubble: the one at the cutout, its satellites, and the Now bubble out at the clock.
 
 The four identity fonts live in `assets/fonts/` and are registered once, in `dna.css`.
+
+This file is the long form of what the system *does*. The rules it has to obey while doing it are in
+`.claude/rules/`: [bubbles.md](.claude/rules/bubbles.md) for what every bubble is,
+[states.md](.claude/rules/states.md) for the state vocabulary,
+[motion.md](.claude/rules/motion.md) for how anything is allowed to move, and
+[architecture.md](.claude/rules/architecture.md) for the Kotlin/WebView split and the windows.
 
 ## The bubble
 
@@ -213,6 +219,39 @@ left open.
 Every ongoing Discord notification counts as a call. Discord posts no other kind for any length of
 time, and the alternative is matching on channel names in whatever language the phone is set to.
 
+## The Now bubble
+
+Some states do not belong at the punch hole. The flashlight is one: One UI draws its own blue chip
+for it at the far left of the status bar, next to the clock, and a bubble that says the light is on
+has to stand exactly there or Samsung's chip shows through beside it. So there is a second bubble out
+by the clock, and it is named for the place rather than for the light — anything that belongs out
+there in future stands in the same spot.
+
+It is still born at the punch hole. The pill leaves the bubble as a drop, travels the width of the
+bar, and only then stands there as a pill; on the way out it goes home the same way. The travel
+distance comes from the host, because the page does not know how wide the screen is.
+
+It never retreats. One UI's chip is directly underneath it, so a pill that moved aside to make room
+would uncover the exact thing it exists to cover — that was built once and Samsung's blue chip
+appeared every time. The row is the side that yields instead, and it yields by
+moving rather than by shrinking: while the Now bubble is out, everything is pushed right until the
+main bubble's left edge stands at the punch hole, the Now bubble takes the bar that was given up,
+and the two rest a few pixels apart so the skin necks between them. The row is allowed one satellite
+while this is true; a second is run into the bubble, which takes the knock, and comes back as a dot.
+A state grown wide enough simply passes in front.
+
+Tapping it opens the flashlight's own panel: five steps on a rail, the dot running between them as
+one body of liquid. Holding it is reserved for the states that will want it. The torch is read from
+`CameraManager.registerTorchCallback` rather than from this app's own taps, so the pill is right
+whoever lit the light — Samsung's tile, the quick settings panel, or the switch in the bubble's own
+Haptic panel.
+
+It merges with the rest of the row like any other bubble, and that is why it is drawn in `pill.html`
+rather than in a page of its own. A shared blur filter reaches exactly as far as the surface it is
+drawn on, so for as long as this was a second window the drop could only ever *appear* out by the
+clock. On one canvas it genuinely separates from the bubble on the way out and is genuinely taken
+back into it on the way home.
+
 ## Replacing the system pop-up
 
 One UI pops up twice over, and switching off only the first leaves the second on screen — which is
@@ -297,18 +336,33 @@ adb shell sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.s
 Then grant this app in the panel's System screen. Without it the toggle shows `kein Zugriff` and
 does nothing rather than lying about the state.
 
-## Phase 0 status
+## What stands, and what is next
 
-Done: accessibility service, `TYPE_ACCESSIBILITY_OVERLAY` window hosting a WebView, the bridge,
-spring-eased compact/expanded pill with pop-in, tap-to-expand, swipe-up dismiss, privacy indicator
-markup, live appearance settings, test-notification button, styled control panel, permission
-diagnosis and repair paths.
+Standing: the accessibility overlay and its bridge; the bubble with Idle, Alert, Active and Haptic
+states; media, timer and call mods with satellites, dots and the sideways rotation between them; the
+liquid skin across the main row; the notification list with swipe-to-dismiss; per-app colours and
+keyword highlighting; the picture state; battery alerts; the Now bubble with the torch and its step
+panel; Samsung's blur by reflection; both system pop-ups suppressed through Shizuku; the control
+panel with permission diagnosis and per-app notification replay.
 
-Phase 2 done: notifications are captured system-wide, filtered (own package, ongoing, group summaries
-are dropped), and pushed to the pill with the app icon and the tap-through intent.
+Next, in order — each of these is a phase, and each is why the one after it is possible:
 
-Not done (later phases): Discord and Spotify layouts, microphone and camera
-detection wiring, Shizuku suppression, boot receiver.
+1. ~~**The state replay harness.**~~ Done. One debug button per state and per transition.
+2. ~~**The canvas window.**~~ Done. One full-width untouchable window draws everything; small
+   touch-proxy windows carry the touches.
+3. ~~**The Now bubble on the canvas.**~~ Done. Liquid across the whole bar; the second window and
+   the window-reordering workaround are gone.
+4. **Modules and the `Bubble` type.** `pill.html` splits into ES modules, and Main, Satellite, Now
+   and Double become one type with one set of shared behaviour.
+5. **Additive motion.** Every animated property owned in one place, animated through the Web
+   Animations API with `composite: 'add'`, so an interaction layers onto what is already running
+   instead of replacing it.
+
+After that: the Double bubble, the lock-screen bubbles, the alarm state, the Discord video tab and
+the recording Now state — each one ordinary feature work standing on the contract in
+`.claude/rules/`.
+
+The live backlog is a note in the Obsidian vault, not in this repository.
 
 ## Device facts measured on-device
 

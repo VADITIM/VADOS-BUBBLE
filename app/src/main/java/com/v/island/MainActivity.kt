@@ -213,6 +213,18 @@ class MainActivity : Activity() {
             pushToIsland(NotificationLog.lastOf(styleKey) ?: standInFor(style))
         }
 
+        /** One state, set up and shown. See DebugStage for what each name stands for. */
+        @JavascriptInterface
+        fun stage(name: String) = runOnUiThread { DebugStage.run(name) }
+
+        /** Every state in a fixed order, slowly enough to be recorded and compared. */
+        @JavascriptInterface
+        fun stageSequence() = runOnUiThread { DebugStage.sequence() }
+
+        /** Where the last finger landed and what the bubble made of it. */
+        @JavascriptInterface
+        fun readTrace(): String = BubbleService.trace()
+
         @JavascriptInterface
         fun setPreference(key: String, value: Int) = Preferences.set(preferences, key, value)
 

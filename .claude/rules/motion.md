@@ -7,6 +7,14 @@ paths:
 
 Every rule here exists because the interface is standing on a phone's status bar, next to a camera cutout, and has to read as one physical thing rather than as several boxes changing size. Motion is the whole product — a state that appears correctly but arrives wrongly is a bug.
 
+## Motion is additive
+
+An interaction never cancels what is already moving. It adds to it: a hold landing on a bubble that is mid-drag layers its scale onto the drag rather than replacing the drag's transform, and the bubble ends up doing both at once because both are true at once. This is the difference between a system that feels alive and one that feels like a set of boxes taking turns.
+
+CSS transitions cannot do this. A second transition on a property replaces the first from wherever it had got to, which is exactly how an animation gets eaten mid-flight and why the same interruption bug keeps returning in a different state. Motion therefore runs through the Web Animations API with `composite: 'add'`, and CSS is left owning appearance only. An animation is an object with a handle: it can be inspected, held, handed over, or let finish — cancelling it is a decision that has to be argued for, not the default that happens by accident.
+
+**One owner per property.** Every animated property has exactly one place in the code that starts animations on it. Two callers animating one property is the race, and no amount of ordering fixes it from the outside.
+
 ## The punch hole is the origin
 
 Everything on this screen is born at the true middle of the screen, which is the middle of the punch hole and the middle of the bubble drawn around it. Nothing spawns where it will eventually live. A pill that belongs somewhere else — the torch out by the clock — is born at the hole as a small drop, travels to its spot, and only then behaves like a pill standing there. The travel distance is the host's to supply (`window.setFlight`): the page does not know how wide the screen is.
@@ -28,7 +36,7 @@ Two shapes belong to one body of water when their blurs overlap. That is one `fe
 
 - Everything inside a goo layer must be **solid**. A half-transparent shape falls below the contrast's threshold and is erased rather than merged; the transparency is worn by the layer, never by what is in it.
 - In the bubble row the strength is **not a constant**. A fixed deviation strong enough to fuse a satellite leaving the bubble welds the whole row into one bar for as long as it stands there, and one weak enough to leave the row alone never merges anything: no single number is both. `meltBy()` reads it off the measured gap between the shapes every frame, so they fuse as they come together and let go as they part — which is what liquid does anyway. A fixed deviation is right only where the shapes never rest close together, like the torch's step slider.
-- Merging happens across shapes inside **one** goo layer, which means inside one surface. Two windows cannot fuse: the torch pill and the bubble are separate surfaces composited by the system, and no filter reaches across them.
+- Merging happens across shapes inside **one** goo layer, which means inside one surface. Two windows cannot fuse: separate surfaces are composited by the system and no filter reaches across them. This is the whole reason the canvas window exists — every bubble is drawn in it so that every bubble can merge with every other one. See [architecture.md](architecture.md#windows); a new bubble is never given a window of its own to draw in.
 - **Faking it across two windows has been tried once and failed.** Each side flattened the corner facing the other and grew a directional glow towards it, driven by one proximity number the host measured between them. It reads as neither: the flattened corners look like the pill has been *cut off* at the edge of its window, and the glow looks like a stray highlight on the bubble rather than like attraction. It was also on almost permanently, because two pills on one bar are never far apart. Corners and shadows are not what makes the row read as liquid — a shared blur and one alpha contrast is, and that is exactly the thing a second window cannot have. If cross-window merging is wanted, it needs both shapes on one surface, which means one window, not a better approximation.
 - The liquid skin mirrors real elements' `getBoundingClientRect()` frame by frame rather than duplicating any geometry rule, so one skin follows transitions, drags and holds for free. Read all rectangles first, then write — interleaving them thrashes layout.
 
@@ -45,3 +53,10 @@ Two more consequences: the blur has to be cleared by hand when its pill goes dar
 Legibility beats speed. A merge the user cannot follow is wrong even when every step is correct — the cause has to be visible as the cause. When something is not readable, the fix is to sequence it properly, not simply to lengthen it.
 
 Never leave the state that is being animated out of a phase in the middle: an element retired in the same frame its retreat begins vanishes on the spot, and the growth it was supposed to explain then happens for no visible reason.
+
+## Room and the hole
+
+Two rules live in [bubbles.md](bubbles.md) because they are properties of being a bubble, and are named here because every motion change runs into them:
+
+- **Nothing is ever clipped.** A bouncy curve overshoots, and a container sized to the target cuts the overshoot off. Overflow is visible on anything that is a bubble, and the window room an overshoot needs is asked for before the animation starts, never while it runs.
+- **Nothing crosses the punch hole.** Content stops at the margin either side of screen centre and fades out — fade, never an ellipsis, never a hard cut — and this holds for resting states most of all, since a resting state is over the hole for as long as it stands there.

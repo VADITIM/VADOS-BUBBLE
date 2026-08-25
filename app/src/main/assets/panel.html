@@ -298,6 +298,47 @@
   </section>
 
   <section class="module stagger">
+    <span class="module-label">States</span>
+    <p class="note">
+      Every state the bubble can be in, without waiting for a real song, a real timer or a real
+      call. Each button sets up what that state needs and then shows it. <b>Walk every state</b>
+      runs the whole list in a fixed order, slowly enough to record — two recordings, before and
+      after a change, are what a regression shows up in.
+    </p>
+    <div class="actions">
+      <button class="wide" onclick="Panel.stageSequence()">Walk every state</button>
+      <button onclick="Panel.stage('idle')">Idle</button>
+      <button onclick="Panel.stage('clear')">Clear</button>
+      <button onclick="Panel.stage('media')">Media</button>
+      <button onclick="Panel.stage('media-paused')">Media paused</button>
+      <button onclick="Panel.stage('timer')">Timer</button>
+      <button onclick="Panel.stage('timer-paused')">Timer paused</button>
+      <button onclick="Panel.stage('call')">Call</button>
+      <button onclick="Panel.stage('call-phone')">Call, phone</button>
+      <button onclick="Panel.stage('media-timer')">Two mods</button>
+      <button onclick="Panel.stage('media-timer-call')">Three mods</button>
+      <button onclick="Panel.stage('alert')">Alert</button>
+      <button onclick="Panel.stage('alert-image')">Alert, photo</button>
+      <button class="wide" onclick="Panel.stage('alert-over-mod')">Alert over a mod</button>
+      <button onclick="Panel.stage('torch')">Torch on</button>
+      <button onclick="Panel.stage('torch-off')">Torch off</button>
+      <button onclick="Panel.stage('battery-charging')">Charging</button>
+      <button onclick="Panel.stage('battery-low')">Battery low</button>
+      <button class="wide" onclick="Panel.stage('battery-critical')">Battery critical</button>
+    </div>
+  </section>
+
+  <section class="module stagger">
+    <span class="module-label">Touch</span>
+    <p class="note">
+      Where the last finger landed, and what the bubble made of it. Touch the bar, then come back
+      here and read it — there is no adb on this phone, so this is the only way a question about a
+      coordinate gets an answer instead of a guess.
+    </p>
+    <pre class="note" id="trace">—</pre>
+  </section>
+
+  <section class="module stagger">
     <span class="module-label">Replay</span>
     <p class="note">
       Each button replays that app's most recent real notification, image and all. If nothing has
@@ -558,4 +599,10 @@
   screens[0].classList.add('active');
   applyPositionalStagger(screens[0]);
   paintNav();
+
+  // The Debug screen's touch trace. Polled rather than pushed: the bubble's page and this
+  // one are two WebViews in two processes with no channel between them, and a question
+  // asked twice a second is cheaper than building one.
+  const trace = document.getElementById('trace');
+  setInterval(() => { trace.textContent = Panel.readTrace(); }, 400);
 </script>
