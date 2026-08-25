@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Registered to be allowed a TYPE_ACCESSIBILITY_OVERLAY window, which is the only
+  window an unprivileged app can put above SystemUI's status bar. Window events are
+  subscribed for one purpose: noticing that an app went fullscreen. No screen
+  content is ever read.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="0"
+    android:canRetrieveWindowContent="false" />

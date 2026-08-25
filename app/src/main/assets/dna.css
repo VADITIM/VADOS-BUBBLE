@@ -1,0 +1,146 @@
+/* Style DNA — VADITIM. Ported from PORTFOLIO25/.claude/style-dna, modules 01-06.
+   Loaded once by every WebView surface in the app; no surface declares its own faces or tokens. */
+
+@font-face { font-family: "Wosker";    src: url('fonts/Wosker.otf')            format('opentype'); }
+@font-face { font-family: "Striker";   src: url('fonts/Striker.otf')           format('opentype'); }
+@font-face { font-family: "Audiowide"; src: url('fonts/Audiowide-Regular.ttf') format('truetype'); }
+@font-face { font-family: "Mono";      src: url('fonts/SpaceMono-Regular.ttf') format('truetype'); }
+
+:root {
+  --ground: #181818;
+  --panel: rgba(18, 18, 18, 0.85);
+  --panel-solid: #121212;
+  --sunken-deep: #0e0e0e;
+  --sunken: #1c1c1c;
+  --raised: #232323;
+
+  --border: #262626;
+  --border-strong: #2c2c2c;
+  --border-control: #3a3a3a;
+
+  --text-primary: rgba(255, 255, 255, 0.87);
+  --text-bright: #f0f0f0;
+  --text-body: #d8d8d8;
+  --text-muted: #9a9a9a;
+  --text-label: #8a8a8a;
+  --text-icon: #6a6a6a;
+  --text-faint: #4a4a4a;
+
+  --danger: #ff6b6b;
+  --danger-hard: #dc143c;
+
+  /* One accent for the whole app, inherited by every component. Terminal green
+     is the identity colour, and this overlay is the sandbox of the system. */
+  --section-color: #5bfd5b;
+
+  --squircle: 0.75rem;
+
+  --enter-delay: 0.5s;
+  --ease-enter: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-leave: cubic-bezier(0.55, 0.06, 0.68, 0.19);
+  --ease-sweep: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  border-radius: var(--squircle);
+}
+
+/* Boxes want the radius; text never does — a rounded label is the tell of a
+   design that applied a radius blindly. */
+p, span, h1, h2, h3, h4, h5, h6, label, li, strong, em, small,
+.module-label, .module-caption, .status-line, .reveal-text {
+  border-radius: 0;
+}
+
+html, body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text-primary);
+  font-family: "Mono", monospace;
+  line-height: 1.5;
+  color-scheme: dark only;
+  forced-color-adjust: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+}
+
+html { scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; }
+
+/* The panel primitive: translucent near-black, one hairline, one radius, a
+   micro-label in the corner. Depth comes from the border, never from a shadow. */
+.module {
+  --accent: var(--section-color);
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--squircle);
+  background: var(--panel);
+  overflow: hidden;
+  transition: border-color 0.25s ease;
+}
+
+.module-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: "Mono", monospace;
+  font-size: 0.63rem;
+  font-weight: 500;
+  letter-spacing: 0.19rem;
+  text-transform: uppercase;
+  color: var(--text-label);
+  padding: 0.81rem 1rem;
+  pointer-events: none;
+}
+
+.module-caption {
+  display: block;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+/* The bar-sweep reveal, module 05 §6.1: text is wiped into existence by an
+   accent bar that was already there, never faded in. The per-element delay is
+   written to --reveal-delay by the positional stagger. */
+.reveal {
+  position: relative;
+  display: inline-block;
+}
+.reveal-text {
+  clip-path: inset(0 100% 0 0);
+  animation: reveal-text 0s linear forwards;
+  animation-delay: calc(var(--reveal-delay, 0s) + 0.283s);
+}
+.reveal-bar {
+  position: absolute;
+  inset: 0;
+  background: var(--accent, var(--section-color));
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: reveal-bar 0.62s var(--ease-sweep) forwards;
+  animation-delay: var(--reveal-delay, 0s);
+}
+@keyframes reveal-text { to { clip-path: inset(0 0 0 0); } }
+@keyframes reveal-bar {
+  0%    { transform: scaleX(0); transform-origin: left center; opacity: 1; }
+  45.6% { transform: scaleX(1); transform-origin: left center; opacity: 1; }
+  45.7% { transform: scaleX(1); transform-origin: right center; opacity: 1; }
+  99%   { transform: scaleX(0); transform-origin: right center; opacity: 1; }
+  100%  { transform: scaleX(0); transform-origin: right center; opacity: 0; }
+}
+
+/* The device axis collapses on a handheld — everything here is coarse pointer,
+   so hover affordances are absent rather than gated. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .reveal-text { clip-path: inset(0 0 0 0); }
+  .reveal-bar { display: none; }
+}
