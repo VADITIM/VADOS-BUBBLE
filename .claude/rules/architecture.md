@@ -29,7 +29,7 @@ A watcher decides *what is true*, never how it looks. Colours and names live in 
 
 ## Windows
 
-**One window draws, and it draws everything.** Bubbles have to merge, merging is one SVG goo layer, and a goo layer reaches exactly as far as the surface it is drawn on — so a bubble in a second window is a bubble that can never be liquid. That single fact decides the window model: a full-width **canvas** window at the top of the screen holds the one WebView, and every bubble, satellite, dot and panel is drawn in it. A new bubble never gets a window of its own.
+**One window draws, and it draws everything.** Bubbles have to merge, merging is one SVG goo layer, and a goo layer reaches exactly as far as the surface it is drawn on — so a bubble in a second window is a bubble that can never be liquid. That single fact decides the window model: a full-screen **canvas** window holds the one WebView, and every bubble, satellite, dot and panel is drawn in it. A new bubble never gets a window of its own.
 
 The canvas is `FLAG_NOT_TOUCHABLE`. It has to be: it spans the whole status bar, and every pixel a touchable window covers is a pixel the notification-shade swipe cannot start on — a full-width touchable overlay makes the top of the screen dead. Untouchable, it draws over the bar and the swipe passes straight through it.
 
@@ -45,7 +45,9 @@ Every overlay window here follows the same shape:
 - Nothing visible, nothing touchable — an invisible window still swallows the shade swipe, so alpha 0 goes together with `FLAG_NOT_TOUCHABLE`.
 - A fixed-size WebView stage clipped by the window. Never resize the WebView: resizing reallocates its surface, which reads as the interface blinking out for a frame.
 
-There are three windows and no more: the canvas, the proxy over the bubble, and the proxy over the Now bubble. Two proxies rather than one wide one, because the gap between them is most of the status bar and it has to stay somewhere the shade swipe can start.
+The canvas is the **whole screen**, not the status bar. It has to be: the lock screen carries a bubble of its own at the bottom, and a bubble is only liquid with what shares its surface — so the one page reaches from the cutout to the thumb. It is untouchable and transparent where nothing is drawn, so the extra room costs the surface and nothing else.
+
+There are four windows and no more: the canvas, and one proxy per bubble that can be touched — over the main bubble, over the Now bubble, and over the lock screen bubble. One proxy each rather than one wide one, because the gaps between them are most of the status bar and that has to stay somewhere the shade swipe can start. A proxy is no longer always at the top of the screen either: `forwardTouch` adds the proxy window's own `y` to the point it reports, or a touch on the lock screen bubble arrives in the page as a touch on the status bar.
 
 ## The bridge
 

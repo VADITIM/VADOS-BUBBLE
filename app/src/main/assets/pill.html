@@ -32,7 +32,7 @@
     /* The alert's own corner, and how far the head row sits inside it. Anything given
        a ground of its own in there is rounded by the difference, so its corners are
        concentric with the bubble's rather than a second, unrelated curve. Mirrors
-       CORNERS.alert and #alert-face's padding. */
+       #alert-face's padding. */
     --alert-radius: 24px;
     --alert-inset: 14px;
     /* The panel's enter curve overshoots by ~56%, which on a 34px-tall bubble
@@ -107,7 +107,12 @@
     border: 1px solid var(--border);
     contain: layout paint;
     will-change: width, height;
-    transition:
+    /* Named rather than written straight into `transition`, so that a rule wanting to
+       *add* a property can put this list back instead of replacing it. See the homing
+       rule below: it replaced the list outright, and every size change on the bubble
+       stopped animating for the rest of the session the first time anything was
+       dragged. A transition list is a contract with every other rule on the element. */
+    --pill-transition:
       /* The width is the one dimension a closed mod moves, and it is moving because
          something split off the bubble or ran back into it — so it rides the split's
          own curve and its own delay rather than the growth's. Opening still grows on
@@ -122,8 +127,13 @@
       /* Late, so the two moves read in order: the bubble pulls its width in, and
          only once it is narrower does it step aside for what is arriving. */
       translate var(--shift-ms, var(--grow-ms)) var(--ease-grow) var(--shift-delay, 0ms),
-      transform 350ms linear,
+      scale 350ms linear,
       border-color 220ms ease;
+    transition: var(--pill-transition);
+    /* The hold's swell, and the only scale here with a duration. Grown from the top
+       edge — see transform-origin — because scaling from the middle pushes the bubble
+       above the window, where the status bar clips it. */
+    scale: var(--hold-now, 1);
     transform-origin: 50% 0;
     /* The window grows on the side the satellite is on, so its centre is no longer
        the screen's. This pulls the bubble back onto the cutout — written as
@@ -156,22 +166,262 @@
   #pill.picture { width: 340px; height: var(--picture-height, 320px); border-radius: 26px; }
   #pill.history { width: 340px; height: var(--history-height, 320px); border-radius: 26px; }
 
-  /* The bubble taking something in. Written as `scale` rather than as a transform,
-     because the transform is the hold's and the translate is the row's place: one
-     property, one owner. Under the goo layer this reads as the row swallowing the
-     circle rather than as a box changing size, which is the whole reason it is a
-     squash and a stretch and not a fade. */
-  #pill.knocked { animation: pill-knock 460ms var(--ease-grow); }
-  @keyframes pill-knock {
-    0% { scale: 1 1; }
-    30% { scale: 1.05 0.93; }
-    62% { scale: 0.985 1.03; }
-    100% { scale: 1 1; }
+  /* The bubble taking something in. Not an animation and not a duration: --absorb is
+     written every frame from how much of the other shape is actually inside this one,
+     and released as a spring when there is nothing left standing outside — so the
+     squash *is* the merge rather than a picture of one played next to it.
+     Wider and shorter, because a body of liquid taking another one in bulges across
+     the direction it came from.
+
+     It shares `transform` with the pull, and the two of them share it because they are
+     the same kind of thing: both are written every frame from something happening right
+     now — how much has entered, how far the finger has drawn the bubble down — and
+     neither may ever be given a transition. Everything with a *duration* is on `scale`
+     instead, which is the whole additive split: the hold eases in on `scale` while the
+     merge squashes and the pull leans on `transform`, and the two compose because they
+     are separate properties rather than two writers fighting over one. `translate` is
+     the row's place and is a third owner again. Three properties, three owners, and
+     nothing here ever has to know what the others are doing. */
+  #pill {
+    transform:
+      /* The play drag rides with the pull because they are the same kind of thing —
+         both written every frame from where the finger is — and it is a translate
+         rather than anything on `translate`, which the row's own place owns. */
+      translate(var(--drag-x, 0px), calc(var(--pull, 0px) + var(--drag-y, 0px)))
+      scale(
+        calc((1 + var(--absorb, 0)) * var(--pull-scale, 1)),
+        calc((1 - var(--absorb, 0) * 0.62) * var(--pull-scale, 1))
+      );
   }
 
   /* Everything the closed bubble is: the bubble and whatever has split off it — a
      plain container, so the satellites sit in the bubble's coordinate space. */
   #assembly { position: absolute; inset: 0; }
+
+  /* #region ── the lock screen's bubble ──────────────────────────────────── */
+
+  /* Down at the bottom of the screen, wide, and reachable with the thumb of the hand
+     holding the phone — which is the whole reason it is not simply the bubble at the
+     cutout. The lock screen is the one place the interface is looked at rather than
+     glanced at, so the mods come down here where they can be worked rather than only
+     read. Mirrors LOCK_INSET / LOCK_BOTTOM / LOCK_HEIGHT in the script below, which is
+     what the touch proxy is placed from — there is no build step joining them. */
+  #lock-now {
+    position: absolute;
+    left: var(--lock-inset, 16px);
+    right: var(--lock-inset, 16px);
+    bottom: var(--lock-bottom, 20px);
+    height: var(--lock-height, 124px);
+    box-sizing: border-box;
+    /* A squircle, not a pill and not a rounded rectangle. This bubble is the one shape
+       here wide enough for the difference to read: at half its height the corners eat
+       the ends of it, and at a plain radius the curve enters and leaves the straight
+       edge with a visible corner where it does. `corner-shape` is a real superellipse
+       and the skin mirrors it, so the liquid keeps the same outline the box has. */
+    border-radius: 34px;
+    corner-shape: squircle;
+    background: var(--pill-background);
+    /* The same hairline every bubble here wears, for the same reason: it goes through
+       the goo filter with the fill and necks with whatever comes near it. */
+    border: 1px solid var(--border);
+    /* Its own accent, written from the song it is carrying rather than read off the
+       row's. The row does not have this mod any more — that is what the steal means —
+       so nothing up there is keeping --app-accent at the right colour for it, and the
+       bubble that owns the song is the one that should be saying what colour it is. */
+    --app-accent: var(--lock-accent, var(--section-color));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Born at nothing and grown into place, because a bubble that is simply there when
+       the screen comes on has not arrived from anywhere. */
+    opacity: 0;
+    scale: 0.94;
+    pointer-events: none;
+    /* The list is named once so that a rule wanting to *add* a property can put it back
+       instead of replacing it. The play drag's homing rule used to write a
+       transform-only list here and took the height away with it, which is why opening
+       was instant rather than animated: every transition this bubble has was collateral
+       of a rule about something else. The sizes run on --grow-ms and --ease-grow, the
+       numbers belonging to the bubble at the cutout, because opening this is the same
+       event and must not read as a second interface. */
+    --lock-transition:
+      opacity var(--lock-fade-ms, 200ms) ease,
+      scale 320ms var(--ease-split),
+      border-radius var(--grow-ms) ease-out;
+    transition: var(--lock-transition);
+  }
+  #lock-now.showing { opacity: 1; scale: 1; pointer-events: auto; }
+  /* The pressure under a finger, said the way every bubble here says it. */
+  #lock-now.showing.pressed { scale: 1.03; }
+
+  /* Unlocking. The bubble does not go out down here — it is *taken back* into the one
+     at the cutout, which is the same body of water and the same goo layer, so it
+     genuinely necks and is drawn in rather than fading out while something else
+     appears at the top of the screen. It closes as it sets off, crawling while it does
+     and opening up to full speed once it has, which is what makes it read as a thing deciding to leave rather than
+     a box sliding across the screen, and it keeps the showing class for the whole journey because that class is what the
+     skin reads to decide this shape is one of the row's at all — taken off at the start
+     it would spend the entire flight outside the liquid, which is the exact bug the
+     torch's drop had. The flight is on the translate property, which nothing else on this bubble
+     owns; the transform property stays the play drag's and is not written here. */
+  #lock-now.flying { pointer-events: none; }
+
+  /* Open, it is the media tab at the bottom of the screen: the same parts in the same
+     order, given the room to be read rather than glanced at. It grows *upwards* on its
+     own, without a rule saying so — the box is hung off the bottom edge, so height is
+     the only thing that changes and the bottom stays where the thumb left it. */
+  #lock-now.open { height: var(--lock-open-height, 546px); border-radius: 44px; }
+
+  /* Three bands rather than one row: the song at the top beside its cover, the
+     transport across the whole width under it, the timeline along the bottom. Nothing
+     shares a row with something that would squeeze it, and the buttons get the width
+     they are worth — this bubble exists to be worked with the thumb of the hand already
+     holding the phone, and three small targets huddled at one end of it is the one
+     arrangement that thumb cannot reach. */
+  #lock-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem 0 0.85rem;
+    transition: gap var(--grow-ms) var(--ease-split), padding var(--grow-ms) var(--ease-split);
+  }
+
+  #lock-art-slot { flex: none; display: grid; place-items: center; }
+  #lock-art {
+    width: var(--lock-art, 44px);
+    height: var(--lock-art, 44px);
+    border-radius: 0.5rem;
+    object-fit: cover;
+    background: var(--sunken);
+    /* No width or height here on purpose. The box jumps straight to its new size and
+       settleLock() scales it back to the old one for a frame, so what actually animates
+       is a compositor transform — which is both cheaper and the only way the cover can
+       travel *and* resize at once while the row it lives in is changing direction under
+       it. See settleLock(). */
+    transition: opacity 150ms ease;
+  }
+
+  /* The one part that may take the room left over, so a long title shortens rather
+     than pushing anything off the end. */
+  #lock-meta { flex: 1; min-width: 0; }
+  #lock-title {
+    font-size: 0.88rem;
+    transition: font-size var(--grow-ms) var(--ease-split);
+    color: var(--text-bright);
+    border-radius: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    /* Faded, never cut and never an ellipsis — the same reading everywhere on this
+       phone: text that does not fit runs out rather than stopping dead. */
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  #lock-artist {
+    margin-top: 0.2rem;
+    font-size: 0.66rem;
+    transition:
+      font-size var(--grow-ms) var(--ease-split),
+      margin-top var(--grow-ms) var(--ease-split);
+    letter-spacing: 0.08rem;
+    text-transform: uppercase;
+    color: var(--app-accent);
+    border-radius: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+
+  #lock-buttons {
+    flex: 1;
+    min-height: 0;
+    /* The band the thumb works, held clear of the song above it: closed, the three
+       parts were near enough to read as one block. */
+    margin-top: 0.55rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 1.1rem;
+    transition: padding var(--grow-ms) var(--ease-split);
+  }
+  #lock-play { width: 48px; height: 48px; color: var(--app-accent); }
+
+  /* Open, the bubble is a record sleeve: the cover fills the width at the top, the song
+     is read underneath it rather than beside it, and the transport is what is left. It
+     is still one box at a greater height and nothing here is a second element — the
+     cover is the same <img> at a different size, so it *travels* between the two
+     layouts instead of being swapped for a bigger copy of itself. The size is a length
+     rather than a percentage for exactly that reason: width and height animate, and a
+     height of auto with an aspect ratio does not. */
+  #lock-now.open #lock-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem 1rem 0;
+  }
+  #lock-now.open { --lock-art: calc(100vw - 4rem); }
+  #lock-now.open #lock-art-slot { width: 100%; }
+  #lock-now.open #lock-art { border-radius: 1.5rem; }
+  #lock-now.open #lock-meta { flex: none; text-align: center; }
+  #lock-now.open #lock-title { font-size: 1.15rem; }
+  #lock-now.open #lock-artist { font-size: 0.72rem; margin-top: 0.35rem; }
+  /* Centred text cannot fade from one end only — it runs out of both. */
+  #lock-now.open #lock-title,
+  #lock-now.open #lock-artist {
+    mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  }
+  #lock-now.open #lock-buttons { padding: 0 2rem; }
+  #lock-now.open .transport { width: 46px; height: 46px; }
+  #lock-now.open #lock-play { width: 66px; height: 66px; }
+
+  /* Lifted off the bottom edge rather than flush against it: at the bubble's full height
+     a line welded to the rim reads as the edge of the box rather than as part of what is
+     playing. Inset with it, so its ends are its own and not the squircle's. */
+  #lock-timeline {
+    flex: none;
+    padding: 0 1.1rem 0.9rem;
+    transition: padding var(--grow-ms) var(--ease-split);
+  }
+  #lock-now.open #lock-timeline { padding: 0 1.6rem 1.4rem; }
+  #lock-clock {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 0 0.35rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.1rem;
+    color: var(--text-muted);
+  }
+  #lock-position, #lock-duration { border-radius: 0; }
+
+  #lock-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-strong);
+    position: relative;
+    transition: height 140ms ease-out;
+  }
+  #lock-now.open #lock-track { height: 6px; }
+  #lock-elapsed {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0%;
+    border-radius: 999px;
+    background: var(--app-accent);
+  }
+  /* Where the song actually is. It rides the end of the filled part rather than being
+     placed from the ratio a second time, so it cannot disagree with the line it stands
+     on. */
+  #lock-dot {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
+    background: var(--app-accent);
+  }
+
+  /* #endregion ───────────────────────────────────────────────────────────── */
 
   /* #region ── liquid ────────────────────────────────────────────────────── */
 
@@ -198,12 +448,20 @@
     pointer-events: none;
   }
   html.liquid #liquid { display: block; }
+  /* The filter reaches as far as its own region and not a pixel further, and the lock
+     screen's bubble is at the other end of the screen from the row. Left at the row's
+     height its skin was drawn *outside* the region: the bubble went on painting its own
+     opaque edge with a solid, unfiltered blob stacked behind it, which is exactly what
+     "no alpha and no blur, unless the main bubble happens to be open" was — an open
+     bubble takes the whole filter off, and the double-painting with it. So while that
+     bubble is standing there the region is the whole screen, and only then. */
+  html.lock-live #liquid { height: 100%; }
   /* The bubble stops painting itself the moment the skin does it instead. Every bubble
      on the row is in this rule, the Now bubble included: it was left out and went on
      painting its own opaque edge on top of the skin, which is why the one bubble whose
      background came from the same custom property as everyone else's still read as a
      different alpha — the rim was solid where the others were glass. */
-  html.liquid #pill, html.liquid .satellite, html.liquid #now {
+  html.liquid #pill, html.liquid .satellite, html.liquid #now, html.liquid #lock-now {
     background: transparent;
     border-color: transparent;
   }
@@ -234,30 +492,45 @@
      pressure is visible before the haptic confirms it. Grown from its own top edge:
      scaling from the middle would push it above the window, where the status bar
      clips it. Only the bubble grows — a satellite is not the thing being held, and
-     scaling the pair moved something the finger was never on. */
-  html.holding #pill { transform: scale(var(--hold-scale, 1.14)); }
+     scaling the pair moved something the finger was never on.
 
-  /* The pull down, live under the finger: the bubble leans out of the cutout by the
-     grab margin and no further, and springs back on its own transform transition if
-     the finger lets go before it has asked for anything. Nothing eases while the
-     finger is down — a pull that lags behind the finger reads as a stutter. */
-  html.pulling #pill {
-    transform: translateY(var(--pull, 0px)) scale(var(--pull-scale, 1));
-    transition: none;
-  }
-
-  /* Both at once, which is the normal case now that a lean no longer calls the hold
-     off: the bubble is still swelling under the finger while it leans out. */
-  html.holding.pulling #pill {
-    transform:
-      translateY(var(--pull, 0px))
-      scale(calc(var(--hold-scale, 1.14) * var(--pull-scale, 1)));
-  }
+     It is a `scale` and nothing else — no transform, no translate — so that the swell
+     is one property with one owner and composes with whatever else the bubble is doing
+     rather than replacing it. Slightly dragging while a hold is growing used to snap
+     the growth to its end and back: the drag and the lean both wrote `transition: none`
+     over the whole element to follow the finger, and the hold's own easing was
+     collateral. That is what "the haptic breaks if I move a little" was, every time. */
+  html.holding #pill { --hold-now: var(--hold-scale, 1.14); }
 
   /* The same gesture on an open mod, which cannot grow anything like as far: the
      window is already the open bubble and only the grab margin is spare, so this is
      just enough pressure to say the hold has been noticed. */
-  html.pressing #pill { transform: scale(1.03); }
+  html.pressing #pill { --hold-now: 1.03; }
+
+  /* Under a finger nothing eases: the width the drag is trading and the lean the pull
+     is taking have to be exactly where the finger is, and one frame of easing behind it
+     reads as a stutter. The hold is the exception and is named here rather than left
+     out — it is not being dragged, it is growing on its own clock underneath the drag,
+     and it is the only thing in this rule that has a duration at all. */
+  html.pulling #pill,
+  html.dragging #pill { transition: scale 350ms linear; }
+
+  /* The play drag: the bubble follows the finger anywhere, on a rubber band, and comes
+     home when it is let go. It is not a gesture — nothing is ever asked for by it — and
+     that is the point: a thing that answers the finger everywhere reads as an object
+     rather than as a control with three approved directions. Instant while the finger
+     is down, sprung on the way back.
+     Nothing is needed to make it instant — `transform` is not in either bubble's
+     transition list, because it is the per-frame property and never has a duration.
+     Only the way home is eased, and the hold's own `scale` is named again there so the
+     springback does not flatten a swell that is still growing. */
+  html.homing #pill {
+    transition: var(--pill-transition), transform var(--home-ms, 520ms) var(--ease-split);
+  }
+  #lock-now { transform: translate(var(--lock-drag-x, 0px), var(--lock-drag-y, 0px)); }
+  #lock-now.homing {
+    transition: var(--lock-transition), transform var(--home-ms, 520ms) var(--ease-split);
+  }
 
   .face {
     position: absolute;
@@ -320,7 +593,9 @@
      takes instead is the knock of the arrival: a shove from where it stands, carrying
      on the way the row was travelling, and back. No fade either, because it never went
      anywhere. The sign is the direction it came from: pulled in from the left it is
-     knocked right, pulled in from the right it is knocked left. */
+     knocked right, pulled in from the right it is knocked left — and how far is the
+     finger's, see BUMP_MIN/BUMP_MAX. The knock is the row's momentum carrying on
+     through what arrived, so a constant distance is the one thing it cannot be. */
   .glyph.bumping { animation: glyph-bump var(--enter-ms, 300ms) var(--ease-grow); }
   @keyframes glyph-bump {
     0% { transform: translateX(0); }
@@ -942,6 +1217,16 @@
     flex: none;
   }
   .transport svg { width: 100%; height: 100%; fill: currentColor; }
+  /* A button that gives under the finger. It is a class and not :active because no
+     finger ever touches this page directly — every touch here is synthesised from a
+     proxy window's coordinates, and a synthesised touch never sets :active. */
+  .transport {
+    transition:
+      scale 220ms var(--ease-grow),
+      width var(--grow-ms) var(--ease-split),
+      height var(--grow-ms) var(--ease-split);
+  }
+  .transport.knocked { scale: 0.82; transition: scale 90ms ease-out; }
   #player-play { width: 44px; height: 44px; color: var(--app-accent); }
 
   /* The timeline is the whole width the transport does not need, and it takes the
@@ -1240,8 +1525,9 @@
   }
 
   /* Under a finger nothing eases: the swap follows the drag frame for frame, and
-     the easing is only for where it lands once the finger is gone. */
-  .dragging #pill,
+     the easing is only for where it lands once the finger is gone. The bubble's own
+     transition is set where the hold's swell is, because that one has to survive a
+     drag rather than be flattened by it. */
   .dragging .satellite { transition: none; }
 
   /* Past two satellites there is no third side to give away, so the rest of the row
@@ -1355,7 +1641,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 0.4rem 0 var(--glyph-inset);
+    /* The right side gives way when the row crowds it. The light stops shrinking at
+       NOW_COVER and the row keeps coming, so what collides after that is not the two
+       boxes but the two *contents* — and the reading is the one with somewhere to go.
+       Padding rather than a transform on the reading itself: the box is a fixed width
+       with space-between, so widening this side simply walks the reading left, and it
+       leaves the reading's own transform free for its entrance. */
+    padding: 0 calc(0.4rem + var(--now-crowd, 0px)) 0 var(--glyph-inset);
     overflow: hidden;
     opacity: 0;
     /* Where the pill is along its flight, and how big it is while making it: born a
@@ -1363,6 +1655,8 @@
     transform: translateX(var(--now-fly, 0px)) scale(var(--now-pop, 0.5));
     transition:
       width var(--now-width-ms, var(--grow-ms)) var(--now-width-ease, var(--ease-grow)),
+      /* Same clock as the width, because it is the same event: the row arriving. */
+      padding var(--now-width-ms, var(--grow-ms)) var(--now-width-ease, var(--ease-grow)),
       height var(--grow-ms) var(--ease-grow),
       border-radius var(--grow-ms) ease-out,
       opacity var(--now-fade-ms, 180ms) ease,
@@ -1640,6 +1934,38 @@
   </div>
 </div>
 
+<!-- The lock screen's own bubble, down where a thumb reaches. It is not a second copy
+     of the main bubble and it is not the Now bubble moved: it is the bubble the row's
+     mods belong to while the phone is locked. Its glyph is at the left like every other
+     bubble's, so a mod arriving here arrives the same way it arrives anywhere. -->
+<div id="lock-now">
+  <div id="lock-head">
+    <div id="lock-art-slot" class="glyph"><img id="lock-art" alt=""></div>
+    <div id="lock-meta">
+      <div id="lock-title"></div>
+      <div id="lock-artist"></div>
+    </div>
+  </div>
+  <div id="lock-buttons">
+    <div class="transport" id="lock-previous">
+      <svg viewBox="0 0 24 24"><path d="M7 6h2v12H7zm3 6 8-6v12z"/></svg>
+    </div>
+    <div class="transport" id="lock-play">
+      <svg viewBox="0 0 24 24"><path id="lock-play-path" d="M8 5v14l11-7z"/></svg>
+    </div>
+    <div class="transport" id="lock-next">
+      <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg>
+    </div>
+  </div>
+  <!-- Flush against the bottom edge, not inset from it: the bubble clips its own
+       corners, so the ends of the line are cut by the squircle and it reads as part of
+       the shape rather than as a bar sitting inside it. -->
+  <div id="lock-timeline">
+    <div id="lock-clock"><span id="lock-position">0:00</span><span id="lock-duration">0:00</span></div>
+    <div id="lock-track"><div id="lock-elapsed"><div id="lock-dot"></div></div></div>
+  </div>
+</div>
+
 </div>
 
 <!-- Blur the layer, then push the alpha back to a hard edge: shapes whose blurs
@@ -1684,11 +2010,11 @@
     quick: document.getElementById('quick-face'),
   };
   const bridge = window.Android || {
-    ready() {}, setWindowSize() {}, setWindowBounds() {}, setBlurBounds() {}, triggerHaptic() {}, onSwipeDismiss() {},
+    ready() {}, setWindowSize() {}, setWindowBounds() {}, setBlurFrame() {}, triggerHaptic() {}, onSwipeDismiss() {},
     mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, setTorchLit() {},
     setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
     openNotification() {}, dismissNotification() {}, timerAction() {},
-    setTorch() {}, setNowBlur() {}, setNowProxy() {}, note() {},
+    setTorch() {}, setNowProxy() {}, setLockProxy() {}, note() {}, wakeFrames() {},
   };
 
   // The host window tracks the bubble in both directions. It sits above the status
@@ -1711,16 +2037,6 @@
     // that grew downwards for it would read as a different object.
     battery:  { width: 190, height: -1 },
     history:  { width: 340, height: 320 },
-  };
-  /**
-   * Each grown state's own border-radius, kept in step with the CSS above. The blur
-   * is rounded by the host, which cannot read a stylesheet, and a radius guessed
-   * from the height spilled past the corners the bubble actually has. A size with no
-   * row here is a pill and is rounded by half its height.
-   */
-  const CORNERS = {
-    alert: 24, image: 24, haptic: 30, picture: 26,
-    history: 26, player: 26, timer: 26,
   };
   const DWELL = 5000;
   const HOLD_MILLIS = 350;
@@ -1760,6 +2076,19 @@
   const SPLIT_SHRINK = 24;
   /** How far the finger travels to hand the bubble over to the satellite. */
   const SWAP_DISTANCE = 80;
+  /**
+   * How hard the arriving glyph is knocked on, and what decides it. The knock is the
+   * row's momentum carrying on through the thing that arrived, so it is the *finger*
+   * that sets it: a flick throws the glyph, a slow drag barely disturbs it. A fixed
+   * distance made every swap read the same however it was made, which is the one
+   * thing a hand-driven gesture must not do.
+   */
+  const BUMP_MIN = 3;
+  const BUMP_MAX = 14;
+  /** The finger speed, in pixels per millisecond, that earns the whole knock. */
+  const SWAP_FLICK = 1.4;
+  /** A finger this still before it lifted has let the row go at rest, not thrown it. */
+  const SWAP_STILL = 90;
   // How long a press has to last before the window is allowed to grow under it.
   const HOLD_GRACE = 140;
   /**
@@ -1772,15 +2101,94 @@
   const HOLD_SLOP = 22;
 
   /**
+   * The room a resting finger is given before anything at all reads it as movement.
+   *
+   * A finger pressing for a third of a second wanders, and every pixel of that wander
+   * used to reach some gesture or other — which is why the hold felt unreliable even
+   * after it was made the senior one: it was not being cancelled any more, but the
+   * bubble was still twitching under it and the swell was fighting a lean nobody asked
+   * for. Inside this nothing moves and nothing is measured. It is subtracted from the
+   * travel rather than compared against it, so the play drag still starts from zero
+   * once the finger is genuinely going somewhere.
+   */
+  const DEAD_ZONE = 12;
+
+  /**
+   * How far a bubble may be pulled from where it rests, however hard it is dragged.
+   *
+   * This is not a gesture and nothing is ever asked for by it: it is the bubble being
+   * an object rather than a control with three approved directions. The finger is
+   * followed in every direction, on a rubber band that gives less the further it goes,
+   * and the bubble springs home when it is let go. The gestures that do mean something
+   * run on top of it, because they are measured from the finger and not from where the
+   * bubble ended up.
+   */
+  const DRAG_RADIUS = 20;
+
+  /**
+   * The band itself: a hyperbola, so the first pixels are nearly free and the last are
+   * nearly immovable, and the bubble never leaves the circle however hard it is pulled.
+   * Past the dead zone by `travel`, it has come `DRAG_RADIUS * travel / (travel + R)`.
+   */
+  function rubberBand(travel) {
+    const past = Math.max(0, travel - DEAD_ZONE);
+    return DRAG_RADIUS * past / (past + DRAG_RADIUS);
+  }
+
+  /**
+   * One bubble following one finger. The direction is the finger's and the distance is
+   * the band's, so a drag straight down and a drag diagonally both end at the edge of
+   * the same circle.
+   */
+  function toy(holder, prefix, dx, dy) {
+    const travel = Math.hypot(dx, dy);
+    const reach = rubberBand(travel);
+    const scale = travel > 0 ? reach / travel : 0;
+    holder.classList.remove('homing');
+    holder.style.setProperty(prefix + '-x', (dx * scale).toFixed(2) + 'px');
+    holder.style.setProperty(prefix + '-y', (dy * scale).toFixed(2) + 'px');
+    stirLiquid(160);
+  }
+
+  /** And letting go of it: home on a spring, with the skin and the glass following. */
+  function untoy(holder, prefix) {
+    if (!holder.classList.contains('homing') && !holder.style.getPropertyValue(prefix + '-x')) return;
+    holder.classList.add('homing');
+    holder.style.setProperty(prefix + '-x', '0px');
+    holder.style.setProperty(prefix + '-y', '0px');
+    stirLiquid(600);
+  }
+
+  /**
    * The pull down, which is the same gesture wherever it starts: the bubble follows
    * the finger a little and opens the list once it has been asked properly. It begins
-   * early and finishes early — a gesture that has to be aimed is one that reads as
-   * broken — and the bubble only travels the grab margin, since below that it would
-   * be clipped by its own window and the window cannot be resized under a finger.
+   * early — a gesture that has to be aimed is one that reads as broken — and then it
+   * has a proper stretch to it, so the bubble is visibly being drawn down rather than
+   * twitching once and opening.
+   *
+   * The travel used to stop at the grab margin because the bubble's own window was the
+   * touchable one and anything below that margin was clipped. It is not any more: the
+   * canvas is STAGE_HEIGHT tall and never resizes, and the proxy that heard the finger
+   * keeps the whole gesture until the finger lifts however far outside itself it goes.
+   * So nothing here is bounded by a window — the only limit left is what reads well.
    */
-  const PULL_START = 4;
-  const PULL_TRIGGER = 14;
-  const PULL_TRAVEL = 8;
+  // The lean begins where the dead zone ends: one number for "the finger is genuinely
+  // going somewhere", not two that disagree by eight pixels.
+  const PULL_START = DEAD_ZONE;
+  const PULL_TRIGGER = 28;
+  const PULL_TRAVEL = 24;
+  /** How much of the way there a finger that *lifted* counts as having asked. */
+  const PULL_SETTLE = 0.7;
+  /**
+   * The same, for a finger that was taken away rather than lifted. Lower, and it has to
+   * be: over an app SystemUI has its own shade gesture on this strip and it pilfers the
+   * pointer partway down, which arrives here as a cancel with the finger still moving.
+   * That is stronger evidence of an ask than a lift is, not weaker — the gesture did not
+   * stop, it was stopped. Discarding it is why the pull worked on the home and lock
+   * screens and did nothing at all inside an app, and why it got worse the further the
+   * pull had to travel.
+   */
+  const PULL_STOLEN = 0.35;
   let pullReach = 0;
   document.documentElement.style.setProperty('--hold-scale', HOLD_SCALE);
   // Mirrors what Kotlin last pushed through setCompactSize, so the hold knows how
@@ -1876,117 +2284,20 @@
       root.style.setProperty('--face-fade', '0ms');
     }
     stirLiquid();
-    paintBlur();
+    paintShift();
   }
 
   /**
-   * The blur is a window effect, so the page cannot draw it and the CSS cannot
-   * animate it. What the page can do is say where the bubble is going and how long
-   * it is taking, and let the host run the same curve on the blurred region — this
-   * is the bubble's own size, not the window's, because the window carries the
-   * invisible grab margin as well and a blur that wide is visibly too big.
+   * How far right the closed row has been pushed, which is a layout rule and nothing
+   * to do with the glass any more — the glass is mirrored off what this ends up
+   * drawing. An open bubble owns the middle of the window on its own, so whatever
+   * offset the closed pair left behind has to go or it opens off the cutout.
    */
-  /**
-   * What a satellite's own move is set to right now, read off the same custom
-   * properties the CSS is reading rather than named a second time here — the split's
-   * length and its head start are written per phase by stageSplit(), and a number
-   * copied into the host would be the one that goes stale.
-   */
-  function splitMillis() {
-    const satellite = satellites[satSide];
-    return parseFloat(getComputedStyle(satellite).getPropertyValue('--split-ms')) || 380;
-  }
-
-  function splitDelay() {
-    const satellite = satellites[satSide];
-    // Only a satellite that is showing is held back; one still arriving has already
-    // spent its delay getting here.
-    if (!satellite.classList.contains('showing')) return 0;
-    return parseFloat(getComputedStyle(satellite).getPropertyValue('--split-delay')) || 150;
-  }
-
-  function paintBlur(handOff) {
-    const target = windowFor(size);
-    const height = target.height < 0 ? compact.height : target.height;
-    // restingMain(), never compact.width: the closed bubble is not always the size it
-    // was configured at — the torch chip taxes it — and the glass has to be the size
-    // the bubble actually is. The blur is a separate region in a different process
-    // and shares nothing with the CSS, so every size the page changes has to be told
-    // to it by hand or it keeps the old one.
-    const width = target.main ||
-      (target.width < 0 ? (CLOSED.has(size) ? restingMain() : compact.width) : target.width);
-    const grow = parseFloat(
-      getComputedStyle(pill).getPropertyValue('--grow-ms')
-    ) || 340;
-    // A drag has no curve to follow: it is already where the finger put it.
-    const dragging = root.classList.contains('dragging');
-    const box = CLOSED.has(size)
-      ? layout()
-      : { mainX: 0, sat: 0, satX: 0, farX: 0, farFade: 1 };
-    const live = CLOSED.has(size) ? liveMods().length : 0;
-    // An open bubble owns the middle of the window on its own: whatever offset the
-    // closed pair left behind has to go, or it opens off the cutout.
-    if (!handOff) root.style.setProperty('--shift', box.mainX + 'px');
-
-    // The moment a swap is committed the two boxes have swapped names but not places:
-    // the new bubble is standing in the satellite's slot at the satellite's size, and
-    // it is the settle afterwards that carries it home. The glass is a region in
-    // another process and takes the same journey by being told it — told the settled
-    // geometry here instead, it spent the whole settle as a full-width frosted panel
-    // around a bubble that was neither that wide nor in that place, which reads as
-    // the bubble briefly growing out one side and then snapping back.
-    const seen = handOff || box;
-
-    sendBlur(
-      handOff ? handOff.width : width,
-      height,
-      CORNERS[size] === undefined ? Math.round(height / 2) : CORNERS[size],
-      Math.round(seen.mainX),
-      live > 1 ? Math.round(seen.sat) : 0,
-      Math.round(seen.satX),
-      // The wrapping satellite is never mid-trade, so it stays a circle. Glass cannot
-      // fade, so it shrinks instead: by the time the circle is invisible its pane has
-      // closed to nothing, and neither is left hanging over the wallpaper.
-      live > 2 && satelliteLimit() > 1 ? Math.round(compact.height * seen.farFade) : 0,
-      Math.round(seen.farX),
-      // A hand-off is not a journey: it is the same pixels under a new name, so the
-      // glass has to be put there outright. Any duration at all and it slides across
-      // from wherever it was.
-      dragging || handOff ? 0 : Math.round(grow),
-      // The satellites are not on the bubble's clock. They move on the split's own
-      // curve, for the split's own length, and they are held back while the bubble
-      // narrows ahead of them — so their glass is given all three rather than being
-      // swept along with the main region and arriving early on a straighter line.
-      dragging || handOff ? 0 : Math.round(splitMillis()),
-      dragging || handOff ? 0 : Math.round(splitDelay())
+  function paintShift() {
+    root.style.setProperty(
+      '--shift', (CLOSED.has(size) ? layout().mainX : 0) + 'px'
     );
-  }
-
-  /**
-   * The glass, handed over on the frame the bubble's own change is drawn on.
-   *
-   * The two live in different processes and start on different clocks: a style written
-   * here does not take effect until the page renders its next frame, while a bridge
-   * call is on the host's looper and its animator starts the moment it is posted. So
-   * the glass set the same way round as the CSS *led* it — it began moving a frame or
-   * more before the shape it belongs to, which is exactly the seam you can see on a
-   * fast state change. Held to the next animation frame it starts with the paint it
-   * belongs to instead.
-   *
-   * Only the last call of a frame is sent, which is also the only one that frame can
-   * draw: a drag paints on every touch move and was posting a bridge call for each.
-   */
-  let blurPending = null;
-
-  function sendBlur() {
-    const waiting = blurPending !== null;
-    blurPending = Array.prototype.slice.call(arguments);
-    if (waiting) return;
-    requestAnimationFrame(() => {
-      const sending = blurPending;
-      blurPending = null;
-      bridge.setBlurBounds.apply(bridge, sending);
-    });
+    stirLiquid();
   }
 
   /** The states the bubble rests in: bare, or under a mod. */
@@ -2012,7 +2323,14 @@
    * rather than in a window of its own, and it is why the drop can be seen leaving
    * the bubble at the punch hole instead of simply appearing out by the clock.
    */
-  const blobs = ['main', 'left', 'right', 'now'].map(name => ({
+  /**
+   * Mirrored in BubbleService's BLUR_PANES: the host keeps one pane of glass per
+   * bubble in exactly this order, and setBlurFrame() sends the rectangles down in it.
+   * A bubble added here and not there draws with no glass behind it.
+   */
+  const BLUR_PANES = ['main', 'left', 'right', 'now', 'lock'];
+
+  const blobs = BLUR_PANES.map(name => ({
     name,
     edge: liquidLayers.edge.appendChild(document.createElement('div')),
     fill: liquidLayers.fill.appendChild(document.createElement('div')),
@@ -2027,6 +2345,7 @@
   function sourceOf(name) {
     if (name === 'main') return pill;
     if (name === 'now') return nowPill;
+    if (name === 'lock') return lockPill;
     return satellites[name];
   }
 
@@ -2043,21 +2362,66 @@
     // page, a zero-opacity box standing at its spot, and a blob mirrored off it would
     // be a permanent lump of liquid out by the clock.
     if (name === 'now') return nowPill.classList.contains('lit');
-    return Boolean(satellites[name].dataset.mod);
+    // Only while it is standing there. Off the lock screen it is a zero-opacity box at
+    // the bottom of the canvas, and a blob mirrored off it would be a permanent lump of
+    // liquid over the wallpaper.
+    if (name === 'lock') return lockPill.classList.contains('showing');
+    // Only while the row is a row. A grown bubble is one shape with nothing beside it,
+    // and a satellite still holding a mod behind it is not standing on the bar — it
+    // would be a frosted circle out at the side of an open panel.
+    return CLOSED.has(size) && Boolean(satellites[name].dataset.mod);
   }
+
+  /** When the mirror last ran, so anything integrated over time has a real step. */
+  let mirroredAt = 0;
+
+  /**
+   * True while the mirror is painting. A merge threshold crossing at the end of a
+   * frame changes state, and a state change repaints — which, under a finger, paints
+   * the skin synchronously and would re-enter this on top of itself.
+   */
+  let mirroring = false;
 
   /** Every rect first, every write after: one layout per frame instead of three. */
   function paintLiquidFrame() {
+    if (mirroring) return;
+    mirroring = true;
+    try {
+      mirrorFrame();
+    } finally {
+      mirroring = false;
+    }
+  }
+
+  function mirrorFrame() {
+    const now = performance.now();
+    // Capped: a loop that stopped and started again, or a frame the system dropped,
+    // would otherwise integrate a spring through half a second in one step and throw
+    // the bubble across the screen.
+    const elapsed = mirroredAt ? Math.min(0.05, (now - mirroredAt) / 1000) : 0;
+    mirroredAt = now;
+
     const measured = blobs.map(blob => {
       if (!isSkinned(blob.name)) return null;
       const source = sourceOf(blob.name);
       const style = getComputedStyle(source);
       return {
+        source,
         box: source.getBoundingClientRect(),
         radius: style.borderRadius,
+        // The skin is the shape, so it owes the shape's corners as well as their size:
+        // a squircle mirrored as a plain round rectangle is a bubble whose liquid does
+        // not fit inside its own outline.
+        corner: style.cornerShape,
         colour: style.borderTopColor,
+        // Glass cannot fade, so it shrinks instead: a circle on its way out is a
+        // smaller pane every frame, and by the time it is invisible there is no pane
+        // left hanging over the wallpaper.
+        alpha: parseFloat(style.opacity),
       };
     });
+
+    sendBlurFrame(measured);
 
     blobs.forEach((blob, index) => {
       const seen = measured[index];
@@ -2071,12 +2435,16 @@
       // The border was inside the box it came from, so the skin keeps it there: the
       // edge is the box itself and the fill is a pixel in from it. Drawing the edge
       // *outside* instead would leave the bubble two pixels wider than it was.
-      write(blob.edge, seen.box, 0, seen.radius);
-      write(blob.fill, seen.box, -1, seen.radius);
+      write(blob.edge, seen.box, 0, seen);
+      write(blob.fill, seen.box, -1, seen);
       blob.edge.style.background = seen.colour;
     });
 
     meltBy(measured);
+    // Last, because a threshold crossing here can change state — and a state change
+    // repaints, which can land back in this function. Everything this frame is meant
+    // to draw has been drawn by now, and the guard above turns the nested call away.
+    renderMerges(measured, elapsed, now);
   }
 
   /**
@@ -2109,12 +2477,54 @@
     }
   }
 
-  function write(shape, box, grow, radius) {
+  /**
+   * The glass, sent as the rectangles it is standing on rather than as a journey.
+   *
+   * The blur is the host's — nothing a WebView draws reaches pixels it does not own —
+   * but it no longer has a life of its own over there: the host used to be told the
+   * shape each bubble was heading for and how long it would take, and it ran that
+   * curve on its own clock, which meant every curve in this file had a twin in Kotlin
+   * and anything the CSS did without being described (a hold's scale, a drag, a swap
+   * that renames two boxes) left the frosted rectangle behind. The skin is already
+   * mirrored off the real boxes every frame, so the glass is read off the same
+   * measurement: it is an extension of the bubble, not a second element chasing it.
+   *
+   * The string is compared before it is sent because a bridge call is a JNI hop and a
+   * resting row measures the same numbers frame after frame.
+   */
+  let blurSent = '';
+
+  function sendBlurFrame(measured) {
+    const spec = measured.map(seen => {
+      if (!seen || !seen.box.width) return '';
+      // A shape mid-fade keeps its box, so the pane is shrunk on the fade instead and
+      // stays centred on the shape while it closes to nothing.
+      const alpha = isNaN(seen.alpha) ? 1 : seen.alpha;
+      if (alpha < 0.01) return '';
+      const width = seen.box.width * alpha;
+      const height = seen.box.height * alpha;
+      return [
+        Math.round(seen.box.left + (seen.box.width - width) / 2),
+        Math.round(seen.box.top + (seen.box.height - height) / 2),
+        Math.round(width),
+        Math.round(height),
+        // One radius, because a blurred region has one: the largest corner the shape
+        // is wearing, capped at half its shortest side the way a border-radius is.
+        Math.round(Math.min(parseFloat(seen.radius) || 0, Math.min(width, height) / 2)),
+      ].join(',');
+    }).join(';');
+    if (spec === blurSent) return;
+    blurSent = spec;
+    bridge.setBlurFrame(spec);
+  }
+
+  function write(shape, box, grow, seen) {
     shape.style.width = (box.width + grow * 2) + 'px';
     shape.style.height = (box.height + grow * 2) + 'px';
     shape.style.transform =
       'translate(' + (box.left - grow) + 'px,' + (box.top - grow) + 'px)';
-    shape.style.borderRadius = radius;
+    shape.style.borderRadius = seen.radius;
+    shape.style.cornerShape = seen.corner;
   }
 
   /**
@@ -2122,22 +2532,272 @@
    * under a window that is on screen all day is a battery bill for nothing, so every
    * paint that could start a transition says so and the loop outlives it by one
    * animation, then stops on its own with the shapes left where they landed.
+   *
+   * It runs whatever state the bubble is in, not only the closed row it draws skin
+   * for: the glass is mirrored in the same pass, and a grown panel has glass exactly
+   * as a closed bubble does. Gated on the skin, an alert opened with the filter off
+   * left its frosted rectangle at the closed bubble's size for as long as it stood
+   * there.
    */
   let liquidUntil = 0;
   let liquidFrame = null;
 
   function stirLiquid(milliseconds) {
-    if (!root.classList.contains('liquid')) return;
     // Past the longest choreography there is, which is a mod being taken back in.
     liquidUntil = Math.max(liquidUntil, performance.now() + (milliseconds || 1100));
-    if (liquidFrame === null) liquidFrame = requestAnimationFrame(flowLiquid);
+    if (liquidFrame !== null) return;
+    // Starting cold. The display idles down when nothing has drawn for a while, so the
+    // first frames of the first animation after a quiet stretch arrive late and unevenly
+    // — the panel is still coming up to speed while the motion is already running. The
+    // host is asked for the frames on the same breath as the motion is asked for.
+    bridge.wakeFrames();
+    wokeAt = performance.now();
+    framesSinceWake = 0;
+    liquidFrame = requestAnimationFrame(flowLiquid);
   }
 
+  /** Temporary, alongside the merge trace: how the first frames after a cold start land. */
+  let wokeAt = 0;
+  let framesSinceWake = 0;
+
   function flowLiquid() {
+    const before = performance.now();
     paintLiquidFrame();
+    if (TRACE_MERGES && framesSinceWake < 8) {
+      framesSinceWake += 1;
+      traceEvent(
+        'frame ' + framesSinceWake + ' at +' + Math.round(before - wokeAt) +
+        'ms, paint ' + Math.round(performance.now() - before) + 'ms'
+      );
+    }
     liquidFrame = performance.now() < liquidUntil
       ? requestAnimationFrame(flowLiquid)
       : null;
+  }
+
+  // #endregion ────────────────────────────────────────────────────────────────
+
+  // #region ── merging ────────────────────────────────────────────────────────
+
+  /**
+   * A merge is measured, not scheduled.
+   *
+   * One bubble running into another used to be a set of timers: the circle was given
+   * a travel length, the bubble was told to open out at a share of it, and the circle
+   * was retired a fixed while after that. Every one of those numbers was a guess at
+   * where the shape would be, and the shape is the only thing that actually knows —
+   * so an ease that overshoots, a drag that reverses, a bubble that is a different
+   * width today all put the reaction somewhere other than the moment it belongs to.
+   * That gap between two animations, each correct on its own clock, is what reads as
+   * lag.
+   *
+   * So a merge is a *catch*: the traveller and the bubble taking it in are registered
+   * as a pair, and every frame the mirror already runs measures how much of the
+   * traveller is inside the receiver. That one number drives everything — the
+   * receiver's stretch is written from it continuously, and the steps of the
+   * choreography fire as it crosses named shares rather than as timers expire. Run it
+   * backwards and it reads backwards, because there is no timeline to run backwards.
+   *
+   * Rectangles, not shapes: these are pills and circles, and their bounding boxes
+   * overlap slightly sooner than their outlines do. The thresholds are named against
+   * this measure, so it is consistent with itself, and the goo is what sells the
+   * contact anyway.
+   */
+  /** The share of the traveller inside the receiver at which the receiver may change state. */
+  const CATCH_ENTERED = 0.8;
+
+  /** ...and at which the traveller can be taken off screen without it being seen going. */
+  const CATCH_SWALLOWED = 0.97;
+
+  /** How far a receiver stretches at full absorption of a shape as big as itself. */
+  const CATCH_SWELL = 0.13;
+
+  /** The release: liquid taken in jumps its tension and settles, so it is a spring. */
+  const CATCH_STIFFNESS = 260;
+  const CATCH_DAMPING = 17;
+
+  /**
+   * A catch that cannot finish still has to finish. A traveller can be caught out of
+   * the air — dressed again, sent back out, opened over — and its steps would then
+   * never fire, leaving a circle marked as leaving for the rest of the session. The
+   * ceiling is not a timeline: nothing is timed against it, it only says that after
+   * this long the merge is over whatever the boxes say.
+   */
+  const CATCH_CEILING = 900;
+
+  /** How long a merge may make no progress at all before it counts as arrived. */
+  const CATCH_STALL = 260;
+
+  /**
+   * Temporary. Every merge says what it did and how far in the traveller was when it
+   * did it, because the only way to tell a threshold that is set wrong from a shape
+   * that never got where it was going is to read the shares off the phone.
+   */
+  const TRACE_MERGES = true;
+
+  function trace(what, caught, entry, now) {
+    if (!TRACE_MERGES) return;
+    console.log(
+      '[merge] ' + what + ' ' + nameOf(caught.traveller) + ' into ' +
+      nameOf(caught.receiver) + ' at ' + entry.toFixed(2) +
+      ' after ' + Math.round(now - caught.since) + 'ms'
+    );
+  }
+
+  function nameOf(element) {
+    return element.id || element.className || 'unnamed';
+  }
+
+  /** Temporary, and the same trace: what the page decided, so the log reads in order. */
+  function traceEvent(text) {
+    if (TRACE_MERGES) console.log('[merge] ' + text);
+  }
+
+  /** The travellers being taken in right now, and what they are being taken into. */
+  const catches = [];
+
+  /** Each receiver's stretch, kept as a spring so it can be released rather than reset. */
+  const swells = new Map();
+
+  /**
+   * Register a merge, or add steps to one already running. A second call for the same
+   * traveller does not restart it: the circle is where it is, and the share of it that
+   * is already inside is the truth whoever asked.
+   */
+  function catchInto(traveller, receiver, steps) {
+    const running = catches.find(caught => caught.traveller === traveller);
+    if (running) {
+      Object.assign(running.steps, steps);
+      return;
+    }
+    const caught = {
+      traveller,
+      receiver,
+      steps: Object.assign({}, steps),
+      entered: false,
+      // The deepest it has been so far, and when that last changed: a merge is judged
+      // by whether it is still getting anywhere, not only by where it has got to.
+      best: 0,
+      since: performance.now(),
+      movedAt: 0,
+    };
+    caught.movedAt = caught.since;
+    catches.push(caught);
+    trace('caught', caught, 0, caught.since);
+    stirLiquid();
+  }
+
+  /** Caught out of the air: it is not being taken in any more, so nothing is owed. */
+  function releaseCatch(traveller) {
+    const index = catches.findIndex(caught => caught.traveller === traveller);
+    if (index >= 0) catches.splice(index, 1);
+  }
+
+  /**
+   * How much of the first box is inside the second, as a share of the first.
+   *
+   * Of the *traveller*, always, and never of whichever happens to be smaller. Measured
+   * the other way it reads 1 the moment a big traveller covers a small receiver, which
+   * on the lock bubble's flight home was a third of the way in — so a shape still most
+   * of the screen wide counted as swallowed and went out in front of the user. A
+   * traveller that is bigger than what is taking it in has not arrived yet; it is still
+   * something that has to become a drop first.
+   */
+  function enteredShare(traveller, receiver) {
+    const wide = Math.min(traveller.right, receiver.right) - Math.max(traveller.left, receiver.left);
+    const tall = Math.min(traveller.bottom, receiver.bottom) - Math.max(traveller.top, receiver.top);
+    if (wide <= 0 || tall <= 0 || !traveller.width || !traveller.height) return 0;
+    return (wide * tall) / (traveller.width * traveller.height);
+  }
+
+  function renderMerges(measured, elapsed, now) {
+    const boxOf = new Map();
+    measured.forEach(seen => {
+      if (seen && seen.box.width) boxOf.set(seen.source, seen.box);
+    });
+
+    const driven = new Map();
+    for (const caught of catches.slice()) {
+      if (!catches.includes(caught)) continue;
+      const traveller = boxOf.get(caught.traveller);
+      const receiver = boxOf.get(caught.receiver);
+      // A traveller that has stopped being one of the shapes on the bar is as far in
+      // as it is ever going: there is nothing left of it standing outside.
+      const entry = traveller && receiver ? enteredShare(traveller, receiver) : 1;
+
+      // A merge that has stopped getting anywhere is over, whatever the boxes say. A
+      // circle that set off and was then left standing half inside the bubble — its
+      // travel interrupted, its target moved out from under it — used to hang there
+      // until the ceiling, which is most of a second of a shape merging with nothing.
+      // Only counted once it has actually started arriving: one that has not touched
+      // the receiver at all is not stalled, it is still on its way.
+      if (entry > caught.best + 0.01) {
+        caught.best = entry;
+        caught.movedAt = now;
+      }
+      const stalled = caught.best > 0.02 && now - caught.movedAt > CATCH_STALL;
+      const late = stalled || now - caught.since > CATCH_CEILING;
+
+      if (traveller && receiver) {
+        // How much a bubble is stretched by what has entered it is how much of it
+        // there is, not merely that something arrived: a dot barely disturbs the
+        // bubble and a satellite of the same size disturbs it fully.
+        const bulk = Math.min(
+          1,
+          (traveller.width * traveller.height) / (receiver.width * receiver.height)
+        );
+        driven.set(
+          caught.receiver,
+          (driven.get(caught.receiver) || 0) + entry * bulk * CATCH_SWELL
+        );
+      }
+
+      if (!caught.entered && (entry >= CATCH_ENTERED || late)) {
+        caught.entered = true;
+        trace('entered', caught, entry, now);
+        if (caught.steps.entered) caught.steps.entered();
+      }
+      if (caught.entered && (entry >= CATCH_SWALLOWED || late)) {
+        // Off the list before the step runs: the step is what takes the traveller off
+        // screen, and a repaint inside it would otherwise find the catch still live.
+        trace('swallowed', caught, entry, now);
+        releaseCatch(caught.traveller);
+        if (caught.steps.swallowed) caught.steps.swallowed();
+      }
+    }
+
+    driven.forEach((_, receiver) => {
+      if (!swells.has(receiver)) swells.set(receiver, { value: 0, velocity: 0 });
+    });
+
+    swells.forEach((swell, receiver) => {
+      const target = driven.get(receiver);
+      if (target !== undefined) {
+        // Driven: the bubble is exactly as stretched as the shape inside it is deep.
+        // The speed it is being stretched at is kept, because that is what the release
+        // inherits — a circle that ran in hard springs back harder than one that
+        // drifted in, and neither is a number written down anywhere.
+        if (elapsed > 0) swell.velocity = (target - swell.value) / elapsed;
+        swell.value = target;
+      } else {
+        swell.velocity +=
+          (-swell.value * CATCH_STIFFNESS - swell.velocity * CATCH_DAMPING) * elapsed;
+        swell.value += swell.velocity * elapsed;
+        if (Math.abs(swell.value) < 0.0004 && Math.abs(swell.velocity) < 0.004) {
+          swells.delete(receiver);
+          receiver.style.removeProperty('--absorb');
+          return;
+        }
+      }
+      receiver.style.setProperty('--absorb', swell.value.toFixed(4));
+    });
+
+    // Nothing here is on a timer, so nothing here can say in advance how long it needs
+    // the mirror for. It asks for the next frame instead, for as long as it has
+    // something left to do.
+    if (catches.length || swells.size) {
+      liquidUntil = Math.max(liquidUntil, now + 120);
+    }
   }
 
   // #endregion ────────────────────────────────────────────────────────────────
@@ -2215,6 +2875,25 @@
    */
   const FAR_PUSH = 17;
 
+  /**
+   * How far the two shapes press *into* each other at the middle of a trade, past
+   * touching. The row's geometry gives the gap no reason to change on its own — the
+   * bubble gives up exactly the width the satellite takes, so the distance between
+   * their centres is constant and the skin has nothing to melt — and the whole liquid
+   * hand-over only ever appeared on the settle, after the finger had already gone.
+   * This is what makes the merge happen under the finger instead: they close, fuse
+   * through the middle, and let go again as the trade finishes.
+   */
+  const SWAP_PRESS = 5;
+
+  /** True once the drag is past the point where letting go would commit it. */
+  let swapPassed = false;
+
+  /** How fast the finger is dragging the row, in pixels per millisecond, smoothed. */
+  let swapSpeed = 0;
+  let swapTravelled = 0;
+  let swapMovedAt = 0;
+
   /** Whether a mod is actually true right now, not merely remembered. */
   function isLive(mod) {
     if (mod === 'timer') return mods.has('timer') && Boolean(timer);
@@ -2234,7 +2913,7 @@
 
   /** The mods that are true, in the order a swipe has left them in. */
   function liveMods() {
-    return modOrder.filter(isLive);
+    return modOrder.filter(mod => isLive(mod) && !isStolen(mod));
   }
 
   /** The mod's own colour, so a satellite keeps the app's identity beside the bubble. */
@@ -2296,7 +2975,7 @@
       paintSatellites();
       ensureClosedWindow();
     }
-    paintBlur();
+    paintShift();
   };
 
   /**
@@ -2390,14 +3069,20 @@
     // Half of both widths plus the gap: the same whichever of them is the big one,
     // which is why this is a constant and not a function of the drag.
     const reach = (resting + satSize()) / 2 + satGap();
+    // Which is why the pair is pressed together on top of it: a peak at halfway, zero
+    // at both ends, so the gap closes to an overlap as the trade goes through and is
+    // back to the resting gap by the time it is done. This is the only thing in the
+    // row that moves the two shapes relative to each other, and it is what the skin
+    // melts on. Positions only — reach itself stays the constant the dots are hung off.
+    const pressed = reach - (satGap() + SWAP_PRESS) * Math.sin(swap * Math.PI);
     // Past halfway the swap is decided, so the far one is drawn where it will land.
     const crossed = swap > 0.5;
     const shoved = crossed ? (1 - swap) * 2 : swap * 2;
     return {
       main: resting - traded,
       sat: satSize() + traded,
-      mainX: push - edge * swap * reach,
-      satX: push + edge * (1 - swap) * reach,
+      mainX: push - edge * swap * pressed,
+      satX: push + edge * (1 - swap) * pressed,
       inSide,
       push,
       // The one on the far side, when a third mod is true. It is the only piece that
@@ -2489,8 +3174,22 @@
       root.style.setProperty(
         '--shift-ms', shiftingHome ? SHIFT_HOME + 'ms' : 'var(--grow-ms)'
       );
-      // The glass moves with them, and it is one region per bubble.
-      paintBlur();
+      // The circle travels on the row's clock too, and this is the whole of that bug:
+      // standing aside for the light is one move of one row, but the bubble took it as
+      // a shift (100ms, no delay) while the circle took it as a split (150ms of delay
+      // and then 380ms of travel) — so the bubble had arrived and stopped before its
+      // own satellite had started. Nothing is splitting here: the two are in the same
+      // place relative to each other before and after, so they move on the same
+      // numbers. A circle already flying home keeps its own, which clearSatellite gave
+      // it and which are the merge's, not the row's.
+      Object.values(satellites).forEach(element => {
+        if (element.dataset.leaving) return;
+        element.style.setProperty('--split-ms', shiftingHome ? SHIFT_HOME + 'ms' : '');
+        element.style.setProperty('--split-delay', shiftingHome ? '0ms' : '');
+      });
+      // The skin and the glass are both mirrored off these boxes, so the only thing
+      // left to say is that they are about to move.
+      stirLiquid();
     }
     paintDots(box);
 
@@ -2630,7 +3329,10 @@
       return;
     }
     element.dataset.leaving = '1';
-    knockBubble();
+    traceEvent(
+      'satellite ' + side + ' sent home, mods=' + liveMods().length +
+      ', limit=' + satelliteLimit() + ', mergeHold=' + mergeHold
+    );
     // Whatever it was doing, it has stopped being true — the bars and the sweeping
     // hand are claims about something that is no longer happening.
     element.classList.remove('live');
@@ -2638,21 +3340,11 @@
     element.style.setProperty('--split-delay', '0ms');
     aimHome(element);
     stirLiquid(MERGE_TRAVEL + MERGE_EXPAND + 200);
-    // Nothing is left to open out around it — the bubble is going bare and staying
-    // there — so the journey is the whole of it.
-    if (!mergeHold) scheduleRetire(MERGE_TRAVEL);
-  }
-
-  /**
-   * The bubble taking a circle in. It is the same knock whatever sent the circle home —
-   * a mod ending, or the Now bubble coming out and leaving the row room for one circle
-   * instead of two — because to the bubble it is the same event: something ran into it.
-   */
-  function knockBubble() {
-    pill.classList.remove('knocked');
-    void pill.offsetWidth;
-    pill.classList.add('knocked');
-    stirLiquid(MERGE_TRAVEL + 460);
+    // The travel is a transition; everything the bubble does about it is measured off
+    // where the circle has actually got to. It is retired when it is inside and cannot
+    // be seen going — whether the bubble is opening out around it or simply going bare,
+    // which is the difference that used to need two different timers.
+    catchInto(element, pill, { swallowed: retireLeaving });
   }
 
   /** Onto the bubble's glyph slot, wherever the bubble currently has it. */
@@ -2676,15 +3368,9 @@
     }
   }
 
-  let retireTimer = null;
-
-  function scheduleRetire(after) {
-    clearTimeout(retireTimer);
-    retireTimer = setTimeout(retireLeaving, after);
-  }
-
   /** Off, on the spot, holding nothing — no journey, no retirement to wait for. */
   function dropSatellite(element) {
+    releaseCatch(element);
     element.classList.remove('showing', 'live');
     delete element.dataset.leaving;
     element.removeAttribute('style');
@@ -2705,9 +3391,10 @@
 
   /** Whatever the circle is holding: the face, its colour, and whether it is moving. */
   function dressSatellite(element, mod) {
-    // Caught on its way home and sent back out: the retirement waiting for it is
-    // called off, and the sweep that would have retired it skips whatever is no
-    // longer marked as leaving.
+    // Caught on its way home and sent back out: it is not being taken in any more, so
+    // the merge watching it is called off and the sweep that would have retired it
+    // skips whatever is no longer marked as leaving.
+    releaseCatch(element);
     delete element.dataset.leaving;
     const fresh = element.dataset.mod !== mod;
     if (fresh) {
@@ -2828,6 +3515,22 @@
   function dragSwap(travelled) {
     const live = liveMods();
     if (live.length < 2) return false;
+    // The finger's speed, kept while it is down so the release has something to throw
+    // the glyph with. Smoothed, because a single touchmove pair is mostly noise — one
+    // slow frame in the middle of a flick would otherwise decide the whole knock. The
+    // travel is measured raw rather than off swap, so a drag that changes its mind and
+    // comes back through the middle still reads as fast.
+    const now = performance.now();
+    if (!root.classList.contains('dragging')) {
+      swapSpeed = 0;
+      swapMovedAt = 0;
+    }
+    if (swapMovedAt && now > swapMovedAt) {
+      const rate = Math.abs(travelled - swapTravelled) / (now - swapMovedAt);
+      swapSpeed = swapMovedAt ? swapSpeed * 0.6 + rate * 0.4 : rate;
+    }
+    swapMovedAt = now;
+    swapTravelled = travelled;
     // Away from a satellite pulls it in. With both sides taken either one can be
     // pulled, so the finger's direction picks which — and it may change its mind, as
     // long as it comes back through the middle first.
@@ -2838,6 +3541,22 @@
       progress = -progress;
     }
     swap = Math.min(1, Math.max(0, progress / SWAP_DISTANCE));
+    // The buzz belongs to the moment the trade is earned, not to the moment the finger
+    // happens to leave: a threshold the user cannot feel until afterwards is a
+    // threshold they have to guess at. It fires in both directions — crossing back is
+    // just as much news — and once per crossing, so a finger resting on the line does
+    // not rattle.
+    const past = swap > 0.5;
+    if (past !== swapPassed) {
+      swapPassed = past;
+      bridge.triggerHaptic('tap');
+      // Past the line the trade has been earned, and a hold must not still be counting
+      // underneath it: a finger that keeps the row a moment too long after the swap has
+      // visibly happened used to be answered with a panel opening on top of it. The
+      // hold outranks the drag right up to the threshold and not one pixel past it —
+      // after that this finger has already said what it wanted.
+      if (past) endHold();
+    }
     root.classList.add('dragging');
     paintSatellites();
     return swap > 0.04;
@@ -2853,9 +3572,28 @@
    * it visibly went; sending it back across would be the jump this replaces. Only
    * then are the transitions let go, and the pair settles into rest.
    */
+  /**
+   * The drag lets go of the row without trading, because the hold has taken the touch
+   * off it. Not releaseSwap: that one asks whether the finger got far enough and hands
+   * the bubble over if it did, and a swap committing behind a panel that is opening
+   * over it is two answers to one finger.
+   */
+  function abandonSwap() {
+    if (!root.classList.contains('dragging')) return;
+    root.classList.remove('dragging');
+    swap = 0;
+    swapDir = 1;
+    swapPassed = false;
+    paintSatellites();
+  }
+
   function releaseSwap() {
     if (!root.classList.contains('dragging')) return;
     const committed = swap > 0.5;
+    swapPassed = false;
+    // A finger that came to a stop and then lifted let the row go; whatever it was
+    // doing a moment before that is not what it handed over with.
+    if (performance.now() - swapMovedAt > SWAP_STILL) swapSpeed = 0;
     if (!committed) {
       root.classList.remove('dragging');
       swap = 0;
@@ -2873,7 +3611,6 @@
     enterFrom(flanked ? box.inSide : satSide);
     swap = 0;
     swapDir = 1;
-    bridge.triggerHaptic('tap');
     // Set before the commit, not after: toClosed() runs inside it and repaints the
     // row on its own account, with swap already back at 0 and satSide already
     // flipped — full width, dead centre, the state the row is headed for but is
@@ -2944,13 +3681,12 @@
     arriving.style.setProperty('--sat-x', box.mainX + 'px');
     arriving.style.setProperty('--sat-width', box.main + 'px');
 
-    // The two of them have traded names, so the glass trades with them: the bubble's
-    // pane is now the small one out at the side, and the satellite's is the wide one
-    // in the middle. Both stand exactly where they already are.
-    paintBlur({
-      width: box.sat, mainX: box.satX, sat: box.main, satX: box.mainX,
-      farFade: box.farFade, farX: box.farX,
-    });
+    // Nothing is said about the glass here. A swap is two boxes trading names without
+    // moving a pixel, and it was exactly the case the old contract could not describe:
+    // the host had to be told the settled geometry outright or it spent the settle as a
+    // full-width pane around a bubble that was neither that wide nor in that place. The
+    // mirror measures what is actually standing there, so a trade is nothing to it.
+    stirLiquid();
   }
 
   /**
@@ -2976,11 +3712,8 @@
     // The one that crossed is already drawn on this side, mid fade-in.
     satellites[box.inSide].style.setProperty('--sat-x', (box.edge * box.reach) + 'px');
 
-    // And the glass goes with them, unmoved, for the same reason it does in a trade.
-    paintBlur({
-      width: box.sat, mainX: box.satX, sat: box.main, satX: box.mainX,
-      farFade: box.farFade, farX: box.farX,
-    });
+    // And the glass needs no telling, for the same reason it does not in a trade.
+    stirLiquid();
   }
 
 
@@ -3090,7 +3823,10 @@
       glyph.classList.add('entering');
       return;
     }
-    glyph.style.setProperty('--bump', (enterSide === 'left' ? 14 : -14) + 'px');
+    const thrown = BUMP_MIN + (BUMP_MAX - BUMP_MIN) * Math.min(1, swapSpeed / SWAP_FLICK);
+    glyph.style.setProperty(
+      '--bump', (enterSide === 'left' ? thrown : -thrown).toFixed(1) + 'px'
+    );
     glyph.classList.add('bumping');
   }
 
@@ -3114,30 +3850,45 @@
   }
 
   /**
-   * The gap between the glyph arriving at the bubble's edge and the bubble opening
-   * out around it. Nothing else happens in it: this *is* the reason the bubble
-   * changes width, and a reason has to be seen before the thing it causes.
+   * The bubble opening out around what has reached it. Nothing happens between the
+   * arrival and this: it *is* the reason the bubble changes width, and a reason has to
+   * be seen before the thing it causes.
+   *
+   * The circle is retired by its own catch when it is deep enough inside not to be
+   * seen going, so nothing is scheduled here either.
    */
-  function handOver(after) {
+  function handOver() {
+    mergeHold = false;
+    root.classList.remove('entering');
+    // Opened or taken over while the glyph was on its way: whatever is showing now
+    // is the user's own doing, and it will ask for closed again itself.
+    if (state !== 'idle') return;
+    // A circle still holding the glyph has to keep holding it until the bubble has
+    // finished arriving around it, or the picture is drawn twice in the meantime.
+    const carried = Boolean(leavingSatellite());
+    takingIn = true;
+    if (carried) root.classList.add('handing-over');
+    toClosed();
+    if (carried) trackExpansion();
+    takingIn = false;
+  }
+
+  /**
+   * The same thing on a timer, for a glyph rather than a bubble. A mod taking a bare
+   * bubble brings its own glyph up out of the punch hole, and a glyph is *inside* the
+   * bubble the whole way — there is no overlap to measure, so this one leg is still
+   * timed against its own arrival curve.
+   */
+  function handOverAfter(milliseconds) {
     clearTimeout(mergeTimer);
-    mergeTimer = setTimeout(() => {
-      mergeHold = false;
-      root.classList.remove('entering');
-      // Opened or taken over while the glyph was on its way: whatever is showing now
-      // is the user's own doing, and it will ask for closed again itself.
-      if (state !== 'idle') return;
-      // A circle still holding the glyph has to keep holding it until the bubble has
-      // finished arriving around it, or the picture is drawn twice in the meantime.
-      const carried = ['right', 'left'].some(side => satellites[side].dataset.leaving);
-      takingIn = true;
-      if (carried) root.classList.add('handing-over');
-      toClosed();
-      if (carried) {
-        trackExpansion();
-        scheduleRetire(MERGE_EXPAND);
-      }
-      takingIn = false;
-    }, after);
+    mergeTimer = setTimeout(handOver, milliseconds);
+  }
+
+  /** The circle on its way home, if one is. */
+  function leavingSatellite() {
+    return ['right', 'left']
+      .map(side => satellites[side])
+      .find(element => element.dataset.leaving) || null;
   }
 
   /**
@@ -3174,7 +3925,13 @@
       root.style.removeProperty('--app-accent');
       setSize('idle');
       claimRoom(owner);
-      handOver(MERGE_TRAVEL * LAND);
+      // The circle that ran in is what opens the bubble out, so the bubble waits for
+      // it rather than for a share of how long it was expected to take. paintSatellites
+      // above is what put it on its way and registered the catch; this adds the step
+      // the arrival is the cause of.
+      const carrier = leavingSatellite();
+      if (carrier) catchInto(carrier, pill, { entered: handOver });
+      else handOverAfter(MERGE_TRAVEL * LAND);
       return;
     }
 
@@ -3193,7 +3950,7 @@
       flyGlyphIn(MOD_CLOSED[owner].face);
       setSize(MOD_CLOSED[owner].size, { width: -1, height: -1, shift: 0 }, true);
       claimRoom(owner);
-      handOver(MOD_ENTER * LAND);
+      handOverAfter(MOD_ENTER * LAND);
       return;
     }
 
@@ -3427,6 +4184,7 @@
     if (!art) {
       mediaArt.classList.add('hidden-art');
       playerArt.classList.add('hidden-art');
+      lockArt.classList.add('hidden-art');
       return;
     }
     const decoded = new Image();
@@ -3445,6 +4203,7 @@
       // same 220ms that reads as a change over there reads as a flicker here.
       swapArt(mediaArt, art, 220);
       swapArt(playerArt, art, 420);
+      swapArt(lockArt, art, 220);
     });
   }
 
@@ -3497,10 +4256,14 @@
     document.getElementById('player-title').textContent = media.title || '';
     document.getElementById('player-artist').textContent = media.artist || '';
     document.getElementById('player-duration').textContent = clock(media.duration || 0);
-    document.getElementById('player-play-path').setAttribute(
-      'd', media.isPlaying ? 'M7 5h3v14H7zm7 0h3v14h-3z' : 'M8 5v14l11-7z'
-    );
+    document.getElementById('player-play-path').setAttribute('d', playPath());
     paintProgress(media.position || 0);
+    paintLock();
+  }
+
+  /** The one shape two bubbles draw for the same fact, so it is written once. */
+  function playPath() {
+    return media && media.isPlaying ? 'M7 5h3v14H7zm7 0h3v14h-3z' : 'M8 5v14l11-7z';
   }
 
   // What the bar is currently showing, which is where a relative drag starts from.
@@ -3523,9 +4286,12 @@
     if (!media || !media.isPlaying) return;
     let position = from === undefined ? (media.position || 0) : from;
     mediaTicker = setInterval(() => {
-      if (size !== 'player' || isScrubbing) return;
+      if (isScrubbing) return;
       position += 500;
-      paintProgress(position);
+      // Two bubbles can be showing this song at once now — the open player up at the
+      // cutout and the lock screen's own — and the second was counting on nothing.
+      if (size === 'player') paintProgress(position);
+      if (lockPill.classList.contains('showing')) paintLockProgress(position);
     }, 500);
   }
 
@@ -3536,6 +4302,10 @@
       clearInterval(mediaTicker);
       pill.classList.remove('sounding');
       if (state === 'idle') toClosed();
+      // The song ending is the lock bubble's business too, and it is the only path that
+      // does not go through paintMedia — so without this the bubble at the bottom stands
+      // there holding a song that has stopped.
+      paintLock();
       return;
     }
     mods.add('media');
@@ -3623,9 +4393,577 @@
     runMediaClock(position);
   }
 
+  // #region ── the lock screen's bubble ─────────────────────────────────────
+
+  /**
+   * Mirrors #lock-now in the CSS above and LOCK_INSET / LOCK_BOTTOM / LOCK_HEIGHT in
+   * BubbleService, which places the touch proxy from them. There is no build step
+   * joining the three, so a size changed in one of them and not the others is a bubble
+   * being aimed at through a hole somewhere else.
+   */
+  const LOCK_INSET = 16;
+  const LOCK_BOTTOM = 20;
+  const LOCK_HEIGHT = 124;
+  /** Open, it is the media tab: the same parts with the room to be worked rather than read. */
+  const LOCK_OPEN_HEIGHT = 546;
+
+  /** A flick up opens the bubble and a flick down closes it, past this much travel. */
+  const LOCK_SWIPE = 24;
+
+  /** Mirrors --lock-fly-ms in the CSS above: the rest of the way home, once it is up to speed. */
+  const LOCK_FLY = 640;
+
+  /** What it pulls itself in to, on the spot, before it goes anywhere at all. */
+  const LOCK_PINCH_SCALE = 0.55;
+
+  /** How long that takes. It is a move of its own, not the first part of the journey. */
+  const LOCK_PINCH = 260;
+
+  /** What share of full speed it crawls at while it is still closing. It is already on its way during the pinch — the pinch is not a pause — but at a quarter of the pace, so the closing is what the eye is given first and the journey only takes over once there is nothing left to close. */
+  const LOCK_CRAWL = 0.25;
+
+  /** Slow to leave, then all at once, and past its mark: gathering in is a thing being wound up, so it has to start reluctantly and end fast enough to throw itself the rest of the way. An ease that leaves at speed reads as the box simply being set to a smaller number, which is the whole complaint about a resize pretending to be a movement. */
+  const LOCK_PINCH_EASE = 'cubic-bezier(0.62, 0, 0.2, 1.65)';
+
+  /** How long the keyguard's own dismiss is left alone before the journey starts. */
+  const LOCK_FLY_WAIT = 120;
+
+  /** Mirrors --ease-split in the CSS above: it lands with the overshoot the row has. */
+  const LOCK_FLY_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
+
+  /** Mirrors --grow-ms and --ease-split in the CSS above: the box is animated by hand. */
+  const LOCK_GROW = 340;
+  const LOCK_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
+
+  const lockPill = document.getElementById('lock-now');
+  const lockArt = document.getElementById('lock-art');
+  const lockElapsed = document.getElementById('lock-elapsed');
+
+  /**
+   * Every part that ends up somewhere else when the bubble opens. The cover is the only
+   * one that resizes as well as moves; the rest are translated, because scaling text and
+   * icons to their new size stretches the glyphs on the way there.
+   */
+  const lockMovers = [
+    { element: document.getElementById('lock-art-slot'), resizes: true },
+    { element: document.getElementById('lock-meta'), resizes: false },
+    { element: document.getElementById('lock-buttons'), resizes: false },
+    { element: document.getElementById('lock-timeline'), resizes: false },
+  ];
+
+  /** True while the keyguard is up. Told by the host; nothing here works it out. */
+  let locked = false;
+
+  /**
+   * What the lock screen's bubble takes off the row while the phone is locked.
+   *
+   * A stolen mod is not copied down here and it is not drawn in both places at once —
+   * it simply belongs to a different bubble for as long as the keyguard is up. The
+   * steal is one filter in liveMods() and nothing else, because liveMods() is what the
+   * row's width, its satellites, its dots and its window are all worked out from: take
+   * the mod out there and every one of them stops carrying it without being told.
+   * Putting it back is the same filter going quiet.
+   */
+  const LOCK_STEALS = ['media'];
+
+  /**
+   * The keyguard has gone but the mod has not been handed back yet — it is still in the
+   * air. The steal outlives the lock screen by exactly one flight, because the row
+   * opening out is supposed to be *caused* by the drop arriving: let go of at the moment
+   * the keyguard went, the bubble at the cutout had already grown and settled before the
+   * thing it grew for had even set off, and the two read as unrelated events happening
+   * near each other rather than as one bubble being taken into another.
+   */
+  let stealHeld = false;
+
+  function isStolen(mod) {
+    return (locked || stealHeld) && LOCK_STEALS.includes(mod);
+  }
+
+  /** Which mod the lock bubble is carrying, in the order the row would have had them. */
+  function lockMod() {
+    if (!locked && !stealHeld) return undefined;
+    return modOrder.filter(mod => LOCK_STEALS.includes(mod) && isLive(mod))[0];
+  }
+
+  /** Open, which on this bubble is the media tab and nothing else so far. */
+  let lockOpen = false;
+
+  /** True for the length of the way home, while the bubble is neither shown nor gone. */
+  let lockFlying = false;
+
+  /** The journey itself, held so it can be let go of when the bubble is taken in. */
+  let lockFlight = null;
+
+  function paintLock() {
+    // Mid-flight the bubble is already not the row's answer any more — locked is false
+    // and the mod has gone back — so every question this function asks is answered
+    // "hide it", which is exactly what must not happen while it is still travelling.
+    if (lockFlying) return;
+    const mod = lockMod();
+    const showing = Boolean(mod);
+    if (lockPill.classList.contains('showing') !== showing) stirLiquid(500);
+    lockPill.classList.toggle('showing', showing);
+    // The goo filter's region is the row's own height until this bubble is standing at
+    // the bottom of the screen, and a skin drawn outside the region is not drawn at all.
+    root.classList.toggle('lock-live', showing);
+    if (!showing && lockOpen) closeLock();
+    fitLockProxy();
+    if (!showing) return;
+    lockPill.style.setProperty('--lock-accent', media.accent || 'var(--section-color)');
+    document.getElementById('lock-title').textContent = media.title || '';
+    document.getElementById('lock-artist').textContent = media.artist || '';
+    document.getElementById('lock-duration').textContent = clock(media.duration || 0);
+    document.getElementById('lock-play-path').setAttribute('d', playPath());
+    paintLockProgress(media.position || 0);
+  }
+
+  /**
+   * Opening does not only make the bubble taller — it re-lays it out. The cover leaves
+   * the side of the title and goes above it, which means the row it is in changes
+   * direction, and no amount of easing on a width can animate that: a reflow is a jump
+   * by definition, and every part of the bubble arrived at its new place in one frame
+   * however carefully its own box was transitioned.
+   *
+   * So the layout is allowed to jump, and then it is put back. Each part is measured
+   * before and after, and for one frame carries the transform that returns it to exactly
+   * where it was; letting go of that transform is what the eye reads as the move. The
+   * cover is the only one that carries a scale with it — an image resamples, but text
+   * and icons stretch — so its width and height jump straight to the new size and the
+   * scale is what travels, which is a compositor transform rather than a relayout every
+   * frame. --ease-split overshoots, so everything lands with the bounce the rest of the
+   * interface has.
+   */
+  function settleLock(change) {
+    const from = lockPill.getBoundingClientRect().height;
+    const before = lockMovers.map(mover => mover.element.getBoundingClientRect());
+    change();
+    // The box's height is animated by hand rather than by the transition list, and this
+    // is the whole reason why: a height still easing towards its new value measures as
+    // the old one, and every part inside a bottom-anchored box is placed off that
+    // height. Measured against a box that had not grown yet, the transforms below put
+    // the contents back to somewhere neither layout ever had them.
+    const to = lockOpen ? LOCK_OPEN_HEIGHT : LOCK_HEIGHT;
+    lockPill.animate(
+      [{ height: from + 'px' }, { height: to + 'px' }],
+      { duration: LOCK_GROW, easing: LOCK_EASE }
+    );
+    lockMovers.forEach((mover, index) => {
+      const from = before[index];
+      const to = mover.element.getBoundingClientRect();
+      if (!from.width || !to.width) return;
+      const scale = mover.resizes ? from.width / to.width : 1;
+      // Centres, not corners: a box that scales about its middle moves its own edges,
+      // and matching corners would leave it half a width out at the far end.
+      const dx = (from.left + from.width / 2) - (to.left + to.width / 2);
+      const dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+      mover.element.style.transition = 'none';
+      mover.element.style.transform =
+        'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + scale.toFixed(3) + ')';
+    });
+    // Next frame, because a transform written and cleared in the same one is never a
+    // transition — the browser only ever computes the second value.
+    requestAnimationFrame(() => {
+      lockMovers.forEach(mover => {
+        mover.element.style.transition = 'transform var(--grow-ms) var(--ease-split)';
+        mover.element.style.transform = '';
+      });
+    });
+    stirLiquid(900);
+  }
+
+  /**
+   * The bubble opening out into the media tab, in place: it is hung off the bottom edge
+   * of the screen, so a taller box grows upwards on its own and the end the thumb is
+   * resting on never moves. Nothing is animated by hand here and there is no second
+   * panel — it is the same bubble at a different height, which is what makes it read as
+   * one thing opening rather than as something else appearing over it.
+   */
+  function openLock() {
+    if (lockOpen) return;
+    lockOpen = true;
+    settleLock(() => lockPill.classList.add('open'));
+    fitLockProxy();
+    // The payload's position is from whenever the session last reported one, which can
+    // be minutes ago. Asked for, so the line is right the moment it is big enough to
+    // read rather than a tick later — the same reason openPlayer asks.
+    const now = Number(bridge.readMediaPosition());
+    paintLockProgress(Number.isFinite(now) && now > 0 ? now : (media && media.position) || 0);
+    stirLiquid(600);
+  }
+
+  function closeLock() {
+    if (!lockOpen) return;
+    lockOpen = false;
+    settleLock(() => lockPill.classList.remove('open'));
+    fitLockProxy();
+    stirLiquid(600);
+  }
+
+  /** The line along the bottom edge, the dot at the end of it, and the two times. */
+  function paintLockProgress(position) {
+    const duration = (media && media.duration) || 0;
+    const ratio = duration > 0 ? Math.min(1, position / duration) : 0;
+    lockElapsed.style.width = (ratio * 100) + '%';
+    document.getElementById('lock-position').textContent = clock(position);
+  }
+
+  /** The proxy is exactly the bubble, and it exists only while the bubble does. */
+  function fitLockProxy() {
+    if (lockFlying || !lockPill.classList.contains('showing')) {
+      bridge.setLockProxy(0, 0, 0, 0);
+      return;
+    }
+    const height = lockOpen ? LOCK_OPEN_HEIGHT : LOCK_HEIGHT;
+    bridge.setLockProxy(
+      Math.round(window.innerWidth - LOCK_INSET * 2), height,
+      LOCK_INSET, Math.round(window.innerHeight - LOCK_BOTTOM - height)
+    );
+  }
+
+  /**
+   * Every proxy put back where it belongs, asked for by the host when the interface
+   * comes back on screen. Hiding takes touchability off the windows the page owns, and
+   * only the page knows which of them should have it back.
+   */
+  window.refitProxies = () => {
+    fitNowProxy();
+    fitLockProxy();
+  };
+
+  /**
+   * Unlocking, which is a merge and not a disappearance.
+   *
+   * The row takes its mod back the moment `locked` goes false — that is the steal
+   * letting go — so the bubble at the cutout is already opening out to receive
+   * something. This is the something: the lock bubble travels to it and is taken in the
+   * same way the torch's drop and a satellite's circle are, as a catch the mirror
+   * measures rather than a bounce played on a timer. The receiver's stretch grows with
+   * however much of the drop is inside it and springs back when it is gone.
+   */
+  function flyLockHome() {
+    // Untouchable from the first frame of the flight: it is not a control any more, and
+    // a proxy left standing over the bottom of an unlocked screen eats the gesture bar.
+    fitLockProxy();
+    // A beat before it leaves, because the keyguard is still playing its own dismiss
+    // over the top of this: a journey that starts underneath that animation is a journey
+    // nobody sees. It goes once there is a home screen to cross.
+    lockPill.classList.add('flying');
+    setTimeout(startLockFlight, LOCK_FLY_WAIT);
+  }
+
+  function startLockFlight() {
+    if (!lockFlying) return;
+    const from = lockPill.getBoundingClientRect();
+    const to = pill.getBoundingClientRect();
+    // Centres, because the shrink is about the middle: matching edges would leave it
+    // most of its own width short of the bubble it is aiming at.
+    const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+    const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+    // By hand rather than as a class with a transition on it. A transition needs a start
+    // value the browser has already drawn, and this journey begins in the same breath as
+    // the class that describes it — so the box was simply *at* the bubble by the time
+    // anything measured it, the merge read a full overlap on its first frame, and
+    // unlocking made the bubble vanish rather than travel. An animation has no such
+    // requirement: it holds its own start, and every frame of it is a real box, which is
+    // the only reason the merge can be measured off it at all.
+    // One journey at two speeds, not two moves: the bubble is already on its way while it
+    // is still closing, at a quarter of the pace, and opens up to full speed the moment
+    // there is nothing left to close. Held still for the closing it reads as two unrelated
+    // things happening in turn — a box being resized, and then a box being slid across the
+    // screen — where the slow start reads as one thing gathering itself and going.
+    //
+    // It closes the rest of the way over the journey, because a merge is only over when
+    // the traveller is genuinely inside what is taking it in. Carried at full width it
+    // would still be most of the screen wide on arrival, and either it would be seen
+    // going out on top of the bubble or the merge would have to be called finished while
+    // it plainly had not happened. The drop it closes to is the receiver's own size,
+    // measured rather than named — the bubble is a different size under every mod, and
+    // both dimensions count, since a drop still standing taller than the bubble is one
+    // that never finishes going in. A shade under that, so it is properly inside rather
+    // than exactly filling it: a drop that merely fits ends the merge on the stall timer
+    // instead of on the shapes.
+    const drop = Math.min(to.width / from.width, to.height / from.height) * 0.9;
+    const whole = LOCK_PINCH + LOCK_FLY;
+    const turn = LOCK_PINCH / whole;
+    // Two animations rather than one set of keyframes, because the size and the journey
+    // are not on the same clock and a keyframe's easing owns every property in it. The
+    // closing winds up and overshoots; the travel crawls at a flat quarter speed and then
+    // opens up. Said in one list, whichever ease was written would have been imposed on
+    // both, and that is how the first attempt ended up with a bubble that only appeared to
+    // shrink where it stood. They are separate CSS properties, so they compose rather than
+    // fight, and both are real boxes to the mirror.
+    const crawled = LOCK_CRAWL * turn;
+    lockFlight = [
+      lockPill.animate(
+        [
+          { scale: 1, offset: 0, easing: LOCK_PINCH_EASE },
+          { scale: LOCK_PINCH_SCALE, offset: turn, easing: LOCK_FLY_EASE },
+          { scale: drop, offset: 1 },
+        ],
+        { duration: whole, fill: 'forwards' }
+      ),
+      lockPill.animate(
+        [
+          { translate: '0px 0px', offset: 0, easing: 'linear' },
+          {
+            translate: (dx * crawled).toFixed(1) + 'px ' + (dy * crawled).toFixed(1) + 'px',
+            offset: turn,
+            easing: LOCK_FLY_EASE,
+          },
+          { translate: dx.toFixed(1) + 'px ' + dy.toFixed(1) + 'px', offset: 1 },
+        ],
+        { duration: whole, fill: 'forwards' }
+      ),
+    ];
+    // From here, not from where the catch starts. The skin and the glass are mirrored
+    // off this box every frame the mirror runs, and the mirror only runs while something
+    // has asked it to — so a pinch that stirred nothing left the frosted rectangle and
+    // the liquid outline standing at full size while the contents visibly pulled in. The
+    // bubble is its skin, so anything that changes its box owes the mirror the frames.
+    stirLiquid(LOCK_PINCH + LOCK_FLY + 400);
+    // The merge begins where the journey does. The pinch is a move of its own and
+    // nothing is being taken in during it.
+    setTimeout(beginLockCatch, LOCK_PINCH);
+  }
+
+  function beginLockCatch() {
+    if (!lockFlying) return;
+    // No steps on it. The catch is here for the goo — the swell that says something is
+    // being taken in — and not for deciding when the journey is over: that is answered by
+    // where the two centres are, in watchLockCentre, which is a plainer question than an
+    // overlap share and gives the same answer at the same instant every time whatever
+    // size the row happens to be.
+    catchInto(lockPill, pill);
+    watchLockCentre();
+    stirLiquid(LOCK_FLY + 400);
+  }
+
+  /** How far the bubble is knocked up by what has just gone into it, and for how long. */
+  const LOCK_BUMP = 12;
+  const LOCK_BUMP_MS = 420;
+
+  /**
+   * Watched rather than timed. The flight is eased and its distance depends on where the
+   * bubble happens to be, so the moment the drop is level with it is not a number that can
+   * be written down beforehand — and it is the moment the whole merge is judged on.
+   */
+  function watchLockCentre() {
+    if (!lockFlying) return;
+    const traveller = lockPill.getBoundingClientRect();
+    const receiver = pill.getBoundingClientRect();
+    if (traveller.top + traveller.height / 2 > receiver.top + receiver.height / 2) {
+      requestAnimationFrame(watchLockCentre);
+      return;
+    }
+    releaseCatch(lockPill);
+    takeLockBack();
+    bumpPill();
+    landLock();
+  }
+
+  /**
+   * The row takes its mod back on the spot. Everything the row does about a mod — its
+   * width, its glyph, its window — is worked out from liveMods(), so letting the steal go
+   * is the whole of it.
+   */
+  function takeLockBack() {
+    stealHeld = false;
+    if (state === 'idle') toClosed();
+    else {
+      paintSatellites();
+      ensureClosedWindow();
+    }
+  }
+
+  /**
+   * Knocked up and back down by what has just gone into it. Added rather than set, because
+   * transform on the bubble belongs to whatever is dragging it this frame — set outright it
+   * would fight the drag and the row's own place.
+   */
+  function bumpPill() {
+    pill.animate(
+      [
+        { transform: 'translateY(0px)' },
+        { transform: 'translateY(-' + LOCK_BUMP + 'px)', offset: 0.35 },
+        { transform: 'translateY(0px)' },
+      ],
+      { duration: LOCK_BUMP_MS, easing: 'cubic-bezier(0.2, 1.6, 0.35, 1)', composite: 'add' }
+    );
+    stirLiquid(LOCK_BUMP_MS + 200);
+  }
+
+  function landLock() {
+    if (!lockFlying) return;
+    lockFlying = false;
+    lockOpen = false;
+    stealHeld = false;
+    // Out on the spot, not faded: by now it is inside the bubble and there is
+    // nothing left to see it happen against. Two hundred milliseconds of fade here
+    // is the split second of a full-size bubble reappearing at the bottom of the
+    // screen — the flight is cancelled with it, so the box springs back to where it
+    // started and then fades from there, in plain sight.
+    lockPill.style.setProperty('--lock-fade-ms', '0ms');
+    lockPill.classList.remove('showing', 'open', 'pressed', 'homing');
+    // Deep enough inside the bubble now that there is nothing left to see go out,
+    // which is also the moment the filter can go back to the row's own height.
+    root.classList.remove('lock-live');
+    fitLockProxy();
+    // And only once that has been drawn is the journey let go of, or the two happen
+    // in one frame and the snap back is what the frame shows.
+    requestAnimationFrame(() => {
+      if (lockFlight) lockFlight.forEach(move => move.cancel());
+      lockFlight = null;
+      lockPill.classList.remove('flying');
+      lockPill.style.removeProperty('--lock-fade-ms');
+    });
+  }
+
+  window.onLock = next => {
+    if (locked === next) return;
+    // Decided and flagged *before* the row is repainted, not after. Taking its mod back
+    // is what repaints the row, and repainting the row repaints this bubble — which
+    // asks lockMod() again, is told the keyguard has gone, and takes `showing` off the
+    // thing that is about to fly. An unskinned shape is not one of the boxes the mirror
+    // measures, so the merge saw a traveller with no box at all, read that as "as far in
+    // as it will ever get", and swallowed the whole journey on its first frame. That is
+    // what made unlocking look like the bubble simply vanishing.
+    const flying = !next && Boolean(lockMod());
+    locked = next;
+    lockFlying = flying;
+    // Held for the length of the flight, so the row does not yet know it has its mod
+    // back. The catch's entered step is what hands it over.
+    stealHeld = flying;
+    if (flying) {
+      flyLockHome();
+      return;
+    }
+    // The row has just lost or got back a mod, so it is repainted rather than nudged:
+    // its width, the circles beside it, the dots and the window it needs are all read
+    // off liveMods(), and that answer has changed.
+    if (state === 'idle') toClosed();
+    else {
+      paintSatellites();
+      ensureClosedWindow();
+    }
+    paintLock();
+  };
+
+  /**
+   * The lock bubble is an object too, and it is the one most likely to be idly pushed
+   * about: it is the bubble a thumb is already resting on. Same band and same dead zone
+   * as the bubble at the cutout — the numbers belong to the interface, not to a bubble.
+   * Nothing is asked for by it, so there is no threshold and no release to interpret;
+   * the transport's own taps still land, because a touch that travelled is not a tap.
+   */
+  let lockStart = null;
+  let lockHoldTimer = null;
+  let lockHeld = false;
+
+  /** True once a flick has already answered this touch, so the tap after it does not. */
+  let lockSwiped = false;
+
+  lockPill.addEventListener('touchstart', event => {
+    lockStart = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    lockHeld = false;
+    lockSwiped = false;
+    lockPill.classList.add('pressed');
+    // Held, it means what a hold means on every bubble here: out to the app the mod
+    // stands for. It runs underneath the play drag exactly as the main bubble's does —
+    // the dead zone is what keeps the two out of each other's way.
+    clearTimeout(lockHoldTimer);
+    lockHoldTimer = setTimeout(() => {
+      lockHeld = true;
+      lockPill.classList.remove('pressed');
+      untoy(lockPill, '--lock-drag');
+      bridge.triggerHaptic('expand');
+      leaveForMod('media');
+    }, HOLD_MILLIS);
+  }, { passive: true });
+
+  lockPill.addEventListener('touchmove', event => {
+    if (!lockStart || lockHeld) return;
+    const dx = event.touches[0].clientX - lockStart.x;
+    const dy = event.touches[0].clientY - lockStart.y;
+    if (Math.hypot(dx, dy) <= DEAD_ZONE) return;
+    // Up opens it, down closes it — the direction the box itself moves, so the gesture
+    // is the animation asked for by hand. It fires the moment the threshold is passed
+    // rather than on release, for the same reason the row's trade does: a threshold
+    // that only answers after the finger has gone is one the thumb has to guess at.
+    if (!lockSwiped && Math.abs(dy) > LOCK_SWIPE && Math.abs(dy) > Math.abs(dx)) {
+      lockSwiped = true;
+      clearTimeout(lockHoldTimer);
+      lockPill.classList.remove('pressed');
+      bridge.triggerHaptic('tap');
+      untoy(lockPill, '--lock-drag');
+      if (dy < 0) openLock();
+      else closeLock();
+      return;
+    }
+    if (lockSwiped) return;
+    toy(lockPill, '--lock-drag', dx, dy);
+  }, { passive: true });
+
+  function releaseLock() {
+    clearTimeout(lockHoldTimer);
+    lockPill.classList.remove('pressed');
+    lockStart = null;
+    untoy(lockPill, '--lock-drag');
+  }
+
+  lockPill.addEventListener('touchend', releaseLock, { passive: true });
+  lockPill.addEventListener('touchcancel', releaseLock, { passive: true });
+
+  /**
+   * Tapped, it opens and closes — the transport's own buttons stop their clicks before
+   * they get here, so a tap on play is a tap on play and a tap on the bubble is a tap
+   * on the bubble. A hold has already acted by the time the finger lifts, and the tap
+   * that follows would undo it.
+   */
+  lockPill.addEventListener('click', () => {
+    if (lockHeld || lockSwiped) return;
+    bridge.triggerHaptic('tap');
+    if (lockOpen) closeLock();
+    else openLock();
+  });
+
+  /**
+   * A button that answers being pressed. The class is taken off on the next frame
+   * rather than after a timer: the shrink is instant and the way back is the long
+   * transition, so the whole of the feedback is one property with one owner, and a
+   * second tap landing during the first one restarts it from wherever it had got to.
+   */
+  function knock(element) {
+    element.classList.add('knocked');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      element.classList.remove('knocked');
+    }));
+  }
+
+  function lockTransport(id, action) {
+    document.getElementById(id).addEventListener('click', event => {
+      event.stopPropagation();
+      knock(event.currentTarget);
+      bridge.triggerHaptic('tap');
+      bridge.mediaControl(action);
+    });
+  }
+
+  lockTransport('lock-previous', 'previous');
+  lockTransport('lock-next', 'next');
+  document.getElementById('lock-play').addEventListener('click', event => {
+    event.stopPropagation();
+    knock(event.currentTarget);
+    bridge.triggerHaptic('tap');
+    bridge.mediaControl(media && media.isPlaying ? 'pause' : 'play');
+  });
+
+  // #endregion ────────────────────────────────────────────────────────────────
+
   function transport(id, action) {
     document.getElementById(id).addEventListener('click', event => {
       event.stopPropagation();
+      knock(event.currentTarget);
       bridge.triggerHaptic('tap');
       bridge.mediaControl(action);
     });
@@ -3636,6 +4974,7 @@
 
   document.getElementById('player-play').addEventListener('click', event => {
     event.stopPropagation();
+    knock(event.currentTarget);
     bridge.triggerHaptic('tap');
     bridge.mediaControl(media && media.isPlaying ? 'pause' : 'play');
   });
@@ -4266,6 +5605,13 @@
     // before this fires; only a real hold ever gets here.
     clearTimeout(growTimer);
     growTimer = setTimeout(() => {
+      // Not while the row is being dragged. Resizing the proxy pulls the surface out
+      // from under the finger and the system answers with a cancel, which would end the
+      // drag the hold is deliberately running underneath. The window a closed row with
+      // a satellite already has is symmetric and holds a satellite's width either side,
+      // which is more than the swell needs — so the growth is simply skipped and the
+      // scale is drawn in room that was already there.
+      if (root.classList.contains('dragging')) return;
       // Scaled from whatever the bubble currently is, never from the bare size: a
       // mod makes the closed bubble wider.
       const base = closedWindow();
@@ -4307,6 +5653,12 @@
       holdTimer = setTimeout(() => {
         hasHeld = true;
         root.classList.remove('holding');
+        // Whatever else the finger had started underneath the hold is let go of here,
+        // and let go of without being asked what it wanted: the hold has the touch now,
+        // and a trade committing or a list opening behind the panel this is about to
+        // put up is two gestures answering one finger.
+        abandonSwap();
+        endPull();
         bridge.triggerHaptic('expand');
         // The hold on a mod is the way out to its app — the one thing the bubble
         // itself can never be. A bare bubble has no app to leave for, so it holds to
@@ -4346,22 +5698,46 @@
     if (hasHeld) return;
     const verticalTravel = event.touches[0].clientY - startY;
     const horizontalTravel = Math.abs(event.touches[0].clientX - startX);
-    // A finger held still for a third of a second still wanders. One slop for both
-    // answers: whatever cancels the hold is the same travel that starts the drag, so
-    // there is no band where the bubble is being dragged and the hold has been
-    // called off but nothing has been asked for yet.
-    if (Math.abs(verticalTravel) > HOLD_SLOP || horizontalTravel > HOLD_SLOP) endHold();
+    const sideways = event.touches[0].clientX - startX;
+    // Inside the dead zone nothing moves and nothing is measured. This is the room the
+    // hold needs: a finger pressing for a third of a second wanders, and every pixel of
+    // that wander used to reach some gesture or other.
+    if (Math.hypot(horizontalTravel, verticalTravel) <= DEAD_ZONE) return;
+    // Until something claims the touch the bubble simply follows the finger on its
+    // band. Once a real gesture has it — a trade, a lean — the play drag lets go and
+    // the row's own motion takes over, or the bubble would be carried twenty pixels off
+    // its place for the whole of a swap.
+    if (root.classList.contains('dragging') || root.classList.contains('pulling') ||
+        hasSwiped) {
+      untoy(root, '--drag');
+    } else {
+      toy(root, '--drag', sideways, verticalTravel);
+    }
+    // The hold is no longer called off by travel at all. It used to be — one slop for
+    // both answers, whatever cancels the hold is the same travel that starts the drag —
+    // and that made the drag the senior gesture: a finger that moved was a finger that
+    // had given up on holding, so the swell stopped growing and the haptic never came.
+    // It is the other way round now. The hold runs underneath whatever else the finger
+    // is doing, swelling on `scale` while the drag trades width and the pull leans, and
+    // if the finger is still down when its timer comes up the hold takes the touch and
+    // the others are let go of without asking for anything. A gesture that has to be
+    // held still to work is one the user has to be careful to make.
     // Sideways across a closed bubble trades width with the satellite, live. The
     // vertical limit only decides whether a drag may *start*: once it has, the
     // finger is free to wander down the screen, which it does — the bubble is at the
     // very top and there is nowhere else for a long drag to go.
-    const sideways = event.touches[0].clientX - startX;
     const dragging = root.classList.contains('dragging');
     // The pull down comes before the sideways trade, and wins whenever the finger is
     // going down more than it is going across. It is the fallback gesture, so it must
     // be the easy one to make: no aiming, and it starts moving almost at once.
+    // Once it has started it keeps the touch until the finger lifts. A pull is now long
+    // enough that the finger wanders well past the drag's slop sideways on the way
+    // down, and the frame where that wander read as wider than the travel handed the
+    // touch to the sideways trade — which sets hasSwiped and kills the pull for good.
+    // The direction only decides which gesture this is, and it is decided once.
+    const pulling = root.classList.contains('pulling');
     if (state !== 'active' && CLOSED.has(size) && !hasSwiped && !dragging &&
-        verticalTravel > PULL_START && verticalTravel > horizontalTravel) {
+        (pulling || (verticalTravel > PULL_START && verticalTravel > horizontalTravel))) {
       // The hold is not called off while the bubble is merely leaning: the finger that
       // is about to be held still wanders a few pixels, and cancelling on that wander
       // is exactly what broke the hold on the sideways drag. Only a pull that has
@@ -4374,13 +5750,22 @@
         openHistory();
         return;
       }
-      const reached = (verticalTravel - PULL_START) / (PULL_TRIGGER - PULL_START);
+      // Clamped low because the latch above lets the finger come back up without
+      // handing the touch on, and a negative reach would push the bubble upwards.
+      const reached = Math.max(0, (verticalTravel - PULL_START) / (PULL_TRIGGER - PULL_START));
       pullReach = reached;
       root.classList.add('pulling');
+      // Under the finger nothing eases, so the springback's own transition has to be off
+      // again before the lean is written — the same handover toy() makes for the drag.
+      root.classList.remove('homing');
       root.style.setProperty('--pull', (PULL_TRAVEL * reached).toFixed(2) + 'px');
-      // A touch of shrink with it, so the last pixels before the trigger still read
-      // as movement once the travel has run out of room.
+      // A touch of shrink with it, so the bubble reads as being drawn out of the
+      // cutout under tension rather than simply sliding down the screen.
       root.style.setProperty('--pull-scale', (1 - 0.03 * reached).toFixed(3));
+      // The glass and the goo are mirrored off the bubble, and the bubble is now
+      // travelling far enough that a mirror standing still is a pane left behind at
+      // the cutout. Short, because the next move re-stirs it.
+      stirLiquid(160);
       return;
     }
     // The drag starts where the hold gives up and not a pixel sooner. It used to
@@ -4394,12 +5779,14 @@
       if (dragSwap(Math.sign(sideways) * committed)) {
         hasSwiped = true;
         hasMoved = true;
-        endHold();
         return;
       }
     }
     if (verticalTravel < -24 && horizontalTravel < 40) {
       hasMoved = true;
+      // The one gesture the hold does not get to run underneath: this one has already
+      // acted, and there is nothing left to hold.
+      endHold();
       bridge.triggerHaptic('dismiss');
       bridge.onSwipeDismiss();
       toClosed();
@@ -4413,13 +5800,23 @@
    * between two frames, and a gesture that was visibly most of the way there and did
    * nothing is the same bug as one that needs aiming.
    */
-  function endPull(settle) {
+  function endPull(settle, threshold) {
     if (!root.classList.contains('pulling')) return;
-    const asked = settle && pullReach > 0.7;
+    const asked = settle && pullReach > (threshold || PULL_SETTLE);
     pullReach = 0;
     root.classList.remove('pulling');
+    // The lean lives inside `transform`, which is the per-frame property and has no
+    // duration of its own — that is the whole point of the split, and it is why letting
+    // go of a pull put the bubble back at the cutout in one frame. The way home is the
+    // play drag's, because it is the same journey: `homing` is the one rule that gives
+    // `transform` a transition, and it is named here rather than a second curve being
+    // written for the pull alone.
+    root.classList.add('homing');
     root.style.removeProperty('--pull');
     root.style.removeProperty('--pull-scale');
+    // The glass and the goo are mirrored off the bubble, so they have to ride the
+    // springback home rather than snapping back the frame the class came off.
+    stirLiquid(600);
     if (asked) {
       // The tap that follows a touchend is not this gesture asking twice — it would
       // close what the pull has just opened.
@@ -4433,6 +5830,7 @@
     releaseSwap();
     endPull(true);
     endHold();
+    untoy(root, '--drag');
   }, { passive: true });
   /**
    * Growing the window to make room for the scaled bubble pulls the surface out from
@@ -4443,7 +5841,8 @@
    */
   pill.addEventListener('touchcancel', () => {
     releaseSwap();
-    endPull();
+    endPull(true, PULL_STOLEN);
+    untoy(root, '--drag');
     if (state === 'haptic' && hasGrown) return;
     endHold();
   }, { passive: true });
@@ -4622,8 +6021,6 @@
   let nowDotAt = 0;
   let nowSliding = false;
   let nowWidth = 46;
-  /** Where the glass has been sent, so a width change does not drag it back home. */
-  let nowFlyAt = 0;
 
   /** One flight is a run of steps, and a second light cancels the first outright. */
   let nowTimers = [];
@@ -4633,6 +6030,9 @@
   function stopNowFlight() {
     nowTimers.forEach(clearTimeout);
     nowTimers = [];
+    // A light switched back on while its drop was falling home is not being taken in
+    // any more, and the bubble must not go on being told it is.
+    releaseCatch(nowPill);
   }
 
   function showNowFace(name) {
@@ -4659,12 +6059,48 @@
    * out, and the panel is a size of its own.
    */
   function fitNowWidth() {
-    if (!nowPill.classList.contains('lit')) return;
-    if (nowOpen || root.classList.contains('now-flying')) return;
-    const next = nowResting();
-    if (Math.abs(next - nowWidth) < 1) return;
-    setNowWidth(next, NOW_EXPAND, 'var(--ease-split)');
-    fitNowProxy();
+    if (nowPill.classList.contains('lit') && !nowOpen &&
+        !root.classList.contains('now-flying')) {
+      const next = nowResting();
+      if (Math.abs(next - nowWidth) >= 1) {
+        setNowWidth(next, NOW_EXPAND, 'var(--ease-split)');
+        fitNowProxy();
+      }
+    }
+    // Always, even when the width did not move — the width not moving is exactly the
+    // case this is for.
+    fitNowCrowd();
+  }
+
+  /** The least bar left between the light's glyph and its reading once it is crowded. */
+  const NOW_READ_GAP = 8;
+  /** How far the reading currently stands off its own edge, so the room can be read back. */
+  let nowCrowd = 0;
+
+  /**
+   * The reading giving way to the row. Once the light has shrunk to NOW_COVER it cannot
+   * give up any more width — below that it hands back the piece of bar it exists to
+   * stand on — so the row goes on coming and the two bubbles' contents are what meet.
+   * The reading is pushed left by exactly as much of it as the row has taken, which is
+   * what one body of liquid does when another arrives beside it: it does not stay put
+   * and get sat on, and it does not vanish.
+   *
+   * Bounded by the glyph, which does not move — the glyph is the left inset in every
+   * bubble here and the one thing on this bar that is always in the same place.
+   */
+  function fitNowCrowd() {
+    const idle = !nowPill.classList.contains('lit') || nowOpen ||
+      root.classList.contains('now-flying');
+    const taken = idle ? 0 : (nowLeft + nowWidth + NOW_REACH) - rowLeftEdge();
+    // Read back through the push already applied, or the room shrinks every time this
+    // runs and the reading walks itself into the glyph one paint at a time.
+    const room = idle ? 0 : nowReading.getBoundingClientRect().left + nowCrowd -
+      nowGlyph.getBoundingClientRect().right - NOW_READ_GAP;
+    const next = Math.min(Math.max(0, taken), Math.max(0, room));
+    if (Math.abs(next - nowCrowd) < 0.5) return;
+    nowCrowd = next;
+    root.style.setProperty('--now-crowd', next.toFixed(1) + 'px');
+    stirLiquid(NOW_EXPAND + 120);
   }
 
   /** Flying, the pill is a drop: as wide as it is tall, a circle. */
@@ -4683,7 +6119,9 @@
     root.style.setProperty('--now-fly', next + 'px');
     root.style.setProperty('--now-fly-ms', milliseconds + 'ms');
     root.style.setProperty('--now-fly-ease', ease);
-    if (!nowOpen) paintNowBlur(nowWidth, next, milliseconds);
+    // Nothing about the glass is said here any more. This bubble's pane is mirrored
+    // off the pill itself every frame like every other one, so the flight only has to
+    // keep the mirror running for as long as it lasts.
     stirLiquid(milliseconds + 120);
   }
 
@@ -4692,39 +6130,7 @@
     root.style.setProperty('--now-width', next + 'px');
     root.style.setProperty('--now-width-ms', milliseconds + 'ms');
     root.style.setProperty('--now-width-ease', ease);
-    if (!nowOpen) paintNowBlur(next, nowFlyAt, milliseconds);
     stirLiquid(milliseconds + 120);
-  }
-
-  /**
-   * The glass, which is the host's and not the page's — nothing a WebView draws
-   * reaches pixels it does not own. Same contract as everywhere else here: the page
-   * says where the shape is going and how long it is taking, and the host runs the
-   * same curve on the blurred region.
-   */
-  function paintNowBlur(width, offset, milliseconds) {
-    nowFlyAt = offset;
-    // Same clock as the row's glass, and for the same reason — see sendBlur.
-    sendNowBlur(
-      Math.round(width),
-      compact.height,
-      Math.round(compact.height / 2),
-      Math.round(nowLeft + offset),
-      Math.round(milliseconds)
-    );
-  }
-
-  let nowBlurPending = null;
-
-  function sendNowBlur() {
-    const waiting = nowBlurPending !== null;
-    nowBlurPending = Array.prototype.slice.call(arguments);
-    if (waiting) return;
-    requestAnimationFrame(() => {
-      const sending = nowBlurPending;
-      nowBlurPending = null;
-      bridge.setNowBlur.apply(bridge, sending);
-    });
   }
 
   /** The proxy is exactly what can be touched, and nothing else on this bar can. */
@@ -4758,6 +6164,7 @@
    * the thing two windows could never do, and the reason this page is the way it is.
    */
   function lightNow() {
+    traceEvent('torch on');
     stopNowFlight();
     paintNowReading();
     root.classList.add('now-flying');
@@ -4794,6 +6201,7 @@
    * there opens up again as it arrives — because it is the thing arriving.
    */
   function douseNow() {
+    traceEvent('torch off');
     stopNowFlight();
     if (nowOpen) closeNowPanel();
     // First, before the width goes: the reading belongs to width the pill is about to
@@ -4825,18 +6233,26 @@
       // for the drop to arrive — the bar is free the moment the light leaves its spot —
       // and anything else reads as the bubbles hanging back before remembering to move.
       window.onTorchChip(false);
-      nowAfter(NOW_RETURN + 60, () => {
-        // Home, dark, and put back on its spot ready to be thrown out again. It goes
-        // out on the spot rather than fading, because by now it is inside the bubble
-        // and there is nothing left to see it happen against.
-        root.style.setProperty('--now-fade-ms', '0ms');
-        nowPill.classList.remove('lit');
-        nowGlyph.classList.remove('dragging');
-        setNowFly(0, 0, 'linear');
-        fitNowProxy();
-        // A transparent view goes on blurring, so the glass is taken off by hand.
-        sendNowBlur(0, 0, 0, 0, 0);
-        requestAnimationFrame(() => root.style.removeProperty('--now-fade-ms'));
+      // And the bubble takes the drop the same way it takes a circle: as a merge it
+      // measures rather than a bounce it plays. The stretch grows with however much of
+      // the drop is inside it — liquid added to a drop of water jumps its tension and
+      // contains itself again — and the light only goes out once the drop is deep
+      // enough inside that nothing is seen going out.
+      catchInto(nowPill, pill, {
+        swallowed: () => {
+          // Home, dark, and put back on its spot ready to be thrown out again. It goes
+          // out on the spot rather than fading, because by now it is inside the bubble
+          // and there is nothing left to see it happen against.
+          root.style.setProperty('--now-fade-ms', '0ms');
+          nowPill.classList.remove('lit');
+          nowGlyph.classList.remove('dragging');
+          setNowFly(0, 0, 'linear');
+          fitNowProxy();
+          // Taking `lit` off is what takes the glass off with it: an unlit Now bubble is
+          // not one of the shapes the mirror measures, so its pane is sent as nothing and
+          // the host clears it — a transparent view otherwise goes on blurring.
+          requestAnimationFrame(() => root.style.removeProperty('--now-fade-ms'));
+        },
       });
     });
   }
@@ -4929,14 +6345,10 @@
     if (!nowSliding) nowDotAt = (torch ? torch.step : 1) - 1;
     paintNowSlider();
     const shift = nowPanelShift();
-    nowFlyAt = shift;
     root.style.setProperty('--now-fly', shift + 'px');
     root.style.setProperty('--now-fly-ms', NOW_PANEL.ms + 'ms');
     root.style.setProperty('--now-fly-ease', 'var(--ease-grow)');
     fitNowProxy();
-    sendNowBlur(
-      NOW_PANEL.width, NOW_PANEL.height, 24, Math.round(nowLeft + shift), NOW_PANEL.ms
-    );
     // The skin is mirrored off this box every frame and the loop only runs while
     // something says it is moving. A class that changes the size says nothing, so
     // without this the blob stayed at the size it had when the panel opened and the
@@ -5217,7 +6629,7 @@
     // changes size under one has to hand it the new room.
     if (size === 'timing') setSize('timing', timerWindow(), true);
     else if (size === 'playing') setSize('playing', mediaWindow(), true);
-    else { paintSatellites(); paintBlur(); }
+    else { paintSatellites(); paintShift(); }
   };
   window.setGrab = value =>
     document.documentElement.style.setProperty('--grab', value + 'px');

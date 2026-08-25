@@ -6,7 +6,7 @@ A system-wide overlay pill for one Samsung Galaxy S25 (SM-S931B, Android 16 / SD
 
 ## The documents
 
-Four rule files in `.claude/rules/`, and each one owns a different question. A change touching an area updates its file in the same task.
+Four rule files in `.Codex/rules/`, and each one owns a different question. A change touching an area updates its file in the same task.
 
 - `bubbles.md` — what every bubble is, whichever kind it is. Read before adding a bubble.
 - `states.md` — the state vocabulary: kinds, states, mods, tabs, and which of them are built.
@@ -18,7 +18,7 @@ Four rule files in `.claude/rules/`, and each one owns a different question. A c
 
 1. **Read in this order:** this file, the rule file covering what is being touched, then the backlog note in the vault. Nothing about open work is written in this repository.
 2. **One backlog item at a time.** Tick it `[x]` in the vault only once it has been verified on the phone.
-3. **Name the contracts the change touches before editing** — state, motion, window, blur, mirrored constant. The glass is mirrored off the real boxes now rather than told where to go, so what a size change owes it is a `stirLiquid()` long enough to cover the transition.
+3. **Name the contracts the change touches before editing** — state, motion, window, blur, mirrored constant. A change that moves a size is not finished until the matching `setBlurBounds` moves with it on the same curve.
 4. **Docs change in the same task**, never afterwards.
 5. **The check is the phone.** Build, install over wifi, walk the states, and say plainly what was verified on the device and what was not. Never report an animation as working when only the build succeeded.
 6. **Fix the cause, not the caller.** A backlog item names one symptom; the same bug is usually live in every sibling that routes through the same function.
@@ -38,7 +38,7 @@ The JDK and the SDK exist only on the machine the phone is flashed from. A check
 Two notes in the user's Obsidian vault, which is a configured working directory for this session:
 
 - `Dynamic Bubble.md` — the live backlog. The user edits it directly; tick an item `[x]` there when it ships.
-- `Dynamic Bubble Stability & Improvements.md` — the system overhaul: the model every bubble is meant to obey, and the current issue list. Its contents are being moved into `.claude/rules/` as they become binding.
+- `Dynamic Bubble Stability & Improvements.md` — the system overhaul: the model every bubble is meant to obey, and the current issue list. Its contents are being moved into `.Codex/rules/` as they become binding.
 
 Nothing about open work belongs in this repository.
 
@@ -52,7 +52,7 @@ Nothing about open work belongs in this repository.
 
 ## Style
 
-The interface follows the VADITIM Style DNA — the `vados-dna` skill in the global config repo (`~/.claude/skills/vados-dna/`). Say **"use VADOS DNA"** to load it. Its typography and motion rules bind here; where a rule in `.claude/rules/` is more specific, the more specific one wins.
+The interface follows the VADITIM Style DNA — the `vados-dna` skill in the global config repo (`~/.Codex/skills/vados-dna/`). Say **"use VADOS DNA"** to load it. Its typography and motion rules bind here; where a rule in `.Codex/rules/` is more specific, the more specific one wins.
 
 ## Don'ts
 

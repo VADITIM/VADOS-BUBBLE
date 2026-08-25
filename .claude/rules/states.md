@@ -22,7 +22,7 @@ Rows are tagged **built** (on the phone now) or **planned** (specified, not writ
 | **Hidden** | Past the second satellite: a coloured dot, not a bubble face. | built | none; it is a count |
 | **Lock** | Where the lock icon is on the lock screen. | planned | none; it is an indicator that merges on unlock |
 | **Notification** | Over the lock screen's own notification list, replacing it. | planned | Active |
-| **Bottom Now** | At the bottom of the lock screen, replacing the Now Bar. | planned | Active, Haptic |
+| **Lock Now** | At the bottom of the lock screen, where a thumb reaches. Replaces the Now Bar. | built, partly | Mod, Active, Haptic; Pull and Push planned |
 
 While the Now bubble is out the row is allowed **one** satellite, not two: the bar left over is not wide enough for a second, and a row that overflows into the punch hole is worse than a row that counts. A satellite losing its place is not hidden — it is run into the bubble, which takes the knock, and it comes back as the first dot.
 
@@ -94,6 +94,34 @@ Everything in [bubbles.md](bubbles.md) still binds — born at the punch hole, l
 ## Lock screen
 
 The lock-screen bubbles exist to replace what the lock screen already draws, not to stand next to it. All of them are planned.
+
+### The steal
+
+A mod on the lock screen is not copied down to the bottom and it is not drawn twice. It **belongs to a different bubble** for as long as the keyguard is up: the Lock Now bubble takes it, and the row at the cutout no longer has it at all. `LOCK_STEALS` names which mods are taken — media today — and the whole of the steal is one filter in `liveMods()`, because `liveMods()` is what the row's width, its satellites, its dots and its window are every one of them worked out from. Take the mod out there and all of them stop carrying it without being told; putting it back is the same filter going quiet.
+
+So a new mod does not need lock-screen handling written for it. It needs a name in `LOCK_STEALS` and a face on the lock bubble, and the row lets go of it by itself.
+
+Satellites follow the bubble that owns the mods, which on the lock screen is this one — planned, not built.
+
+The stolen mod keeps its own identity down there rather than borrowing the row's. `--app-accent` is scoped to the lock bubble and written from the song it is carrying, because the row does not have that mod any more — nothing up there is keeping the colour right for a bubble that is no longer its.
+
+Active on this bubble is not a panel that appears over it: it is the same box at a greater height. It is hung off the bottom edge of the screen, so height is the only thing that changes and it grows upwards on its own, with the end the thumb is resting on never moving. A second element would have to be told all of that. It is entered by a tap or by a flick upwards, and left by either the same tap or a flick down — the direction of the flick is the direction the box moves.
+
+Its transitions are named once in `--lock-transition` and every rule that adds a property to the list puts that list back rather than replacing it. The play drag's homing rule did replace it, and took the height with it: opening was instant, and the bug read as "Active is not animated" rather than as what it was — a rule about dragging quietly owning every other animation the bubble had. Same trap as the blanket `transition: none` in [motion.md](motion.md#motion-is-additive).
+
+Closed, its layout is three bands rather than one row: the song at the top beside its cover, the transport spread across the whole width beneath it, and the timeline along the bottom. The width matters — this is the bubble worked with the thumb of the hand already holding the phone, and controls huddled at one end of a full-width box are the one place that thumb cannot reach.
+
+Open, it is a record sleeve and takes about seventy per cent of the screen: the cover fills the width at the top, the song is read underneath it rather than beside it, and the transport grows into what is left. Nothing here is a second element — the cover is the same `<img>` at a different size, so it *travels* between the two layouts rather than being swapped for a bigger copy of itself. Its size is written as a length rather than a percentage for exactly that reason: width and height animate, and a height of auto with an aspect ratio does not.
+
+The timeline is flush against the bottom edge with no padding under it, so the squircle cuts the ends of the line and it belongs to the shape. The dot marking the song's position rides the end of the filled part rather than being placed from the ratio a second time — one number, one owner, and it cannot disagree with the line it stands on.
+
+A touch anywhere on a lock-screen bubble has to hold the screen on. These windows are not the keyguard's, so working the controls down there is watched by nobody and the screen goes off mid-gesture. `PowerManager.userActivity` is a signature permission and out of reach; `FLAG_KEEP_SCREEN_ON` set on the canvas at the touch and taken off again a while later is the same thing from the outside. It has to come off again — a flag left standing is a phone that never sleeps.
+
+Unlocking is a **merge**, not a disappearance. It is one journey at two speeds, never two moves. It closes to `LOCK_PINCH_SCALE` on an ease that leaves slowly and ends fast and past its mark, and it is travelling the whole time it does — at `LOCK_CRAWL`, a quarter of full speed — then opens up to full speed for the rest of the way once there is nothing left to close. Held still while it closes it reads as two unrelated things in turn, a resize and then a slide. Size and travel are two animations on two properties rather than one keyframe list, because a keyframe's easing owns every property in it and these two want opposite ones. It travels on one goo layer with the bubble, closing over the journey to the bubble's own measured size — a shape wider than what is taking it in has not arrived yet. The `catchInto` is there for the swell only; the merge itself ends the frame the drop's centre reaches the bubble's, watched per frame rather than timed, because the flight is eased and its distance depends on where the bubble is standing, so that instant is not a number that can be written down beforehand. At it the drop goes out on the spot, the row takes its mod back in the same frame, and the bubble is knocked `LOCK_BUMP` up and back down — added to its transform, never set, since transform belongs to whatever is dragging it.
+
+The steal outlives the keyguard by exactly one flight. `stealHeld` keeps `liveMods()` filtering the mod out while the drop is in the air, and the catch's `entered` step is what lets it go — so the row opens out *because* the drop arrived. Released when the keyguard went instead, the bubble at the cutout had already grown and settled before the thing it grew for had set off, and the two read as unrelated events happening near each other.
+
+The flag saying it is flying is set *before* the row is repainted, never after. Taking the mod back is what repaints the row, and repainting the row repaints this bubble — which asks `lockMod()` again, is told the keyguard has gone, and takes `showing` off the very thing that is about to fly. It keeps `showing` for the whole journey: that class is what the skin reads to decide the shape is one of the row's at all, and taken off at the start it would spend the flight outside the liquid and arrive as a separate object fading on top of the bubble — the exact bug the torch drop had.
 
 - **Lock** stands where the lock icon is. Unlocking animates it open and then merges it into the Main bubble, which ripples for it.
 - **Notification** bubbles overlap the system's own lock-screen notifications and take their place.

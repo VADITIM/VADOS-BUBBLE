@@ -1,5 +1,6 @@
 package com.v.island
 
+import android.app.KeyguardManager
 import android.accessibilityservice.AccessibilityService
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -76,13 +77,21 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          */
         private const val NOW_LEFT = 16
 
+
         /**
-         * Tall enough for the tallest thing the page can ask for, which is the
-         * notification list at three quarters of the screen — see historyWindow() in
-         * pill.html. The stage is the ceiling on everything: the window can be told
-         * any height, but nothing is drawn past the edge of the surface inside it.
+         * One pane of glass per bubble that can stand anywhere on this screen: the main
+         * bubble, a satellite each side, the Now bubble, and the lock screen's own. Mirrored in pill.html's BLUR_PANES,
+         * which sends exactly this many regions in exactly this order — there is no
+         * build step joining the two, so a bubble added on one side and not the other
+         * is a bubble that draws without glass or a pane blurring nothing.
          */
-        private const val STAGE_HEIGHT = 620
+        private const val BLUR_PANES = 5
+
+        /** How long a touch on a bubble holds the screen on for. */
+        private const val LOCK_AWAKE = 15_000L
+
+        /** One wake covers a gesture; asking on every touch event is asking for nothing. */
+        private const val WAKE_FRAMES_EVERY = 150L
 
         private const val BASE_FLAGS =
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -196,33 +205,27 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private lateinit var nowProxy: View
     private lateinit var nowProxyParams: WindowManager.LayoutParams
 
-    /** The Now bubble's own glass. It travels the whole bar, so it is its own region. */
-    private lateinit var blurNow: View
-    private var nowAnimator: android.animation.ValueAnimator? = null
-    private var nowCorner = 0f
+    /** The same again for the lock screen bubble, down at the bottom of the canvas. */
+    private lateinit var lockProxy: View
+    private lateinit var lockProxyParams: WindowManager.LayoutParams
 
     /**
-     * An empty view that exists only to carry the blur. The blurred region is a
-     * view's bounds, so blurring the window root blurred the invisible grab margin
-     * with it; this one is exactly the bubble, and it follows the bubble's own
-     * animation rather than jumping to the finished size.
+     * One empty view per bubble, carrying nothing but that bubble's glass: main, the
+     * two satellites, the Now pill. The blurred region is a view's bounds, so blurring
+     * the window root blurred the invisible grab margin with it, and one region
+     * spanning the row would blur the gaps between the shapes as well.
+     *
+     * They are placed, never animated. The page mirrors every shape's real
+     * `getBoundingClientRect()` frame by frame and sends the rectangles as they are
+     * being drawn, so the glass has no curve, no duration and no geometry of its own to
+     * keep in step with the CSS — it is wherever its bubble is this frame. The pane
+     * that replayed the bubble's curve on the host's own clock is what used to drift
+     * out from under a shape that was scaled, dragged or handed over mid-flight.
      */
-    private lateinit var blurCanvas: View
-    private var blurAnimator: android.animation.ValueAnimator? = null
+    private lateinit var blurPanes: List<View>
 
-    /** The satellites' glass runs on the split's own clock, which is not the bubble's. */
-    private var satelliteAnimator: android.animation.ValueAnimator? = null
-
-    /** The radius each blurred region is rounded by right now, in pixels. */
-    private var blurCorner = 0f
-    private val satelliteCorners = floatArrayOf(0f, 0f)
-
-    /**
-     * A satellite's own glass. Two of them, because three mods flank the bubble —
-     * one circle a side — and each is its own pane: a single region spanning the row
-     * would blur the gaps between them as well.
-     */
-    private lateinit var blurSatellites: List<View>
+    /** The radius each pane is rounded by right now, in pixels. */
+    private val paneCorners = FloatArray(BLUR_PANES)
     private lateinit var params: WindowManager.LayoutParams
     private lateinit var preferences: SharedPreferences
     private var pageReady = false
@@ -242,6 +245,16 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
      */
     private var isScreenOff = false
     private var screenWatch: BroadcastReceiver? = null
+
+    /**
+     * Whether the keyguard is up. The lock screen is not a mode this app enters — it is
+     * a place the phone is, and the page draws a different set of bubbles while it is
+     * there. Read from `KeyguardManager` rather than tracked through the broadcasts,
+     * because the broadcasts are only ever the cue to look: SCREEN_ON fires before the
+     * keyguard has decided, and a phone woken by a notification is locked while a phone
+     * woken to an already-dismissed keyguard is not.
+     */
+    private var isLocked = false
 
     /**
      * Nothing is read from the events themselves; they are only the cue to look at
@@ -291,40 +304,22 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             // Without this the window gets pushed below the cutout and the bubble
             // can never sit level with it.
             setOnApplyWindowInsetsListener { _, _ -> android.view.WindowInsets.CONSUMED }
-            blurCanvas = View(this@BubbleService)
-            addView(
-                blurCanvas,
-                FrameLayout.LayoutParams(
-                    dp(compactWidth()),
-                    dp(compactHeight()),
-                    Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                ).apply { topMargin = dp(topGrab()) }
-            )
-            blurNow = View(this@BubbleService).apply { visibility = View.GONE }
-            addView(
-                blurNow,
-                FrameLayout.LayoutParams(
-                    dp(compactHeight()),
-                    dp(compactHeight()),
-                    Gravity.TOP or Gravity.START
-                ).apply { topMargin = dp(topGrab()) }
-            )
-            blurSatellites = List(2) { View(this@BubbleService).apply { visibility = View.GONE } }
-            blurSatellites.forEach { satellite ->
+            // Hung off the left edge and moved by translation alone: the page measures
+            // every rectangle from the left edge of the canvas, which is this window,
+            // so a pane placed at that number is over its bubble without a second
+            // coordinate system to convert between.
+            blurPanes = List(BLUR_PANES) { View(this@BubbleService).apply { visibility = View.GONE } }
+            blurPanes.forEach { pane ->
                 addView(
-                    satellite,
-                    FrameLayout.LayoutParams(
-                        dp(compactHeight()),
-                        dp(compactHeight()),
-                        Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                    ).apply { topMargin = dp(topGrab()) }
+                    pane,
+                    FrameLayout.LayoutParams(0, 0, Gravity.TOP or Gravity.START)
                 )
             }
             addView(
                 webView,
                 FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
-                    dp(STAGE_HEIGHT),
+                    stageHeight(),
                     Gravity.TOP or Gravity.CENTER_HORIZONTAL
                 )
             )
@@ -348,7 +343,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         params = WindowManager.LayoutParams(
             screenWidth(),
-            dp(STAGE_HEIGHT),
+            stageHeight(),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             CANVAS_FLAGS,
             PixelFormat.TRANSLUCENT
@@ -402,6 +397,32 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
+        lockProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, lockProxyParams, "lock")
+                return true
+            }
+        }
+        // Placed from the page like the Now bubble.s, and given no size until the lock
+        // screen actually has a bubble to be over. Unlike the two at the top of the
+        // screen this one costs no shade swipe at all -- nothing starts a gesture down there
+        // except the navigation bar, which is below it.
+        lockProxyParams = WindowManager.LayoutParams(
+            0, 0,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
         // Hung on the left, where the Now bubble stands, rather than centred like the
         // bubble's own. It is given no size until the light is on.
         nowProxyParams = WindowManager.LayoutParams(
@@ -417,7 +438,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
-        applyBlur()
+        // No pane is painted here: every one of them is hidden until the page sends the
+        // first frame of rectangles, which is the only side that knows what it is drawing.
         // The refresh rate is only half of it: the platform also throttles a view that
         // does not say it wants frames, and a WebView animating CSS looks idle to it.
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
@@ -426,6 +448,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // a window that is only there to draw.
         windowManager.addView(touchProxy, proxyParams)
         windowManager.addView(nowProxy, nowProxyParams)
+        windowManager.addView(lockProxy, lockProxyParams)
         applyVisibility()
         ShizukuShell.bind(this)
         instance = this
@@ -444,15 +467,26 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         isScreenOff = !getSystemService(PowerManager::class.java).isInteractive
         screenWatch = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                isScreenOff = intent.action == Intent.ACTION_SCREEN_OFF
-                applyVisibility()
+                if (intent.action != Intent.ACTION_USER_PRESENT) {
+                    isScreenOff = intent.action == Intent.ACTION_SCREEN_OFF
+                    applyVisibility()
+                }
+                reportLock()
             }
         }.also {
             registerReceiver(
                 it,
-                IntentFilter(Intent.ACTION_SCREEN_OFF).apply { addAction(Intent.ACTION_SCREEN_ON) }
+                IntentFilter(Intent.ACTION_SCREEN_OFF).apply {
+                    addAction(Intent.ACTION_SCREEN_ON)
+                    // The one event that says the keyguard is *gone*. Unlocking raises no
+                    // screen event at all — the screen was already on — so without this
+                    // the page would keep the lock screen's bubbles up over the home
+                    // screen until something else happened to make it look again.
+                    addAction(Intent.ACTION_USER_PRESENT)
+                }
             )
         }
+        reportLock()
     }
 
     override fun onConfigurationChanged(configuration: Configuration) {
@@ -472,29 +506,27 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // The blur is the compositor's, not the view's, so a transparent view keeps
         // blurring: it has to be taken off by hand or it hangs over a landscape
         // screen with nothing drawn on it.
-        if (isHidden) {
-            SamsungBlur.clear(blurCanvas)
-            SamsungBlur.clear(blurNow)
-            blurSatellites.forEach { SamsungBlur.clear(it) }
-        } else {
-            if (blurNow.visibility == View.VISIBLE) applyBlur(blurNow, nowCorner)
-            applyBlur()
-            blurSatellites.forEachIndexed { index, satellite ->
-                if (satellite.visibility == View.VISIBLE) {
-                    applyBlur(satellite, satelliteCorners[index])
-                }
-            }
-        }
+        if (isHidden) blurPanes.forEach { SamsungBlur.clear(it) } else repaintBlur()
         // The canvas is never touchable; the proxy is what stops hearing fingers when
         // there is nothing on screen to touch.
         proxyParams.flags =
             if (isHidden) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             else BASE_FLAGS
-        // The Now proxy is only ever touchable while the light is on, so hiding takes
-        // the flag away and showing leaves it to the page to ask for it back.
+        // The other two proxies stand over bubbles that are not always there, so hiding
+        // takes the flag away and *showing has to ask for it back*. It used to be left
+        // to whatever the page happened to repaint next, and that is a proxy that never
+        // becomes touchable again until something unrelated moves: waking to a lock
+        // screen sets the keyguard flag before the screen event lands, so the page sees
+        // no change, sends nothing, and the bubble at the bottom of the screen is drawn
+        // perfectly and cannot be touched. The page is the only side that knows what is
+        // interactive, so it is asked rather than guessed at.
         if (isHidden) {
             nowProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(nowProxy, nowProxyParams) }
+            lockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
+        } else {
+            push("window.refitProxies()")
         }
         runCatching { windowManager.updateViewLayout(stage, params) }
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
@@ -508,8 +540,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             TorchWatch.stop()
             screenWatch?.let { runCatching { unregisterReceiver(it) } }
             screenWatch = null
+            awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
-            nowAnimator?.cancel()
+            runCatching { windowManager.removeView(lockProxy) }
             runCatching { windowManager.removeView(nowProxy) }
             runCatching { windowManager.removeView(touchProxy) }
             runCatching { windowManager.removeView(stage) }
@@ -526,7 +559,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         proxyParams.height = dp(compactHeight() + topGrab() + GRAB + BLEED)
         proxyParams.x = params.x
         proxyParams.y = 0
-        applyBlur()
+        repaintBlur()
         runCatching { windowManager.updateViewLayout(stage, params) }
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
         pushAppearance()
@@ -557,8 +590,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             SamsungBlur.clear(view)
             return
         }
-        if (view === blurCanvas) blurCorner = corner
-        if (view === blurNow) nowCorner = corner
         if (SamsungBlur.apply(view, dp(radius), corner)) return
 
         // AOSP's path, for a build where the vendor one is gone. It is a no-op while
@@ -570,45 +601,73 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
     }
 
-    private fun applyBlur() = applyBlur(blurCanvas, blurCorner)
+    /** Every pane that is showing, blurred again at the rounding it already has. */
+    private fun repaintBlur() = blurPanes.forEachIndexed { index, pane ->
+        if (pane.visibility == View.VISIBLE) applyBlur(pane, paneCorners[index])
+    }
 
     /**
-     * The Now bubble's glass, run on the same curve the page is running. It is a
-     * single region on its own — never part of the row's — because for most of its
-     * life it is at the other end of the bar, and one region spanning the gap would
-     * be a frosted smear across the whole status bar.
+     * A touch on a bubble counts as using the phone, and the keyguard has no idea it
+     * happened: these windows are not the lock screen's, so working the media controls
+     * down there was watched by nobody and the screen went off in the middle of it.
+     *
+     * PowerManager.userActivity, which is what actually resets the timer, is a signature
+     * permission and out of reach. FLAG_KEEP_SCREEN_ON is not — while it is set the
+     * timeout cannot run out at all — so it is set on the touch and taken off again a
+     * while later, which is the same thing from the outside: every touch pushes the
+     * screen-off out by LOCK_AWAKE from that moment. It has to come off again, or the
+     * one flag left standing is a phone that never sleeps.
      */
-    private fun animateNowBlur(
-        widthDp: Int,
-        heightDp: Int,
-        cornerDp: Int,
-        leftDp: Int,
-        durationMs: Int
-    ) {
-        nowAnimator?.cancel()
-        if (widthDp <= 0) {
-            blurNow.visibility = View.GONE
-            SamsungBlur.clear(blurNow)
-            return
+    private val awake = android.os.Handler(android.os.Looper.getMainLooper())
+    private val sleepAgain = Runnable {
+        params.flags = params.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON.inv()
+        runCatching { windowManager.updateViewLayout(stage, params) }
+    }
+
+    private fun keepAwake() {
+        // Only while the keyguard is up, which is the only place the problem was: these
+        // windows are not the lock screen's, so a touch on them is watched by nobody.
+        // Held on an unlocked phone it does the opposite of what it looks like — the flag
+        // suspends the timeout rather than restarting it, so the moment it comes off again
+        // the display is already past due and the screen goes off on the spot, which reads
+        // as the phone locking itself at random a few seconds after being unlocked.
+        if (!isLocked) return
+        awake.removeCallbacks(sleepAgain)
+        if (params.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON == 0) {
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            runCatching { windowManager.updateViewLayout(stage, params) }
         }
-        val bounds = boundsOf(blurNow)
-        val from = BlurBox(bounds.width, bounds.height, nowCorner, blurNow.translationX)
-        val to = BlurBox(dp(widthDp), dp(heightDp), dp(cornerDp).toFloat(), dp(leftDp).toFloat())
-        blurNow.visibility = View.VISIBLE
-        if (durationMs <= 0 || from.width == 0) {
-            place(blurNow, to, to, 1f)
-            return
-        }
-        nowAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = durationMs.toLong()
-            interpolator = android.view.animation.PathInterpolator(0.22f, 1.12f, 0.36f, 1f)
-            addUpdateListener { place(blurNow, from, to, it.animatedValue as Float) }
-            start()
-        }
+        awake.postDelayed(sleepAgain, LOCK_AWAKE)
     }
 
     /** The display's own width in pixels, which is exactly how wide the canvas is. */
     private fun screenWidth(): Int = windowManager.currentWindowMetrics.bounds.width()
+
+    /**
+     * The canvas is the whole screen, and it has to be: the lock screen carries a bubble
+     * of its own down at the bottom, and a bubble is only liquid with what shares its
+     * surface. It was 620dp — enough for the notification list at three quarters of the
+     * screen and no more — and everything below that was simply not drawable. Untouchable
+     * and transparent where nothing is drawn, so the extra room costs nothing but the
+     * surface itself; what it buys is that every bubble on this phone is still in one page
+     * and one goo layer, top of the screen and bottom alike. The stage is the ceiling on
+     * everything: the window can be told any height, but nothing is drawn past the edge of
+     * the surface inside it.
+     */
+    private fun stageHeight(): Int = windowManager.currentWindowMetrics.bounds.height()
+
+    /**
+     * Tells the page where the phone is. Sent on every cue rather than only on changes,
+     * because the page queues anything that arrives before it is ready and the state has
+     * to survive that; the page itself ignores a value it already has.
+     */
+    private fun reportLock() {
+        isLocked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
+        // Unlocked, the hold is over: the phone is being used and its own timeout is the
+        // right one again.
+        if (!isLocked) { awake.removeCallbacks(sleepAgain); sleepAgain.run() }
+        push("window.onLock($isLocked)")
+    }
 
     @Volatile
     private var lastTouch = "nothing has been touched yet"
@@ -652,7 +711,15 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         val proxyLeft =
             if (centred) (screenWidth() - proxy.width) / 2f + proxy.x else proxy.x.toFloat()
         val x = (proxyLeft - params.x + event.x) / density
-        val y = event.y / density
+        // Plus the window's own top, because a proxy is not always at the top of the
+        // screen any more: the lock screen's bubble stands at the bottom of the canvas,
+        // and a touch reported at its own window's y would land in the status bar.
+        val y = (proxy.y + event.y) / density
+        // A finger landing is the other thing that always ends in motion.
+        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            wakeFrames()
+            keepAwake()
+        }
         val action = when (event.actionMasked) {
             android.view.MotionEvent.ACTION_DOWN -> "down"
             android.view.MotionEvent.ACTION_MOVE -> "move"
@@ -666,115 +733,48 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.onProxyTouch('$action', $x, $y, '$source')")
     }
 
-    /** One blurred region: a size, a rounding and where it sits across the window. */
-    private class BlurBox(
-        val width: Int,
-        val height: Int,
-        val corner: Float,
-        val offset: Float
-    )
-
-    private fun boundsOf(view: View) = view.layoutParams as FrameLayout.LayoutParams
-
-    private fun place(view: View, from: BlurBox, to: BlurBox, travelled: Float) {
-        val bounds = boundsOf(view)
-        bounds.width = from.width + ((to.width - from.width) * travelled).toInt()
-        bounds.height = from.height + ((to.height - from.height) * travelled).toInt()
-        view.layoutParams = bounds
-        view.translationX = from.offset + (to.offset - from.offset) * travelled
-        // The corner is re-applied every frame, because the bubble's own radius is
-        // transitioning too: a blur that jumped straight to the target radius
-        // spilled past the bubble's still-rounder corners.
-        applyBlur(view, from.corner + (to.corner - from.corner) * travelled)
-    }
-
     /**
-     * The bubble's own growth, replayed for the blur. The blur cannot be animated by
-     * the CSS that owns the bubble — it is a window effect, not a pixel the page can
-     * draw — so the page hands over the shapes it is heading for and how long it will
-     * take, and the same curve is run here. Without this the blur snapped to the
-     * finished size and the animation played inside a shape that was already there.
+     * One frame of glass: every pane put exactly where its bubble is being drawn right
+     * now, in the page's own coordinates.
      *
-     * Two regions, not one: a satellite is its own circle with its own glass, and a
-     * single region spanning both blurred the gap between them as well.
+     * There is no animation here on purpose. The host used to be handed the shape each
+     * bubble was heading for and how long it would take, and it replayed that curve on
+     * its own clock — which meant every curve in the CSS had a twin in Kotlin, and any
+     * motion the page had not thought to describe (a hold's scale, a drag, a swap that
+     * renames two boxes without moving them) left the frosted rectangle standing at a
+     * size and a place its bubble was not. The page mirrors real rectangles every frame
+     * for the liquid skin already, and the same measurement drives the glass: it cannot
+     * disagree with a shape it is read off.
+     *
+     * A rectangle of no width is a bubble that is not there, and its pane is hidden and
+     * cleared by hand — a transparent view goes on blurring.
      */
-    private fun animateBlur(
-        main: BlurBox,
-        satellites: List<BlurBox?>,
-        duration: Long,
-        satelliteDuration: Long,
-        satelliteDelay: Long
-    ) {
-        blurAnimator?.cancel()
-        satelliteAnimator?.cancel()
-        val mainFrom = BlurBox(
-            boundsOf(blurCanvas).width,
-            boundsOf(blurCanvas).height,
-            blurCorner,
-            blurCanvas.translationX
-        )
-        val satellitesFrom = blurSatellites.mapIndexed { index, view ->
-            BlurBox(
-                boundsOf(view).width,
-                boundsOf(view).height,
-                satelliteCorners[index],
-                view.translationX
-            )
-        }
-
-        blurSatellites.forEachIndexed { index, view ->
-            val box = satellites.getOrNull(index)
-            view.visibility = if (box == null) View.GONE else View.VISIBLE
-            if (box == null) SamsungBlur.clear(view)
-        }
-
-        if (duration <= 0L) {
-            place(blurCanvas, main, main, 1f)
-        } else {
-            blurAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-                this.duration = duration
-                // The same overshoot the bubble's --ease-grow has, so the two edges stay
-                // together instead of one arriving late.
-                interpolator = android.view.animation.PathInterpolator(0.22f, 1.12f, 0.36f, 1f)
-                addUpdateListener {
-                    place(blurCanvas, mainFrom, main, it.animatedValue as Float)
+    private fun placeBlurFrame(spec: String) {
+        val density = resources.displayMetrics.density
+        val regions = spec.split(';')
+        blurPanes.forEachIndexed { index, pane ->
+            val numbers = regions.getOrNull(index)
+                ?.split(',')
+                ?.mapNotNull { it.toFloatOrNull() }
+                .orEmpty()
+            if (numbers.size < 5 || numbers[2] < 1f || numbers[3] < 1f) {
+                if (pane.visibility != View.GONE) {
+                    pane.visibility = View.GONE
+                    SamsungBlur.clear(pane)
                 }
-                start()
+                return@forEachIndexed
             }
-        }
-
-        if (satellites.all { it == null }) return
-
-        // A satellite's glass is not on the bubble's clock and never was: the page
-        // moves a circle on --ease-split, which overshoots by most of its own travel,
-        // holds it back by --split-delay so the bubble can narrow first, and only then
-        // lets it go. Run on the bubble's shorter, gentler curve with no delay at all,
-        // the frosted circle set off early, took a straighter line and arrived first —
-        // which is the glass and the circle visibly coming apart mid-split. Its own
-        // duration, its own delay, its own curve, or it cannot be in step.
-        if (satelliteDuration <= 0L) {
-            blurSatellites.forEachIndexed { index, view ->
-                satellites.getOrNull(index)?.let {
-                    satelliteCorners[index] = it.corner
-                    place(view, it, it, 1f)
-                }
-            }
-            return
-        }
-        satelliteAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            this.duration = satelliteDuration
-            startDelay = satelliteDelay
-            interpolator = android.view.animation.PathInterpolator(0.2f, 1.7f, 0.35f, 1f)
-            addUpdateListener {
-                val travelled = it.animatedValue as Float
-                blurSatellites.forEachIndexed { index, view ->
-                    val box = satellites.getOrNull(index) ?: return@forEachIndexed
-                    val from = satellitesFrom[index]
-                    place(view, from, box, travelled)
-                    satelliteCorners[index] = from.corner + (box.corner - from.corner) * travelled
-                }
-            }
-            start()
+            val bounds = pane.layoutParams as FrameLayout.LayoutParams
+            bounds.width = (numbers[2] * density).toInt()
+            bounds.height = (numbers[3] * density).toInt()
+            pane.layoutParams = bounds
+            pane.translationX = numbers[0] * density
+            pane.translationY = numbers[1] * density
+            pane.visibility = View.VISIBLE
+            // Re-applied every frame, because the bubble's own radius moves with its
+            // width: glass that kept a rounding of its own spilled past the corners.
+            paneCorners[index] = numbers[4] * density
+            applyBlur(pane, paneCorners[index])
         }
     }
 
@@ -796,9 +796,36 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     }
 
     private fun push(js: String) {
+        // Every one of these is about to cause motion, and the panel this is drawn on
+        // is variable-rate: a status bar nobody has touched in a minute is being
+        // refreshed a handful of times a second, and the first frames of an animation
+        // started into that idle state arrive late and unevenly — which is the stutter
+        // on an animation that has not played for a while, and the reason the second
+        // one looks fine. So the frames are asked for before the thing that needs them,
+        // exactly as window room is.
+        wakeFrames()
         webView.post {
             if (pageReady) webView.evaluateJavascript(js, null) else pending.addLast(js)
         }
+    }
+
+    /** When the panel was last asked to come up to speed. */
+    private var framesWokeAt = 0L
+
+    /**
+     * Ask for a high refresh rate and force a draw, which is what actually pulls the
+     * display out of its idle rate — a category set once at startup is not enough on a
+     * view that then draws nothing for a minute. Throttled, because a drag calls it on
+     * every event and one wake covers the whole gesture.
+     */
+    private fun wakeFrames() {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - framesWokeAt < WAKE_FRAMES_EVERY) return
+        framesWokeAt = now
+        stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
+        webView.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
+        stage.invalidate()
+        webView.invalidate()
     }
 
     /**
@@ -912,19 +939,29 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         /**
-         * The Now bubble's own glass, which travels the whole width of the bar rather
-         * than sitting near the middle like the bubble's. A width of nothing takes it
-         * off: a transparent view goes on blurring, so it has to be cleared by hand.
+         * Where every bubble is being drawn this frame — one region per bubble, in the
+         * page's own coordinates, as `left,top,width,height,corner` separated by
+         * semicolons and in the order the panes stand in: main, left satellite, right
+         * satellite, Now. An empty region is a bubble that is not on screen.
+         *
+         * This arrives on the page's animation frame while it has something moving, and
+         * stops when it does. It is not a request for a journey: the page is not saying
+         * where a shape is going, it is saying where the shape *is*, so there is nothing
+         * for the host to interpolate and nothing of the CSS's timing to duplicate here.
          */
         @JavascriptInterface
-        fun setNowBlur(
-            widthDp: Int,
-            heightDp: Int,
-            cornerDp: Int,
-            leftDp: Int,
-            durationMs: Int
-        ) {
-            webView.post { animateNowBlur(widthDp, heightDp, cornerDp, leftDp, durationMs) }
+        fun setBlurFrame(spec: String) {
+            webView.post { placeBlurFrame(spec) }
+        }
+
+        /**
+         * The page is about to start moving something the host had no hand in — a
+         * timer running out, a transition it decided on its own. Everything the host
+         * pushes wakes the panel already; this is the same wake for the other half.
+         */
+        @JavascriptInterface
+        fun wakeFrames() {
+            webView.post { this@BubbleService.wakeFrames() }
         }
 
         /**
@@ -935,6 +972,30 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun note(text: String) {
             lastNote = text
+        }
+
+        /**
+         * Where the lock screen bubble is being drawn, in the page's own coordinates and
+         * measured from the top of the canvas — which is the top of the screen, so the
+         * page sends a top even though the CSS hangs the bubble off the bottom. Mirrors
+         * LOCK_INSET / LOCK_BOTTOM / LOCK_HEIGHT in pill.html.
+         */
+        @JavascriptInterface
+        fun setLockProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {
+            webView.post {
+                val isLive = widthDp > 0
+                lockProxyParams.width = if (isLive) dp(widthDp) else 0
+                lockProxyParams.height = if (isLive) dp(heightDp) else 0
+                // Plus the canvas's own x, for the same reason the Now proxy takes it:
+                // the page measures from the left edge of the canvas and the canvas is
+                // moved by the user's horizontal offset.
+                lockProxyParams.x = params.x + dp(leftDp)
+                lockProxyParams.y = dp(topDp)
+                lockProxyParams.flags =
+                    if (isLive) BASE_FLAGS
+                    else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
+            }
         }
 
         @JavascriptInterface
@@ -962,52 +1023,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             }
         }
 
-        /**
-         * The bubble's size as the CSS is about to draw it, which is not the window's:
-         * the window is the bubble plus the grab margin, and during a collapse it is
-         * still the old, larger one. The blur follows this, not the window.
-         */
-        @JavascriptInterface
-        fun setBlurBounds(
-            widthDp: Int,
-            heightDp: Int,
-            cornerDp: Int,
-            offsetDp: Int,
-            satelliteWidthDp: Int,
-            satelliteOffsetDp: Int,
-            farSatelliteWidthDp: Int,
-            farSatelliteOffsetDp: Int,
-            durationMs: Int,
-            satelliteMs: Int,
-            satelliteDelayMs: Int
-        ) {
-            webView.post {
-                val main = BlurBox(
-                    dp(if (widthDp < 0) compactWidth() else widthDp),
-                    dp(if (heightDp < 0) compactHeight() else heightDp),
-                    dp(cornerDp).toFloat(),
-                    dp(offsetDp).toFloat()
-                )
-                // A satellite is a pill of the closed height, however wide it is
-                // mid-drag, so it is rounded by half that height and never by more.
-                fun satellite(widthDp: Int, offsetDp: Int) = if (widthDp <= 0) null else BlurBox(
-                    dp(widthDp),
-                    dp(compactHeight()),
-                    dp(compactHeight()) / 2f,
-                    dp(offsetDp).toFloat()
-                )
-                animateBlur(
-                    main,
-                    listOf(
-                        satellite(satelliteWidthDp, satelliteOffsetDp),
-                        satellite(farSatelliteWidthDp, farSatelliteOffsetDp)
-                    ),
-                    durationMs.toLong(),
-                    satelliteMs.toLong(),
-                    satelliteDelayMs.toLong()
-                )
-            }
-        }
 
         @JavascriptInterface
         fun triggerHaptic(type: String) = vibrate(
