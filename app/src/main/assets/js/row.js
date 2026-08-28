@@ -40,10 +40,16 @@ function paintSize() {
   pill.classList.toggle('battery', shared.size === 'battery');
   pill.classList.toggle('timer', shared.size === 'timer');
 
-  // The skin only exists for the closed row: a grown panel is one shape with
-  // nothing to merge into, so it paints its own background and the filter stops.
-  root.classList.toggle('liquid', CLOSED.has(shared.size));
+  // The skin only exists for the closed row: a grown panel is one shape with nothing to
+  // merge into, so it paints its own background and the filter stops. Taken off here the
+  // moment a growth starts, because from that frame on the bubble is bigger than the
+  // filter's region and has to paint itself — but it is *not* put back here. The way back
+  // is measured in the mirror, at the frame the shape has come home; switched on the
+  // state's word, the whole close was drawn blanked with the skin dropped outside the
+  // region, which is what "no alpha and no blur while closing" was, and the unfiltered
+  // edge blob standing in for it is the large accent-coloured hue an alert closed with.
   if (!CLOSED.has(shared.size)) {
+    root.classList.remove('liquid');
     // Opening is a growth, not a split, and must not inherit the split's curve or
     // the wait a departing satellite left behind.
     root.style.setProperty('--width-ease', 'var(--ease-grow)');

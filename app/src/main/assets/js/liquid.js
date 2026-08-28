@@ -1,7 +1,7 @@
 import { lockPill } from './lock.js';
 import { nowPill } from './now.js';
 import { satellites } from './row.js';
-import { CLOSED, MELT_MAX, MELT_MIN, bridge, pill, shared } from './state.js';
+import { CLOSED, MELT_MAX, MELT_MIN, bridge, pill, root, shared } from './state.js';
 
 /**
  * The row's skin, drawn as solid shapes under one metaball filter so the bubble
@@ -80,6 +80,21 @@ let mirroredAt = 0;
  */
 let mirroring = false;
 
+/**
+ * The skin takes the bubble over again when the shape has come home, which is measured
+ * rather than announced: a bubble bigger than the filter's own region has its skin
+ * silently dropped, so blanking its background the frame a close *begins* leaves the
+ * whole close painting nothing at all. paintSize takes the skin off when a growth
+ * starts; this is the only thing that puts it back.
+ */
+function settleSkin(seen) {
+  if (root.classList.contains('liquid') || !CLOSED.has(shared.size)) return;
+  // Its own resting height and a little over for the border, since the box is measured
+  // and the number it is measured against is the one Kotlin last pushed down.
+  if (!seen || !seen.box.height || seen.box.height > shared.compact.height + 3) return;
+  root.classList.add('liquid');
+}
+
 /** Every rect first, every write after: one layout per frame instead of three. */
 export function paintLiquidFrame() {
   if (mirroring) return;
@@ -119,6 +134,7 @@ function mirrorFrame() {
     };
   });
 
+  settleSkin(measured[0]);
   sendBlurFrame(measured);
 
   blobs.forEach((blob, index) => {
