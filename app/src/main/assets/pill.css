@@ -137,7 +137,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  /* Nothing a bubble does is ever clipped: every curve here overshoots, and a box sized
+     to the target cuts the overshoot off — which reads as the animation being wrong
+     rather than as the box being small. What genuinely has to be contained says so on
+     the element that has to contain it. */
+  overflow: visible;
 }
 /* ponytail: width/height transition on one contained element. If the S25
    ever shows jank here, swap to transform scale + counter-scaled content. */
@@ -226,7 +230,9 @@ html, body {
   --app-accent: var(--lock-accent, var(--section-color));
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* Not clipped, like every other bubble: this is the one whose overshoot is the
+     reference for all of them. */
+  overflow: visible;
   /* Born at nothing and grown into place, because a bubble that is simply there when
      the screen comes on has not arrived from anywhere. */
   opacity: 0;
@@ -846,6 +852,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    instead of being cut off square by the slot it is sliding out of. */
 #media-art-slot, #player-cover {
   mask-image: linear-gradient(90deg, transparent, #000 18%);
+  /* Without this the gradient tiles, and a cover sliding out past the slot reappears
+     under the next copy of it. It never showed while the bubble clipped everything. */
+  mask-repeat: no-repeat;
 }
 
 /* Three bars that move only while the sound does — the indicator is the truth
@@ -1266,6 +1275,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
      and the last line jumps as it settles. Fixed here and clipped by the bubble, the
      text is set once and the growth only uncovers it. Mirrors SIZES.history.width. */
   width: 340px;
+  /* Which makes this the one face that has to clip itself: it is wider than the bubble
+     for the whole of the growth, and the bubble does not clip anything any more. */
+  overflow: hidden;
+  border-radius: inherit;
   box-sizing: border-box;
 }
 
@@ -1490,7 +1503,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   /* Less the border, which the box already spends on the left: without that the
      glyph sat two pixels right of the circle's middle. */
   padding-left: var(--glyph-inset);
-  overflow: hidden;
+  /* A satellite is a bubble, so its glyph's knock is allowed outside it. */
+  overflow: visible;
   opacity: 0;
   /* Born standing exactly on the bubble's own glyph — same size, same inset, left
      edges flush — because that is where the thing it carries already was. It is
@@ -1649,7 +1663,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
      with space-between, so widening this side simply walks the reading left, and it
      leaves the reading's own transform free for its entrance. */
   padding: 0 calc(0.4rem + var(--now-crowd, 0px)) 0 var(--glyph-inset);
-  overflow: hidden;
+  overflow: visible;
   opacity: 0;
   /* Where the pill is along its flight, and how big it is while making it: born a
      small drop at the hole, arriving full size here where --now-fly is nothing. */
