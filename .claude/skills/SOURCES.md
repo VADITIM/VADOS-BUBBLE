@@ -1,47 +1,69 @@
 # Where these skills came from
 
-Every folder beside this file was vendored from a public repository at the commit
-named below. Nothing here was written for this project, and nothing here outranks
-`CLAUDE.md` or the files in `.claude/rules/` — where a vendored skill and a project
-rule disagree, the project rule wins, because it was written against this phone.
+Every folder beside this file was vendored from a public repository at the commit named
+below. Nothing here was written for a specific project, and nothing here outranks a
+project's own `CLAUDE.md` or rule files — where a vendored skill and a project rule
+disagree, the project rule wins, because it was written against that codebase.
 
 Re-vendoring is a fresh clone at a newer commit and a diff, not a merge: these are
-upstream files and no local edit should ever be made in place. A change worth keeping
-belongs in `.claude/rules/`.
+upstream files and no local edit should be made in place.
 
 | Source | Commit | Skills | What it is |
 |---|---|---|---|
-| [bergside/awesome-design-skills](https://github.com/bergside/awesome-design-skills) | `f631a09` | 67 | Visual style presets — one aesthetic each (`neon`, `brutalism`, `editorial`, `claymorphism`, …). Web-oriented. |
-| [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) | `ccbc156` | 14 | Design taste and judgement: `taste-skill`, `brandkit`, `redesign-skill`, `minimalist-skill`, image-to-code. |
-| [emilkowalski/skills](https://github.com/emilkowalski/skills) | `d23d7f8` | 12 | **The set that matters most here.** `apple-design`, `animate`, `improve-animations`, `review-animations`, `animation-vocabulary`, `find-animation-opportunities`. |
-| [dietrichgebert/ponytail](https://github.com/dietrichgebert/ponytail) | `2ed6c52` | 6 | Technical-debt discipline: `ponytail`, `-review`, `-audit`, `-debt`, `-gain`, `-help`. This codebase already writes `ponytail:` comments; this is where that convention comes from. |
-| [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `09506a9` | 1 | Frontend design quality — audit, critique, polish, animate. v4.1.2, user-invocable. |
+| [emilkowalski/skills](https://github.com/emilkowalski/skills) | `d23d7f8` | 12 | `apple-design`, `animate`, `improve-animations`, `review-animations`, `animation-vocabulary`, `find-animation-opportunities`, `emil-design-eng`, `prototype`, `write-swift`, `animate-expo`, `pick-ui-library`, `ask-sonner`. |
+| [greensock/gsap-skills](https://github.com/greensock/gsap-skills) | `aed9cfd` | 8 | Official GSAP: core, timeline, scrolltrigger, plugins, react, frameworks, utils, performance. |
+| [dietrichgebert/ponytail](https://github.com/dietrichgebert/ponytail) | `2ed6c52` | 6 | Technical-debt discipline. `ponytail-debt` harvests `ponytail:` comments into a ledger — the convention Dynamic Bubble already writes. |
+| [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) | `ccbc156` | 14 | Design taste: `taste-skill`, `brandkit`, `redesign-skill`, `minimalist-skill`, image-to-code, imagegen. |
+| [199-biotechnologies/motion-dev-animations-skill](https://github.com/199-biotechnologies/motion-dev-animations-skill) | `3feedfb` | 1 | Motion.dev (Framer Motion successor) for React, Next, Svelte, Astro. |
+| [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `09506a9` | 1 | Frontend design quality — audit, critique, polish, animate. v4.1.2. |
 | [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master) | `2bd9251` | 1 | Prompt engineering, with a credential-safety rule. |
 
-## Two things that were changed on the way in
+`vados-dna`, `ui-ux-pro-max` and `stop-slop` are not vendored — they are this
+repository's own and predate this file.
 
-- **`impeccable` collided.** `bergside`'s is a cream-and-burnt-orange style preset;
-  `pbakaus`'s is the design-quality skill. They share nothing but a name, so the
-  preset is installed as **`impeccable-style`** and the name `impeccable` is
-  pbakaus's, which is the one the repository was asked for by URL.
-- **Ponytail's hooks were not installed.** `hooks/*.js` and `hooks/*.sh` in that
-  repository run on Claude Code lifecycle events and only do anything once wired into
-  `settings.json`. Wiring an upstream script into this project's hooks is a separate
-  decision from reading its skills, so only `skills/` was taken.
+## Skills, not plugins
+
+`settings.json` once enabled ten plugins. **None of them arrived in a Claude Code web
+session**: `~/.claude/plugins/` held a single bucket file and nothing else, so `ponytail`
+was unavailable until it was vendored and no `gsap-*` skill ever appeared. Vendored
+skills loaded every time.
+
+So the rule here is **vendored skills are the floor that travels; plugins are a local
+convenience that may not arrive.** GSAP is vendored for that reason, and
+`gsap-skills@gsap-skills` was removed from `enabledPlugins` along with its marketplace
+entry so it cannot load twice on machines where plugins do resolve.
+
+Nine plugins remain enabled, `ponytail@ponytail` among them — which *is* now vendored, so
+on a machine where plugins resolve it will appear twice. Worth pruning; left alone here
+because it is a decision about a local setup rather than about this library.
+
+## What was removed, and why
+
+68 style presets from [bergside/awesome-design-skills](https://github.com/bergside/awesome-design-skills)
+were vendored and then removed. They were not dropped for being web-only — they were
+platform-agnostic token tables and would have transferred to desktop and mobile work
+fine. They were dropped for being generated and redundant:
+
+- **49% of their bytes were byte-identical boilerplate**; 36 of the 68 shared one
+  literally identical body from `## Accessibility` to end of file.
+- **The generator leaked into the output.** `glassmorphism`'s Brand line described a chat
+  app; `pacman`'s was arcade ad copy; `material`, `editorial` and `brutalism` had empty
+  Brand lines. Every preset declared weights `100–900` and radius `4px/8px` whatever its
+  aesthetic.
+- Unique content was roughly 400 bytes of a 3.8KB file: seven hex colours, three font
+  names, two radii, two spacings.
+- **`ui-ux-pro-max` already holds the same ground in better form** — `data/styles.csv` is
+  84 styles × 21 columns, beside `colors.csv`, `typography.csv`, `motion.csv` and
+  `data/stacks/` for SwiftUI, React Native, Flutter, WPF, WinUI 3, Avalonia and Jetpack
+  Compose. Reach for that rather than re-adding presets.
+
+One name collided during that episode and the resolution outlived it: `impeccable` is
+pbakaus's design-quality skill. bergside's identically-named colour preset was installed
+as `impeccable-style` and went with the rest.
 
 ## Vetting
 
-All 100 `SKILL.md` files were scanned for network calls, credential access,
-destructive commands and instructions that redirect the agent. Nothing was found:
-every hit on `API_KEY`, `secret` or `credential` is a benchmark README describing the
-upstream project's own test harness, or `prompt-master`'s rule *forbidding*
-credentials in generated prompts.
-
-## A note on the cost
-
-100 skill descriptions load into the context of every session in this repository.
-Roughly two thirds are web-page style presets with no bearing on an Android status-bar
-overlay drawn in one WebView. If sessions start feeling crowded, the honest fix is to
-keep `emilkowalski`, `ponytail`, `impeccable`, `taste-skill` and `prompt-master`, and
-drop the presets — which is a `git rm` of the folders listed under `awesome-design-skills`
-above and nothing else.
+Every `SKILL.md` was scanned for network calls, credential access, destructive commands
+and instructions that redirect the agent. Nothing was found. `motion-dev-animations`
+ships one executable, `scripts/validate_motion_config.py`, which is a local config
+validator and reaches nothing off the machine.
