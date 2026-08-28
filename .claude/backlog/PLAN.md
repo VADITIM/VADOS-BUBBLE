@@ -160,8 +160,9 @@ Added 2026-08-28.
 - [x] **Money highlighted like a marker, yellow.** `.money`, `MONEY_PATTERN`. Symbol either side,
       because both are written: `7,80€` and `$5.00`. The symbol is part of the match — a bare number
       is not money.
-- [ ] **Google apps in Google colours, except Gmail.** `AppStyles.kt`. **Needs a decision before it
-      can be built**, see below.
+- [~] **Google apps in Google colours, except Gmail.** `AppStyles.kt`. **Google Wallet is done** —
+      Google Blue `#4285f4`, the primary rather than a share of the four. The rest of the Google apps
+      still need the decision below.
 
 ### Open question on the Google item
 
@@ -174,12 +175,18 @@ wearing a Google colour, and the ask is to take it off. Two readings, and they b
 2. **All Google apps share one four-colour Google treatment** — a gradient or a multi-stop accent
    across blue/red/yellow/green — and Gmail alone stays flat.
 
-Reading 2 is the harder one: `--app-accent` is a single colour threaded through the border, the
-keyword marks and the glyph, so a multi-stop accent means teaching every one of those to take a
-gradient. Worth knowing before choosing.
+Reading 2 is the harder one, and now measured rather than guessed: `--app-accent` is read into
+`color`, `border-color`, `background` and `border` at **nine sites** in `pill.css`. A gradient cannot
+go into `color` or `border-color` at all without rewriting each of them, so the four-colour treatment
+is not a colour change — it is a change to how the accent is consumed everywhere. Wallet was shipped
+under reading 1 for that reason; it is reversible if you want reading 2.
 
-Also: no Google app other than Gmail is in `AppStyles` yet. Whichever reading wins, this item starts
-by adding the ones that actually notify — Calendar, Drive, Photos, Keep, Maps.
+Google Wallet is now in `AppStyles` beside Gmail. Whichever reading wins, the rest of the item is
+adding the other Google apps that actually notify — Calendar, Drive, Photos, Keep, Maps.
+
+Worth noting the two features meet: a Wallet notification is a payment, so `7,80 € bezahlt bei REWE`
+gets the yellow money marker inside a Google-blue bubble without either feature knowing about the
+other.
 
 ---
 

@@ -113,8 +113,52 @@ Two helpers exist in code for the same reason and should be ported to any platfo
 accent fill) and `desaturate(hex, amount)` (blends toward that same luminance grey, used to mute an
 accent without shifting its hue).
 
+## Marks inside running text
+
+A sixth role, and the one exception to *one accent per screen*: text that came from **outside** the
+app — a message, a notification, a log line — carries things worth spotting before the prose is read.
+A link, a date, an amount of money. These get their own fixed colours, and they are fixed *globally*
+rather than per screen, because their whole value is that the reader already knows what they mean and
+does not have to learn them twice.
+
+| Mark | Ink | Why that one |
+|---|---|---|
+| Link | `#6fb3ff` | The one piece of styling a reader knows the meaning of untaught. Underlined too. |
+| Time and date | `rgba(91,196,253,0.32)` | Light blue, as a band. When a thing happens. |
+| Money | `rgba(255,221,27,0.30)` | Sodium yellow, as a band. What a thing costs. |
+| Kind-of-message keywords | the app's own accent | Says *what this is*, so it borrows the identity already naming the sender. |
+
+**A link recolours glyphs; a highlight puts colour behind them.** That distinction is what lets the
+link blue and the date blue sit this close without reading as the same thing, and it is why the two
+roles can share a hue family at all.
+
+**A highlight is a band, not a chip.** Drawn as a gradient rather than a `background-color`: shorter
+than the line box, low against the baseline, and bleeding past both ends at a slight angle, because a
+real pen does not stop square. A flat fill with a radius is a chip, and a chip is what every other
+piece of software does.
+
+```css
+background-image: linear-gradient(100deg, transparent 0.4%, var(--ink) 1.2%,
+                                          var(--ink) 98.5%, transparent 99.6%);
+background-size: 100% 62%;  background-position: 0 88%;  background-repeat: no-repeat;
+```
+
+Put it on `background` rather than a pseudo-element, so a match that wraps across two lines is marked
+on both — which is what a pen would do and what a `::before` cannot.
+
+Two rules for the code that applies them, both learned the expensive way:
+
+- **Later passes must not re-enter earlier marks.** Each pass walks the tree the previous ones left
+  behind, so a link is fair game for every pattern after it, and a URL comes out wearing three marks
+  that mean nothing there. Skip text already claimed.
+- **A pattern matching user-facing text is tested against real strings before it ships**, in the
+  language the device is actually set to. A regex that looks right is not right: `\b` closing an
+  alternation that ends in `€` never matches, because a word boundary needs a word character on one
+  side — so `45 CHF` passes and `7,80€`, the commonest case, silently does not.
+
 ## Anti-patterns
 
 Light backgrounds. A second accent on the same screen with equal weight. Pure `#fff` prose.
-Gradients as surfaces (gradients are for *glow masks* only). A colour chosen because it "looks nice"
-rather than because it encodes a state. Hardcoded accents in a leaf component.
+Gradients as surfaces (gradients are for *glow masks* and text marks only). A colour chosen because
+it "looks nice" rather than because it encodes a state. Hardcoded accents in a leaf component. A
+semantic mark that changes colour per screen — its whole value is that it never does.

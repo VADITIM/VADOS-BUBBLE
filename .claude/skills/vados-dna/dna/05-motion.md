@@ -296,6 +296,20 @@ Platform-specific in expression, universal in substance.
 - **`immediateRender: false` as a global default**, so a `from` tween does not flash its start state.
 - Interruptible-first: a transition class that toggles off transitions during a drag, restoring them
   on complete *and on interrupt*, because a cancelled transition that never restores is a dead panel.
+- **A class that *grants* a transition is a lease, not a gift — someone must take it back.** The
+  inverse of the rule above, and the harder one to see, because nothing looks broken at the moment it
+  goes wrong. A gesture that springs an element home by adding a `.homing` class gives that element's
+  transform a duration; if no code removes the class, every later write to that property is eased
+  from then until the page reloads. The damage lands on whatever *else* writes that property
+  per-frame — a merge squash, a drag, a physics value — which now lags, overshoots and reads as the
+  element "bouncing to random positions" long after the gesture that leaked the lease is forgotten.
+  Every add of a transition-granting class names the line that removes it, in the same commit.
+- **A gesture's way home is an additive animation, not a transition.** The property a gesture writes
+  every frame is usually shared — a drag offset, a spring, an absorb, a lean all compose on one
+  transform — and a transition on it is a second, uninvited author. Spring home with a composited
+  additive animation (`composite: 'add'`, or the engine's equivalent) so the return *layers onto*
+  whatever else is true rather than fighting it, and the per-frame property keeps its defining
+  property: **no duration, ever, from anyone.**
 
 ---
 

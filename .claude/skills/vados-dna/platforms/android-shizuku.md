@@ -101,6 +101,25 @@ adb shell sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.s
   space: one token pair at the root, read blindly by every surface.
 - **Wake locks are a budget.** A bubble that wakes the screen holds it for seconds, not minutes —
   long enough to watch it arrive and read it, short enough not to drain.
+- **ES modules do not load from `file:///android_asset/`.** A `file://` document has an opaque
+  origin, and a module import is a CORS-checked fetch, so `<script type="module">` fails — silently,
+  with a dead interface and nothing obvious in logcat. Classic `<script src>` is unaffected, which is
+  why a page can work for years and then break the moment it is split into modules. Serve the assets
+  over a virtual https origin instead (`WebViewAssetLoader`, `appassets.androidplatform.net`); it is
+  a real origin, so modules, `fetch` and workers all behave as they do in a browser. Do not reach for
+  `allowFileAccessFromFileURLs` — it widens what page JavaScript may read and does not reliably fix
+  module CORS anyway. **Probe this before splitting a page**: one trivial module and one console line
+  costs a minute and decides the whole architecture.
+
+- **Vendor effects called by reflection are a per-frame budget, not a free call.** One UI's blur
+  (`android.view.SemBlurInfo` via `semSetBlurInfo`) is reached by reflection because AOSP's
+  `FLAG_BLUR_BEHIND` is dead on these builds. Caching the `Class`/`Method` lookups is the obvious
+  half; the half that gets missed is that *invoking* them still costs — a builder allocation plus
+  three `Method.invoke`s per surface per frame, which on five surfaces at 120Hz is thousands of
+  reflective calls a second and a fresh object each time. **Gate re-application on the value actually
+  changing**, and never read a `SharedPreferences` key inside a per-frame path. The symptom is not a
+  crash; it is a phone that runs warm and an interface that micro-stutters under something else's
+  load.
 
 ## Gesture ownership on a phone
 

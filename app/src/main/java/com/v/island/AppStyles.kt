@@ -31,6 +31,12 @@ object AppStyles {
         Style("discord", "Discord", "com.discord", "#5865f2"),
         Style("instagram", "Instagram", "com.instagram.android", "#e1306c"),
         Style("gmail", "Gmail", "com.google.android.gm", "#fbbc04"),
+        // Google Blue, because a Google app wears a Google colour — and this one wears the
+        // primary rather than a share of the four. The accent is a single value read into
+        // border-color, color and background at nine places in pill.css, so a four-colour
+        // Google treatment is not a colour change here, it is teaching every one of those
+        // sites to take a gradient. Gmail keeps its yellow and is the stated exception.
+        Style("wallet", "Google Wallet", "com.google.android.apps.walletnfcrel", "#4285f4"),
         Style("db", "DB Navigator", "de.hafas.android.db", "#ec0016"),
         Style("comdirect", "Comdirect", "de.comdirect.app", "#ffd200"),
         Style("spotify", "Spotify", "com.spotify.music", "#1db954"),

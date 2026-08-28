@@ -49,5 +49,14 @@ Keep the numbering stable. `dna/` modules are referenced by number from project 
 
 ## Repository
 
-This skill lives in `https://github.com/VADITIM/.claude` alongside the rest of the global
-configuration. Changes are committed and pushed there, not left local.
+This skill lives in `https://github.com/VADITIM/claude-config` (branch `global`) alongside the rest
+of the global configuration. Changes are committed and pushed there, not left local.
+
+It was called `VADITIM/.claude` until the leading dot turned out to make it unattachable on Claude
+Code on the web — the clone path collides with `~/.claude` itself — so a session could not fetch the
+DNA at all and worked without it while believing it was bound. Anything still pointing at that name
+is stale.
+
+Where a project vendors a copy of this skill into its own `.claude/skills/`, that copy is downstream:
+edit here, then re-vendor. A fix made only in the vendored copy is a fix that exists in one repo and
+looks like it exists everywhere.

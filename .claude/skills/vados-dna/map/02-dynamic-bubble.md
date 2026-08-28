@@ -15,10 +15,18 @@ web app rather than a second one that drifts.
 
 ```
 app/src/main/assets/dna.css     the token layer — faces, palette, panel, label, reveal
+app/src/main/assets/pill.css    the bubble's own styles
 app/src/main/assets/panel.html  the control panel (two screens: Settings green, System blue)
-app/src/main/assets/pill.html   the bubble
+app/src/main/assets/pill.html   the bubble: markup and the SVG filter definitions only
+app/src/main/assets/js/         ES modules — liquid, motion, row, state, bridge, tabs, mods/
 app/src/main/assets/fonts/      the four identity faces, registered once in dna.css
 ```
+
+The page was one 6,600-line `pill.html` until it was split. Two things made that possible and both
+are worth stealing: the assets are served over a **virtual https origin** rather than
+`file:///android_asset/`, because modules cannot load from an opaque origin
+(`platforms/android-shizuku.md`), and the split shipped as its own commits with no behaviour change
+in them, checked against a **recorded run of the debug stage** taken before it started.
 
 ## Kotlin side
 
@@ -49,6 +57,23 @@ Full detail in `platforms/android-shizuku.md`. The headlines:
 - The interface is **two screens with their own accents and diagonal slices**, changed only by the
   bottom nav or the number row — never by a swipe, because full-width sliders own the horizontal
   stroke. That is the gesture-ownership rule from `dna/06-interaction.md` applied literally.
+- **One window draws, and it draws everything.** Bubbles merge through a single SVG goo layer — one
+  blur plus one alpha contrast — and a filter reaches exactly as far as the surface it is drawn on.
+  So a bubble in a second window can never be liquid, and the window model follows from that one
+  fact rather than from anything about layout. Faking it across two windows was tried once and read
+  as neither: flattened corners look like the pill was *cut off*, and a directional glow looks like a
+  stray highlight rather than attraction.
+- **The skin and the glass mirror the real boxes, frame by frame.** Nothing is told where to go: the
+  liquid outline and the host's blur panes are both read off `getBoundingClientRect()` every frame,
+  so they follow transitions, drags and holds for free. The version that replayed the page's curves
+  on the Kotlin side needed a twin of every CSS curve and still left the frosted rectangle standing
+  where its bubble was not. **One measurement feeding both beats two things trying to keep step.**
+- **A merge is measured, not scheduled.** How much of an arriving shape is inside its receiver is one
+  number, computed per frame, and it drives the squash, the state change and the retire. The timer
+  version guessed where a shape would be, and an ease that overshoots or a drag that reverses put
+  every reaction slightly off the moment it belonged to — which is what read as lag.
+- **CI builds the debug APK and publishes it as a rolling release**, so a machine without the SDK can
+  still compile a change. It never makes one *verified*: the check is still the phone.
 
 ## Direction
 
