@@ -168,3 +168,22 @@ export const shared = {
 
 /** The mods that are true right now: 'media', and the sensor indicators later. */
 export const mods = new Set();
+
+/**
+ * Start a clock hand partway through its sweep, so it reads as the hand that was already
+ * running rather than a new one starting at twelve.
+ *
+ * A negative `animation-delay` is the whole mechanism: it begins an animation that far into
+ * its cycle. The offset comes off the wall clock rather than any state of ours, which is what
+ * keeps every hand in the interface in phase with every other — the bubble's glyph and the
+ * satellite's circle are meant to be one picture handed between two places, and two
+ * independently started twelve-second loops are not.
+ *
+ * Lives here because it is reached from both the row and a mod, and state.js is the module
+ * that imports nothing: anything both sides call belongs where neither has to import the
+ * other. Mirrors the 12s in sweep's two rules in pill.css; nothing joins them at build time.
+ */
+export const SWEEP_CYCLE = 12000;
+export function setSweepPhase(element) {
+  element.style.setProperty('--sweep-phase', -(Date.now() % SWEEP_CYCLE) + 'ms');
+}

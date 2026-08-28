@@ -1,4 +1,4 @@
-import { catchInto, releaseCatch, stirLiquid } from './liquid.js';
+import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
 import { clock, paintProgress, playPath, shownPosition } from './mods/media.js';
 import { DEAD_ZONE, cancelSpring, toy, untoy } from './motion.js';
 import { fitNowProxy } from './now.js';
@@ -432,6 +432,11 @@ function landLock() {
 }
 
 window.onLock = next => {
+  // Before the early return, and deliberately. The host reports the lock state on every
+  // screen event, so this runs on wake as well as on a real change — and on wake the phone
+  // is still locked, so `next` matches and everything below is skipped. The glass has to be
+  // re-asserted anyway: the host cleared every pane when the screen went off. See resendBlur.
+  resendBlur();
   if (locked === next) return;
   // Decided and flagged *before* the row is repainted, not after. Taking its mod back
   // is what repaints the row, and repainting the row repaints this bubble — which
@@ -614,8 +619,23 @@ function scrubBy(clientX) {
   return Math.min(shared.media.duration, Math.max(0, Math.round(scrubStart + travelled)));
 }
 
+/**
+ * The timeline owns its touch outright, and every event in the stream says so.
+ *
+ * It is drawn inside the bubble, so without this every touch on it reached the bubble's own
+ * handlers as well: the hold began counting under the finger and fired its haptic mid-drag,
+ * the pull leaned the whole panel while the thumb was only moving sideways along a line, and
+ * the click that follows a lift closed the player the scrub had just finished working. One
+ * finger, three answers.
+ *
+ * `shared.isScrubbing` was not enough on its own — it is read by the clock, so a repaint does
+ * not fight the drag, but nothing in the gesture layer ever asked. Stopping the events here is
+ * what makes the ownership real, and it is stopped on the whole stream rather than on
+ * touchstart alone: a `touchend` and its `click` bubble too, and the close came from those.
+ */
 playerTimeline.addEventListener('touchstart', event => {
   if (!shared.media || !shared.media.duration) return;
+  event.stopPropagation();
   shared.isScrubbing = true;
   playerTimeline.classList.add('scrubbing');
   scrubOrigin = event.touches[0].clientX;
@@ -625,17 +645,23 @@ playerTimeline.addEventListener('touchstart', event => {
 
 playerTimeline.addEventListener('touchmove', event => {
   if (!shared.isScrubbing) return;
+  event.stopPropagation();
   shared.scrubPosition = scrubBy(event.touches[0].clientX);
   paintProgress(shared.scrubPosition);
 }, { passive: true });
 
-playerTimeline.addEventListener('touchend', () => {
+playerTimeline.addEventListener('touchend', event => {
   if (!shared.isScrubbing) return;
+  event.stopPropagation();
   shared.isScrubbing = false;
   playerTimeline.classList.remove('scrubbing');
   bridge.triggerHaptic('tap');
   bridge.mediaSeek(String(shared.scrubPosition));
 }, { passive: true });
+
+// The tap that follows the lift, which would otherwise reach the bubble and close the very
+// panel the drag was working in.
+playerTimeline.addEventListener('click', event => event.stopPropagation());
 
 // A cancelled touch never gets a touchend, and a bar left twice as tall would
 // claim a drag that is over.

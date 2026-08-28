@@ -208,6 +208,26 @@ function meltBy(measured) {
  */
 let blurSent = '';
 
+/**
+ * Forget what the host was last told, so the next frame sends the regions again even if
+ * nothing about them has changed.
+ *
+ * The dedupe below is right almost always — an unchanged spec is a bridge call and a layout
+ * pass for nothing — but it assumes the host still has what it was given. At screen-off the
+ * host clears every pane by hand, because the blur belongs to the compositor and a
+ * transparent view goes on blurring. So the two disagree exactly once: the panes are gone
+ * and the page believes they are still there, and on wake it says nothing because the
+ * geometry is identical to what it was before the screen went off.
+ *
+ * That is the whole of "the blur on the locked bar sometimes does not render". Sometimes,
+ * because anything that moved while the phone slept — a song changing, a timer ticking —
+ * changed the spec and hid the bug.
+ */
+export function resendBlur() {
+  blurSent = '';
+  stirLiquid(240);
+}
+
 function sendBlurFrame(measured) {
   const spec = measured.map(seen => {
     if (!seen || !seen.box.width) return '';

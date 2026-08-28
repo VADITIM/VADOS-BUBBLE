@@ -247,6 +247,11 @@ class IslandNotificationListener : NotificationListenerService() {
             .put("title", extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty())
             .put("text", extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty())
             .put("lines", messages(statusBarNotification.notification))
+            // When it arrived, so the list can say how long ago rather than only what. The
+            // notification's own postTime, not the moment this ran: a conversation is rewritten
+            // in place as each line lands, so re-reading it must not make an hour-old thread
+            // look new. Epoch milliseconds, and the page turns it into an age when it draws.
+            .put("postedAt", statusBarNotification.postTime)
     }
 
     /**

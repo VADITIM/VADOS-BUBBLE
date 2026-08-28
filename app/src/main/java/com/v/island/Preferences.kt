@@ -24,16 +24,25 @@ object Preferences {
 
     private const val STORE = "island"
 
+    /**
+     * Settled on the phone rather than reasoned about: a narrower, shorter bubble that sits
+     * closer to the cutout, and glass rather than a solid black pill — 80% alpha over a 60dp
+     * blur is what makes it read as part of the screen instead of a sticker on it.
+     *
+     * Only a first install and a fresh Reset take these. A phone that has been used has its own
+     * values in SharedPreferences and will not move, which is correct and is also why changing a
+     * default here is never visible on the device it was tuned on.
+     */
     val defaults = mapOf(
-        WIDTH to 130,
-        HEIGHT to 34,
+        WIDTH to 85,
+        HEIGHT to 30,
         HORIZONTAL_OFFSET to 0,
-        VERTICAL_OFFSET to 12,
+        VERTICAL_OFFSET to 3,
         RED to 0,
         GREEN to 0,
         BLUE to 0,
-        BACKGROUND_ALPHA to 100,
-        BLUR to 0,
+        BACKGROUND_ALPHA to 80,
+        BLUR to 60,
         NOTIFICATION_IDENTITY to 2
     )
 

@@ -40,7 +40,7 @@ object AppStyles {
         Style("db", "DB Navigator", "de.hafas.android.db", "#ec0016"),
         Style("comdirect", "Comdirect", "de.comdirect.app", "#ffd200"),
         Style("spotify", "Spotify", "com.spotify.music", "#1db954"),
-        Style("clock", "Uhr", "com.sec.android.app.clockpackage", "#ff8a00")
+        Style("clock", "Clock", "com.sec.android.app.clockpackage", "#ff8a00")
     )
 
     /** Second packages of the same app: the business build, the web build, the token app. */

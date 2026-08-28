@@ -1,5 +1,5 @@
 import { closedTarget, setSize, showFace, toClosed } from '../row.js';
-import { bridge, mods, pill, shared } from '../state.js';
+import { bridge, mods, pill, setSweepPhase, shared } from '../state.js';
 
 const timerRemaining = document.getElementById('timer-remaining');
 const timerClock = document.getElementById('timer-clock');
@@ -41,6 +41,9 @@ export function paintTimer() {
     '--app-accent', shared.timer.accent || 'var(--section-color)'
   );
   // A paused timer keeps its target, so it stops counting rather than lying.
+  // Phased before the class goes on: adding .running starts the sweep, and an animation
+  // started before its delay is written begins at twelve for one frame.
+  setSweepPhase(document.getElementById('timer-glyph'));
   pill.classList.toggle('running', Boolean(shared.timer.endsAt) && !shared.timer.isPaused);
   pill.classList.toggle('paused', Boolean(shared.timer.isPaused));
   const reading = remainingText();

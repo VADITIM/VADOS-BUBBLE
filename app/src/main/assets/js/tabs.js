@@ -201,6 +201,24 @@ function grouped(entries) {
   return groups;
 }
 
+/**
+ * How long ago something arrived, in the shortest true form. Minutes are the unit the list is
+ * read in — "how stale is this" is the only question being asked of it — so anything under an
+ * hour is minutes, and the first minute is "now" rather than "0m", which reads as broken.
+ *
+ * Empty for anything without a time, so a payload from before postedAt existed simply has no
+ * age rather than an age of fifty-six years.
+ */
+function agoText(postedAt) {
+  if (!postedAt) return '';
+  const minutes = Math.floor((Date.now() - postedAt) / 60000);
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return minutes + 'm';
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + 'h';
+  return Math.floor(hours / 24) + 'd';
+}
+
 export function openHistory() {
   const list = document.getElementById('history-list');
   list.textContent = '';
@@ -245,6 +263,19 @@ export function openHistory() {
       tally.className = 'history-tally';
       tally.textContent = group.entries.length;
       head.appendChild(tally);
+    }
+    // How long ago, at the far end of the head row. Read off the newest entry in the group
+    // rather than the head: a conversation is grouped oldest-first for reading, but its age
+    // is the age of the last thing said in it, not the first.
+    const newest = group.entries.reduce(
+      (latest, one) => (one.postedAt || 0) > (latest.postedAt || 0) ? one : latest, entry
+    );
+    const age = agoText(newest.postedAt);
+    if (age) {
+      const when = document.createElement('div');
+      when.className = 'history-when';
+      when.textContent = age;
+      head.appendChild(when);
     }
     copy.appendChild(head);
 

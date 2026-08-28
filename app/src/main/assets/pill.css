@@ -888,10 +888,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   column-gap: var(--hole-gap);
 }
 
+/* Mirrors .sat-art, and must: the same cover travels between the two. */
 #media-art {
   width: var(--mod-glyph);
   height: var(--mod-glyph);
-  border-radius: 0.3rem;
+  border-radius: 50%;
   object-fit: cover;
   flex: none;
   background: var(--sunken);
@@ -990,7 +991,17 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: var(--app-accent);
   transform-origin: 50% 100%;
 }
-#pill.running #timer-glyph::after { animation: sweep 12s steps(12, end) infinite; }
+/* Phase-anchored, both here and on the satellite. A negative delay starts an animation
+   partway through, and the share of the cycle already elapsed is written from the wall
+   clock — so a hand that is recreated, or whose class is toggled off and on, picks up
+   where the old one was instead of snapping back to twelve o'clock. The satellite is
+   rebuilt from markup on every dress, which is why it was the visible one: every swap
+   reset its hand while the bubble's kept going, and the two are supposed to be one
+   picture that does not move. */
+#pill.running #timer-glyph::after {
+  animation: sweep 12s steps(12, end) infinite;
+  animation-delay: var(--sweep-phase, 0ms);
+}
 /* Twelve ticks, one a second: a hand that glides reads as a stopwatch, one that
    steps reads as a clock. */
 @keyframes sweep { to { transform: rotate(360deg); } }
@@ -1456,6 +1467,19 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   color: var(--text-muted);
   flex: none;
 }
+/* How long ago, pushed to the far end of the head row. Metadata, so it takes the muted
+   step rather than the app's colour — the name beside it is already carrying the identity
+   and two coloured things in one row is two claims on the eye. Tabular figures because it
+   ticks: proportional ones make the row twitch as 9m becomes 10m. */
+.history-when {
+  font-size: 0.56rem;
+  letter-spacing: 0.04rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  padding-left: 0.5rem;
+  flex: none;
+}
 /* Whoever sent it, written once above their lines. */
 .history-who {
   font-size: 0.72rem;
@@ -1698,10 +1722,14 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 /* The song's own glyph, at the size and inset it has in the bubble, because it is
    the same picture: the circle is where it went, not a second drawing of it. */
+/* Fully round, here and in the bubble both. It is one picture handed between two places,
+   so a radius that differs between them is the hand-over visibly failing — the cover
+   appeared to change shape at the moment it was supposed to be proving it had not moved.
+   A circle rather than a matched corner because the satellite it sits in is a circle. */
 .sat-art {
   width: var(--mod-glyph);
   height: var(--mod-glyph);
-  border-radius: 0.3rem;
+  border-radius: 50%;
   object-fit: cover;
   flex: none;
   background: var(--sunken);
@@ -1726,7 +1754,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: var(--app-accent);
   transform-origin: 50% 100%;
 }
-.satellite.live .sat-clock::after { animation: sweep 12s steps(12, end) infinite; }
+.satellite.live .sat-clock::after {
+  animation: sweep 12s steps(12, end) infinite;
+  animation-delay: var(--sweep-phase, 0ms);
+}
 
 /* #endregion ───────────────────────────────────────────────────────────── */
 /* #region ── the Now bubble ─────────────────────────────────────────────── */

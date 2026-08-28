@@ -5,7 +5,7 @@ import { carryArt, mediaWindow, paintMedia, runBars } from './mods/media.js';
 import { paintTimer, timerWindow } from './mods/timer.js';
 import { endHold } from './motion.js';
 import { fitNowWidth } from './now.js';
-import { BUMP_MAX, BUMP_MIN, CHIP_ROOM, CLOSED, MOD_WIDTH, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, SWAP_FLICK, SWAP_STILL, bridge, faces, mods, pill, root, shared } from './state.js';
+import { BUMP_MAX, BUMP_MIN, CHIP_ROOM, CLOSED, MOD_WIDTH, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, SWAP_FLICK, SWAP_STILL, bridge, faces, mods, pill, root, setSweepPhase, shared } from './state.js';
 
 export function showFace(name) {
   for (const [key, element] of Object.entries(faces)) {
@@ -674,6 +674,10 @@ function dressSatellite(element, mod) {
     element.innerHTML = SATELLITE_FACES[mod];
     // Brand new bars, which no swing is driving yet.
     runBars();
+    // A clock rebuilt from markup starts its sweep at twelve, and a swap rebuilds it every
+    // time — so the hand jumped back on every trade while the bubble's own kept running.
+    // They are meant to be one picture handed between two places. See setSweepPhase.
+    if (mod === 'timer') setSweepPhase(element);
   }
   // The avatar is data, not markup, so it is set every paint rather than baked into
   // the face: the same circle carries whoever the call is with now.

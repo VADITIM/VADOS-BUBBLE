@@ -125,7 +125,7 @@ class MainActivity : Activity() {
         .put("accent", style.accent)
         .put("package", style.packageName)
         .put("title", "Testeingang")
-        .put("text", "Noch keine echte Benachrichtigung von ${style.label}")
+        .put("text", "No real notification from ${style.label} yet")
         .put("iconBase64", JSONObject.NULL)
         .put("imageBase64", JSONObject.NULL)
         .put("mediaState", JSONObject.NULL)
