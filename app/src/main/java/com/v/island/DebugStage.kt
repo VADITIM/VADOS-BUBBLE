@@ -29,9 +29,11 @@ object DebugStage {
 
     /** What the sequence walks, in the order it walks them. */
     private val SEQUENCE = listOf(
-        "idle", "media", "media-timer", "media-timer-call", "alert-over-mod",
-        "clear", "alert", "alert-image", "timer-paused", "call-phone",
-        "torch", "battery-charging", "battery-low", "clear"
+        "idle", "media", "media-timer", "media-timer-call", "satellite-closing",
+        "mod-closing", "mod-to-idle", "alert-over-mod",
+        "clear", "alert", "alert-marked", "alert-stacking", "alert-image",
+        "timer-paused", "call-phone",
+        "now-flight", "torch", "battery-charging", "battery-low", "clear"
     )
 
     /** How long each staged state is left standing before the next one replaces it. */
@@ -102,6 +104,58 @@ object DebugStage {
             "battery-critical" -> BubbleService.deliverBattery(battery("critical", 4))
 
             "clear" -> { clear(); BubbleService.deliverTorch(null) }
+
+            // A mod ending while another is still standing: the one that went closes, the
+            // one left over is a circle out at the side, and it runs back in and makes the
+            // bubble a mod bubble again. The merge, in other words — the transition with
+            // the most moving parts and the one nothing else here reaches.
+            "mod-closing" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                BubbleService.deliverTimer(timer(isPaused = false))
+                handler.postDelayed({ BubbleService.deliverTimer(null) }, 1400L)
+            }
+
+            // Three mods down to two, so a dot has to become a circle. The row's widths, its
+            // satellites and its dots are all worked out from the same list, and this is the
+            // only stage where that list shortens with something still past the circles.
+            "satellite-closing" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                BubbleService.deliverTimer(timer(isPaused = false))
+                BubbleService.deliverCall(call(phone = false))
+                handler.postDelayed({ BubbleService.deliverCall(null) }, 1400L)
+            }
+
+            // The last mod ending, which is a departure and not a repaint: the width comes
+            // back first and the glyph leaves down into the hole. Staged because an app being
+            // killed is the real cause and that is not something to arrange on purpose.
+            "mod-to-idle" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                handler.postDelayed({ BubbleService.deliverMedia(null) }, 1600L)
+            }
+
+            // The light out and back: born at the hole, flying to its spot by the clock, and
+            // the whole row standing aside for it — then the same in reverse.
+            "now-flight" -> {
+                BubbleService.deliverTorch(torch())
+                handler.postDelayed({ BubbleService.deliverTorch(null) }, 2200L)
+            }
+
+            // Two from the same sender inside one dwell. Today the second replaces the first;
+            // when stacking is built this is the stage that shows it appending instead.
+            "alert-stacking" -> {
+                clear()
+                BubbleService.deliver(notification())
+                handler.postDelayed({ BubbleService.deliver(notification()) }, 700L)
+            }
+
+            // The marks in running text, on a message written the way this phone writes them:
+            // a German date, a clock time and an amount with the symbol after it.
+            "alert-marked" -> BubbleService.deliver(
+                notification().put("text", "Termin 27.08.2026 um 14:30, Anzahlung 7,80€ fällig")
+            )
         }
     }
 

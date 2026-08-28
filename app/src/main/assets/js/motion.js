@@ -30,7 +30,22 @@ export const DEAD_ZONE = 12;
  * run on top of it, because they are measured from the finger and not from where the
  * bubble ended up.
  */
-const DRAG_RADIUS = 20;
+const DRAG_RADIUS = 40;
+
+/**
+ * How far into the band the finger may go before the hold is called off, as a share of the
+ * radius. The band was doubled to give the bubble more to say when it is pushed about, and
+ * doubling it alone would have doubled the room a finger has to wander while a hold is
+ * counting underneath — so the distance the *hold* tolerates is pinned where it already was,
+ * at the old radius, which is 80% of the new one.
+ *
+ * Past it the finger has plainly stopped resting and started dragging, so the hold resets to
+ * idle and does not fire. This is the one thing that outranks the hold from below: everywhere
+ * else the hold runs underneath whatever the finger is doing and wins if it is still down
+ * when the timer comes up. Here it is not a competing gesture that takes the touch, it is the
+ * hold's own precondition failing — a finger this far out was never holding.
+ */
+const HOLD_ABANDON = 0.8;
 
 /**
  * The band itself: a hyperbola, so the first pixels are nearly free and the last are
@@ -84,6 +99,10 @@ export function toy(element, prefix, dx, dy) {
   const travel = Math.hypot(dx, dy);
   const reach = rubberBand(travel);
   const scale = travel > 0 ? reach / travel : 0;
+  // Measured on the band rather than on the finger: the band is what the user can see, so
+  // the threshold fires where the bubble looks like it has been dragged rather than at a
+  // raw travel that means different things at different points along a hyperbola.
+  if (reach > DRAG_RADIUS * HOLD_ABANDON) endHold();
   cancelSpring(element);
   element.style.setProperty(prefix + '-x', (dx * scale).toFixed(2) + 'px');
   element.style.setProperty(prefix + '-y', (dy * scale).toFixed(2) + 'px');

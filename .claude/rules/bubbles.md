@@ -40,9 +40,11 @@ A mod is content injected into a bubble, and which bubbles may carry it is part 
 | Torch | **Now only** | built |
 | Recording / screen share | Now only | planned |
 | Download, Upload | Now only | planned |
-| Bluetooth, USB, Hotspot | Now only | planned |
+| Bluetooth, USB, Hotspot | **Status only** | planned |
 | Discord video | Main, Satellite | planned |
-| DB Navigator | Main, Satellite | planned |
+| DB Navigator | Main, Satellite, **Lock Now** | planned |
+
+Now carries what is *happening* — a torch burning, a recording running, a download in flight. Status carries what is *connected*. That is the line between the two, and it is why bluetooth is not a Now mod even though it would fit there.
 
 Torch is the one to read twice. It is not a mod the row is currently not showing — it is a mod the row may never show, because the Now bubble exists to cover One UI's flashlight chip and a torch drawn anywhere else covers nothing. Eligibility is what stops a new Now mod from being written as a row mod that happens to start out there.
 
@@ -63,6 +65,7 @@ What follows, and none of it is negotiable:
 - **One canvas.** Merging is one SVG goo layer, a filter reaches exactly as far as its own surface, so a bubble in a second window can never be liquid with anything. A new bubble is drawn in `pill.html` and is never given a window of its own. See [architecture.md](architecture.md#windows).
 - **Solid inside the layer.** A half-transparent shape falls under the alpha contrast and is erased instead of merged. The transparency belongs to the layer; what is in it is opaque. `html.liquid` blanks each bubble's own background — a bubble left out of that blanking paints twice and reads as the one solid thing in a row of glass.
 - **The strength is read off the gap**, never fixed (`meltBy()`): shapes fuse as they close and let go as they part, because that is what liquid does. A constant strong enough to fuse a leaving satellite welds the resting row into a bar.
+- **Nearness is measured only between shapes that share a row.** The melt strength is read off the smallest gap between bubbles, and a gap only means anything horizontally when the two are side by side. Measured as one sorted line it broke the moment a bubble was drawn somewhere other than the bar: the lock bubble is nearly full-width at the bottom of the canvas, so against anything on the row it reported a gap of most of the screen negative, pinned the deviation at its ceiling, and welded the whole row into one bar for as long as the keyguard was up. Five boxes make ten pairs — there is nothing to save by being clever.
 - **The skin is mirrored, not told.** One per-frame `getBoundingClientRect()` pass feeds both the goo and the host's blur panes, so the glass cannot disagree with the bubble it is read off. A size change owes that mirror a `stirLiquid()` long enough to cover the whole transition, including every close.
 - **A new bubble needs a blur pane on both sides** — a name in `BLUR_PANES` in `pill.html` and a pane counted in `BubbleService.BLUR_PANES`. Nothing joins the two at build time; a missing pane is a bubble with no glass.
 - **A bubble standing outside the row grows the filter region while it is there, and only while it is there.** Outside the region the skin is silently dropped and the bubble goes on painting its own background — which reads as a colour bug and is a geometry one.
@@ -72,10 +75,13 @@ What follows, and none of it is negotiable:
 One press response, one arrival curve, one family of easing across all of them. The Lock Now bubble is the reference because it is the one that is right today:
 
 - `--ease-split`, `cubic-bezier(0.2, 1.7, 0.35, 1)` — it lands past its mark and settles back.
-- `scale 320ms var(--ease-split)` for the swell, `.pressed { scale: 1.03 }` for the press.
-- `border-radius` with `corner-shape: squircle`, so the curvature is continuous and there is no visible corner where the arc meets the edge.
+- `scale 320ms var(--ease-split)` for the swell, and **1.03 under a finger** for the press.
 
 A bubble that arrives on a linear or an ease-out is a box being positioned. The same curve everywhere is most of what makes several shapes read as one material.
+
+**A press is one gesture and must not change meaning with where on the bar it lands.** 1.03 is what the lock bubble, the Now bubble and the main bubble's `pressing` state all say. The main bubble's *hold* is a different thing and goes further (`--hold-now`, 1.14): a press is an acknowledgement, a hold is a state on its way to opening something. The Now bubble sat at 1.08 — nearly the main bubble's full hold swell — so the same press read as twice as emphatic out at the clock as at the cutout, and its class had been added on touch-down all along with no rule to match.
+
+**Squircle is not part of this, and that is deliberate.** `corner-shape: squircle` belongs to the lock bubble alone: it is the one shape here wide enough for the difference between a superellipse and a rounded rectangle to read. On a pill or a circle the corners already eat the whole end, so a squircle there is not a subtler shape but a *different* one — a round satellite would become a rounded square. Bounciness is the motion, not the corner.
 
 ## Nothing is ever clipped
 

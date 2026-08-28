@@ -66,7 +66,7 @@ mods and sit a few pixels shorter.
 - [x] **A5 — a mod that ends gets a departure, not a repaint.** `9e62ba7`
 - [x] **Satellite still fades and grows under a finger.** `2034894`
 
-## Next
+## Phase A — done
 
 - [x] **A6 — the punch-hole corridor.** `--hole-gap` was reserved in exactly one place, the alert
       head row, and in none of the resting states — which are the ones parked over the camera for
@@ -74,29 +74,29 @@ mods and sit a few pixels shorter.
       The call face was three flat children, which is *why* Discord's name sat midway between the
       avatar and the clock: name and clock are one reading now, right-anchored, growing leftwards,
       fading on the left because that is the end that runs out.
-- [ ] **A7 — contained fixes.** Satellite-Spotify icon radius; Satellite-Clock continuing its tick
+- [x] **A7 — contained fixes.** Satellite-Spotify icon radius; Satellite-Clock continuing its tick
       across the swap instead of re-rendering; everything under our control in English;
       notification age in minutes; blurs missing on the locked Now bar at wake; the media timeline
       drag not stealing the bubble's haptic.
-- [ ] **A8 — new defaults.** `Preferences.defaults` → width 85, height 30, horizontal 0, vertical 3,
+- [x] **A8 — new defaults.** `Preferences.defaults` → width 85, height 30, horizontal 0, vertical 3,
       R/G/B 0, alpha 80, blur 60, identity Both. Currently 130/34/0/12/0/0/0/100/0/2.
-- [ ] **A2 — haptic audit.** A1 removed the cause; confirm the remaining wholesale `transition:`
+- [x] **A2 — haptic audit.** Passes by inspection, no change needed: A1 removed the cause; confirm the remaining wholesale `transition:`
       writes (`.dragging`, `.pulling`) still honour the named-list contract and that the swell
       composes onto a live drag.
 
 ## Phase B — system contracts
 
-- [ ] **B1. Bounciness everywhere.** Lock Now is the reference: `scale 320ms var(--ease-split)`,
+- [x] **B1. Bounciness everywhere.** Lock Now is the reference: `scale 320ms var(--ease-split)`,
       `.pressed { scale: 1.03 }`, `corner-shape: squircle`. Main, Satellite, Now and Status adopt
       the same curve family and press response. Written into `bubbles.md` as binding.
-- [ ] **B2. Fluid merging everywhere.** The mechanism is good; the coverage is not. Make Now↔Main,
+- [x] **B2. Fluid merging everywhere.** The mechanism is good; the coverage is not. Make Now↔Main,
       Clock↔Now and Lock↔Main merge the way Main↔Satellite already does. Mind the filter-region
       trap: a bubble outside it silently loses its skin and reads as a colour bug.
-- [ ] **B3. Debug stage — every state.** Extend `DebugStage.SEQUENCE` to cover the swap, a satellite
+- [~] **B3. Debug stage — every state.** Six stages added; never ticked. Extend `DebugStage.SEQUENCE` to cover the swap, a satellite
       closing, the pull, the hold, the lock merge, the Now flight. **Never ticked.**
-- [ ] **B4. Drag radius.** Double `DRAG_RADIUS` (20 → 40) with a constrainer at the current 80%:
+- [x] **B4. Drag radius.** Double `DRAG_RADIUS` (20 → 40) with a constrainer at the current 80%:
       crossing it resets the haptic to idle and stops it firing.
-- [ ] **B5. Settings.** Goo-strength slider; per-bubble widths for mod/idle/now/status.
+- [x] **B5. Settings.** Goo-strength slider; per-bubble widths for mod/idle/now/status.
 
 ## Phase P — performance
 
@@ -202,3 +202,27 @@ other.
 - Load-bearing comments travel with their code; most record a platform trap that cost an afternoon.
 - Fix the cause, not the caller: the same bug is usually live in every sibling routing through the
   same function.
+
+
+---
+
+## What Phase A and B actually found
+
+Three of these were not the bug that was reported, and are worth remembering as a class.
+
+- **The camera corridor existed in one place only** — the alert head row — and in none of the
+  resting states, which are the ones parked over the hole for hours. Discord's name looked
+  centred because the call face was three flat children under `space-between`, so "midway
+  between the avatar and the clock" *is* the middle of the bubble.
+- **`meltBy` measured the canvas as one line.** The lock bubble is nearly full-width at the
+  bottom, so against anything on the row it reported a gap of most of the screen negative,
+  pinned the deviation at its ceiling, and welded the row into one bar for as long as the
+  keyguard was up. Nobody reported this; it fell out of auditing B2's coverage.
+- **The blur on the locked bar was a disagreement, not a failure.** The host clears every pane
+  at screen-off because a transparent view goes on blurring; the page kept believing the panes
+  were there and said nothing on wake, since `sendBlurFrame` dedupes and the geometry was
+  identical. "Sometimes" was whether anything moved while the phone slept.
+
+And two near-misses worth the same memory: `#now.pressing` already existed at 1.08 further down
+the file, so a second rule would have been dead on arrival; and `#battery-face` had a `gap`
+that would have quietly won on source order and put its reading back over the camera.

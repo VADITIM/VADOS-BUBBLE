@@ -5,7 +5,7 @@ import { carryArt, mediaWindow, paintMedia, runBars } from './mods/media.js';
 import { paintTimer, timerWindow } from './mods/timer.js';
 import { endHold } from './motion.js';
 import { fitNowWidth } from './now.js';
-import { BUMP_MAX, BUMP_MIN, CHIP_ROOM, CLOSED, MOD_WIDTH, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, SWAP_FLICK, SWAP_STILL, bridge, faces, mods, pill, root, setSweepPhase, shared } from './state.js';
+import { BUMP_MAX, BUMP_MIN, CHIP_ROOM, CLOSED, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, SWAP_FLICK, SWAP_STILL, bridge, faces, mods, pill, root, setSweepPhase, shared } from './state.js';
 
 export function showFace(name) {
   for (const [key, element] of Object.entries(faces)) {
@@ -304,7 +304,7 @@ function restingMain() {
   if (mergeHold) return shared.compact.width;
   const live = liveMods();
   if (!live.length) return shared.compact.width;
-  return shared.compact.width + MOD_WIDTH + 4 - (live.length > 1 ? SPLIT_SHRINK : 0);
+  return shared.compact.width + shared.modWidth + 4 - (live.length > 1 ? SPLIT_SHRINK : 0);
 }
 
 /**

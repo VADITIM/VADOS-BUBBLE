@@ -75,6 +75,11 @@ export const CHIP_ROOM = 12;
  * that are touching. See meltBy().
  */
 export const MELT_MIN = 1.6;
+/**
+ * The deviation the skin melts at when two shapes are touching, and so — since shapes bridge
+ * at roughly twice it — how far apart two bubbles can be and still neck. The default the
+ * strength slider is a percentage of; `shared.goo` is what meltBy actually reads.
+ */
 export const MELT_MAX = 6;
 /** How much the main bubble pulls in when it has let a satellite go. */
 export const SPLIT_SHRINK = 24;
@@ -164,6 +169,10 @@ export const shared = {
   call: null,
   hasHeld: false,
   pullReach: 0,
+  /** The melt ceiling in force, which the settings panel scales. */
+  goo: MELT_MAX,
+  /** How much wider than the bare bubble a mod makes it, from the settings panel. */
+  modWidth: 56,
 };
 
 /** The mods that are true right now: 'media', and the sensor indicators later. */

@@ -325,6 +325,12 @@
       <button onclick="Panel.stage('battery-charging')">Charging</button>
       <button onclick="Panel.stage('battery-low')">Battery low</button>
       <button class="wide" onclick="Panel.stage('battery-critical')">Battery critical</button>
+      <button class="wide" onclick="Panel.stage('mod-closing')">A mod closing, one left</button>
+      <button class="wide" onclick="Panel.stage('satellite-closing')">A satellite closing</button>
+      <button class="wide" onclick="Panel.stage('mod-to-idle')">Last mod to idle</button>
+      <button class="wide" onclick="Panel.stage('now-flight')">Now, out and home</button>
+      <button class="wide" onclick="Panel.stage('alert-stacking')">Two from one sender</button>
+      <button class="wide" onclick="Panel.stage('alert-marked')">Alert with date and money</button>
     </div>
   </section>
 
@@ -420,6 +426,8 @@
     { key: 'blue',               name: 'Blue',              min: 0,    max: 255 },
     { key: 'backgroundAlpha',    name: 'Background alpha',  min: 0,    max: 100 },
     { key: 'blurRadius',         name: 'Backdrop blur',     min: 0,    max: 60 },
+    { key: 'gooStrength',        name: 'Goo strength',      min: 0,    max: 200 },
+    { key: 'modWidthDp',         name: 'Mod width',         min: 20,   max: 160 },
     { key: 'notificationIdentity', name: 'App identity',    min: 0,    max: 2,
       labels: ['Icon', 'Name', 'Both'] },
   ];

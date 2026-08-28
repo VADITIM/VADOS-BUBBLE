@@ -173,18 +173,36 @@ function mirrorFrame() {
  * about that is a constant.
  */
 function meltBy(measured) {
-  const boxes = measured.filter(seen => seen && seen.box.width)
-    .map(seen => seen.box)
-    .sort((left, right) => left.left - right.left);
+  const boxes = measured.filter(seen => seen && seen.box.width).map(seen => seen.box);
   let closest = Infinity;
-  for (let index = 1; index < boxes.length; index += 1) {
-    closest = Math.min(closest, boxes[index].left - boxes[index - 1].right);
+  // Every pair, and only the pairs that actually stand beside each other. Sorting the boxes
+  // by their left edge and walking the list treats the canvas as one line, which it stopped
+  // being the moment a bubble was drawn at the bottom of the screen: the lock bubble is
+  // nearly the full width down there, so against anything on the row it reported a gap of
+  // most of the screen *negative*, the deviation pinned at its maximum, and the whole row
+  // was welded into one bar for as long as the keyguard was up. Two shapes on different
+  // rows are not near each other in any sense the skin cares about — five boxes make ten
+  // pairs, so there is nothing to save by being clever about it.
+  for (let a = 0; a < boxes.length; a += 1) {
+    for (let b = a + 1; b < boxes.length; b += 1) {
+      const one = boxes[a];
+      const two = boxes[b];
+      if (one.top >= two.bottom || two.top >= one.bottom) continue;
+      closest = Math.min(
+        closest, one.left < two.left ? two.left - one.right : one.left - two.right
+      );
+    }
   }
   // Touching or overlapping is full strength; a resting row is far enough out to be
   // left as separate shapes. Between the two the neck forms and thins on its own.
+  // shared.goo rather than MELT_MAX: the ceiling is the settings panel's to move, and the
+  // floor stays where it is — a slider that could also raise the resting deviation would
+  // weld a row that is standing still, which is the one thing the measured melt exists to
+  // avoid.
+  const ceiling = shared.goo || MELT_MAX;
   const melt = closest === Infinity
     ? MELT_MIN
-    : Math.min(MELT_MAX, Math.max(MELT_MIN, MELT_MAX - closest * 0.5));
+    : Math.min(ceiling, Math.max(MELT_MIN, ceiling - closest * 0.5));
   if (melt !== meltNow) {
     meltNow = melt;
     liquidBlur.setAttribute('stdDeviation', melt);

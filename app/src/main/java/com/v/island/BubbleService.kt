@@ -785,6 +785,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setCompactSize(${Preferences.get(preferences, Preferences.WIDTH)},${Preferences.get(preferences, Preferences.HEIGHT)})")
         push("window.setGrab(${topGrab()})")
         push("window.setNotificationIdentity(${Preferences.get(preferences, Preferences.NOTIFICATION_IDENTITY)})")
+        push("window.setGoo(${Preferences.get(preferences, Preferences.GOO)})")
+        push("window.setModWidth(${Preferences.get(preferences, Preferences.MOD_WIDTH)})")
         push("window.setUnreadCount(${IslandNotificationListener.count()})")
         // The closed mods are state, not events: whatever was already true before this
         // page existed has to be asked for, because nothing will announce it again.

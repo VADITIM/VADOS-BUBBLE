@@ -22,6 +22,16 @@ object Preferences {
     /** 0 = icon only, 1 = name only, 2 = both. */
     const val NOTIFICATION_IDENTITY = "notificationIdentity"
 
+    /**
+     * How far the liquid reaches, as a percentage of the deviation the skin melts at when two
+     * shapes are touching. Shapes bridge at roughly twice the deviation, so this is directly
+     * how far apart two bubbles can be and still neck.
+     */
+    const val GOO = "gooStrength"
+
+    /** How much wider than the bare bubble a mod makes it. */
+    const val MOD_WIDTH = "modWidthDp"
+
     private const val STORE = "island"
 
     /**
@@ -43,7 +53,9 @@ object Preferences {
         BLUE to 0,
         BACKGROUND_ALPHA to 80,
         BLUR to 60,
-        NOTIFICATION_IDENTITY to 2
+        NOTIFICATION_IDENTITY to 2,
+        GOO to 100,
+        MOD_WIDTH to 56
     )
 
     fun of(context: Context): SharedPreferences =

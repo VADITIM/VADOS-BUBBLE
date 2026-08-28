@@ -1816,7 +1816,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     border-radius var(--grow-ms) ease-out,
     opacity var(--now-fade-ms, 180ms) ease,
     transform var(--now-fly-ms, 320ms) var(--now-fly-ease, var(--ease-split)),
-    scale 240ms var(--ease-grow);
+    scale 320ms var(--ease-split);
 }
 #now.lit { opacity: 1; }
 /* Above the row whatever it is doing. Nothing else on this page asks for a z at all —
@@ -1824,8 +1824,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    light in front of every one of them, and the markup order backs it up. */
 /* The growth under the finger. Written as `scale` rather than as part of the
    transform, because the transform is the flight out and home and has an owner
-   already — two writers on one property is one of them losing. */
-#now.pressing { scale: 1.08; }
+   already — two writers on one property is one of them losing.
+
+   1.03, matching the lock bubble and the main bubble's own pressed state. It was 1.08,
+   which is nearly the main bubble's full hold swell — so the same press read as twice as
+   emphatic out at the clock as it did at the cutout, and a press is one gesture that
+   should not change meaning depending on which end of the bar it lands on. */
+#now.pressing { scale: 1.03; }
 /* Open, it stands in the middle of the screen and in front of everything else on the
    bar: it is the thing being interacted with, and nothing on the row outranks that.
    One surface, so this is a z-index — it used to be a window being removed and added

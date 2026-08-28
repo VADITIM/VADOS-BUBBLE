@@ -3,8 +3,8 @@ import { mediaWindow } from './mods/media.js';
 import { show } from './mods/notification.js';
 import { timerWindow } from './mods/timer.js';
 import { nowHolds, nowOpen, nowPill, nowTouch } from './now.js';
-import { paintSatellites, paintShift, setSize } from './row.js';
-import { CLOSED, bridge, pill, root, shared } from './state.js';
+import { ensureClosedWindow, paintSatellites, paintShift, setSize } from './row.js';
+import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
 
 /**
  * The window this page is drawn in takes no touches at all — it spans the whole
@@ -157,6 +157,24 @@ window.setCompactSize = (width, height) => {
 window.setGrab = value =>
   document.documentElement.style.setProperty('--grab', value + 'px');
 window.setNotificationIdentity = value => { pill.dataset.identity = String(value); };
+
+/**
+ * How far the liquid reaches, as a percentage of the deviation two touching shapes melt at.
+ * A percentage rather than a raw deviation because the number that matters to the eye is
+ * "how far apart can two bubbles be and still neck", and that is twice the deviation — so
+ * the slider is scaled against the value the interface was tuned at rather than set blind.
+ */
+window.setGoo = percent => {
+  shared.goo = MELT_MAX * (Number(percent) || 100) / 100;
+  stirLiquid(240);
+};
+
+/** How much wider than the bare bubble a mod makes it. The row reads it every layout. */
+window.setModWidth = value => {
+  shared.modWidth = Number(value) || 56;
+  paintSatellites();
+  ensureClosedWindow();
+};
 window.setMicrophoneActive = isActive =>
   document.getElementById('microphone-dot').classList.toggle('active', isActive);
 window.setCameraActive = isActive =>
