@@ -243,6 +243,8 @@ class IslandNotificationListener : NotificationListenerService() {
             .put("app", style.key)
             .put("appName", labelOf(statusBarNotification.packageName))
             .put("accent", style.accent)
+            // Absent for every app whose identity is one colour, which is all but Google's.
+            .put("gradient", style.gradient ?: JSONObject.NULL)
             .put("package", statusBarNotification.packageName)
             .put("title", extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty())
             .put("text", extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty())

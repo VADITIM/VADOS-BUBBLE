@@ -1,6 +1,6 @@
 import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
 import { clock, paintProgress, playPath, shownPosition } from './mods/media.js';
-import { DEAD_ZONE, cancelSpring, toy, untoy } from './motion.js';
+import { cancelSpring, DEAD_ZONE, rubberBandPast, toy, untoy } from './motion.js';
 import { fitNowProxy } from './now.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
@@ -485,6 +485,12 @@ lockPill.addEventListener('touchstart', event => {
   lockHeld = false;
   lockSwiped = false;
   lockPill.classList.add('pressed');
+  // The scale is a 320ms transition and the skin is mirrored off the measured box, so
+  // without a stir the mirror is not running while it happens: the DOM content visibly
+  // grew and the glass and the outline stayed exactly where they were. That is the whole
+  // of "the content scales instead of the bubble" — the bubble did scale, its skin simply
+  // was not being read while it did.
+  stirLiquid(420);
   // Held, it means what a hold means on every bubble here: out to the app the mod
   // stands for. It runs underneath the play drag exactly as the main bubble's does —
   // the dead zone is what keeps the two out of each other's way.
@@ -518,6 +524,13 @@ lockPill.addEventListener('touchmove', event => {
     return;
   }
   if (lockSwiped) return;
+  // Past the band's threshold the finger has plainly stopped resting and started dragging,
+  // so the hold is called off exactly as it is on the main bubble. toy() cannot do it for
+  // us: the endHold it calls is the row's, and this bubble keeps its own timer.
+  if (rubberBandPast(dx, dy)) {
+    clearTimeout(lockHoldTimer);
+    lockPill.classList.remove('pressed');
+  }
   toy(lockPill, '--lock-drag', dx, dy);
 }, { passive: true });
 
@@ -556,6 +569,68 @@ function knock(element) {
     element.classList.remove('knocked');
   }));
 }
+
+/**
+ * A control inside the bubble owns its whole touch stream, not only the click it ends with.
+ *
+ * Stopping the click alone was not enough and the phone proved it: touchstart still reached
+ * the bubble, so the press swelled and the hold began counting under a finger that was on a
+ * button, touchmove still dragged the whole bubble on its band, and the synthetic click is
+ * dispatched on whatever elementFromPoint answers at *release* — so a thumb that slid a few
+ * pixels off the button between down and up had its click land on the bubble instead, and
+ * the bubble opened. One finger, three answers, and the third one only sometimes.
+ */
+function ownsTouch(element) {
+  for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'click']) {
+    element.addEventListener(type, event => event.stopPropagation(), { passive: true });
+  }
+}
+ownsTouch(document.getElementById('lock-buttons'));
+ownsTouch(document.getElementById('lock-timeline'));
+
+/**
+ * Dragging the lock bubble's timeline. It had none — the scrub was written for the main
+ * bubble's player and this bubble has its own line, so the thumb slid along it and nothing
+ * moved but the bubble underneath.
+ *
+ * The same shape as the player's: the position is tracked in `shared.scrubPosition` so the
+ * clock stops repainting over the drag, and the seek is sent once on release rather than on
+ * every frame — a media session asked to seek sixty times a second answers none of them.
+ * ownsTouch above already keeps this whole stream off the bubble.
+ */
+const lockTrack = document.getElementById('lock-track');
+let lockScrubOrigin = 0;
+let lockScrubStart = 0;
+
+document.getElementById('lock-timeline').addEventListener('touchstart', event => {
+  if (!shared.media || !shared.media.duration) return;
+  shared.isScrubbing = true;
+  lockScrubOrigin = event.touches[0].clientX;
+  lockScrubStart = shownPosition;
+  shared.scrubPosition = shownPosition;
+}, { passive: true });
+
+document.getElementById('lock-timeline').addEventListener('touchmove', event => {
+  if (!shared.isScrubbing) return;
+  const box = lockTrack.getBoundingClientRect();
+  const travelled =
+    ((event.touches[0].clientX - lockScrubOrigin) / box.width) * shared.media.duration;
+  shared.scrubPosition = Math.min(
+    shared.media.duration, Math.max(0, Math.round(lockScrubStart + travelled))
+  );
+  paintLockProgress(shared.scrubPosition);
+}, { passive: true });
+
+function releaseLockScrub() {
+  if (!shared.isScrubbing) return;
+  shared.isScrubbing = false;
+  bridge.triggerHaptic('tap');
+  bridge.mediaSeek(String(shared.scrubPosition));
+}
+document.getElementById('lock-timeline')
+  .addEventListener('touchend', releaseLockScrub, { passive: true });
+document.getElementById('lock-timeline')
+  .addEventListener('touchcancel', () => { shared.isScrubbing = false; }, { passive: true });
 
 function lockTransport(id, action) {
   document.getElementById(id).addEventListener('click', event => {

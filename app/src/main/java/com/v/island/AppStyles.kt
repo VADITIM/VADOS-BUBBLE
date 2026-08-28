@@ -10,11 +10,19 @@ package com.v.island
  */
 object AppStyles {
 
+    /**
+     * @param accent the one colour the interface threads through borders, glyphs and marks.
+     * @param gradient the CSS gradient for an identity that is genuinely several colours —
+     *   Google's four. Optional, and only the two places that can take one use it: the mark
+     *   beside a notification row and the app's name. Everything else reads [accent], because
+     *   a border-color and an SVG fill cannot take a gradient without being rewritten.
+     */
     data class Style(
         val key: String,
         val label: String,
         val packageName: String,
-        val accent: String
+        val accent: String,
+        val gradient: String? = null
     )
 
     /**
@@ -24,6 +32,13 @@ object AppStyles {
      */
     val generic = Style("generic", "Generic", "", "#ffffff")
 
+    /**
+     * Google's four, left to right as Google writes them. Shared, because every Google app but
+     * Gmail wears it — Gmail is the stated exception and keeps its own colour.
+     */
+    private const val GOOGLE =
+        "linear-gradient(100deg, #4285f4 0%, #ea4335 34%, #fbbc04 67%, #34a853 100%)"
+
     /** Order is the order the debug screen lists them in. */
     private val styles = listOf(
         Style("telegram", "Telegram", "org.telegram.messenger", "#2ea6ff"),
@@ -31,12 +46,14 @@ object AppStyles {
         Style("discord", "Discord", "com.discord", "#5865f2"),
         Style("instagram", "Instagram", "com.instagram.android", "#e1306c"),
         Style("gmail", "Gmail", "com.google.android.gm", "#fbbc04"),
-        // Google Blue, because a Google app wears a Google colour — and this one wears the
-        // primary rather than a share of the four. The accent is a single value read into
-        // border-color, color and background at nine places in pill.css, so a four-colour
-        // Google treatment is not a colour change here, it is teaching every one of those
-        // sites to take a gradient. Gmail keeps its yellow and is the stated exception.
-        Style("wallet", "Google Wallet", "com.google.android.apps.walletnfcrel", "#4285f4"),
+        // The four Google colours, in their own order — blue, red, yellow, green. A Google app
+        // wears Google's identity and that identity is not one colour, so the flat blue it had
+        // was the compromise rather than the answer. The accent stays blue for the places that
+        // can only take one colour; the gradient is what the name and the mark wear.
+        Style(
+            "wallet", "Google Wallet", "com.google.android.apps.walletnfcrel", "#4285f4",
+            GOOGLE
+        ),
         Style("db", "DB Navigator", "de.hafas.android.db", "#ec0016"),
         Style("comdirect", "Comdirect", "de.comdirect.app", "#ffd200"),
         Style("spotify", "Spotify", "com.spotify.music", "#1db954"),

@@ -247,6 +247,13 @@ export function openHistory() {
     const mark = document.createElement('div');
     mark.className = 'history-mark';
     mark.style.background = entry.accent || '#ffffff';
+    // An identity that is genuinely several colours — Google's four — carries them as a
+    // gradient beside its flat accent. Only the two places that can take one use it; the
+    // accent above stays the fallback and is what everything else reads.
+    if (entry.gradient) {
+      row.dataset.gradient = '';
+      row.style.setProperty('--row-gradient', entry.gradient);
+    }
 
     const copy = document.createElement('div');
     copy.className = 'history-copy';

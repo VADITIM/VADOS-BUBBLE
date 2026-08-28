@@ -95,6 +95,17 @@ export function cancelSpring(element) {
  * the band's, so a drag straight down and a drag diagonally both end at the edge of
  * the same circle.
  */
+/**
+ * Whether a drag has gone far enough that a hold running underneath it should be called off.
+ *
+ * Exported because every bubble owes the same answer and only this file knows the band. The
+ * main bubble's hold is ended inside toy(); the lock bubble keeps its own timer and asks
+ * here, which is the difference between one rule and two that drift.
+ */
+export function rubberBandPast(dx, dy) {
+  return rubberBand(Math.hypot(dx, dy)) > DRAG_RADIUS * HOLD_ABANDON;
+}
+
 export function toy(element, prefix, dx, dy) {
   const travel = Math.hypot(dx, dy);
   const reach = rubberBand(travel);

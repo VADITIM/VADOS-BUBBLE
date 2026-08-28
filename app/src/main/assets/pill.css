@@ -236,9 +236,21 @@ html, body {
   --app-accent: var(--lock-accent, var(--section-color));
   display: flex;
   flex-direction: column;
-  /* Not clipped, like every other bubble: this is the one whose overshoot is the
-     reference for all of them. */
-  overflow: visible;
+  /* Clipped, and this is the one bubble that must be. An element's own `overflow` never
+     clips its own transform — a scale scales the box and its children together, and the
+     padding box scales with them — so hiding here costs this bubble's overshoot nothing.
+     What it does contain is the content, which is laid out for the open height while the
+     box is still closed: `.open` blows the cover up to calc(100vw - 4rem) and the whole
+     of it spilled across the wallpaper for the length of the growth.
+
+     The timeline depends on it too, and says so in the markup: it is flush against the
+     bottom edge so the squircle cuts the ends of the line and it reads as part of the
+     shape. With nothing clipping, the line ran out past the corners.
+
+     "Nothing is ever clipped" is about ancestors and the window, not about a bubble
+     clipping itself. The main bubble is the real exception — its glyph's knock genuinely
+     translates outside the box — and it keeps `visible` for that reason. */
+  overflow: hidden;
   /* Born at nothing and grown into place, because a bubble that is simply there when
      the screen comes on has not arrived from anywhere. */
   opacity: 0;
@@ -806,8 +818,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .money {
   border-radius: 0;
   background-repeat: no-repeat;
-  background-size: 100% 62%;
-  background-position: 0 88%;
+  /* Centred on the glyphs, not hung under them. At 88% the band's top edge was down at
+     the baseline and the rest of it fell through the descenders, so a highlighted date
+     read as underlined rather than marked and the text sat above its own ink. A pen is
+     drawn across a word, so the band is centred on the line box and tall enough to cover
+     the x-height with room over the caps. */
+  background-size: 100% 78%;
+  background-position: 0 50%;
   /* Bleeds a little past the glyphs on both sides, the way a stroke overshoots the word. */
   padding: 0 0.12em;
   margin: 0 -0.06em;
@@ -1445,6 +1462,19 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   border-bottom: 1px solid var(--border);
 }
 .history-row:last-child { border-bottom: 0; }
+/* An app whose identity is several colours at once carries them as a gradient beside its
+   single accent, and only the two places that can take one use it: the mark down the side
+   of the row, and the name. Everything else --app-accent feeds — a border-color, a fill —
+   cannot take a gradient at all without being rewritten, so the flat accent stays the
+   fallback and remains what the rest of the interface reads. */
+.history-row[data-gradient] .history-mark { background-image: var(--row-gradient); }
+.history-row[data-gradient] .history-name {
+  background-image: var(--row-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
 .history-mark { align-self: stretch; border-radius: 999px; }
 .history-copy { min-width: 0; }
 .history-name {
