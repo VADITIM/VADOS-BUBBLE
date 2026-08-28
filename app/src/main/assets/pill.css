@@ -1518,8 +1518,16 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* Under a finger nothing eases: the swap follows the drag frame for frame, and
    the easing is only for where it lands once the finger is gone. The bubble's own
    transition is set where the hold's swell is, because that one has to survive a
-   drag rather than be flattened by it. */
-.dragging .satellite { transition: none; }
+   drag rather than be flattened by it.
+   Only `transform` is the drag's, so only `transform` goes. This used to be a blanket
+   `transition: none` and took the split's width and fade with it — a satellite arriving
+   or leaving while a finger happened to be down appeared and vanished on the spot. A
+   gesture turns off the transitions that are its own, never all of them. */
+.dragging .satellite {
+  transition:
+    width var(--grow-ms) var(--ease-grow),
+    opacity 120ms ease;
+}
 
 /* Past two satellites there is no third side to give away, so the rest of the row
    is counted rather than drawn: a dot each, in its own app's colour, outside the
@@ -1551,7 +1559,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   0% { opacity: 0; transform: translateX(-12px); }
   100% { opacity: 1; transform: translateX(0); }
 }
-.dragging .dots { transition: none; }
+/* The same care: the dots hold their place through a drag, but a dot being counted for
+   the first time still has a fade to do. */
+.dragging .dots { transition: opacity 160ms ease; }
 
 .sat-bars {
   display: flex;
