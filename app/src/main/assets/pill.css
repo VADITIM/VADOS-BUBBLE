@@ -868,6 +868,26 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   padding: 0 0.4rem 0 var(--glyph-inset);
 }
 
+/* The camera corridor, in the states that stand over it for hours rather than for a
+   dwell. A resting mod bubble is two runs — the glyph and its reading — and the hole is
+   between them, so the gap between them is a floor rather than a spacing choice: they may
+   be pushed further apart by space-between, never closer together than this.
+
+   The same reservation #alert-head has already made, applied where it was missing. An
+   alert holds the middle clear for a second and a half; a mod holds it for as long as the
+   song is playing, which is the case that actually matters and was the one not doing it.
+
+   Every face here is exactly two children, which is what makes one gap the whole rule —
+   the call face was three until its name and clock were wrapped into one reading.
+
+   One state it over-reserves: while the Now bubble is out the row is pushed right until
+   the bubble's left edge is at the hole, so the hole is no longer under the middle of the
+   bubble and this corridor is 40px the reading could have had. Wasted room, never covered
+   text, and not worth a second geometry to recover. */
+#media-face, #timer-face, #call-face, #battery-face {
+  column-gap: var(--hole-gap);
+}
+
 #media-art {
   width: var(--mod-glyph);
   height: var(--mod-glyph);
@@ -984,7 +1004,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
      a whole sentence in the summary instead — "Keine Runden abgeschlossen". Left to
      wrap, its second line is drawn below a pill one line tall and cut in half by
      the edge. One line, and what does not fit fades out rather than being cut or
-     given an ellipsis: the same treatment #call-name gets, for the same reason. */
+     given an ellipsis — the rule #call-name follows too. The direction differs, and the
+     anchor is what decides it: this reading is set from its left, so it overflows on the
+     right and fades there; Discord's name is anchored against the clock at the right,
+     grows leftwards, and fades on the left. The fade covers the end that runs out, which
+     is never the end that is pinned. */
   max-width: 104px;
   overflow: hidden;
   white-space: nowrap;
@@ -1063,17 +1087,36 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* Kept clear of the middle. The bubble is welded to the cutout, so the camera sits
    in the centre of it and anything starting there is read through a hole — the
    name begins to the right of it, not at it. */
+/* The reading: who is on the call, then how long it has lasted, as one run anchored to
+   the right end of the bubble. It grows leftwards from the clock, and stops before the
+   corridor because the corridor is a real gap the flexbox will not let it cross. */
+#call-reading {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
 #call-name {
   font-size: 0.62rem;
   letter-spacing: 0.02rem;
   color: var(--text-bright);
-  max-width: 62px;
   overflow: hidden;
   white-space: nowrap;
+  /* Right-aligned, because this run is anchored at the right and a name set left inside
+     it would drift back toward the middle as it shortened — which is the centred look
+     this replaces, arriving by a different route. */
+  text-align: right;
+  min-width: 0;
   /* Clipped left of the first glyph and paid back, so nothing is shaved off it. */
   padding: 0 0.4rem 0 0.2rem;
   margin-left: -0.2rem;
-  mask-image: linear-gradient(90deg, #000 calc(100% - 1.2rem), transparent);
+  /* The text grows leftwards now, so the end that runs out of room is the left one, and
+     that is the end that fades. The mask used to fade the right — the end anchored
+     against the clock, which never overflows — so a long name was cut square on the left
+     and faded where there was nothing to hide. Fade, never an ellipsis. */
+  mask-image: linear-gradient(90deg, transparent, #000 1.2rem);
 }
 
 /* A call on the line reads left to right the way the dialer's own screen does:
@@ -1088,12 +1131,21 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   font-variant-numeric: tabular-nums;
   flex: none;
 }
+/* A phone call reads left to right the way the dialer does, so its name takes the whole
+   reading and pushes the clock to the far end. Discord's does not: it sits beside the
+   clock at the right and the two travel together. `max-width: none` used to be here too,
+   undoing a 62px cap on the base rule — that cap is gone, because the corridor is what
+   bounds this name now and a second, smaller limit only stopped it short of the room it
+   was allowed. */
+#pill.phone-call #call-reading { flex: 1 1 0; justify-content: space-between; }
 #pill.phone-call #call-name {
   /* Whatever the reading does not need, so a long name is cut rather than the
      clock, and a short one leaves the clock exactly where it was. */
   flex: 1 1 0;
-  max-width: none;
+  text-align: left;
   min-width: 0;
+  /* Left-set here, so the end that overflows is the right one and the fade goes back. */
+  mask-image: linear-gradient(90deg, #000 calc(100% - 1.2rem), transparent);
 }
 
 /* #endregion ───────────────────────────────────────────────────────────── */
@@ -1104,7 +1156,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    shown at the moment it changes — past a mark, or plugged in — and then it is
    gone, so it is an alert that happens to be about the phone itself. */
 #pill.battery { width: 190px; height: var(--pill-height); }
-#battery-face { justify-content: space-between; padding: 0 0.55rem; gap: 0.5rem; }
+/* No gap of its own: it takes the camera corridor with the other resting faces, and a
+   half-rem written here would have quietly won on source order and put the reading back
+   over the hole. */
+#battery-face { justify-content: space-between; padding: 0 0.55rem; }
 
 #battery-glyph {
   position: relative;

@@ -89,6 +89,15 @@ The hole is the one place on this screen where content simply cannot go. Content
 
 A mod's glyph and its short reading inside the bubble are not subject to the fade. It is a text behaviour at the boundary, not a mask over the bubble, and they only fade when they animate outside the bubble's own bounds.
 
+**How it is held, so a new face does not have to work it out again.** A resting face is exactly **two runs** — the glyph and its reading — and the corridor is a `column-gap` of `--hole-gap` between them. A gap is a floor, not a spacing choice: `space-between` may push the two further apart, and nothing can bring them closer. That is the whole enforcement, and it is why the shape of the face matters more than any width. The call face was three flat children until its name and clock were wrapped into one reading, and being three is precisely why its name sat midway between them — over the camera — while every two-part face was fine.
+
+Two things follow for anything new:
+
+- **A face with three runs has no corridor.** Wrap until it has two, rather than reaching for a width that happens to look right; a hardcoded `max-width` stops the reading short of the room it is allowed and still does not guarantee the middle.
+- **The fade covers the end that runs out, which is never the end that is pinned.** A reading set from its left overflows on the right and fades there; one anchored against a clock at the right grows leftwards and fades on the left. A mask copied from a face with the opposite anchor fades where there is nothing to hide and cuts square where there is.
+
+`--hole-gap` is over-reserved in exactly one state: while the Now bubble is out the row is pushed right until the bubble's left edge is at the hole, so the hole is no longer beneath the middle of the bubble. That costs the reading room it could have had; it never puts text under the camera, and it is not worth a second geometry to recover.
+
 ## What a new bubble owes
 
 Before writing one, name each of these for it:

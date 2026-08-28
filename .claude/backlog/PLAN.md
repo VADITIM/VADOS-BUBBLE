@@ -68,10 +68,12 @@ mods and sit a few pixels shorter.
 
 ## Next
 
-- [ ] **A6 — the punch-hole corridor.** Discord names right-aligned, expanding right-to-left,
-      stopping at `--hole-gap` either side of centre with a **fade** — never an ellipsis, never a
-      hard cut. One rule for every resting state, not for Discord alone. `--hole-gap` already
-      exists in `pill.css` and is documented as reserved; this is about honouring it everywhere.
+- [x] **A6 — the punch-hole corridor.** `--hole-gap` was reserved in exactly one place, the alert
+      head row, and in none of the resting states — which are the ones parked over the camera for
+      hours rather than for a dwell. It is now a `column-gap` floor on all four resting faces.
+      The call face was three flat children, which is *why* Discord's name sat midway between the
+      avatar and the clock: name and clock are one reading now, right-anchored, growing leftwards,
+      fading on the left because that is the end that runs out.
 - [ ] **A7 — contained fixes.** Satellite-Spotify icon radius; Satellite-Clock continuing its tick
       across the swap instead of re-rendering; everything under our control in English;
       notification age in minutes; blurs missing on the locked Now bar at wake; the media timeline
