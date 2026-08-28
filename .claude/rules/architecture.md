@@ -51,6 +51,8 @@ There are four windows and no more: the canvas, and one proxy per bubble that ca
 
 ## The bridge
 
+The page is served from `https://appassets.androidplatform.net/` rather than `file:///android_asset/`, over a `shouldInterceptRequest` in `AssetOrigin` that reads straight out of `assets/`. It is not about security: Chromium gives every `file://` document its own opaque origin and refuses the module fetches an import graph is made of, so a page loaded from `file://` can carry inline script and nothing else — which is the whole reason `pill.html` was one file for as long as it was. The domain resolves nowhere, so a path the interceptor does not answer fails instead of reaching a network. `panel.html` stays on `file://`: it is one page with no imports, and it has nothing to gain from moving.
+
 Page-to-host calls are `@JavascriptInterface` methods on an inner `Bridge`; host-to-page calls are `window.on…` / `window.set…` functions pushed as script. Scripts sent before the page says `ready()` queue and replay in order.
 
 The page decides *when*, because it is the only side that knows where its own animation has got to. Do not re-derive an animation's timing on the Kotlin side. Sequencing between two bubbles is not a message at all any more: the Now bubble telling the main bubble that the flying drop has cleared it used to be a relay through the host, and on one canvas it is one page calling its own function.

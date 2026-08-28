@@ -297,7 +297,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 }
             }
             addJavascriptInterface(Bridge(), "Android")
-            loadUrl("file:///android_asset/pill.html")
+            webViewClient = AssetOrigin.client(this@BubbleService)
+            loadUrl(AssetOrigin.ROOT + "pill.html")
         }
 
         stage = FrameLayout(this).apply {
