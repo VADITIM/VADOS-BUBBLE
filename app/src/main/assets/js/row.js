@@ -1083,11 +1083,49 @@ function enterFrom(side) {
   enterSide = side;
 }
 
+/**
+ * How long the glyph takes to leave once the width has been given back. Mirrors
+ * --leave-ms in pill.css, and it starts at LAND of the width's own --grow-ms: the same
+ * hand-over the arrival makes, read backwards.
+ */
+const MOD_LEAVE = 260;
+const MOD_LEAVE_WAIT = 340 * LAND;
+let leaveTimer = null;
+
+/**
+ * A mod ending: the width is the consequence and is given back first, then the glyph
+ * leaves. A mod whose app was killed pushes null like any other update, and without this
+ * the bubble simply repainted itself bare — the face swapped on the spot while the width
+ * animated behind it, which reads as a glitch rather than as something going.
+ */
+function flyGlyphOut(name) {
+  const glyph = faces[name] && faces[name].querySelector('.glyph');
+  if (!glyph) {
+    showFace('idle');
+    return;
+  }
+  root.classList.add('leaving');
+  stirLiquid(MOD_LEAVE_WAIT + MOD_LEAVE + 200);
+  leaveTimer = setTimeout(() => {
+    glyph.classList.add('leaving');
+    leaveTimer = setTimeout(() => {
+      glyph.classList.remove('leaving');
+      root.classList.remove('leaving');
+      leaveTimer = null;
+      showFace('idle');
+      root.style.removeProperty('--app-accent');
+    }, MOD_LEAVE);
+  }, MOD_LEAVE_WAIT);
+}
+
 /** Plays the glyph's arrival: up out of the middle and onto the left. */
 function flyGlyphIn(name) {
   const glyph = faces[name] && faces[name].querySelector('.glyph');
   if (!glyph) return;
-  glyph.classList.remove('entering', 'bumping');
+  // A mod arriving on top of one that is still leaving takes the bubble back off it.
+  clearTimeout(leaveTimer);
+  root.classList.remove('leaving');
+  glyph.classList.remove('entering', 'bumping', 'leaving');
   // Without this the class is added in the same frame it was removed and the
   // animation is never restarted — the glyph simply appears where it lands.
   void glyph.offsetWidth;
@@ -1251,9 +1289,20 @@ export function toClosed() {
     return;
   }
 
+  // Which mod the bubble is losing, read before it is forgotten: nothing else knows
+  // afterwards that anything was ever there to leave.
+  const leaving = lastOwner;
   lastOwner = null;
   ensureClosedWindow();
   setSize('idle');
-  showFace('idle');
-  root.style.removeProperty('--app-accent');
+  if (!leaving) {
+    // A departure already in flight owns the face until it lands. toClosed() is called
+    // again by anything that repaints the closed row, and repainting the bare bubble
+    // over a mod that is still going is the abrupt close this exists to stop.
+    if (leaveTimer !== null) return;
+    showFace('idle');
+    root.style.removeProperty('--app-accent');
+    return;
+  }
+  flyGlyphOut(MOD_CLOSED[leaving].face);
 }

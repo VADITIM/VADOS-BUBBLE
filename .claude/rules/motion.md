@@ -55,6 +55,8 @@ Everything on this screen is born at the true middle of the screen, which is the
 
 A mod arriving never widens the bubble and then fills it. The mod's glyph flies in first, lands against the left inset, and the bubble opens out around it *because* it got there. On the way out the same thing runs backwards: the width is given back first, then the glyph leaves. The same applies to a whole pill arriving from the cutout — it hits its stop and opens out off that stop.
 
+A mod that ends because its app was killed leaves the same way: `flyGlyphOut()` gives the width back, fades the reading with it, and only then runs the glyph down into the hole. Pushing `null` is a departure, not a repaint — a face swapped for the idle one on the spot reads as the bubble forgetting rather than as the mod going — and a departure in flight owns the face until it lands, or the next repaint of the closed row cuts it short.
+
 - `LAND` is the share of the arrival at which the flying thing is actually against its stop. The arrival curves overshoot and settle back, so this is under halfway, not the end. Hand over at `LAND`, never on animation end, or there is a visible pause between the landing and the width change. They are one action and one reaction.
 - Ask the host for the window room the growth will need *before* the flight, not when the growth starts. The window is resized a frame or two after being asked, and a resize landing mid-growth clips it.
 

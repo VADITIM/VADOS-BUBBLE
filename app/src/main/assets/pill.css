@@ -608,10 +608,24 @@ html.dragging #pill { transition: scale 350ms linear; }
   to { transform: translateX(0) scale(1); opacity: 1; }
 }
 
+/* And the way out, which is the same journey backwards: the width is given back first
+   and the glyph leaves last, down into the hole it came out of. A mod whose app was
+   killed used to have no departure at all — its face was swapped for the idle one on the
+   spot while the width animated on its own, which reads as the bubble forgetting rather
+   than as the mod going. */
+.glyph.leaving { animation: glyph-leave var(--leave-ms, 260ms) var(--ease-grow) forwards; }
+@keyframes glyph-leave {
+  from { transform: translateX(0) scale(1); opacity: 1; }
+  to { transform: translateX(var(--enter-from)) scale(0.66); opacity: 0; }
+}
+
 /* While the glyph is still on its way in, the bubble is the bare closed bubble
    and carries nothing else: the reading belongs to the width that has not been
    asked for yet. */
 html.entering .face.showing > :not(.glyph) { opacity: 0; transition: none; }
+/* On the way out the reading goes with the width, ahead of the glyph, and it fades
+   rather than cutting: it is the consequence leaving before the cause. */
+html.leaving .face.showing > :not(.glyph) { opacity: 0; transition: opacity 140ms ease; }
 
 /* The hand-over at the end of a merge. The circle and the bubble are holding the
    same glyph in the same place, so the bubble's own copy waits until the circle
