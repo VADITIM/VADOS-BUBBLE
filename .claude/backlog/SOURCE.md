@@ -163,3 +163,12 @@ New standard settings from top to bottom:
 80
 60
 Both
+---
+
+## Added 2026-08-28, after the original note
+
+[] Every google related thing should have google colors except Gmail
+
+[] Time stuff and Dates should be highlighted like a Marker highlight in light blue
+
+[] Money stuff should be highlighted in yellow like with a marker (7,80€ example)
