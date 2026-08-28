@@ -18,6 +18,12 @@
   /* A link's blue, bright enough to survive on the bubble's black rather than the
      browser default nobody can read on it. */
   --link: #6fb3ff;
+  /* The two highlighter inks. Both are laid behind the text as a band rather than given to
+     the glyphs, which is the whole distinction from --link above: a link recolours letters,
+     a marker leaves them alone and puts colour under them. That is why these can sit this
+     close to the link's blue without the two reading as the same thing. */
+  --mark-time: rgba(91, 196, 253, 0.32);
+  --mark-money: rgba(255, 221, 27, 0.30);
   /* The camera hole plus the daylight either side of it. Everything here is centred
      on the screen and so is the hole, so the middle of any grown state is the one
      place text must never be written — it is not covered by the bubble once the
@@ -783,6 +789,40 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .keyword {
   color: var(--app-accent);
   border-radius: 0;
+}
+
+/* When something happens, and what it costs — the two things read out of a notification
+   before any of its prose, so they are marked the way a person marks them on paper rather
+   than the way software colours text.
+
+   A highlighter is a band *behind* the glyphs that does not line up with the text box: it is
+   shorter than the line, sits low against the baseline, and bleeds past both ends at a slight
+   angle because a real pen does not stop square. The gradient is what buys all three — a flat
+   background-color here is a chip, and a chip is what every other piece of software does.
+
+   Painted on background rather than on a pseudo-element so a match that wraps across two
+   lines is marked on both, which is what a pen would do and what an ::before cannot. */
+.time,
+.money {
+  border-radius: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 62%;
+  background-position: 0 88%;
+  /* Bleeds a little past the glyphs on both sides, the way a stroke overshoots the word. */
+  padding: 0 0.12em;
+  margin: 0 -0.06em;
+}
+.time {
+  background-image: linear-gradient(
+    100deg, transparent 0.4%, var(--mark-time) 1.2%,
+    var(--mark-time) 98.5%, transparent 99.6%
+  );
+}
+.money {
+  background-image: linear-gradient(
+    100deg, transparent 0.4%, var(--mark-money) 1.2%,
+    var(--mark-money) 98.5%, transparent 99.6%
+  );
 }
 #pill.picture #text { display: none; }
 

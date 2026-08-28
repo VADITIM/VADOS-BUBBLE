@@ -22,6 +22,40 @@ const KEYWORDS = [
 const LINK_PATTERN = /\bhttps?:\/\/\S+|\bwww\.\S+/gi;
 
 /**
+ * When a thing happens, in the formats this phone actually writes them in — it is set to
+ * German, so `27.08.2026` and `27.08.` are dates and the comma is a decimal point, which is
+ * exactly why this pattern and the money one below have to be told apart carefully rather
+ * than both hunting for "a number with punctuation in it".
+ *
+ * Deliberately only the concrete tokens. "heute" and "morgen" are time words too, but they
+ * turn up in ordinary sentences several times a message and a highlighter drawn over every
+ * one of them is a highlighter that has stopped meaning anything.
+ */
+const TIME_PATTERN = new RegExp(
+  [
+    '\\d{1,2}:\\d{2}(?::\\d{2})?',
+    '\\d{1,2}\\.\\d{1,2}\\.(?:\\d{2,4})?',
+    '\\d{4}-\\d{2}-\\d{2}',
+    '\\d{1,2}\\.?\\s?(?:Jan|Feb|Mär|Mar|Apr|Mai|May|Jun|Jul|Aug|Sep|Okt|Oct|Nov|Dez|Dec)[a-zä]*\\.?',
+  ].join('|'),
+  'gi'
+);
+
+/**
+ * An amount of money, symbol on either side because both are written: `7,80€` from a German
+ * app and `$5.00` from an American one. The symbol has to be part of the match rather than a
+ * lookaround — a bare number is not money and highlighting one would light up every message
+ * containing a quantity.
+ *
+ * The `\b` closes the letter codes only, never the symbols. Written outside the whole
+ * alternation it silently killed the commonest case on this phone: a word boundary needs a
+ * word character on one side, `€` is not one, and `7,80€ empfangen` has a space after the
+ * symbol — so `7,80€` failed to match while `45 CHF` passed.
+ */
+const MONEY_PATTERN =
+  /[€$£¥]\s?\d[\d.,]*|\d[\d.,]*\s?(?:[€$£¥]|(?:EUR|USD|GBP|CHF)\b)/gi;
+
+/**
  * A message, with the parts of it that are not prose marked as such: links wear
  * the blue and the underline every link everywhere wears, and the handful of words
  * that say what kind of message this is take the app's own colour.
@@ -34,6 +68,11 @@ export function markUp(host, message) {
   host.textContent = message;
   if (!message) return;
   paintMatches(host, LINK_PATTERN, 'link');
+  // Before the keywords, because these two are the specific ones: a date is a date whatever
+  // words are around it, while "Termin" is a guess about what the message is. Each pass only
+  // ever sees text no earlier pass has claimed — see paintMatches.
+  paintMatches(host, TIME_PATTERN, 'time');
+  paintMatches(host, MONEY_PATTERN, 'money');
   // One pass over the whole list rather than one per word, so the earliest match in
   // the message wins rather than the earliest word in the list.
   const words = KEYWORDS
@@ -46,7 +85,16 @@ function paintMatches(host, pattern, className) {
   // Collected first: replacing a node while walking the live list skips whatever
   // came after it.
   const texts = [];
-  const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+  // Text already claimed by an earlier pass is skipped outright, because each pass walks the
+  // tree the previous ones left behind rather than the original string. Without this a link
+  // is fair game for every pattern that follows it: `https://x.com/post/12.05.2026` came out
+  // of the link pass as one span and then had "post" recoloured and the date highlighted
+  // inside it — a URL wearing three different marks, none of which meant anything there.
+  const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => node.parentNode === host
+      ? NodeFilter.FILTER_ACCEPT
+      : NodeFilter.FILTER_REJECT,
+  });
   while (walker.nextNode()) texts.push(walker.currentNode);
 
   for (const node of texts) {
