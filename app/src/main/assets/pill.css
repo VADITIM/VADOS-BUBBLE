@@ -103,10 +103,10 @@ html, body {
   contain: layout paint;
   will-change: width, height;
   /* Named rather than written straight into `transition`, so that a rule wanting to
-     *add* a property can put this list back instead of replacing it. See the homing
-     rule below: it replaced the list outright, and every size change on the bubble
-     stopped animating for the rest of the session the first time anything was
-     dragged. A transition list is a contract with every other rule on the element. */
+     *add* a property can put this list back instead of replacing it. The springback
+     home used to be such a rule and replaced the list outright, and every size change
+     on the bubble stopped animating for the rest of the session the first time anything
+     was dragged. A transition list is a contract with every other rule on the element. */
   --pill-transition:
     /* The width is the one dimension a closed mod moves, and it is moving because
        something split off the bubble or ran back into it — so it rides the split's
@@ -233,7 +233,7 @@ html, body {
   scale: 0.94;
   pointer-events: none;
   /* The list is named once so that a rule wanting to *add* a property can put it back
-     instead of replacing it. The play drag's homing rule used to write a
+     instead of replacing it. The play drag's springback used to be a rule that wrote a
      transform-only list here and took the height away with it, which is why opening
      was instant rather than animated: every transition this bubble has was collateral
      of a rule about something else. The sizes run on --grow-ms and --ease-grow, the
@@ -515,17 +515,13 @@ html.dragging #pill { transition: scale 350ms linear; }
    that is the point: a thing that answers the finger everywhere reads as an object
    rather than as a control with three approved directions. Instant while the finger
    is down, sprung on the way back.
-   Nothing is needed to make it instant — `transform` is not in either bubble's
-   transition list, because it is the per-frame property and never has a duration.
-   Only the way home is eased, and the hold's own `scale` is named again there so the
-   springback does not flatten a swell that is still growing. */
-html.homing #pill {
-  transition: var(--pill-transition), transform var(--home-ms, 520ms) var(--ease-split);
-}
+   Nothing here makes it instant, and nothing here makes it spring either: `transform` is
+   in no transition list at all, because it is the property everything written per frame
+   shares — the drag, the pull's lean, the merge's `--absorb` squash. The way home is an
+   added animation in motion.js instead. It used to be a `homing` class holding a 520ms
+   overshoot on `transform`, and giving a per-frame value a spring that overshoots is the
+   bubble bouncing to places nothing sent it. */
 #lock-now { transform: translate(var(--lock-drag-x, 0px), var(--lock-drag-y, 0px)); }
-#lock-now.homing {
-  transition: var(--lock-transition), transform var(--home-ms, 520ms) var(--ease-split);
-}
 
 .face {
   position: absolute;

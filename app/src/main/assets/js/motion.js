@@ -42,27 +42,68 @@ function rubberBand(travel) {
   return DRAG_RADIUS * past / (past + DRAG_RADIUS);
 }
 
+/** How long the way home takes, and the curve it lands on. Mirrors --ease-split in pill.css. */
+const HOME_MILLISECONDS = 520;
+const HOME_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
+
+/** The springback each bubble is running, so a finger coming back can take it off again. */
+const springs = new WeakMap();
+
+/**
+ * The way home, added to the bubble rather than transitioned onto it.
+ *
+ * It used to be a class — `homing` — that gave `transform` a 520ms overshooting
+ * transition, and `transform` is the property everything written per frame shares: the
+ * merge's `--absorb` squash, the pull's lean. A per-frame value driven through a spring
+ * that overshoots by 1.7 is the bubble bouncing and landing somewhere it was never sent,
+ * and the class outlived the gesture that added it, so after the first drag of a session
+ * every later one left it on. An added animation cannot do that: it composes onto whatever
+ * `transform` is already saying, it ends by itself, and it takes nothing over on the way.
+ */
+function springHome(element, from) {
+  cancelSpring(element);
+  const spring = element.animate(
+    { transform: [from, 'translate(0px, 0px) scale(1)'] },
+    { duration: HOME_MILLISECONDS, easing: HOME_EASE, composite: 'add' },
+  );
+  springs.set(element, spring);
+}
+
+/** The finger is back on the bubble, so the journey home is over whatever it had left. */
+export function cancelSpring(element) {
+  const spring = springs.get(element);
+  if (spring) spring.cancel();
+}
+
 /**
  * One bubble following one finger. The direction is the finger's and the distance is
  * the band's, so a drag straight down and a drag diagonally both end at the edge of
  * the same circle.
  */
-export function toy(holder, prefix, dx, dy) {
+export function toy(element, prefix, dx, dy) {
   const travel = Math.hypot(dx, dy);
   const reach = rubberBand(travel);
   const scale = travel > 0 ? reach / travel : 0;
-  holder.classList.remove('homing');
-  holder.style.setProperty(prefix + '-x', (dx * scale).toFixed(2) + 'px');
-  holder.style.setProperty(prefix + '-y', (dy * scale).toFixed(2) + 'px');
+  cancelSpring(element);
+  element.style.setProperty(prefix + '-x', (dx * scale).toFixed(2) + 'px');
+  element.style.setProperty(prefix + '-y', (dy * scale).toFixed(2) + 'px');
   stirLiquid(160);
 }
 
-/** And letting go of it: home on a spring, with the skin and the glass following. */
-export function untoy(holder, prefix) {
-  if (!holder.classList.contains('homing') && !holder.style.getPropertyValue(prefix + '-x')) return;
-  holder.classList.add('homing');
-  holder.style.setProperty(prefix + '-x', '0px');
-  holder.style.setProperty(prefix + '-y', '0px');
+/**
+ * And letting go of it: home on a spring, with the skin and the glass following.
+ *
+ * The offsets are *removed* rather than written back as `0px`. Left standing at zero they
+ * are still an answer to "is this bubble being dragged", and the guard here read exactly
+ * that — which is how one drag per session used to be enough to leave the bubble sprung.
+ */
+export function untoy(element, prefix) {
+  const x = element.style.getPropertyValue(prefix + '-x');
+  const y = element.style.getPropertyValue(prefix + '-y');
+  if (!x && !y) return;
+  element.style.removeProperty(prefix + '-x');
+  element.style.removeProperty(prefix + '-y');
+  springHome(element, `translate(${x || '0px'}, ${y || '0px'})`);
   stirLiquid(600);
 }
 
@@ -235,9 +276,9 @@ pill.addEventListener('touchmove', event => {
   // its place for the whole of a swap.
   if (root.classList.contains('dragging') || root.classList.contains('pulling') ||
       hasSwiped) {
-    untoy(root, '--drag');
+    untoy(pill, '--drag');
   } else {
-    toy(root, '--drag', sideways, verticalTravel);
+    toy(pill, '--drag', sideways, verticalTravel);
   }
   // The hold is no longer called off by travel at all. It used to be — one slop for
   // both answers, whatever cancels the hold is the same travel that starts the drag —
@@ -281,9 +322,9 @@ pill.addEventListener('touchmove', event => {
     const reached = Math.max(0, (verticalTravel - PULL_START) / (PULL_TRIGGER - PULL_START));
     shared.pullReach = reached;
     root.classList.add('pulling');
-    // Under the finger nothing eases, so the springback's own transition has to be off
-    // again before the lean is written — the same handover toy() makes for the drag.
-    root.classList.remove('homing');
+    // Under the finger nothing eases, so a springback still running has to be taken off
+    // before the lean is written — the same handover toy() makes for the drag.
+    cancelSpring(pill);
     root.style.setProperty('--pull', (PULL_TRAVEL * reached).toFixed(2) + 'px');
     // A touch of shrink with it, so the bubble reads as being drawn out of the
     // cutout under tension rather than simply sliding down the screen.
@@ -329,17 +370,18 @@ pill.addEventListener('touchmove', event => {
 function endPull(settle, threshold) {
   if (!root.classList.contains('pulling')) return;
   const asked = settle && shared.pullReach > (threshold || PULL_SETTLE);
+  const leant = PULL_TRAVEL * shared.pullReach;
+  const shrunk = 1 - 0.03 * shared.pullReach;
   shared.pullReach = 0;
   root.classList.remove('pulling');
   // The lean lives inside `transform`, which is the per-frame property and has no
   // duration of its own — that is the whole point of the split, and it is why letting
   // go of a pull put the bubble back at the cutout in one frame. The way home is the
-  // play drag's, because it is the same journey: `homing` is the one rule that gives
-  // `transform` a transition, and it is named here rather than a second curve being
-  // written for the pull alone.
-  root.classList.add('homing');
+  // play drag's, because it is the same journey: one added animation off where the lean
+  // had got to, rather than a second curve written for the pull alone.
   root.style.removeProperty('--pull');
   root.style.removeProperty('--pull-scale');
+  springHome(pill, `translate(0px, ${leant.toFixed(2)}px) scale(${shrunk.toFixed(3)})`);
   // The glass and the goo are mirrored off the bubble, so they have to ride the
   // springback home rather than snapping back the frame the class came off.
   stirLiquid(600);
@@ -356,7 +398,7 @@ pill.addEventListener('touchend', () => {
   releaseSwap();
   endPull(true);
   endHold();
-  untoy(root, '--drag');
+  untoy(pill, '--drag');
 }, { passive: true });
 /**
  * Growing the window to make room for the scaled bubble pulls the surface out from
@@ -368,7 +410,7 @@ pill.addEventListener('touchend', () => {
 pill.addEventListener('touchcancel', () => {
   releaseSwap();
   endPull(true, PULL_STOLEN);
-  untoy(root, '--drag');
+  untoy(pill, '--drag');
   if (shared.state === 'haptic' && hasGrown) return;
   endHold();
 }, { passive: true });

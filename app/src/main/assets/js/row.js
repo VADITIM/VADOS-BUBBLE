@@ -1085,13 +1085,18 @@ function flyGlyphIn(name) {
   // Without this the class is added in the same frame it was removed and the
   // animation is never restarted — the glyph simply appears where it lands.
   void glyph.offsetWidth;
-  if (enterSide === 'hole') {
+  // Consumed here and not left standing: a side is a fact about the swipe that caused
+  // this arrival, and a mod handed over for any other reason afterwards was reading the
+  // last swipe's side and being knocked on by a finger that had long since gone.
+  const side = enterSide;
+  enterSide = 'hole';
+  if (side === 'hole') {
     glyph.classList.add('entering');
     return;
   }
   const thrown = BUMP_MIN + (BUMP_MAX - BUMP_MIN) * Math.min(1, swapSpeed / SWAP_FLICK);
   glyph.style.setProperty(
-    '--bump', (enterSide === 'left' ? thrown : -thrown).toFixed(1) + 'px'
+    '--bump', (side === 'left' ? thrown : -thrown).toFixed(1) + 'px'
   );
   glyph.classList.add('bumping');
 }

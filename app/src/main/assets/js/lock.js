@@ -1,6 +1,6 @@
 import { catchInto, releaseCatch, stirLiquid } from './liquid.js';
 import { clock, paintProgress, playPath, shownPosition } from './mods/media.js';
-import { DEAD_ZONE, toy, untoy } from './motion.js';
+import { DEAD_ZONE, cancelSpring, toy, untoy } from './motion.js';
 import { fitNowProxy } from './now.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
@@ -415,7 +415,8 @@ function landLock() {
   // screen — the flight is cancelled with it, so the box springs back to where it
   // started and then fades from there, in plain sight.
   lockPill.style.setProperty('--lock-fade-ms', '0ms');
-  lockPill.classList.remove('showing', 'open', 'pressed', 'homing');
+  lockPill.classList.remove('showing', 'open', 'pressed');
+  cancelSpring(lockPill);
   // Deep enough inside the bubble now that there is nothing left to see go out,
   // which is also the moment the filter can go back to the row's own height.
   root.classList.remove('lock-live');
