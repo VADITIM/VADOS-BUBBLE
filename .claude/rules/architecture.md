@@ -63,7 +63,27 @@ Touch is the one thing that travels the other way. A touch-proxy window has no c
 
 ## The page
 
-**Not built yet — this is what the split is to be.** `pill.html` is markup and the SVG filter definitions. Styles are in `pill.css` beside `dna.css`; logic is ES modules under `assets/js/`, loaded with `<script type="module">` from `file:///android_asset/` and split by concern rather than by state. One `Bubble` type carries what [bubbles.md](bubbles.md) says every bubble has; Main, Satellite, Now and Double are instances of it that differ in where they stand, which states they may enter, and what they carry. There is no factory, no event bus and no configuration layer around it — one type is the whole abstraction.
+`pill.html` is markup and the SVG filter definitions. Styles are in `pill.css` beside `dna.css`; logic is ES modules under `assets/js/`, loaded with one `<script type="module" src="js/main.js">` and split by concern rather than by state:
+
+| Module | What it owns |
+|---|---|
+| `state.js` | the page's handles (`pill`, `faces`, `root`), the `bridge` stub, every shared constant, and `shared` |
+| `motion.js` | the rubber band, `toy`/`untoy`, and every gesture on the main bubble |
+| `liquid.js` | the mirror, the goo, the blur frames, `stirLiquid`, `catchInto` |
+| `row.js` | layout, satellites, dots, the swap, window sizing, the mod hand-over |
+| `now.js`, `lock.js` | the Now bubble and the lock screen's |
+| `mods/*.js` | one file per mod: `media`, `timer`, `call`, `battery`, `notification` |
+| `tabs.js` | the Tabs that are nobody's mod: history, quick settings |
+| `bridge.js` | the `window.on…` / `set…` entry points and forwarded touch |
+| `main.js` | imports every module for its side effects, then `bridge.ready()` |
+
+Two things hold this together, and both are load-bearing:
+
+**`shared` is the state several modules write.** An imported binding can be read anywhere and assigned only where it was declared, so eighteen module-scope `let`s would have become eighteen setters. They are one exported object instead, and a write stays where the decision is made. A value only one module writes is that module's own and does not belong in it.
+
+**`state.js` imports nothing.** The modules are a cycle — the row calls into the mods, the mods paint the row — which ES modules allow as long as nothing reads another module's binding *while modules are still evaluating*. A module with no imports of its own is always evaluated first, so every module's top-level lines may reach `state.js` and their own file and nothing else. `bridge.ready()` sits in `main.js` for the same reason: the host replays everything it has queued the moment it is called, and the page has to be whole before that. A function reference read at the top of a file (`room: timerWindow`) is exactly the read that breaks this, and it is written `room: () => timerWindow()`.
+
+One `Bubble` type carries what [bubbles.md](bubbles.md) says every bubble has; Main, Satellite, Now and Double are instances of it that differ in where they stand, which states they may enter, and what they carry — **not built yet**. There is no factory, no event bus and no configuration layer around it — one type is the whole abstraction.
 
 ## Vendor reflection
 
