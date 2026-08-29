@@ -201,13 +201,38 @@ One step each, one push each, naming the feature.
 - [ ] **C10. Lock screen** — the Lock icon bubble; rubber-band response to unlock swipe progress;
       real Notification bubbles in a scrollable overflow-visible container.
 - [ ] **C11. Notification quick settings** — **blocked**, the two screenshots were never attached.
-- [ ] **C12. Status bar replacement** — one-button set/reset of the Samsung settings, and an option
-      to disable the status bar entirely. **Blocked**, the four screenshots were never attached.
+- [ ] **C12. Status bar replacement** — one-button set/reset of the Samsung settings. **Blocked**,
+      the four screenshots were never attached. Disabling the bar itself is its own step now —
+      see C15, last in this phase, because it depends on Status and Clock existing first.
 - [ ] **C13. Rendering order** — the bubble always at the lowest index system-wide so system
       notifications never overlap it, without suppressing them.
 - [ ] **C14. Blur over content** — an overlapped bubble's content is not inside the blur. The panes
       are host `View`s *behind* the WebView, so a pane cannot blur WebView pixels. **Research step
       with an honest answer**, not a promised fix.
+- [ ] **C15. Disable the status bar.** The last step, and depends on C1 and C2 being on the phone
+      first — the real bar is the only thing showing the clock and connectivity/battery until
+      Status and Clock exist as bubbles, so hiding it earlier would delete information rather than
+      replace it. This is the overhaul's own logic: nothing stock is removed until what it did is
+      fletched out and standing in its place.
+
+      Mechanism, researched, not yet tried on the phone: no root and no privileged permission is
+      needed. `pm grant com.v.island android.permission.WRITE_SECURE_SETTINGS` (once, from an
+      `adb shell` — a normal app cannot grant itself a secure-settings permission) unlocks the
+      hidden AOSP flag `Settings.Global.policy_control`, which SystemUI reads on every window
+      layout: `settings put global policy_control immersive.full=*` hides status and nav bars
+      system-wide, `immersive.status=*` status bar alone, `null*` reverts. Grantable once at
+      install and then driven entirely from `onServiceConnected()` — no further adb step. It is a
+      swipe-revealable immersive mode, not a removal: the real bar still exists and a swipe from
+      the top edge brings it back momentarily, the way a fullscreen video player behaves — which
+      is the one property this project needs kept, since the shade swipe must never be blocked.
+
+      What is unverified: Samsung's own community reports `policy_control` as unreliable on One
+      UI, honoured on some builds and silently ignored on others, because their SystemUI fork
+      does not always take the AOSP path stock Android does. Whether One UI 8.5 on the SM-S931B
+      honours it at all **can only be answered on the phone** — this is a one-button
+      set/reset toggle to build and walk, not a promise. Good Lock's NavStar module was checked
+      as a fallback and rejected: it reports as icons-only, not a real hide, so there is no second
+      mechanism waiting if this one does not stick.
 
 ## Content marking
 
