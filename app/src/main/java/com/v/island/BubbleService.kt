@@ -266,6 +266,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         if (instance !== this) return
         val isBarHidden = !windowManager.currentWindowMetrics.windowInsets
             .isVisible(android.view.WindowInsets.Type.statusBars())
+        // Temporary: logs every read so a swipe-to-reveal or back-gesture peek in a
+        // fullscreen game can be compared against what the bubbles actually did — see
+        // C15 in PLAN.md, the reveal was reported to hide the bubbles instead of showing them.
+        android.util.Log.i(
+            "IslandBubble",
+            "statusBar event=${event?.eventType} isBarHidden=$isBarHidden wasFullScreen=$isFullScreen"
+        )
         if (isBarHidden == isFullScreen) return
         isFullScreen = isBarHidden
         applyVisibility()
