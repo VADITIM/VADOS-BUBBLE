@@ -207,13 +207,39 @@ function paintStack(notification, appending) {
 
   if (!continues) stack.replaceChildren();
   next.slice(continues ? drawn.length : 0).forEach(line => addLine(line, continues));
+  // An append can be measured now — the bubble is already standing at its size. A fresh
+  // alert cannot, and must not be left wearing the last one's answer either, so it starts
+  // un-outgrown and is asked again once it has grown into the room it is being given.
+  if (continues) measureOverflow();
+  else stack.classList.remove('over');
+}
 
-  // Measured with the class off, because the class is what moves the anchor to the
-  // bottom — and content overflowing the *start* edge of a flex container is not part
-  // of what scrollHeight counts, so asking while it is already on always answers no.
+/**
+ * Whether the stack has outgrown the room the alert gives it, which is what moves its
+ * anchor to the bottom edge and puts the fade on the top.
+ *
+ * Measured with the class off, because the class is what moves that anchor — and
+ * content overflowing the *start* edge of a flex container is not part of what
+ * scrollHeight counts, so asking while it is already on always answers no.
+ */
+function measureOverflow() {
   stack.classList.remove('over');
   stack.classList.toggle('over', stack.scrollHeight > stack.clientHeight);
 }
+
+/**
+ * Asked again once the bubble has finished growing, because the stack takes whatever
+ * height the alert leaves it and on the first frame of an arrival the alert is still
+ * the closed bubble — 34px of it. Everything overflows a box that size, so the first
+ * answer was always yes: one line of one message came to rest against the bottom edge
+ * of the alert with a hole under the header, faded at the top, for no reason anything
+ * on screen could explain. An append needs no second look, since the bubble is already
+ * standing at its size, and there the first answer is the right one.
+ */
+pill.addEventListener('transitionend', event => {
+  if (shared.state !== 'alert') return;
+  if (event.target === pill && event.propertyName === 'height') measureOverflow();
+});
 
 export function show(notification) {
   clearTimeout(shared.dwellTimer);

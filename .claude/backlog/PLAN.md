@@ -107,6 +107,12 @@ Walked on the device and reported back, in the order they were reported.
       nothing, which is what pushes the stack up: one animation rather than a fade next to a
       jump. `alert-stacking` in `DebugStage` sent the identical notification twice and could
       never have shown this; it sends a conversation of three now.
+- [x] **A single message came to rest at the bottom of the alert.** The stacking above, one
+      build later: the stack fills whatever the head row leaves it, and on the frame an alert
+      arrives that is still the *closed* bubble — so the outgrown test answered yes for one
+      line, bottom-anchored it and faded its top. Measured after the growth now, off the pill's
+      own `transitionend`; an append is measured immediately, since the bubble is already at
+      size. The class of bug: a box read for its size while it is still on its way to it.
 
 ## Phase A — done
 
