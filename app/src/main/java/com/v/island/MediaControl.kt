@@ -129,11 +129,23 @@ object MediaControl {
      * player is the second or two it takes to connect. Nothing is lost in between: the
      * player's own notification still stands in through [offer] during exactly those
      * seconds, and it only exists while something really is playing.
+     *
+     * That alone was not enough, because the leftover a session list falls back to is
+     * regularly a *paused* one: Spotify keeps its session alive long after the app has
+     * been closed and swiped away, so closing YouTube or Netflix put a song from that
+     * morning in the bubble. The second test is [IslandNotificationListener.isOfferingPlayer]
+     * — whether the phone is still showing that player a notification at all.
      */
     private fun select() {
-        val next = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-            ?: controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PAUSED }
-            ?: controllers.firstOrNull { it.sessionToken == controller?.sessionToken && isOngoing(it) }
+        // A session whose player has no notification is a session its app left behind:
+        // the phone is not offering that player anywhere else either. Null is "could not
+        // ask", not "no", so it passes.
+        val offered = controllers.filter {
+            IslandNotificationListener.isOfferingPlayer(it.packageName) != false
+        }
+        val next = offered.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+            ?: offered.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PAUSED }
+            ?: offered.firstOrNull { it.sessionToken == controller?.sessionToken && isOngoing(it) }
 
         if (next?.sessionToken != controller?.sessionToken) hasSounded = false
         controller = next

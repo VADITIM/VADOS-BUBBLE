@@ -131,6 +131,31 @@ class IslandNotificationListener : NotificationListenerService() {
             val service = instance ?: return
             BubbleService.deliverCall(call()?.let { CallWatch.describe(service, it) })
         }
+
+        /** A notification carrying a media session is a player's, whoever posted it. */
+        fun isPlayer(statusBarNotification: StatusBarNotification): Boolean =
+            statusBarNotification.notification.extras
+                .containsKey(Notification.EXTRA_MEDIA_SESSION)
+
+        /**
+         * Whether this player is one the phone is actually offering right now, or a
+         * session left lying around by an app that is gone. Null means the shade could
+         * not be read at all, which is a different answer from "no" and must not be
+         * treated as one.
+         *
+         * A media session is not proof that a player exists. Spotify keeps a paused one
+         * alive long after it has been closed and swiped away, so closing YouTube handed
+         * the bubble a song nobody had touched since that morning — the session list
+         * simply fell back to whatever else was in it. The notification is the proof: a
+         * player the phone is really offering has a row in the shade and a card in the
+         * media panel, and one that has been closed has neither.
+         */
+        fun isOfferingPlayer(packageName: String): Boolean? {
+            val service = instance ?: return null
+            return runCatching {
+                service.activeNotifications.any { it.packageName == packageName && isPlayer(it) }
+            }.getOrNull()
+        }
     }
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -208,9 +233,6 @@ class IslandNotificationListener : NotificationListenerService() {
         BubbleService.deliverCount(count())
     }
 
-    /** A notification carrying a media session is a player's, whoever posted it. */
-    private fun isPlayer(statusBarNotification: StatusBarNotification): Boolean =
-        statusBarNotification.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
 
     /**
      * The player's notification wearing the shape [MediaControl] publishes, so the

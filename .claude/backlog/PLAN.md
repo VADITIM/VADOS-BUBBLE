@@ -89,6 +89,15 @@ Walked on the device and reported back, in the order they were reported.
       controller alone, so a second player starting to sound behind a leftover session was never
       heard, and it called `publish()` rather than re-selecting, so a song that ended kept the
       bubble.
+- [x] **Closing YouTube handed the bubble Spotify, which was not running.** The half above did
+      not cover it: the leftover a session list falls back to is regularly a *paused* one, and
+      Spotify keeps its session alive long after the app has been closed and swiped away — a
+      paused session passes the second test, so closing a video put that morning's song in the
+      bubble. A session is now also asked whether the phone is still offering that player a
+      notification at all (`IslandNotificationListener.isOfferingPlayer`). A media session is not
+      proof a player exists; the notification is, because it is what the shade and Samsung's own
+      media panel are drawn from. Null — the shade could not be read — passes, since it is a
+      different answer from no.
 
 ## Phase A — done
 
