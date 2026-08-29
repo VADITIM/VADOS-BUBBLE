@@ -29,7 +29,20 @@ object MediaControl {
 
     private var manager: MediaSessionManager? = null
     private var listener: ComponentName? = null
+
+    /** Every session the phone currently has, all of them listened to. See [attach]. */
+    private var controllers: List<MediaController> = emptyList()
+
+    /** The one the bubble is about, which is not simply the first one that exists. */
     private var controller: MediaController? = null
+
+    /**
+     * Whether the session the bubble is showing has ever actually made a sound, reset
+     * whenever the bubble changes session. It is the whole difference between a player
+     * that is warming up and one that finished hours ago — see [select].
+     */
+    private var hasSounded = false
+
     private var onChanged: (JSONObject?) -> Unit = {}
 
     /** Re-encoding the same album art on every playback tick would be pure waste. */
@@ -37,9 +50,14 @@ object MediaControl {
     private var artUri: String? = null
 
     private val controllerCallback = object : MediaController.Callback() {
-        override fun onMetadataChanged(metadata: MediaMetadata?) = publish()
-        override fun onPlaybackStateChanged(state: PlaybackState?) = publish()
-        override fun onSessionDestroyed() = attach(emptyList())
+        // select() rather than publish(): a state change can mean this session is no
+        // longer the one to show — it stopped, or another player started sounding —
+        // and publishing straight from the callback showed a song that had ended.
+        override fun onMetadataChanged(metadata: MediaMetadata?) = select()
+        override fun onPlaybackStateChanged(state: PlaybackState?) = select()
+        // One session dying says nothing about the others, so the list is asked for
+        // again rather than thrown away.
+        override fun onSessionDestroyed() = refresh()
     }
 
     fun start(context: Context, onChanged: (JSONObject?) -> Unit) {
@@ -69,35 +87,71 @@ object MediaControl {
     }
 
     fun stop() {
-        controller?.unregisterCallback(controllerCallback)
+        controllers.forEach { it.unregisterCallback(controllerCallback) }
+        controllers = emptyList()
         controller = null
+        hasSounded = false
         onChanged = {}
     }
 
     /**
-     * Whichever session is actually making sound, otherwise whichever is paused,
-     * otherwise whichever exists at all. That last fallback is the important one: a
-     * player is regularly BUFFERING, CONNECTING or STATE_NONE for the first seconds
-     * after it opens, and insisting on a clean playing state meant the bubble simply
-     * did not see Spotify most of the time it was asked.
+     * Every active session is listened to, not only the one being shown. A playback
+     * state changing does not fire the session-list listener, so with a callback on
+     * the chosen controller alone a second player starting to sound behind a session
+     * that was already there was never heard at all.
      */
-    private fun attach(controllers: List<MediaController>) {
+    private fun attach(next: List<MediaController>) {
+        if (next.map { it.sessionToken } != controllers.map { it.sessionToken }) {
+            controllers.forEach { it.unregisterCallback(controllerCallback) }
+            controllers = next
+            controllers.forEach { it.registerCallback(controllerCallback) }
+        }
+        select()
+    }
+
+    /**
+     * Whichever session is actually making sound, otherwise whichever is paused,
+     * otherwise the one already being shown for as long as it is still going.
+     *
+     * The third pass used to be `firstOrNull { it.metadata != null }` — any session
+     * carrying a song, whatever state it was in. That was written for a player's first
+     * seconds, which are STATE_NONE, BUFFERING or CONNECTING while it starts up, and
+     * insisting on a clean playing state had meant the bubble did not see Spotify most
+     * of the time it was asked. But the sessions an app leaves behind when it is
+     * *finished* look identical: a browser tab that played a video this morning, a
+     * game that made a sound, a podcast app that was closed. They sit in the active
+     * list with their metadata intact for as long as the process lives, and the bubble
+     * opened out into a media mod for them with nothing playing — which is what "it
+     * randomly expands into a mod" was.
+     *
+     * So a session is no longer chosen on metadata alone. It is listened to from the
+     * moment it appears and chosen the moment it plays or pauses, which for a real
+     * player is the second or two it takes to connect. Nothing is lost in between: the
+     * player's own notification still stands in through [offer] during exactly those
+     * seconds, and it only exists while something really is playing.
+     */
+    private fun select() {
         val next = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
             ?: controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PAUSED }
-            ?: controllers.firstOrNull { it.metadata != null }
+            ?: controllers.firstOrNull { it.sessionToken == controller?.sessionToken && isOngoing(it) }
 
-        if (next?.sessionToken == controller?.sessionToken) {
-            publish()
-            return
-        }
-        controller?.unregisterCallback(controllerCallback)
+        if (next?.sessionToken != controller?.sessionToken) hasSounded = false
         controller = next
-        controller?.registerCallback(controllerCallback)
         publish()
     }
 
-    /** True while a session exists at all, playing or paused. */
-    val isActive: Boolean get() = controller != null
+    /**
+     * Whether a session that is neither playing nor paused at this instant is still
+     * the one the bubble is in the middle of. One that has sounded keeps the bubble
+     * through the states a player passes through mid-song — buffering, or the
+     * STATE_NONE some apps report while they re-connect — but STOPPED and ERROR are
+     * the player saying it is done, and one that has never sounded keeps nothing.
+     */
+    private fun isOngoing(candidate: MediaController): Boolean = hasSounded &&
+        when (candidate.playbackState?.state) {
+            PlaybackState.STATE_STOPPED, PlaybackState.STATE_ERROR, null -> false
+            else -> true
+        }
 
     /** Who is playing, so a caller can tell whether this session is the way in. */
     val packageName: String? get() = controller?.packageName
@@ -177,6 +231,11 @@ object MediaControl {
 
         val metadata = current.metadata
         val state = current.playbackState
+        // The one place the fact is established: a session that has played or paused
+        // is a real player, and [select] lets it keep the bubble on that basis.
+        if (state?.state == PlaybackState.STATE_PLAYING ||
+            state?.state == PlaybackState.STATE_PAUSED
+        ) hasSounded = true
         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE).orEmpty()
         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
             ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST).orEmpty()

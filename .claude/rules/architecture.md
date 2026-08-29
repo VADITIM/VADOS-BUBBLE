@@ -27,6 +27,8 @@ One file per source of truth, each pushing a JSON payload or `null`:
 
 A watcher decides *what is true*, never how it looks. Colours and names live in `AppStyles`; the payload carries them as data so the page never learns app names.
 
+**A watcher decides what is true *now*, and the platform is full of things that are merely still there.** A media session outlives the playing it was created for — an app leaves it in the active list, metadata intact, until its process dies — and so does an ongoing notification an app forgot to cancel. A watcher that reads existence as truth turns every one of those leftovers into a bubble opening out of nowhere, which is the worst failure this app has, because it happens while nobody is doing anything. So the test is never "is there one": it is a state the source itself declares, and where a source is genuinely ambiguous during its first seconds (a player is STATE_NONE while it connects) the watcher listens through them rather than believing them.
+
 ## Windows
 
 **One window draws, and it draws everything.** Bubbles have to merge, merging is one SVG goo layer, and a goo layer reaches exactly as far as the surface it is drawn on — so a bubble in a second window is a bubble that can never be liquid. That single fact decides the window model: a full-screen **canvas** window holds the one WebView, and every bubble, satellite, dot and panel is drawn in it. A new bubble never gets a window of its own.

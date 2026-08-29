@@ -66,6 +66,30 @@ mods and sit a few pixels shorter.
 - [x] **A5 — a mod that ends gets a departure, not a repaint.** `9e62ba7`
 - [x] **Satellite still fades and grows under a finger.** `2034894`
 
+## Reported from the phone
+
+Walked on the device and reported back, in the order they were reported.
+
+- [x] **The lock bubble's overflow, gestures and the marker.** `0d72b8b` — `#lock-now` back to
+      `overflow: hidden` (A3 was wrong: an element's own `overflow` never clips its own transform,
+      so hiding cost the bounce nothing and the thing it actually contained was `.open`'s cover);
+      `stirLiquid(420)` on the press, because the mirror was not running during the 320ms scale;
+      `rubberBandPast()` exported so the lock bubble's own hold hears the drag threshold; the
+      transport buttons and the timeline own their whole touch stream rather than the click alone;
+      a scrub on `#lock-timeline`, which had none; the marker centred on the line box.
+- [x] **The bubble expanded into the media mod with nothing playing.** `MediaControl.attach` chose
+      a session on `metadata != null` alone — any session carrying a song, whatever state it was
+      in. That fallback was written for a player's *first* seconds, which are STATE_NONE or
+      BUFFERING while it connects; the sessions apps leave behind when they are *finished* look
+      identical and sit in the active list for as long as the process lives. A browser tab that
+      played a video, a game that made a sound, a closed podcast app: each of them opened the
+      bubble out into a media mod out of nowhere. A session is now listened to from the moment it
+      appears and only *chosen* once it plays or pauses, and it keeps the bubble until it says
+      STOPPED, ERROR or dies. Two smaller bugs came out with it: the callback was on the chosen
+      controller alone, so a second player starting to sound behind a leftover session was never
+      heard, and it called `publish()` rather than re-selecting, so a song that ended kept the
+      bubble.
+
 ## Phase A — done
 
 - [x] **A6 — the punch-hole corridor.** `--hole-gap` was reserved in exactly one place, the alert
