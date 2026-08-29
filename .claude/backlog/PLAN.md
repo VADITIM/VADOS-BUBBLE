@@ -234,6 +234,20 @@ One step each, one push each, naming the feature.
       as a fallback and rejected: it reports as icons-only, not a real hide, so there is no second
       mechanism waiting if this one does not stick.
 
+- [ ] **C16. Fullscreen-game bubble visibility is backwards.** In Clash Royale the bubble is
+      visible by default over the fullscreen game — it should be hidden by default, the way
+      `isFullScreen` in `BubbleService.onAccessibilityEvent` is meant to make it. Swiping down or
+      the back gesture then reveals the status bar and makes the bubble disappear, which is also
+      backwards: the reveal should bring the bubble back with the bar, not take it away. A
+      diagnostic log line was added and pushed (`c9d59dd`) on `statusBar event=…` in
+      `onAccessibilityEvent` to tell apart two candidate causes: the event never firing for this
+      game at all (in which case the disappearance is the real system status bar visually drawn
+      over our accessibility overlay during the peek, not our code hiding anything), versus the
+      event firing with `isBarHidden` read backwards. Needs the phone: `adb logcat -s IslandBubble`
+      through opening the game and doing the swipe/back gesture. Pull the log line back out once
+      diagnosed — it is temporary. This is also the gate for C15: swipe-to-reveal has to actually
+      show the bubbles, not hide them, before disabling the real bar is worth doing at all.
+
 ## Content marking
 
 Added 2026-08-28.
