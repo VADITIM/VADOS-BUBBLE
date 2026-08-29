@@ -189,57 +189,49 @@ function addLine(text, arriving) {
   );
 }
 
+/** How many of the conversation's messages the stack has already been shown. */
+let seenCount = 0;
+
+/**
+ * What has been said since the stack was last drawn.
+ *
+ * `lines` grows as the conversation does, so what is new is whatever comes after the
+ * count already taken — a count rather than a search through the run, because someone
+ * sending "ok" twice has said two things and looking the last one up finds the wrong
+ * one of them. An app that posts a fresh notification per message has no `lines` at all
+ * and hands over the same one-element run every time, so there the test is simply that
+ * it says something other than what is already at the bottom of the stack. The same
+ * test covers a messenger that trims its oldest lines away as the run gets long.
+ */
+function arrivalsIn(next, last) {
+  if (next.length > seenCount) return next.slice(seenCount);
+  const newest = next[next.length - 1];
+  return newest && newest !== last ? [newest] : [];
+}
+
 /**
  * The stack, brought up to what the notification now says.
  *
- * What is new is whatever comes *after* what is already drawn — a prefix match rather
- * than a membership test, because someone sending "ok" twice has said two things and a
- * set would swallow the second. Anything that does not continue what is on screen is
- * not a continuation at all, so the stack is rebuilt.
+ * A fresh alert is **one message**, whatever the conversation behind it is holding, and
+ * is drawn exactly as an alert has always been drawn. The run exists only to tell what
+ * has been added while the alert is standing there — drawn in full it would put a
+ * backlog on screen and stack an alert nobody watched arrive, which is the one thing
+ * stacking is not for.
  */
 function paintStack(notification, appending) {
+  const drawn = [...stack.children];
+  const last = drawn.length ? drawn[drawn.length - 1].dataset.line : undefined;
   const next = linesOf(notification);
-  const drawn = [...stack.children].map(line => line.dataset.line);
-  const continues = appending &&
-    drawn.length > 0 &&
-    next.length > drawn.length &&
-    drawn.every((line, index) => line === next[index]);
+  const arrivals = appending ? arrivalsIn(next, last) : [];
+  seenCount = next.length;
 
-  if (!continues) stack.replaceChildren();
-  next.slice(continues ? drawn.length : 0).forEach(line => addLine(line, continues));
-  // An append can be measured now — the bubble is already standing at its size. A fresh
-  // alert cannot, and must not be left wearing the last one's answer either, so it starts
-  // un-outgrown and is asked again once it has grown into the room it is being given.
-  if (continues) measureOverflow();
-  else stack.classList.remove('over');
+  if (appending) {
+    arrivals.forEach(line => addLine(line, true));
+    return;
+  }
+  stack.replaceChildren();
+  addLine(next[next.length - 1] || '', false);
 }
-
-/**
- * Whether the stack has outgrown the room the alert gives it, which is what moves its
- * anchor to the bottom edge and puts the fade on the top.
- *
- * Measured with the class off, because the class is what moves that anchor — and
- * content overflowing the *start* edge of a flex container is not part of what
- * scrollHeight counts, so asking while it is already on always answers no.
- */
-function measureOverflow() {
-  stack.classList.remove('over');
-  stack.classList.toggle('over', stack.scrollHeight > stack.clientHeight);
-}
-
-/**
- * Asked again once the bubble has finished growing, because the stack takes whatever
- * height the alert leaves it and on the first frame of an arrival the alert is still
- * the closed bubble — 34px of it. Everything overflows a box that size, so the first
- * answer was always yes: one line of one message came to rest against the bottom edge
- * of the alert with a hole under the header, faded at the top, for no reason anything
- * on screen could explain. An append needs no second look, since the bubble is already
- * standing at its size, and there the first answer is the right one.
- */
-pill.addEventListener('transitionend', event => {
-  if (shared.state !== 'alert') return;
-  if (event.target === pill && event.propertyName === 'height') measureOverflow();
-});
 
 export function show(notification) {
   clearTimeout(shared.dwellTimer);

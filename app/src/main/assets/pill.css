@@ -775,25 +775,32 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    arriving in pieces is one alert that grows, never a second alert interrupting the
    first — see js/mods/notification.js.
 
-   It fills whatever the head row leaves, so that leftover *is* the cap, and it reads
-   from the top like anything else until the stack outgrows it. `min-height: 0` because
-   a flex item will not shrink below its content without it, and the whole point here is
-   that it does. */
+   One message is not a stack and is drawn as though none of this existed: `flex: none`
+   makes the box exactly as tall as the message, so it stands under the head row where it
+   always has, with no free space to be anchored in and nothing to fade. */
 #text {
   min-width: 0;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-/* Outgrown, and the anchor moves to the bottom edge: the newest line stands still where
-   the eye already is and the stack runs off the *top*, which is the end that has already
-   been read — and fades there rather than being cut. Both belong to this one class and
-   not to the resting stack, where a bottom anchor would drop a single message away from
-   the head row and the fade would eat its first line. It is set from the page, which is
-   the only side that can measure whether there is anything to run out. */
-#text.over {
+/* Several, and only then. The box takes whatever the head row leaves — that leftover is
+   the cap — and anchors to its *bottom* edge, so the newest line stands still where the
+   eye already is and the stack runs off the top, which is the end that has already been
+   read, fading there rather than being cut.
+
+   The count is the condition rather than a measurement, and that is the point: whether a
+   stack has outgrown its room can only be measured against a box that has finished
+   growing, and on the frame an alert arrives the bubble is still the closed one — 34px,
+   which one line of anything overflows. Measured there it said yes for a single message
+   and stood it against the bottom edge under a fade. `:has()` cannot be wrong about how
+   many children there are, on that frame or any other. `min-height: 0` because a flex
+   item will not shrink below its content without it, and the whole point here is that
+   it does. */
+#text:has(.message + .message) {
+  flex: 1 1 auto;
+  min-height: 0;
   justify-content: flex-end;
   mask-image: linear-gradient(180deg, transparent, #000 1.5rem);
 }
