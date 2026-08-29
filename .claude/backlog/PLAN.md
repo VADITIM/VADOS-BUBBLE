@@ -98,6 +98,15 @@ Walked on the device and reported back, in the order they were reported.
       proof a player exists; the notification is, because it is what the shade and Samsung's own
       media panel are drawn from. Null — the shade could not be read — passes, since it is a
       different answer from no.
+- [x] **A new message from the same person replayed the whole alert.** C7, above. The read that
+      matters: the payload already carried `lines`, the whole conversation, and the alert was
+      drawing only `text` — the last of it. So this was never about accumulating state in the
+      page; it was about drawing what had already arrived. What is new on each payload is
+      whatever follows what is on screen — a prefix match, not a membership test, or someone
+      sending "ok" twice has said one thing. An arriving line grows its own height out of
+      nothing, which is what pushes the stack up: one animation rather than a fade next to a
+      jump. `alert-stacking` in `DebugStage` sent the identical notification twice and could
+      never have shown this; it sends a conversation of three now.
 
 ## Phase A — done
 
@@ -165,8 +174,13 @@ One step each, one push each, naming the feature.
 - [ ] **C5. Now geometry** — same width and position Spotify covers; swipe up dismisses to the punch
       hole on the Lock-Now-derived bounce.
 - [ ] **C6. Alarm state** — full screen with the top margin, orange, circular squircle buttons.
-- [ ] **C7. Alert stacking** — a second notification from the same person inside the alert window
-      appends and slides in from the bottom under a fade, growing the bubble downwards *animated*.
+- [x] **C7. Alert stacking** — a second message from the same conversation appends beneath the
+      first instead of announcing itself as a new alert. Built off `lines`, which the payload
+      already carried: a messenger posts one notification per conversation and rewrites it as
+      each message lands, so the conversation was in the page all along and only the last of it
+      was being drawn. The bubble does not grow — the stack is anchored to its bottom edge once
+      it outgrows the alert, so the oldest is pushed up and off the top under a fade, which is
+      what was asked for over a growing box.
 - [ ] **C8. Spotify polish** — dithered hue bottom to ~35%, dot at the timeline head, squircle buttons.
 - [ ] **C9. Discord video**; **DB Navigator** (Zugnummer/remaining while travelling, Gleis/departure at
       an Umstieg; tap expands the journey, tap again opens the app, haptic goes to the Abo tab).

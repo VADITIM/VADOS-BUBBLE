@@ -79,7 +79,7 @@ html, body {
    is invisible until a letter lands there. Text is not a box: it never rounds.
    The DNA already says so for spans and headings; these are the divs it cannot
    know about. */
-#text, #app-name, #title, #unread,
+#text, .message, #app-name, #title, #unread,
 #player-title, #player-artist, #player-position, #player-duration,
 #history-label, #history-count, #history-empty, .history-name, .history-text,
 #quick-label, #microphone-state,
@@ -770,21 +770,67 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   /* Right-aligned, so an over-long name hangs off the *left* edge and fades there. */
   mask-image: linear-gradient(90deg, transparent, #000 1.4rem);
 }
+/* The stack of what has been said, oldest at the top. A messenger rewrites one
+   notification as each line lands rather than posting a new one, so a conversation
+   arriving in pieces is one alert that grows, never a second alert interrupting the
+   first — see js/mods/notification.js.
+
+   It fills whatever the head row leaves, so that leftover *is* the cap, and it reads
+   from the top like anything else until the stack outgrows it. `min-height: 0` because
+   a flex item will not shrink below its content without it, and the whole point here is
+   that it does. */
+#text {
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Outgrown, and the anchor moves to the bottom edge: the newest line stands still where
+   the eye already is and the stack runs off the *top*, which is the end that has already
+   been read — and fades there rather than being cut. Both belong to this one class and
+   not to the resting stack, where a bottom anchor would drop a single message away from
+   the head row and the fade would eat its first line. It is set from the page, which is
+   the only side that can measure whether there is anything to run out. */
+#text.over {
+  justify-content: flex-end;
+  mask-image: linear-gradient(180deg, transparent, #000 1.5rem);
+}
+
 /* A message is meant to be read, not sampled: it wraps and takes the lines it
    needs, and the alert is tall enough to hold three of them. */
-#text {
+.message {
   min-width: 0;
   font-size: 0.72rem;
   line-height: 1.35;
   color: var(--text);
-  flex: none;
   white-space: normal;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+  flex: none;
+  box-sizing: border-box;
 }
-#pill.expanded #text { -webkit-line-clamp: 5; }
+#pill.expanded .message { -webkit-line-clamp: 5; }
+/* Between two lines of one conversation, exactly as faint as the same divider in the
+   history list — it is the same fact being said in two places, and it only says that
+   someone pressed send twice. Padding and margin rather than the container's `gap`,
+   because the arrival animates this element's own height from nothing and a gap belongs
+   to the container: it would stand at full size from the first frame while the line it
+   is separating was still nothing. The margin is animated alongside the height for the
+   same reason — it is the half of the spacing that sits outside the border box. */
+.message + .message {
+  border-top: 1px solid var(--border);
+  padding-top: 0.34rem;
+  margin-top: 0.34rem;
+}
+/* The arrival is animated from the page rather than from here, because it grows this
+   element's height out of nothing and the height it is growing to is whatever the words
+   wrapped to — a number only the page can measure. Growing it is what pushes everything
+   already in the stack upwards, so the arrival and the push are one animation rather
+   than a fade standing next to a jump. */
 
 /* A link is blue and underlined wherever it is, and that is the whole reason to do
    it here too: it is the one piece of styling a reader already knows the meaning

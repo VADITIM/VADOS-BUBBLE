@@ -120,14 +120,120 @@ function paintMatches(host, pattern, className) {
   }
 }
 
+const stack = document.getElementById('text');
+
+/** How long an arriving line takes to push the stack up and fade itself in. */
+const ARRIVE_MILLIS = 300;
+
+/** Mirrors --ease-grow in pill.css; WAAPI cannot be handed a custom property. */
+const EASE_GROW = 'cubic-bezier(0.22, 1.12, 0.36, 1)';
+
+/** Mirrors the padding-top and margin-top on `.message + .message` in pill.css. */
+const LINE_GAP = '0.34rem';
+
+/**
+ * Every message this notification is currently carrying, oldest first.
+ *
+ * `lines` is the whole conversation and `text` is only the last of it — a messenger
+ * posts one notification per conversation and rewrites it as each message lands,
+ * which is the same reading the history list already takes. An app that posts one
+ * notification per message has no `lines` and its single `text` is the whole of it.
+ */
+function linesOf(notification) {
+  const lines = (notification.lines || []).map(line => line.text).filter(Boolean);
+  return lines.length ? lines : [notification.text || ''];
+}
+
+/**
+ * Whether this is the alert on screen having another thing said into it, rather than
+ * something new arriving.
+ *
+ * The key is the real test: a messenger rewriting its conversation keeps it, which is
+ * exactly why `lines` grows. The sender is the fallback for an app that posts a fresh
+ * notification per message, where the key changes every time and the person does not.
+ */
+function isSameConversation(shown, next) {
+  if (!shown) return false;
+  if (shown.key === next.key) return true;
+  return Boolean(next.title) &&
+    shown.title === next.title &&
+    shown.package === next.package;
+}
+
+/**
+ * One line of the conversation, arriving from below.
+ *
+ * Its own height is what is animated, from nothing to whatever the words wrapped to,
+ * and that is deliberately the same animation as the push: the stack is anchored to
+ * its bottom edge, so a line growing at the end of it moves everything above it up and
+ * off the top. Animated separately they read as a fade happening next to a jump.
+ */
+function addLine(text, arriving) {
+  const line = document.createElement('div');
+  line.className = 'message';
+  // What is already drawn, so the next payload can be compared against it without a
+  // second copy of the conversation being kept in the page.
+  line.dataset.line = text;
+  markUp(line, text);
+  stack.appendChild(line);
+  if (!arriving) return;
+  // The margin travels with the height because it is the one part of the spacing that
+  // sits outside the border box: left alone it lands at full size on the first frame
+  // and the push starts with a jump the height animation then has to catch up with.
+  line.animate(
+    [
+      { height: '0px', marginTop: '0px', opacity: 0, translate: '0 0.5rem' },
+      { height: line.offsetHeight + 'px', marginTop: LINE_GAP, opacity: 1, translate: '0 0' },
+    ],
+    { duration: ARRIVE_MILLIS, easing: EASE_GROW }
+  );
+}
+
+/**
+ * The stack, brought up to what the notification now says.
+ *
+ * What is new is whatever comes *after* what is already drawn — a prefix match rather
+ * than a membership test, because someone sending "ok" twice has said two things and a
+ * set would swallow the second. Anything that does not continue what is on screen is
+ * not a continuation at all, so the stack is rebuilt.
+ */
+function paintStack(notification, appending) {
+  const next = linesOf(notification);
+  const drawn = [...stack.children].map(line => line.dataset.line);
+  const continues = appending &&
+    drawn.length > 0 &&
+    next.length > drawn.length &&
+    drawn.every((line, index) => line === next[index]);
+
+  if (!continues) stack.replaceChildren();
+  next.slice(continues ? drawn.length : 0).forEach(line => addLine(line, continues));
+
+  // Measured with the class off, because the class is what moves the anchor to the
+  // bottom — and content overflowing the *start* edge of a flex container is not part
+  // of what scrollHeight counts, so asking while it is already on always answers no.
+  stack.classList.remove('over');
+  stack.classList.toggle('over', stack.scrollHeight > stack.clientHeight);
+}
+
 export function show(notification) {
   clearTimeout(shared.dwellTimer);
+
+  const picture = document.getElementById('picture');
+  const hasImage = Boolean(notification.imageBase64);
+  // A photo is not another line in a conversation — the image alert is a different
+  // face at a different height and there is nowhere in it for the stack to grow. So a
+  // picture always arrives as its own alert, and the next words after it do too.
+  const appending = shared.state === 'alert' &&
+    !hasImage &&
+    !pill.classList.contains('with-image') &&
+    isSameConversation(shared.current, notification);
+
   shared.state = 'alert';
   shared.current = notification;
 
   document.getElementById('app-name').textContent = notification.appName || '';
   document.getElementById('title').textContent = notification.title || '';
-  markUp(document.getElementById('text'), notification.text || '');
+  paintStack(notification, appending);
   document.documentElement.style.setProperty(
     '--app-accent', notification.accent || '#ffffff'
   );
@@ -136,16 +242,18 @@ export function show(notification) {
   icon.classList.toggle('present', Boolean(notification.iconBase64));
   if (notification.iconBase64) icon.src = notification.iconBase64;
 
-  const picture = document.getElementById('picture');
-  const hasImage = Boolean(notification.imageBase64);
   pill.classList.toggle('with-image', hasImage);
   if (hasImage) picture.src = notification.imageBase64;
 
   showFace('alert');
   pill.classList.add('alert');
   setSize(hasImage ? 'image' : 'alert');
+  // Still a thing that arrived, so it is still felt — what an appended line does not do
+  // is play the bubble's arrival a second time. The alert is already open and standing
+  // where it stands; re-announcing it is what made reading a conversation impossible.
   bridge.triggerHaptic('notification');
 
+  // The dwell starts again, so a conversation being had is a bubble that stays up.
   shared.dwellTimer = setTimeout(toClosed, DWELL);
 }
 

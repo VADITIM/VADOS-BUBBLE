@@ -143,12 +143,30 @@ object DebugStage {
                 handler.postDelayed({ BubbleService.deliverTorch(null) }, 2200L)
             }
 
-            // Two from the same sender inside one dwell. Today the second replaces the first;
-            // when stacking is built this is the stage that shows it appending instead.
+            // Three from the same sender inside one dwell, arriving the way a messenger really
+            // posts them: one notification rewritten, carrying every message so far. The first
+            // is an alert; the two after it append beneath it without the bubble announcing
+            // itself again, and by the third the oldest is being pushed off the top.
             "alert-stacking" -> {
                 clear()
-                BubbleService.deliver(notification())
-                handler.postDelayed({ BubbleService.deliver(notification()) }, 700L)
+                BubbleService.deliver(conversation("Are you around this evening?"))
+                handler.postDelayed({
+                    BubbleService.deliver(
+                        conversation(
+                            "Are you around this evening?",
+                            "I found the place we were talking about last week"
+                        )
+                    )
+                }, 900L)
+                handler.postDelayed({
+                    BubbleService.deliver(
+                        conversation(
+                            "Are you around this evening?",
+                            "I found the place we were talking about last week",
+                            "It is a five minute walk from you, we could go at eight"
+                        )
+                    )
+                }, 1800L)
             }
 
             // The marks in running text, on a message written the way this phone writes them:
@@ -235,6 +253,19 @@ object DebugStage {
             .put("imageBase64", JSONObject.NULL)
             .put("mediaState", JSONObject.NULL)
     }
+
+    /**
+     * One conversation as a messenger posts it: the same key rewritten each time, carrying
+     * every message so far in `lines` with the newest also standing as `text`. That array
+     * growing is the whole of what the alert stacks on.
+     */
+    private fun conversation(vararg messages: String): JSONObject = notification()
+        .put("key", "stage:conversation")
+        .put("title", "Mara")
+        .put("text", messages.last())
+        .put("lines", JSONArray().apply {
+            messages.forEach { put(JSONObject().put("text", it)) }
+        })
 
     private fun battery(state: String, percent: Int) =
         JSONObject().put("state", state).put("level", percent)
