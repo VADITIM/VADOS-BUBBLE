@@ -47,6 +47,10 @@ Two traps come with it. The transform has to be cleared on a *later* frame than 
 
 Over an app, SystemUI has its own shade gesture on this strip and pilfers the pointer partway down: the page sees a cancel with the finger still moving, not a lift. Discarding the gesture there is why the pull worked on the home and lock screens and did nothing at all inside an app — and why it got worse the further the pull had to travel. A cancel mid-gesture is *stronger* evidence of an ask than a lift is, so it commits at a lower bar (`PULL_STOLEN` against `PULL_SETTLE`). Any gesture with a distance threshold owes the same reading of a cancel.
 
+## The drag band scales down over a list
+
+The object-like press-and-drag every bubble gets (`motion.js`'s rubber band, `DRAG_RADIUS`) is right for a bare bubble and wrong once it has grown into the notifications tab: that box holds a scrollable list, not something to be pushed around, and a swipe meant for the list underneath was shoving the whole panel with it. `dragRadius()` reads `shared.size` and returns 15% of the resting radius while it is `'history'` — an 85% cut, not zero, so the bubble still answers a touch rather than reading as dead. Cutting the radius alone is enough: `rubberBand()`'s hyperbola takes its whole shape from that one number, so a smaller radius already gives both less reach and less give per pixel, and no second constant is needed for "intensity". Any other tab that turns out to hold a scrollable list of its own owes the same read of `shared.size`, not a second copy of the scale.
+
 ## The punch hole is the origin
 
 Everything on this screen is born at the true middle of the screen, which is the middle of the punch hole and the middle of the bubble drawn around it. Nothing spawns where it will eventually live. A pill that belongs somewhere else — the torch out by the clock — is born at the hole as a small drop, travels to its spot, and only then behaves like a pill standing there. The travel distance is the host's to supply (`window.setFlight`): the page does not know how wide the screen is.

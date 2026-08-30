@@ -33,6 +33,20 @@ export const DEAD_ZONE = 12;
 const DRAG_RADIUS = 40;
 
 /**
+ * The notifications tab is a scrollable list, not an object to be pushed around, so the
+ * same press-and-drag the bare bubble gets reads as far too loose once it has grown into
+ * that tab — a swipe meant for the list underneath was shoving the whole panel instead.
+ * Cut to 15% of the resting radius (an 85% reduction) rather than turned off outright,
+ * so the bubble still answers a touch instead of feeling dead while `shared.size` is
+ * `'history'`.
+ */
+const HISTORY_DRAG_SCALE = 0.15;
+
+function dragRadius() {
+  return shared.size === 'history' ? DRAG_RADIUS * HISTORY_DRAG_SCALE : DRAG_RADIUS;
+}
+
+/**
  * How far into the band the finger may go before the hold is called off, as a share of the
  * radius. The band was doubled to give the bubble more to say when it is pushed about, and
  * doubling it alone would have doubled the room a finger has to wander while a hold is
@@ -53,8 +67,9 @@ const HOLD_ABANDON = 0.8;
  * Past the dead zone by `travel`, it has come `DRAG_RADIUS * travel / (travel + R)`.
  */
 function rubberBand(travel) {
+  const radius = dragRadius();
   const past = Math.max(0, travel - DEAD_ZONE);
-  return DRAG_RADIUS * past / (past + DRAG_RADIUS);
+  return radius * past / (past + radius);
 }
 
 /** How long the way home takes, and the curve it lands on. Mirrors --ease-split in pill.css. */
@@ -103,7 +118,7 @@ export function cancelSpring(element) {
  * here, which is the difference between one rule and two that drift.
  */
 export function rubberBandPast(dx, dy) {
-  return rubberBand(Math.hypot(dx, dy)) > DRAG_RADIUS * HOLD_ABANDON;
+  return rubberBand(Math.hypot(dx, dy)) > dragRadius() * HOLD_ABANDON;
 }
 
 export function toy(element, prefix, dx, dy) {
@@ -113,7 +128,7 @@ export function toy(element, prefix, dx, dy) {
   // Measured on the band rather than on the finger: the band is what the user can see, so
   // the threshold fires where the bubble looks like it has been dragged rather than at a
   // raw travel that means different things at different points along a hyperbola.
-  if (reach > DRAG_RADIUS * HOLD_ABANDON) endHold();
+  if (reach > dragRadius() * HOLD_ABANDON) endHold();
   cancelSpring(element);
   element.style.setProperty(prefix + '-x', (dx * scale).toFixed(2) + 'px');
   element.style.setProperty(prefix + '-y', (dy * scale).toFixed(2) + 'px');
