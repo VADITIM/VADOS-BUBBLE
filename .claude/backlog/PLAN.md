@@ -248,6 +248,13 @@ One step each, one push each, naming the feature.
       diagnosed — it is temporary. This is also the gate for C15: swipe-to-reveal has to actually
       show the bubbles, not hide them, before disabling the real bar is worth doing at all.
 
+- [ ] **C17. Strip the descriptions out of `panel.html`.** Every `<p class="note">` and
+      `<span class="module-caption">` across all three screens (Settings, Debug, System) —
+      clutter, not documentation the user reads. Keep the labels, rows, sliders and buttons;
+      remove only the prose explaining them. The System screen (now the first tab, moved ahead of
+      Settings and Debug) is the one with the most of them — five between the Access module and
+      its caption.
+
 ## Content marking
 
 Added 2026-08-28.

@@ -258,7 +258,62 @@
   }
 </style>
 
-<section class="screen" data-screen="settings" data-accent="#5bfd5b" data-side="left">
+<section class="screen" data-screen="system" data-accent="#0040ff" data-side="left">
+  <div class="slice"></div>
+  <div class="slice front"></div>
+
+  <h1 class="stagger"><span class="reveal"><span class="reveal-text">System</span><span class="reveal-bar"></span></span></h1>
+  <span class="kicker stagger">Access and service</span>
+
+  <section class="module stagger">
+    <span class="module-label">Access</span>
+    <div class="row">
+      <span class="row-name">Accessibility</span>
+      <span class="status" id="status-accessibility">checking</span>
+      <button onclick="Panel.requestAccessibility()">Grant</button>
+    </div>
+    <div class="row">
+      <span class="row-name">Notifications</span>
+      <span class="status" id="status-post">checking</span>
+      <button onclick="Panel.requestPostNotifications()">Grant</button>
+    </div>
+    <div class="row">
+      <span class="row-name">Notification access</span>
+      <span class="status" id="status-listener">checking</span>
+      <button onclick="Panel.requestNotificationAccess()">Grant</button>
+    </div>
+    <div class="row">
+      <span class="row-name">Shizuku</span>
+      <span class="status" id="status-shizuku">checking</span>
+      <button onclick="Panel.requestShizuku()">Grant</button>
+    </div>
+    <div class="row">
+      <span class="row-name">System pop-ups</span>
+      <span class="status" id="status-headsup">checking</span>
+      <button onclick="Panel.toggleHeadsUp()">Toggle</button>
+    </div>
+    <p class="note">
+      With system pop-ups suppressed the bubble is the only thing that announces a notification —
+      it still lands in the shade, nothing is dropped. Needs Shizuku: the switch is a global
+      setting no sideloaded app may write.
+    </p>
+    <p class="note">
+      Shizuku powers the microphone-access toggle on the pill. It has to be started after every
+      reboot, from the Shizuku app.
+    </p>
+    <p class="note">
+      A toggle greyed out as <b>Restricted setting</b> means Android is blocking a sideloaded app.
+      Open <b>App info</b>, use the three-dot menu, choose <b>Allow restricted settings</b>, then grant it again.
+    </p>
+    <div class="actions">
+      <button class="wide" onclick="Panel.openApplicationInfo()">Open app info</button>
+    </div>
+  </section>
+
+  <span class="module-caption stagger">Access is granted once; the accessibility toggle brings the bubble up.</span>
+</section>
+
+<section class="screen" data-screen="settings" data-accent="#5bfd5b" data-side="right">
   <div class="slice"></div>
   <div class="slice front"></div>
 
@@ -354,65 +409,10 @@
   </section>
 </section>
 
-<section class="screen" data-screen="system" data-accent="#0040ff" data-side="right">
-  <div class="slice"></div>
-  <div class="slice front"></div>
-
-  <h1 class="stagger"><span class="reveal"><span class="reveal-text">System</span><span class="reveal-bar"></span></span></h1>
-  <span class="kicker stagger">Access and service</span>
-
-  <section class="module stagger">
-    <span class="module-label">Access</span>
-    <div class="row">
-      <span class="row-name">Accessibility</span>
-      <span class="status" id="status-accessibility">checking</span>
-      <button onclick="Panel.requestAccessibility()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">Notifications</span>
-      <span class="status" id="status-post">checking</span>
-      <button onclick="Panel.requestPostNotifications()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">Notification access</span>
-      <span class="status" id="status-listener">checking</span>
-      <button onclick="Panel.requestNotificationAccess()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">Shizuku</span>
-      <span class="status" id="status-shizuku">checking</span>
-      <button onclick="Panel.requestShizuku()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">System pop-ups</span>
-      <span class="status" id="status-headsup">checking</span>
-      <button onclick="Panel.toggleHeadsUp()">Toggle</button>
-    </div>
-    <p class="note">
-      With system pop-ups suppressed the bubble is the only thing that announces a notification —
-      it still lands in the shade, nothing is dropped. Needs Shizuku: the switch is a global
-      setting no sideloaded app may write.
-    </p>
-    <p class="note">
-      Shizuku powers the microphone-access toggle on the pill. It has to be started after every
-      reboot, from the Shizuku app.
-    </p>
-    <p class="note">
-      A toggle greyed out as <b>Restricted setting</b> means Android is blocking a sideloaded app.
-      Open <b>App info</b>, use the three-dot menu, choose <b>Allow restricted settings</b>, then grant it again.
-    </p>
-    <div class="actions">
-      <button class="wide" onclick="Panel.openApplicationInfo()">Open app info</button>
-    </div>
-  </section>
-
-  <span class="module-caption stagger">Access is granted once; the accessibility toggle brings the bubble up.</span>
-</section>
-
 <nav>
+  <button data-goto="system">System</button>
   <button data-goto="settings">Settings</button>
   <button data-goto="debug">Debug</button>
-  <button data-goto="system">System</button>
 </nav>
 
 <script>
