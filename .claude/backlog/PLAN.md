@@ -255,6 +255,23 @@ One step each, one push each, naming the feature.
       Settings and Debug) is the one with the most of them — five between the Access module and
       its caption.
 
+- [ ] **C18. A message from the same conversation still replays the full alert arrival.**
+      Reported on the phone: a second message from the same person while the alert is already up
+      still pops the bubble out and in as if it had just arrived, instead of appending beneath the
+      first line silently. The logic for this already exists and is meant to be built —
+      `isSameConversation()` and `paintStack(notification, appending)` in `js/mods/notification.js`
+      (C7 in this file, ticked done) — so this is a regression or a gap in that logic, not new work
+      to design. `isSameConversation()` reads `notification.key`, falling back to `title` +
+      `package`; the arrival animation only fires when `appending` is false. Two places to look,
+      in order: whether `appending` is actually landing `false` for a real same-sender pair (the
+      messaging app's `key`/`title` may not be as stable as WhatsApp/Telegram's usually are — a
+      title that includes an unread count changes every message and breaks the fallback match), or
+      whether something downstream still plays an arrival animation even when `appending` is
+      `true` despite the check passing. `adb logcat -s IslandBubble` with a temporary log of
+      `notification.key`, `title`, `package` and the resulting `appending` value on every `show()`
+      call is the fastest way to see which one it is — needs the phone and a real second message
+      from a real conversation, not the debug panel's stage buttons.
+
 ## Content marking
 
 Added 2026-08-28.
