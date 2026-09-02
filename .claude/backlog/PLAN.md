@@ -145,8 +145,16 @@ Walked on the device and reported back, in the order they were reported.
 - [x] **B2. Fluid merging everywhere.** The mechanism is good; the coverage is not. Make Now↔Main,
       Clock↔Now and Lock↔Main merge the way Main↔Satellite already does. Mind the filter-region
       trap: a bubble outside it silently loses its skin and reads as a colour bug.
-- [~] **B3. Debug stage — every state.** Six stages added; never ticked. Extend `DebugStage.SEQUENCE` to cover the swap, a satellite
-      closing, the pull, the hold, the lock merge, the Now flight. **Never ticked.**
+- [~] **B3. Debug stage — every state.** Extended again with everything Phase C added: the three
+      new Now mods, the Status bubble with and without a Modus, the alarm, and a staged lock
+      screen (`stageLock`, which tells the page the keyguard is up without touching `isLocked`,
+      so the padlock, the notification bubbles, the bottom Now bubble and the merge home can all
+      be walked without locking the phone). The recorder's and the alarm's buttons carry their
+      real titles, because what a tap does is decided by matching those titles.
+      **Still not everything, and still not ticked**: the swap, the pull and the hold are
+      gestures, and a stage cannot press a finger to the glass. Those three need either a
+      synthesised touch stream or a hand on the phone, and a stage that pretended to cover them
+      would be worse than one that says it does not.
 - [x] **B4. Drag radius.** Double `DRAG_RADIUS` (20 → 40) with a constrainer at the current 80%:
       crossing it resets the haptic to idle and stops it firing.
 - [x] **B5. Settings.** Goo-strength slider; per-bubble widths for mod/idle/now/status.

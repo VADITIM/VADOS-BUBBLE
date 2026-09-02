@@ -182,6 +182,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.push("window.onBattery($battery)")
         }
 
+        /**
+         * The lock screen, staged. Everything down there is painted from one call, so telling the
+         * page the keyguard is up is the whole of it — and the whole of it is what needs walking:
+         * the padlock, the notification bubbles, the bottom Now bubble and the merge home.
+         *
+         * It does not touch isLocked, so nothing else starts believing the phone is locked: the
+         * screen-on flag in particular stays exactly where it was, and that flag suspends the
+         * display timeout rather than restarting it.
+         */
+        fun stageLock(locked: Boolean) {
+            instance?.push("window.onLock($locked)")
+        }
+
         /** An alarm ringing, or null once it has been answered. */
         fun deliverAlarm(alarm: JSONObject?) {
             val service = instance ?: return

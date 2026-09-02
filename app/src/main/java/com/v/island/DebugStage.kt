@@ -33,8 +33,48 @@ object DebugStage {
         "mod-closing", "mod-to-idle", "alert-over-mod",
         "clear", "alert", "alert-marked", "alert-stacking", "alert-image",
         "timer-paused", "call-phone",
-        "now-flight", "torch", "battery-charging", "battery-low", "clear"
+        "now-flight", "torch", "recording", "download", "upload",
+        "connectivity", "connectivity-bluetooth", "connectivity-hotspot",
+        "battery-charging", "battery-low", "alarm", "locked", "clear"
     )
+
+    /** A transfer at a share of the way through, wearing the line the app's own text would. */
+    private fun transfer(kind: String, name: String, done: Int) {
+        BubbleService.deliverNowMods(
+            JSONObject()
+                .put("recording", JSONObject.NULL)
+                .put(
+                    "transfer",
+                    JSONObject()
+                        .put("mod", kind)
+                        .put("key", "stage-transfer")
+                        .put("label", name)
+                        .put("accent", "#4285f4")
+                        .put("done", done)
+                        .put("total", 100)
+                        .put("detail", "$done,4 von 118 MB · 12,1 MB/s")
+                        .put("actions", JSONArray())
+                )
+        )
+    }
+
+    /** What the phone is attached to, in the shape ConnectivityWatch publishes. */
+    private fun attached(
+        link: String,
+        level: Int,
+        bluetooth: JSONObject? = null,
+        hotspot: Boolean = false,
+        usb: Boolean = false
+    ) {
+        BubbleService.deliverConnectivity(
+            JSONObject()
+                .put("link", link)
+                .put("level", level)
+                .put("usb", usb)
+                .put("hotspot", hotspot)
+                .put("bluetooth", bluetooth ?: JSONObject.NULL)
+        )
+    }
 
     /** How long each staged state is left standing before the next one replaces it. */
     private const val STEP_MILLIS = 3500L
@@ -138,6 +178,65 @@ object DebugStage {
 
             // The light out and back: born at the hole, flying to its spot by the clock, and
             // the whole row standing aside for it — then the same in reverse.
+            // The Now bubble's other mods, each carrying the shape the real payload has. The
+            // recorder's buttons are staged with their real titles, because what a tap does is
+            // decided by matching those titles and a stage with different words would test
+            // nothing that ships.
+            "recording" -> BubbleService.deliverNowMods(
+                JSONObject()
+                    .put(
+                        "recording",
+                        JSONObject()
+                            .put("mod", "recording")
+                            .put("key", "stage-recording")
+                            .put("label", "Screen recorder")
+                            .put("since", System.currentTimeMillis() - 74_000L)
+                            .put("isPaused", false)
+                            .put(
+                                "actions",
+                                JSONArray()
+                                    .put(JSONObject().put("index", 0).put("title", "Pause"))
+                                    .put(JSONObject().put("index", 1).put("title", "Stop"))
+                            )
+                    )
+                    .put("transfer", JSONObject.NULL)
+            )
+
+            "download" -> transfer("download", "Kaufvertrag.pdf", 62)
+            "upload" -> transfer("upload", "IMG_4471.heic", 88)
+
+            // What the bubble at the right end of the bar wears, with and without a Modus.
+            "connectivity" -> attached(link = "wifi", level = 3)
+            "connectivity-bluetooth" -> attached(
+                link = "wifi",
+                level = 4,
+                bluetooth = JSONObject().put("name", "Buds3 Pro").put("charge", 64)
+            )
+            "connectivity-hotspot" -> attached(link = "mobile", level = -1, hotspot = true)
+
+            // An alarm ringing, which is the one state that takes the whole screen. Its buttons
+            // carry the clock app's own words for the same reason the recorder's do.
+            "alarm" -> BubbleService.deliverAlarm(
+                JSONObject()
+                    .put("key", "stage-alarm")
+                    .put("label", "Wecker")
+                    .put("detail", "")
+                    .put(
+                        "actions",
+                        JSONArray()
+                            .put(JSONObject().put("index", 0).put("title", "Schlummern"))
+                            .put(JSONObject().put("index", 1).put("title", "Beenden"))
+                    )
+            )
+
+            // The lock screen without locking the phone: the padlock, the notification bubbles
+            // and the bottom Now bubble all stand up, and the unlock is the merge home.
+            "locked" -> {
+                BubbleService.deliverMedia(media(isPlaying = true))
+                BubbleService.stageLock(true)
+                handler.postDelayed({ BubbleService.stageLock(false) }, 2600L)
+            }
+
             "now-flight" -> {
                 BubbleService.deliverTorch(torch())
                 handler.postDelayed({ BubbleService.deliverTorch(null) }, 2200L)
