@@ -7,6 +7,7 @@ export const faces = {
   timer: document.getElementById('timer-face'),
   timerPanel: document.getElementById('timer-panel'),
   call: document.getElementById('call-face'),
+  alarm: document.getElementById('alarm-face'),
 
 
   alert: document.getElementById('alert-face'),
@@ -19,6 +20,7 @@ export const bridge = window.Android || {
   setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
   openNotification() {}, dismissNotification() {}, timerAction() {},
   setTorch() {}, setNowProxy() {}, setLockProxy() {}, setStatusProxy() {}, openConnectionSettings() {},
+  recordingAction() {}, alarmAction() {},
   note() {}, wakeFrames() {},
 };
 // The host window tracks the bubble in both directions. It sits above the status
@@ -38,6 +40,9 @@ export const SIZES = {
   // Five steps in a row and their label above them; nothing else belongs in it.
 
   history:  { width: 340, height: 320 },
+  // The whole screen less the margin the bubble is already standing in. An alarm is the one
+  // state allowed to cost the shade swipe: while it rings there is nothing else to be doing.
+  alarm:    { width: 356, height: 720 },
 };
 export const DWELL = 5000;
 export const HOLD_MILLIS = 350;

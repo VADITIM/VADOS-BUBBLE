@@ -53,6 +53,18 @@
        the clock — which is the middle of the bubble, which is the camera. Wrapped, this
        face is the same two-part shape every other resting face has: glyph on the left,
        reading on the right, and the corridor between them belongs to neither. -->
+  <!-- The alarm is a state of the bubble, not a bubble of its own: it arrives out of the row
+       the way every other state does and it is the same shape all the way up, which is the
+       whole reason it can take the screen without reading as a dialog appearing over one. -->
+  <div class="face" id="alarm-face">
+    <div id="alarm-clock"></div>
+    <div id="alarm-label"></div>
+    <div id="alarm-buttons">
+      <button class="alarm-button" id="alarm-snooze">Snooze</button>
+      <button class="alarm-button alarm-stop" id="alarm-dismiss">Stop</button>
+    </div>
+  </div>
+
   <div class="face" id="call-face">
     <div id="call-avatar" class="avatar glyph"></div>
     <div id="call-reading">

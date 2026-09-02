@@ -24,6 +24,7 @@ One file per source of truth, each pushing a JSON payload or `null`:
 | `CallWatch` | an ongoing call notification |
 | `TorchWatch` | `CameraManager.registerTorchCallback`, and setting strength |
 | `NowWatch` | a recording running, a transfer in flight — both read off ongoing notifications |
+| `AlarmWatch` | an alarm ringing, told apart by its full-screen intent |
 | `BatteryWatch`, `MicrophoneAccess` | charge, sensor privacy |
 | `ConnectivityWatch` | the default network, USB, tethering, and what is paired over bluetooth |
 

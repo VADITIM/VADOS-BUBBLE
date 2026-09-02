@@ -122,6 +122,20 @@ class IslandNotificationListener : NotificationListenerService() {
             BubbleService.deliverTimer(timer()?.let { TimerWatch.describe(it) })
         }
 
+        /** The alarm that is ringing, or null. */
+        fun alarm(): StatusBarNotification? =
+            instance?.activeNotifications?.firstOrNull { AlarmWatch.isAlarm(it) }
+
+        /** Snooze or dismiss — the clock app's own buttons, pressed from the bubble. */
+        fun alarmAction(index: Int) {
+            alarm()?.let { AlarmWatch.act(it, index) }
+        }
+
+        fun publishAlarm() {
+            if (instance == null) return
+            BubbleService.deliverAlarm(alarm()?.let { AlarmWatch.describe(it) })
+        }
+
         /** The recording that is running, or null when nothing is being recorded. */
         fun recording(): StatusBarNotification? =
             instance?.activeNotifications?.firstOrNull { NowWatch.isRecording(it) }
@@ -214,6 +228,13 @@ class IslandNotificationListener : NotificationListenerService() {
             publishCall()
             return
         }
+        // An alarm is not an announcement either: it rings until it is answered, and it is the
+        // one thing here allowed to take the whole screen. Asked before the recording, because
+        // the clock app posts an ongoing notification for a ringing alarm as well.
+        if (AlarmWatch.isAlarm(statusBarNotification)) {
+            publishAlarm()
+            return
+        }
         // A recording and a transfer are states in the same sense, and they belong to the
         // bubble out at the clock rather than to the row: what is happening, not what is
         // connected. A progress notification re-posts on every tick, so this is also how the
@@ -266,6 +287,7 @@ class IslandNotificationListener : NotificationListenerService() {
         if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
             publishNowMods()
         }
+        if (AlarmWatch.isAlarm(statusBarNotification)) publishAlarm()
         // The song may have ended with its notification, or only changed players.
         if (isPlayer(statusBarNotification)) MediaControl.refresh()
         // The badge is the shade, so it moves whenever the shade does — including

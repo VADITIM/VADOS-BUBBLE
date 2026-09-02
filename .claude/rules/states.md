@@ -38,6 +38,7 @@ What a bubble *is*, independent of which mod or content it is showing.
 | **Mod** | Closed, mod-owned | A mod (media/clock/call) owns the bubble's shape: glyph, short reading, `playing`/`timing`/`calling` width. On the main bubble this is **Main-Mod**. A mod widens the bubble slightly, puts its own glyph against the left inset and its reading or secondary icons on the right. |
 | **Satellite-left / Satellite-right** | Satellite | A second or third live mod, not the owner, drawn as a circle beside the bubble instead of inside it. A satellite only exists because a mod is behind it, so it is always a Mod state by side rather than by centre. |
 | **Alert** | Alert | A fresh notification arriving: `alerting` (text) or `image` (with a photo), dwells and auto-closes. Main bubble only — an alert is by definition a thing that arrived, and only the bubble at the punch hole stands for arrivals. **One conversation is one alert**, and it stacks — see below. |
+| **Alarm** | — | **Built.** An alarm ringing, which is the one state allowed to take the whole screen: it is not information, it is a demand, and it goes on until it is answered. It is a *state of the bubble* rather than a bubble of its own — same shape, same corners, arriving out of the row — because a second element would have to be given the growth, the liquid, the window and the corners again, and it would arrive from nowhere. Orange, with two circular-squircle buttons wearing the clock app's own words. |
 | **Active** | Grow / Open | Tapped open, full detail, own layout, no satellites: `expanded`, `picture`, `player`, `timer`, `history`. What it opens is a Tab (below). |
 | **Haptic** | — | Held down, growing under the finger. In code this is the hold in progress, before it resolves either to opening a different Tab than Tap would, or to leaving for the mod's own app. |
 | **Pull** | — | Swiped down. Opens the notification Tab from any bubble at all — the one gesture no mod has claimed, so it can mean the same thing everywhere. |
@@ -93,6 +94,16 @@ A Tab is the content of an Active state: its own container with its own layout, 
 | **Picture** | Tap on an alert carrying a photo. Sized to the image rather than to a fixed box. | built |
 | **Discord video** | Tap on the Discord video mod. 16:9 to screen width, or the video's own ratio if it is vertical. | planned |
 | **Recording** | Haptic on the Now recording bubble: elapsed and stop. It shares the flashlight panel's box rather than opening a second one — it is the same bubble held down. | built |
+
+### The alarm
+
+Read off the notification, like the timer: a ringing alarm is a state the clock app declares and takes back. What separates it from every other notification that app posts is the **full-screen intent** — an app asking to take over the screen is the platform's own definition of "this cannot wait", and it is the alarms and the incoming calls that use it. Calls are excluded by name, because they have a bubble already.
+
+Three things about it are deliberate:
+
+- **It costs the shade swipe while it rings**, because the window is the whole screen. That is the one time this project accepts that cost: there is nothing else to be doing.
+- **The buttons wear the clock app's own words**, and fire the clock app's own actions. A label of ours saying "Snooze" over an action that turns out to be something else is the worst possible thing to press at six in the morning; a button whose action is not offered is not drawn.
+- **Pressing stop does not close it.** The alarm is over when the clock app says it is over, and it says so by taking its notification away. Closing on the press would put the bubble back on the bar while the phone was still ringing.
 
 ## What the Now bubble carries
 

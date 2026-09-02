@@ -2245,3 +2245,64 @@ html.now-flying #now-reading, .now-face:not(.showing) #now-reading {
   font-size: 0.8rem;
   font-weight: 500;
 }
+
+
+/* ── The alarm ─────────────────────────────────────────────────────────────────────────
+   The bubble grown all the way. Orange, because this is the one state that is a demand
+   rather than a reading, and it is the same shape at the same corners the whole way up —
+   a box that changed its geometry on the way would read as a dialog appearing over the
+   screen rather than as the bubble becoming the alarm. */
+html.ringing #pill {
+  background: #ff6a00;
+  border-color: #ff8a2b;
+  /* Squircle at this size, and only at this size: it is the one shape here wide enough for
+     the difference between a superellipse and a rounded rectangle to read at all. */
+  corner-shape: squircle;
+  border-radius: 46px;
+}
+#alarm-face {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 2rem 1.5rem;
+  color: #ffffff;
+}
+#alarm-clock {
+  font-size: 4.2rem;
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+#alarm-label {
+  font-size: 1rem;
+  font-weight: 500;
+  opacity: 0.9;
+  text-align: center;
+}
+#alarm-buttons {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+}
+/* Circular squircles: round enough to be thumbs' targets in the dark, and the superellipse
+   is what keeps them from reading as two plain circles stuck on an orange field. */
+.alarm-button {
+  width: 116px;
+  height: 116px;
+  border: none;
+  border-radius: 44%;
+  corner-shape: squircle;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: scale 220ms var(--ease-grow);
+}
+.alarm-button:active { scale: 0.94; }
+.alarm-button[hidden] { display: none; }
+/* The one that ends it is the solid one. At six in the morning the difference between the two
+   has to be visible before either word is read. */
+.alarm-stop { background: #ffffff; color: #ff6a00; }

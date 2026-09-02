@@ -24,6 +24,7 @@ import './now.js';
 import './status.js';
 import './clock.js';
 import './double.js';
+import './alarm.js';
 import './bridge.js';
 
 bridge.ready();

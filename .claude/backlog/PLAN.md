@@ -237,7 +237,15 @@ One step each, one push each, naming the feature.
       so there is one place to put the right values, but *what* those values are is a measurement
       off One UI's own Now Bar chip and can only be taken on the phone. Tick this when the two
       numbers have been measured there.
-- [ ] **C6. Alarm state** — full screen with the top margin, orange, circular squircle buttons.
+- [x] **C6. Alarm state** — full screen with the top margin, orange, circular squircle buttons.
+      `AlarmWatch` tells a ringing alarm from everything else the clock app posts by its
+      full-screen intent, which is the platform's own way of saying "this cannot wait"; calls
+      are excluded by name because they have a bubble already. It is a **state of the main
+      bubble**, not a bubble of its own — same shape, same corners, arriving out of the row —
+      and it is the one state that costs the shade swipe, because while it rings there is
+      nothing else to be doing. The buttons wear the clock app's own words and fire its own
+      actions, and pressing stop does not close the bubble: the alarm is over when the clock
+      app takes its notification away. **Not walked on the phone.**
 - [x] **C7. Alert stacking** — a second message from the same conversation appends beneath the
       first instead of announcing itself as a new alert. Built off `lines`, which the payload
       already carried: a messenger posts one notification per conversation and rewrites it as

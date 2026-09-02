@@ -179,6 +179,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.push("window.onBattery($battery)")
         }
 
+        /** An alarm ringing, or null once it has been answered. */
+        fun deliverAlarm(alarm: JSONObject?) {
+            val service = instance ?: return
+            service.wakeScreen()
+            service.push("window.onAlarm(${alarm ?: "null"})")
+        }
+
         /** What is happening — a recording, a transfer — for the bubble out at the clock. */
         fun deliverNowMods(mods: JSONObject) {
             instance?.push("window.onNowMods($mods)")
@@ -930,6 +937,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // it binds, and on an install that happens before this service exists — the
         // push was dropped on the floor and nothing was ever going to say it again.
         IslandNotificationListener.publishCall()
+        // And an alarm that was already ringing when this page was built.
+        IslandNotificationListener.publishAlarm()
     }
 
     private fun push(js: String) {
@@ -1140,6 +1149,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * the bubble and no more: it sits over the system's own icons at the right end of the bar,
          * which is a stretch the shade swipe is started on as often as anywhere else.
          */
+        /** Snooze or dismiss, pressed from the alarm the bubble is showing. */
+        @JavascriptInterface
+        fun alarmAction(index: Int) {
+            IslandNotificationListener.alarmAction(index)
+        }
+
         /** A recorder's own button, pressed from the Now bubble. */
         @JavascriptInterface
         fun recordingAction(index: Int) {
