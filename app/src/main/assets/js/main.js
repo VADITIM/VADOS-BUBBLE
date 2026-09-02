@@ -11,6 +11,7 @@
  * it has queued the moment it is called and the page has to be whole before that.
  */
 import { bridge } from './state.js';
+import './carry.js';
 import './motion.js';
 import './liquid.js';
 import './row.js';

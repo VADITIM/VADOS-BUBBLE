@@ -1,3 +1,4 @@
+import { CARRY_GRAB, carryTo, dropCarry, isCarrying } from './carry.js';
 import { stirLiquid } from './liquid.js';
 import { openPlayer } from './mods/media.js';
 import { openCurrent, openPicture } from './mods/notification.js';
@@ -315,6 +316,22 @@ pill.addEventListener('touchmove', event => {
   // hold needs: a finger pressing for a third of a second wanders, and every pixel of
   // that wander used to reach some gesture or other.
   if (Math.hypot(horizontalTravel, verticalTravel) <= DEAD_ZONE) return;
+  // Past this the bubble comes off its spot and is being *carried*: it stops rubber-banding
+  // and goes exactly where the finger goes, and it stays where it is let go of. Under it,
+  // everything behaves as it always has — the band, the springback, the trade — so the
+  // gesture is additive rather than a mode the bubble is put into.
+  //
+  // Only from a closed bubble. An open panel is centred on the screen and an alert is a thing
+  // arriving at the hole; neither is a shape to pick up, and a drag on one of them already
+  // means something else.
+  if (isCarrying() ||
+      (Math.hypot(horizontalTravel, verticalTravel) > CARRY_GRAB &&
+        CLOSED.has(shared.size) && shared.state === 'idle' &&
+        !root.classList.contains('dragging') && !root.classList.contains('pulling'))) {
+    untoy(pill, '--drag');
+    carryTo(sideways, verticalTravel);
+    return;
+  }
   // Until something claims the touch the bubble simply follows the finger on its
   // band. Once a real gesture has it — a trade, a lean — the play drag lets go and
   // the row's own motion takes over, or the bubble would be carried twenty pixels off
@@ -443,6 +460,9 @@ pill.addEventListener('touchend', () => {
   releaseSwap();
   endPull(true);
   endHold();
+  // Let go of where it was let go of, before the play drag's springback is asked for: a carried
+  // bubble has no home to spring to, which is the whole point of carrying it.
+  dropCarry();
   untoy(pill, '--drag');
 }, { passive: true });
 /**
@@ -454,6 +474,7 @@ pill.addEventListener('touchend', () => {
  */
 pill.addEventListener('touchcancel', () => {
   releaseSwap();
+  dropCarry();
   endPull(true, PULL_STOLEN);
   untoy(pill, '--drag');
   if (shared.state === 'haptic' && hasGrown) return;

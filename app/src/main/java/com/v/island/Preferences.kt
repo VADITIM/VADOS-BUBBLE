@@ -40,6 +40,14 @@ object Preferences {
      */
     const val NOW_PUSHES = "nowPushesRow"
 
+    /**
+     * Where the bubble has been carried to, in dp from the punch hole. Kept because a bubble
+     * that went home every time the phone slept was never really put anywhere — persistence is
+     * part of the feature rather than a polish pass on it.
+     */
+    const val CARRY_X = "carriedX"
+    const val CARRY_Y = "carriedY"
+
     private const val STORE = "island"
 
     /**
@@ -64,7 +72,9 @@ object Preferences {
         NOTIFICATION_IDENTITY to 2,
         GOO to 100,
         MOD_WIDTH to 56,
-        NOW_PUSHES to 1
+        NOW_PUSHES to 1,
+        CARRY_X to 0,
+        CARRY_Y to 0
     )
 
     fun of(context: Context): SharedPreferences =

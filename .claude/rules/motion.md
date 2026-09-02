@@ -51,6 +51,21 @@ Over an app, SystemUI has its own shade gesture on this strip and pilfers the po
 
 The object-like press-and-drag every bubble gets (`motion.js`'s rubber band, `DRAG_RADIUS`) is right for a bare bubble and wrong once it has grown into the notifications tab: that box holds a scrollable list, not something to be pushed around, and a swipe meant for the list underneath was shoving the whole panel with it. `dragRadius()` reads `shared.size` and returns 15% of the resting radius while it is `'history'` — an 85% cut, not zero, so the bubble still answers a touch rather than reading as dead. Cutting the radius alone is enough: `rubberBand()`'s hyperbola takes its whole shape from that one number, so a smaller radius already gives both less reach and less give per pixel, and no second constant is needed for "intensity". Any other tab that turns out to hold a scrollable list of its own owes the same read of `shared.size`, not a second copy of the scale.
 
+## A bubble can be carried
+
+Past `CARRY_GRAB` a drag stops being a rubber band and becomes a carry: the bubble comes off its spot, follows the finger one to one, and stays where it is let go of. Under that threshold everything behaves exactly as it did — band, springback, trade — so this is additive rather than a mode the bubble is put into. Only from a closed, idle bubble: an open panel is centred on the screen and an alert is a thing arriving at the hole, and a drag on either already means something else.
+
+Four collisions, each answered rather than discovered:
+
+- **The place is a `translate`, added to the row own shift.** Two authors, one property, no fight — they are two different reasons for the same bubble to be somewhere other than the middle, so they add. `--carry-ms` is zero while a finger is on it and a real duration when it is being put down or fetched home.
+- **The goo layer region travels with it**, as a band around wherever it is standing. Not the whole screen: a filter costs its area, and the whole screen is exactly the cost the bar-sized region exists to avoid. Outside the region a bubble silently loses its skin and paints its own background, which reads as a colour bug.
+- **The proxy follows, and only when the finger is off it.** Moving a window under a live finger is the cancel trap the hold already knows about, so the window is placed on release, not per frame.
+- **Anything past a mod happens at the cutout.** The bubble is fetched home for an alert or an open panel and given its place back when that closes. One rule, applied in `setSize`, because the alternative is re-deriving every geometry in the row against a moving origin.
+
+Free placement rather than the edge-snap dock Google and Samsung bubbles use, and that is a *window* decision before it is a taste one: a bubble parked half off-screen needs a proxy hanging over the edge and a dock needs a proxy the size of the dock, while free placement keeps the proxy exactly as big as the bubble has always been. Carrying therefore costs no extra pixels of shade swipe — only different ones. Let go within `CARRY_HOME` of the hole it is home again, so there is always a way back.
+
+Where it was put is stored, because a bubble that went home every time the phone slept was never really put anywhere.
+
 ## The punch hole is the origin
 
 Everything on this screen is born at the true middle of the screen, which is the middle of the punch hole and the middle of the bubble drawn around it. Nothing spawns where it will eventually live. A pill that belongs somewhere else — the torch out by the clock — is born at the hole as a small drop, travels to its spot, and only then behaves like a pill standing there. The travel distance is the host's to supply (`window.setFlight`): the page does not know how wide the screen is.

@@ -433,36 +433,31 @@ One step each, one push each, naming the feature.
       open and close with `adb logcat -s IslandBubble`, then pull both lines back out; they are
       diagnostics, not documentation.
 
-- [ ] **C19. A bubble that can be carried.** Today the pill is fixed at the punch hole and the only
-      thing a drag does is rubber-band it back. The ask is the chat-head behaviour Google's and
-      Samsung's message bubbles have: pick the bubble up, move it anywhere on the screen, and let it
-      stay where it was put — the bubble as an object on the screen rather than a fixture of the
-      status bar.
+- [x] **C19. A bubble that can be carried.** Built. Past `CARRY_GRAB` a drag stops being a rubber
+      band and becomes a carry: the bubble comes off its spot, follows the finger one to one, and
+      stays where it is let go of. Under the threshold nothing changed, so the gesture is additive
+      rather than a mode the bubble is put into.
 
-      It is not a gesture change, it is a change to what the bubble *is*, so name what it collides
-      with before writing any of it:
+      Each collision the item named, and what answered it:
 
-      - **The window model.** The canvas is already the whole screen and untouchable, so a bubble
-        carried down to the middle of the display is still drawn — and still liquid, since it never
-        leaves the one surface. What does not follow it is the goo layer's filter region, which is
-        deliberately bar-sized: a bubble outside it silently loses its skin and paints its own
-        background, which reads as a colour bug. The region has to travel with the carried bubble,
-        the way the lock bubble's does.
-      - **The touch proxy is the real cost.** A proxy is exactly as big as what is interactive, and
-        every pixel it covers is a pixel the shade swipe cannot start on. A bubble parked at the top
-        of the screen keeps that rule cheap; one being *dragged* needs a proxy that follows the
-        finger, and the drag has to be able to leave the top strip without the gesture being handed
-        back to SystemUI mid-move.
-      - **Where it rests is not free either.** Google's and Samsung's bubbles snap to an edge and
-        park half off-screen; parking anywhere at all leaves a touchable window sitting over an app
-        the user is trying to use. Decide the resting rule (edge-snap with a dock, or free
-        placement) before building the drag, because it decides how big the proxy ever has to be.
-      - **The punch hole is still the origin, and probably still home.** A carried bubble is a
-        bubble that has been taken somewhere; the states that mean something at the cutout — Alert
-        arriving, the Now row standing aside, satellites a side — have to say what they do while it
-        is somewhere else, or the answer is that it returns home for them.
-      - **Persistence.** Whether a carried position survives a screen-off, a rotation and a service
-        restart is part of the feature, not a polish pass.
+      - **The window model.** The goo layer's region travels with the bubble, as a band around
+        where it stands rather than the whole screen — the whole screen is exactly the cost the
+        bar-sized region exists to avoid.
+      - **The touch proxy.** It follows, and it is placed on release rather than per frame:
+        moving a window under a live finger is the cancel trap the hold already knows about.
+      - **The resting rule.** Free placement, decided *before* the drag was written because it
+        decides the proxy's size — an edge-snap dock needs a proxy the size of the dock, and a
+        bubble parked half off-screen needs one hanging over the edge. Free placement keeps the
+        proxy exactly as big as the bubble has always been, so carrying costs no extra pixels of
+        shade swipe, only different ones. Let go within `CARRY_HOME` of the hole and it is home.
+      - **The cutout states.** Anything past a mod is fetched home for and given its place back
+        afterwards, applied once in `setSize` — the alternative is re-deriving every geometry in
+        the row against a moving origin.
+      - **Persistence.** `carriedX` / `carriedY` in `Preferences`, pushed back to the page on
+        start.
+
+      **Not walked on the phone, and this is the item that most needs it**: the threshold, the
+      one-to-one follow and how a carried bubble sits over a real app are all feel.
 
 ## Content marking
 

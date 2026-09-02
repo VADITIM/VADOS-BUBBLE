@@ -78,6 +78,7 @@ Touch is the one thing that travels the other way. A touch-proxy window has no c
 | `row.js` | layout, satellites, dots, the swap, window sizing, the mod hand-over |
 | `now.js`, `lock.js`, `status.js`, `clock.js` | the Now bubble, the lock screen's, the one at the right end of the bar, and the time at the left |
 | `padlock.js`, `notes.js` | the lock screen's padlock, and its notifications as bubbles |
+| `carry.js` | where the bubble has been carried to, and everything that follows from it |
 | `mods/*.js` | one file per mod: `media`, `timer`, `call`, `notification` |
 | `double.js` | the second bubble at the hole, and the announcements it carries |
 | `tabs.js` | the Tabs that are nobody's mod: history, quick settings |

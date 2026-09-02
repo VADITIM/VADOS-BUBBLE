@@ -127,7 +127,7 @@ html, body {
     top var(--grow-ms) var(--ease-grow),
     /* Late, so the two moves read in order: the bubble pulls its width in, and
        only once it is narrower does it step aside for what is arriving. */
-    translate var(--shift-ms, var(--grow-ms)) var(--ease-grow) var(--shift-delay, 0ms),
+    translate var(--carry-ms, var(--shift-ms, var(--grow-ms))) var(--ease-split) var(--shift-delay, 0ms),
     scale 350ms linear,
     border-color 220ms ease;
   transition: var(--pill-transition);
@@ -139,7 +139,11 @@ html, body {
   /* The window grows on the side the satellite is on, so its centre is no longer
      the screen's. This pulls the bubble back onto the cutout — written as
      `translate` rather than `transform`, which the hold's scale owns. */
-  translate: var(--shift, 0px) 0;
+  /* The row's place and the carried place are one property with two authors and no fight: they
+     are added, because they are two different reasons for the same bubble to be somewhere other
+     than the middle. --carry-ms is 0 while a finger is on it and a real duration when it is
+     being put down or fetched home. */
+  translate: calc(var(--shift, 0px) + var(--carry-x, 0px)) var(--carry-y, 0px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -475,6 +479,17 @@ html.liquid #liquid { display: block; }
    bubble takes the whole filter off, and the double-painting with it. So while that
    bubble is standing there the region is the whole screen, and only then. */
 html.lock-live #liquid, html.locked #liquid { height: 100%; }
+/* The region travels with a carried bubble rather than growing to the whole screen: a filter
+   costs its area, and the whole screen is exactly the cost the bar-sized region exists to
+   avoid. It is a band around wherever the bubble is standing — up as far as it has been carried
+   above its spot, down as far as below it — so the skin has room and nothing else is paid for. */
+html.carried #liquid {
+  top: var(--liquid-rise, 0px);
+  height: calc(
+    var(--grab, 0px) + var(--liquid-tall, calc(var(--pill-height) * 1.2 + 16px))
+    + var(--liquid-drop, 0px) - var(--liquid-rise, 0px)
+  );
+}
 /* The bubble stops painting itself the moment the skin does it instead. Every bubble
    on the row is in this rule, the Now bubble included: it was left out and went on
    painting its own opaque edge on top of the skin, which is why the one bubble whose

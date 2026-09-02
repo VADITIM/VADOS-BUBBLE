@@ -274,6 +274,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
      */
     private lateinit var blurPanes: List<View>
 
+    /** Where the bubble has been carried to, which the proxy has to follow. */
+    private var carriedX = 0
+    private var carriedY = 0
+
     /** The radius each pane is rounded by right now, in pixels. */
     private val paneCorners = FloatArray(BLUR_PANES)
 
@@ -977,6 +981,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setGoo(${Preferences.get(preferences, Preferences.GOO)})")
         push("window.setModWidth(${Preferences.get(preferences, Preferences.MOD_WIDTH)})")
         push("window.setNowPushes(${Preferences.get(preferences, Preferences.NOW_PUSHES)})")
+        push(
+            "window.setCarried(" +
+                "${Preferences.get(preferences, Preferences.CARRY_X)}," +
+                "${Preferences.get(preferences, Preferences.CARRY_Y)})"
+        )
         push("window.setUnreadCount(${IslandNotificationListener.count()})")
         // The closed mods are state, not events: whatever was already true before this
         // page existed has to be asked for, because nothing will announce it again.
@@ -1123,12 +1132,16 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 // riseDp is what the page wants to draw above the resting bubble. It is
                 // room, not a move: the proxy already starts at the top of the screen,
                 // so the height covers it and the y never changes.
-                proxyParams.y = 0
+                // Plus wherever the bubble has been carried to. The proxy is exactly as big as
+                // the bubble either way — free placement rather than an edge-snap dock is what
+                // keeps it that size — so carrying costs no extra pixels of shade swipe, only
+                // different ones.
+                proxyParams.y = dp(carriedY)
                 // A satellite hangs off one side, so the proxy is wider on that side
                 // only. Without this the centred proxy would sit off the bubble to make
                 // the room, and every touch would land shifted by half the difference.
                 proxyParams.x =
-                    dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + shiftDp)
+                    dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + shiftDp + carriedX)
                 runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
             }
         }
@@ -1198,6 +1211,32 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * the bubble and no more: it sits over the system's own icons at the right end of the bar,
          * which is a stretch the shade swipe is started on as often as anywhere else.
          */
+        /**
+         * Where the bubble has been carried to, told on every move and stored when it is put
+         * down. The page owns the position — it is the side that knows where it is drawing —
+         * and the host only has to keep the window under it and remember it for next time.
+         */
+        @JavascriptInterface
+        fun setCarryProxy(xDp: Int, yDp: Int) {
+            webView.post {
+                carriedX = xDp
+                carriedY = yDp
+                push("window.refitProxies()")
+                proxyParams.y = dp(yDp)
+                proxyParams.x = dp(
+                    Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + xDp
+                )
+                runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+            }
+        }
+
+        @JavascriptInterface
+        fun setCarried(xDp: Int, yDp: Int) {
+            Preferences.set(preferences, Preferences.CARRY_X, xDp)
+            Preferences.set(preferences, Preferences.CARRY_Y, yDp)
+            setCarryProxy(xDp, yDp)
+        }
+
         /** How fast the session plays, for a voice note that is being waited through. */
         @JavascriptInterface
         fun mediaSpeed(rate: String) {

@@ -1,4 +1,5 @@
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
+import { fitCarry } from './carry.js';
 import { isStolen } from './lock.js';
 import { paintAvatar, paintCall } from './mods/call.js';
 import { carryArt, mediaWindow, paintMedia, runBars } from './mods/media.js';
@@ -1029,6 +1030,11 @@ function windowFor(next, override) {
 export function setSize(next, override) {
   if (shared.size === next && !override) return;
   shared.size = next;
+  // Anything past a mod happens at the cutout: an alert is a thing *arriving* there and every
+  // open panel is centred on the screen. A carried bubble is fetched home for it and given its
+  // place back when it closes — one rule, and the honest one, because the alternative is
+  // re-deriving every geometry in the row against a moving origin.
+  fitCarry();
   const target = windowFor(next, override);
   const width = target.width < 0 ? shared.compact.width : target.width;
 
