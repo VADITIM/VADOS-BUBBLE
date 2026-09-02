@@ -92,6 +92,12 @@ function settleSkin(seen) {
   // Its own resting height and a little over for the border, since the box is measured
   // and the number it is measured against is the one Kotlin last pushed down.
   if (!seen || !seen.box.height || seen.box.height > shared.compact.height + 3) return;
+  // Temporary: the bubble was reported going opaque for a frame exactly as it lands, and this is the one place the
+  // skin and the bubble's own background trade over. Pull back out once diagnosed.
+  console.log(
+    'liquid on: size=' + shared.size + ' box=' + Math.round(seen.box.width) + 'x' +
+    Math.round(seen.box.height) + ' compact=' + shared.compact.height + ' alpha=' + seen.alpha
+  );
   root.classList.add('liquid');
 }
 

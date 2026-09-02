@@ -287,6 +287,51 @@ One step each, one push each, naming the feature.
       call is the fastest way to see which one it is — needs the phone and a real second message
       from a real conversation, not the debug panel's stage buttons.
 
+- [ ] **C20. The bubble goes opaque for a frame as a close lands.** Reported on the phone: exactly at
+      the end of a closing animation, as the pill settles back onto its resting position, it briefly
+      loses its transparency — it reads as the bubble re-rendering itself. Ruled out on the device:
+      it is not the host's blur panes. The suspect is the `html.liquid` handover, which is the one
+      thing that trades at that moment: `paintSize` takes the skin off the frame a *growth* starts,
+      because a bubble bigger than the goo layer's filter region loses its skin anyway, and
+      `settleSkin` is the only thing that puts it back — measured, at the frame the shape has come
+      home. So for the whole close the bubble paints its own background with the skin also drawing,
+      and at the landing frame the two swap over. Whether the flash is one frame of *both* or one
+      frame of *neither* is what the two temporary `console.log` lines already in the tree answer —
+      `settleSkin` in `js/liquid.js` and the `liquid off` line in `paintSize` in `js/row.js`. Walk one
+      open and close with `adb logcat -s IslandBubble`, then pull both lines back out; they are
+      diagnostics, not documentation.
+
+- [ ] **C19. A bubble that can be carried.** Today the pill is fixed at the punch hole and the only
+      thing a drag does is rubber-band it back. The ask is the chat-head behaviour Google's and
+      Samsung's message bubbles have: pick the bubble up, move it anywhere on the screen, and let it
+      stay where it was put — the bubble as an object on the screen rather than a fixture of the
+      status bar.
+
+      It is not a gesture change, it is a change to what the bubble *is*, so name what it collides
+      with before writing any of it:
+
+      - **The window model.** The canvas is already the whole screen and untouchable, so a bubble
+        carried down to the middle of the display is still drawn — and still liquid, since it never
+        leaves the one surface. What does not follow it is the goo layer's filter region, which is
+        deliberately bar-sized: a bubble outside it silently loses its skin and paints its own
+        background, which reads as a colour bug. The region has to travel with the carried bubble,
+        the way the lock bubble's does.
+      - **The touch proxy is the real cost.** A proxy is exactly as big as what is interactive, and
+        every pixel it covers is a pixel the shade swipe cannot start on. A bubble parked at the top
+        of the screen keeps that rule cheap; one being *dragged* needs a proxy that follows the
+        finger, and the drag has to be able to leave the top strip without the gesture being handed
+        back to SystemUI mid-move.
+      - **Where it rests is not free either.** Google's and Samsung's bubbles snap to an edge and
+        park half off-screen; parking anywhere at all leaves a touchable window sitting over an app
+        the user is trying to use. Decide the resting rule (edge-snap with a dock, or free
+        placement) before building the drag, because it decides how big the proxy ever has to be.
+      - **The punch hole is still the origin, and probably still home.** A carried bubble is a
+        bubble that has been taken somewhere; the states that mean something at the cutout — Alert
+        arriving, the Now row standing aside, satellites a side — have to say what they do while it
+        is somewhere else, or the answer is that it returns home for them.
+      - **Persistence.** Whether a carried position survives a screen-off, a rotation and a service
+        restart is part of the feature, not a polish pass.
+
 ## Content marking
 
 Added 2026-08-28.

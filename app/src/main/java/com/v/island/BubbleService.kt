@@ -621,6 +621,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // while the bubble is growing or closing. Keyed on radius and corner alone the whole animation was one apply
         // on the first frame and skips after it, so the glass stayed the width the bubble started at.
         if (!resized && paneBlurRadius[index] == radius && paneBlurCorner[index] == corner) return
+        // Temporary: every apply on the main pane, to see what the last frames of a close actually do — the bubble
+        // was reported losing its glass for a frame exactly as it lands. Pull this back out once diagnosed.
+        if (index == 0) {
+            android.util.Log.i(
+                "IslandBubble",
+                "blur apply pane0 radius=$radius corner=$corner resized=$resized size=${view.width}x${view.height}"
+            )
+        }
         if (SamsungBlur.apply(view, dp(radius), corner)) {
             paneBlurRadius[index] = radius
             paneBlurCorner[index] = corner
@@ -642,6 +650,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // against, and a cleared pane has to be placed again whatever it was or was not wearing.
         paneSpec[index] = null
         if (paneBlurRadius[index] == -1) return
+        // Temporary, with the apply log above: a clear landing mid-close is the shape of the reported flash.
+        if (index == 0) android.util.Log.i("IslandBubble", "blur clear pane0")
         SamsungBlur.clear(view)
         paneBlurRadius[index] = -1
         paneSpec[index] = null

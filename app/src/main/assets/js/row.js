@@ -49,6 +49,9 @@ function paintSize() {
   // region, which is what "no alpha and no blur while closing" was, and the unfiltered
   // edge blob standing in for it is the large accent-coloured hue an alert closed with.
   if (!CLOSED.has(shared.size)) {
+    // Temporary, with the log in settleSkin: which of the two paints owns the bubble at every moment of an open and
+    // a close, since one frame with both or neither is exactly the reported flash.
+    if (root.classList.contains('liquid')) console.log('liquid off: size=' + shared.size);
     root.classList.remove('liquid');
     // Opening is a growth, not a split, and must not inherit the split's curve or
     // the wait a departing satellite left behind.
