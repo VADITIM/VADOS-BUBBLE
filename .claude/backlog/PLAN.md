@@ -475,9 +475,24 @@ Added 2026-08-28.
 - [x] **Money highlighted like a marker, yellow.** `.money`, `MONEY_PATTERN`. Symbol either side,
       because both are written: `7,80€` and `$5.00`. The symbol is part of the match — a bare number
       is not money.
-- [~] **Google apps in Google colours, except Gmail.** `AppStyles.kt`. **Google Wallet is done** —
-      Google Blue `#4285f4`, the primary rather than a share of the four. The rest of the Google apps
-      still need the decision below.
+- [x] **Google apps in Google colours, except Gmail.** `AppStyles.kt`. Calendar, Drive, Photos,
+      Keep and Maps now wear the same treatment Wallet does — each app's own primary as the flat
+      accent for the nine places in `pill.css` that can only take one colour, and the shared
+      four-colour gradient for the two that can take more. Gmail is off Google yellow and on its
+      own product red: of all the Google apps it was the only one already wearing a Google colour,
+      and it is the one that was asked not to.
+      **This settles the open question below as reading 2**, which is what Wallet had already
+      shipped as — accent *and* gradient, rather than accent alone. It is five lines to revert if
+      the other reading is wanted.
+
+### The Google item's open question, as answered
+
+Answered by what shipped: reading 2, accent plus gradient, which is what Wallet was already
+carrying. The paragraphs below are kept because the *measurement* in them is still the reason —
+`--app-accent` is read into `color`, `border-color`, `background` and `border` at nine sites, and
+a gradient cannot go into `color` or `border-color` at all. That is why the treatment is two
+values rather than one, and why any future identity that is genuinely several colours has to
+carry both.
 
 ### Open question on the Google item
 
