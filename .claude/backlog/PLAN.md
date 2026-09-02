@@ -228,8 +228,15 @@ One step each, one push each, naming the feature.
       default on, and it governs both the row's shift and its satellite limit. **Not walked on
       the phone** — in particular the recorder package names and the pause/resume button titles
       are the two things only the device can confirm.
-- [ ] **C5. Now geometry** — same width and position Spotify covers; swipe up dismisses to the punch
+- [~] **C5. Now geometry** — same width and position Spotify covers; swipe up dismisses to the punch
       hole on the Lock-Now-derived bounce.
+      **The swipe is built**: up past `NOW_SWIPE` sends the bubble home on the lock bubble's
+      two-speed flight, ending on the centres rather than on a timer, and the dismissed mod stays
+      dismissed until it really ends. **The geometry is half done and says so**: both numbers that
+      describe what the bubble covers — `setNowLeft` and `setNowCover` — now come from the host,
+      so there is one place to put the right values, but *what* those values are is a measurement
+      off One UI's own Now Bar chip and can only be taken on the phone. Tick this when the two
+      numbers have been measured there.
 - [ ] **C6. Alarm state** — full screen with the top margin, orange, circular squircle buttons.
 - [x] **C7. Alert stacking** — a second message from the same conversation appends beneath the
       first instead of announcing itself as a new alert. Built off `lines`, which the payload

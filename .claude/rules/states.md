@@ -16,7 +16,7 @@ Rows are tagged **built** (on the phone now) or **planned** (specified, not writ
 |---|---|---|---|
 | **Main** | At the punch hole. The bubble. | built | Idle, Mod, Alert, Active, Haptic, Pull, Push |
 | **Satellite** | Beside the Main bubble, one a side, two at most. | built | Mod (by side), Active, Haptic, Push |
-| **Now** | Out at the clock, left end of the status bar. It takes the bar from its own spot to the punch hole, and the row stands aside for it. | built | Idle, Mod, Active, Haptic |
+| **Now** | Out at the clock, left end of the status bar. It takes the bar from its own spot to the punch hole, and the row stands aside for it. | built | Idle, Mod, Active, Haptic, Push |
 | **Status** | Right end of the status bar, over the system's own icons. | built | Idle, Modus, Active |
 | **Double** | Beside the punch hole, alongside whatever Main is doing. | built | none of the common states — see below |
 | **Hidden** | Past the second satellite: a coloured dot, not a bubble face. | built | none; it is a count |
@@ -105,6 +105,14 @@ Neither a recording nor a transfer is watched by a source of its own. Both are o
 Paused is read off the recorder's buttons, not off a field — no recorder posts a state, but a running one offers "pause" and a paused one offers "resume". Both words are matched in both languages the phone speaks, because neither word is ours.
 
 Whether the row stands aside for this bubble is a setting (`nowPushesRow`, on by default). Off, the row keeps its place and its two satellites, and the Now bubble takes only the bar that is actually free.
+
+### Push on the Now bubble
+
+A swipe up sends it home to the punch hole and lets go of what it was showing. It is a Push in the sense this file means — the mod comes off the bubble, not out of existence — so the recording goes on recording and the file goes on arriving; the mod stays dismissed until it actually ends, or a transfer's next tick would bring the bubble back a fraction of a second later. If something else is happening it takes the bubble over on the spot rather than the shape flying home and coming straight back out.
+
+The flight is the lock bubble's shape rather than the torch's: gathered in on the spot while already crawling home, then up to full speed, and the merge ends the frame the drop's centre reaches the bubble's. The torch going *out* keeps its own choreography, because that one is a light being switched off and it has been walked on the phone. Two flights until the dismissal has been walked too; then they should become one helper.
+
+Where this bubble stands and how much bar it must cover are **one measurement, taken on the phone**: `setNowLeft` and `setNowCover` both come from the host now, so the page has no geometry of its own to disagree with. What the numbers have to match is what One UI's own Now Bar chip covers — that is a device measurement and nothing else can stand in for it.
 
 ## Status
 

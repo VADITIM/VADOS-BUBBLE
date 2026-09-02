@@ -77,6 +77,15 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          */
         private const val NOW_LEFT = 16
 
+        /**
+         * The narrowest that bubble may ever stand, which is what One UI's own Now Bar chip covers:
+         * below it our pill hands back a piece of the bar it exists to be instead of, and Samsung's
+         * shows past its end. Here rather than in the page because it is one measurement with
+         * NOW_LEFT — where the chip starts and how wide it is — and split across two files the two
+         * halves drift. Mirrors NOW_COVER in js/now.js, which holds it until this arrives.
+         */
+        private const val NOW_COVER = 128
+
 
         /**
          * One pane of glass per bubble that can stand anywhere on this screen: the main
@@ -904,6 +913,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private fun pushAppearance() {
         push("window.setNowLeft($NOW_LEFT)")
+        push("window.setNowCover($NOW_COVER)")
         push("window.setPillBackground('${Preferences.backgroundCss(preferences)}')")
         push("window.setCompactSize(${Preferences.get(preferences, Preferences.WIDTH)},${Preferences.get(preferences, Preferences.HEIGHT)})")
         push("window.setGrab(${topGrab()})")

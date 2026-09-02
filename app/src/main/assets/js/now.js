@@ -68,7 +68,17 @@ const NOW_REACH = 4;
  * bar it is there to be instead of. Only the flight home goes below it, and by then it
  * is a drop and on its way out.
  */
-const NOW_COVER = 128;
+let NOW_COVER = 128;
+
+/**
+ * Where its left edge rests and how much bar it must cover are one measurement, taken on the
+ * phone off the chip One UI draws there — so both come from the host and neither is decided
+ * here. This one is a fallback for the frames before the host has said anything.
+ */
+window.setNowCover = value => {
+  NOW_COVER = Number(value) || NOW_COVER;
+  fitNowWidth();
+};
 
 /** Where its left edge rests, told by the host, which is the side that measures. */
 let nowLeft = 53;
@@ -120,6 +130,31 @@ const NOW_WIDTHS = {
   download: 178,
   upload: 178,
 };
+
+/**
+ * Which mods have been swiped away. A dismissed mod is still live — the recording is still
+ * recording — it is simply not being shown any more, and it stays dismissed until it actually
+ * ends. Anything else and a transfer swiped away is back a fraction of a second later, because
+ * a progress notification re-posts on every tick.
+ */
+const nowDismissed = {};
+
+/** How far up the finger has to travel for the swipe to be a dismissal. Mirrors LOCK_SWIPE. */
+const NOW_SWIPE = 24;
+
+/**
+ * The dismissal's own flight, which is the lock bubble's shape rather than the torch's: it
+ * gathers itself in on the spot while already crawling home, then opens up to full speed. The
+ * torch going *out* keeps its own choreography — that one is a light being switched off and it
+ * has been walked on the phone — so this is a second flight rather than a rewrite of the first.
+ * When the dismissal has been walked too, the two should become one helper.
+ */
+const NOW_FLING_PINCH_SCALE = 0.55;
+const NOW_FLING_PINCH = 260;
+const NOW_FLING = 520;
+const NOW_FLING_CRAWL = 0.25;
+const NOW_FLING_PINCH_EASE = 'cubic-bezier(0.62, 0, 0.2, 1.65)';
+const NOW_FLING_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
 
 /** A finished transfer stands still for this long wearing a tick, then goes home. */
 const NOW_DONE_DWELL = 1100;
@@ -362,9 +397,13 @@ function setNowMod(name, payload) {
   const had = nowOrder.length;
   if (payload) {
     nowLive[name] = payload;
-    if (!nowOrder.includes(name)) nowOrder.push(name);
+    // A dismissed mod keeps being tracked and keeps being out of the order: the swipe said
+    // "not on my bar", not "stop happening", and the difference is what stops a transfer's
+    // next tick from bringing the bubble straight back.
+    if (!nowOrder.includes(name) && !nowDismissed[name]) nowOrder.push(name);
   } else {
     delete nowLive[name];
+    delete nowDismissed[name];
     nowOrder = nowOrder.filter(mod => mod !== name);
   }
   fitElapsedTick();
@@ -662,6 +701,100 @@ let nowHeld = false;
 let nowHoldTimer = null;
 let nowDownAt = null;
 
+/**
+ * Swiped up: the bubble goes home to the punch hole and what it was showing is let go of.
+ *
+ * It is a Push in the sense states.md means — the mod comes off the bubble, not out of
+ * existence — so the recording goes on recording and the file goes on arriving. If something
+ * else is live it takes the bubble over on the spot; if nothing is, the shape flies home and
+ * is taken back into the bubble at the cutout, measured rather than timed.
+ */
+function flingNowHome() {
+  const owner = nowOwner();
+  if (!owner) return;
+  nowDismissed[owner] = true;
+  nowOrder = nowOrder.filter(mod => mod !== owner);
+  bridge.triggerHaptic('tap');
+  if (nowOrder.length) {
+    // Handed straight over: there is still something happening, and a bubble that flew home
+    // and came back out for it would be one journey saying two things.
+    paintNowFace();
+    fitNowWidth();
+    fitNowProxy();
+    return;
+  }
+  stopNowFlight();
+  if (nowOpen) closeNowPanel();
+  root.classList.add('now-flying');
+  fitNowProxy();
+  const from = nowPill.getBoundingClientRect();
+  const to = pill.getBoundingClientRect();
+  const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+  const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+  const whole = NOW_FLING_PINCH + NOW_FLING;
+  const turn = NOW_FLING_PINCH / whole;
+  const drop = Math.min(to.width / from.width, to.height / from.height) * 0.9;
+  // Two animations on two properties rather than one keyframe list, because a keyframe's
+  // easing owns every property in it and these two want opposite ones: the closing winds up
+  // and overshoots, the travel crawls flat and then opens out.
+  const flight = [
+    nowPill.animate(
+      [
+        { scale: 1, offset: 0, easing: NOW_FLING_PINCH_EASE },
+        { scale: NOW_FLING_PINCH_SCALE, offset: turn, easing: NOW_FLING_EASE },
+        { scale: drop, offset: 1 },
+      ],
+      { duration: whole, fill: 'forwards' }
+    ),
+    nowPill.animate(
+      [
+        { translate: '0px 0px', offset: 0, easing: 'linear' },
+        {
+          translate: (dx * NOW_FLING_CRAWL * turn).toFixed(1) + 'px ' +
+            (dy * NOW_FLING_CRAWL * turn).toFixed(1) + 'px',
+          offset: turn,
+          easing: NOW_FLING_EASE,
+        },
+        { translate: dx.toFixed(1) + 'px ' + dy.toFixed(1) + 'px', offset: 1 },
+      ],
+      { duration: whole, fill: 'forwards' }
+    ),
+  ];
+  // The mirror only runs while something asks for frames, and the skin and the glass are both
+  // read off this box: a flight that stirred nothing would leave a frosted rectangle standing
+  // at the clock while the shape crossed the screen.
+  stirLiquid(whole + 400);
+  // The bar is free the moment the shape leaves its spot, not when it arrives.
+  window.onTorchChip(false);
+  catchInto(nowPill, pill);
+  nowAfter(NOW_FLING_PINCH, () => watchNowCentre(flight));
+}
+
+/**
+ * The merge ends the frame the drop's centre reaches the bubble's. Watched rather than timed:
+ * the flight is eased and its distance depends on where the bubble is standing, so that
+ * instant is not a number that can be written down beforehand.
+ */
+function watchNowCentre(flight) {
+  const mine = nowPill.getBoundingClientRect();
+  const bubble = pill.getBoundingClientRect();
+  if (mine.left + mine.width / 2 > bubble.left + bubble.width / 2) {
+    nowAfter(0, () => requestAnimationFrame(() => watchNowCentre(flight)));
+    return;
+  }
+  releaseCatch(nowPill);
+  root.style.setProperty('--now-fade-ms', '0ms');
+  nowPill.classList.remove('lit');
+  fitNowProxy();
+  requestAnimationFrame(() => {
+    flight.forEach(move => move.cancel());
+    root.classList.remove('now-flying');
+    setNowFly(0, 0, 'linear');
+    setNowWidth(nowDrop(), 0, 'linear');
+    root.style.removeProperty('--now-fade-ms');
+  });
+}
+
 export function nowTouch(action, x, y) {
   if (action === 'down') {
     nowHeld = false;
@@ -691,7 +824,14 @@ export function nowTouch(action, x, y) {
   clearTimeout(nowHoldTimer);
   nowPill.classList.remove('pressing');
   const travelled = nowDownAt ? Math.hypot(x - nowDownAt.x, y - nowDownAt.y) : Infinity;
+  const lifted = nowDownAt ? nowDownAt.y - y : 0;
   nowDownAt = null;
+  // Upwards past the threshold is a dismissal whatever else the finger did on the way: it is
+  // the one gesture on this bubble that means the same thing it means on every other one.
+  if (action === 'up' && !nowOpen && lifted > NOW_SWIPE) {
+    flingNowHome();
+    return;
+  }
   if (action !== 'up' || nowHeld || travelled >= PROXY_TAP_SLOP) return;
   bridge.triggerHaptic('expand');
   if (nowOpen) {
