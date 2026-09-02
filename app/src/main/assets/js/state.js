@@ -19,7 +19,8 @@ export const bridge = window.Android || {
   mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, setTorchLit() {},
   setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
   openNotification() {}, dismissNotification() {}, timerAction() {},
-  setTorch() {}, setNowProxy() {}, setLockProxy() {}, note() {}, wakeFrames() {},
+  setTorch() {}, setNowProxy() {}, setLockProxy() {}, setStatusProxy() {}, openConnectionSettings() {},
+  note() {}, wakeFrames() {},
 };
 // The host window tracks the bubble in both directions. It sits above the status
 // bar, so anything it covers is a pixel the shade swipe cannot start on — at rest

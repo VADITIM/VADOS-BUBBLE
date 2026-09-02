@@ -2,6 +2,7 @@ import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
 import { clock, paintProgress, playPath, shownPosition } from './mods/media.js';
 import { cancelSpring, DEAD_ZONE, rubberBandPast, toy, untoy } from './motion.js';
 import { fitNowProxy } from './now.js';
+import { fitStatusProxy } from './status.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 import { leaveForMod } from './tabs.js';
@@ -240,6 +241,7 @@ function fitLockProxy() {
 window.refitProxies = () => {
   fitNowProxy();
   fitLockProxy();
+  fitStatusProxy();
 };
 
 /**

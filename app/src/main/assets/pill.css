@@ -480,7 +480,8 @@ html.lock-live #liquid { height: 100%; }
    painting its own opaque edge on top of the skin, which is why the one bubble whose
    background came from the same custom property as everyone else's still read as a
    different alpha — the rim was solid where the others were glass. */
-html.liquid #pill, html.liquid .satellite, html.liquid #now, html.liquid #lock-now {
+html.liquid #pill, html.liquid .satellite, html.liquid #now, html.liquid #lock-now,
+html.liquid #status {
   background: transparent;
   border-color: transparent;
 }
@@ -2025,3 +2026,71 @@ html.now-flying #now-reading, .now-face:not(.showing) #now-reading {
 
 /* #endregion ───────────────────────────────────────────────────────────── */
 
+
+
+/* ── The Status bubble ─────────────────────────────────────────────────────────────────
+   The bar's other end. It stands on the system's own connectivity icons the way the Now
+   bubble stands on One UI's flashlight chip, and it is deliberately a few pixels shorter
+   than the bubbles that can be worked: that difference is how the eye tells a bubble that
+   only reports from one that does something. */
+#status {
+  position: absolute;
+  z-index: 3;
+  /* Centred in the bar rather than hung from it, because it is shorter than the row. */
+  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2);
+  right: var(--status-right, 14px);
+  height: calc(var(--pill-height) - var(--status-short, 4px));
+  box-sizing: border-box;
+  border-radius: calc(var(--pill-height) / 2);
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.55rem;
+  color: #fff;
+  overflow: visible;
+  opacity: 0;
+  /* Where it is along its birth flight and how big it is while making it: a small drop at
+     the punch hole, full size out here where --status-fly is nothing. */
+  transform: translateX(var(--status-fly, 0px)) scale(var(--status-pop, 0.5));
+  --status-transition:
+    opacity 200ms ease,
+    width var(--grow-ms) var(--ease-grow),
+    border-color 220ms ease,
+    transform 420ms var(--ease-split),
+    scale 320ms var(--ease-split);
+  transition: var(--status-transition);
+}
+#status.lit { opacity: 1; }
+/* 1.03, the one press response every bubble here shares. */
+#status.pressing { scale: 1.03; }
+/* A Modus colours the whole bubble, and it does it through the *border*: the skin reads its
+   edge colour off this box, so an accent written here arrives in the liquid without a second
+   rule to keep in step — the same way an alert's accent does on the main bubble. */
+#status.modal { border-color: var(--status-accent); }
+#status-modus, #status-link {
+  width: calc(var(--mod-glyph) - 8px);
+  height: calc(var(--mod-glyph) - 8px);
+  display: grid;
+  place-items: center;
+}
+#status-modus { color: var(--status-accent); }
+#status-modus:empty { display: none; }
+#status-modus svg, #status-link svg { width: 100%; height: 100%; fill: currentColor; }
+/* The link's own strength, drawn by dimming rather than by a second icon set: the bars are
+   one shape and how much of it is lit is the reading. Unknown — a mobile link, whose level
+   needs a permission this app does not ask for — is full, because a link that is up is up. */
+#status-link[data-level="0"] { opacity: 0.35; }
+#status-link[data-level="1"] { opacity: 0.5; }
+#status-link[data-level="2"] { opacity: 0.7; }
+#status-link[data-level="3"] { opacity: 0.85; }
+#status-charge {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+/* Plugged in is the one thing about the phone's own charge worth saying in a bubble that is
+   otherwise about everything else attached to it. */
+#status.plugged #status-charge { color: #5bfd5b; }

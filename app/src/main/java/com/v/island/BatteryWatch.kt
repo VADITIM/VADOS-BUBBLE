@@ -30,7 +30,11 @@ object BatteryWatch {
 
     private var receiver: BroadcastReceiver? = null
 
-    fun start(context: Context, onEvent: (JSONObject) -> Unit) {
+    /** Where the level goes on every reading, as opposed to the marks worth announcing. */
+    private var onLevel: ((Int, Boolean) -> Unit)? = null
+
+    fun start(context: Context, onEvent: (JSONObject) -> Unit, onCharge: (Int, Boolean) -> Unit) {
+        onLevel = onCharge
         if (receiver != null) return
         val listener = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) = read(intent, onEvent)
@@ -45,6 +49,7 @@ object BatteryWatch {
     fun stop(context: Context) {
         receiver?.let { runCatching { context.unregisterReceiver(it) } }
         receiver = null
+        onLevel = null
         wasPlugged = null
         announced = Int.MAX_VALUE
     }
@@ -55,6 +60,10 @@ object BatteryWatch {
         if (level < 0 || scale <= 0) return
         val percent = level * 100 / scale
         val isPlugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        // Told on every reading including the first: the Status bubble draws the level rather
+        // than announcing it, and the sticky broadcast that must not become an alert is exactly
+        // the reading that bubble needs to have something to show at all.
+        onLevel?.invoke(percent, isPlugged)
 
         val first = wasPlugged == null
         val justPlugged = !first && isPlugged && wasPlugged == false

@@ -26,7 +26,7 @@ never a working animation; the phone remains the check.
 | **Hidden** | Past the second satellite | built | no — a dot; a count, not a face |
 | **Now** | Left end of the bar, at the clock | built | yes, its own set |
 | **Lock Now** | Bottom of the lock screen | built, partly | yes (stolen via `LOCK_STEALS`) |
-| **Status** | Right end of the bar | planned | **no** — connectivity; battery always rightmost |
+| **Status** | Right end of the bar | built | **no** — connectivity; battery always rightmost |
 | **Clock** | Top-left, over the system clock | planned | **no** — merges with Now, never overlaps |
 | **Double** | Beside the punch hole, alongside Main | planned | no — charging, low battery, recording ended |
 | **Lock** | Where the lock icon is | planned | no — opens, then merges into Main on unlock |
@@ -40,7 +40,7 @@ never a working animation; the phone remains the check.
 | Battery | Main today → becomes the first **Double** | built, moving |
 | Torch | **Now only** | built |
 | Recording, Download, Upload | **Now only** — what is *happening* | planned |
-| Bluetooth, USB, Hotspot | **Status only** — what is *connected* | planned |
+| Bluetooth, USB, Hotspot | **Status only** — what is *connected* | built |
 | Discord video | Main, Satellite | planned |
 | DB Navigator | Main, Satellite, **Lock Now** | planned |
 
@@ -189,9 +189,17 @@ Everything here was read out of the code, not guessed. Ordered by cost.
 
 One step each, one push each, naming the feature.
 
-- [ ] **C1. Status bubble** — connectivity is its whole subject: bluetooth (device icon, charge %),
+- [x] **C1. Status bubble** — connectivity is its whole subject: bluetooth (device icon, charge %),
       USB, hotspot, wifi/mobile, signal, battery always rightmost. A Modus colours the whole bubble
-      and puts its icon on the left. Active expands to that connection's settings.
+      and puts its icon on the left. Active opens that connection's settings.
+      `ConnectivityWatch` reads the default network, the USB state, tethering and what is paired;
+      `js/status.js` draws it; a sixth blur pane and a fourth proxy carry it. Two honest limits,
+      written into `states.md`: mobile draws no strength bars, because a cellular level needs
+      `READ_PHONE_STATE` and that is a runtime prompt for a glyph, and a paired device's charge
+      comes from the broadcast SystemUI's own meter reads rather than from the hidden method that
+      is blocked. Active is the system's settings screen for what the bubble is reporting rather
+      than a panel of ours — a panel that toggled radios would be a second settings app.
+      **Not walked on the phone.**
 - [ ] **C2. Clock bubble** — top-left over the system clock; no mods; visible merge with Now.
 - [ ] **C3. Double** — charging leaves the Main row, magnetic against Main's edges when they overlap.
 - [ ] **C4. Now mods** — Recording (red pill, white content, tap pause/resume, haptic panel, elapsed),

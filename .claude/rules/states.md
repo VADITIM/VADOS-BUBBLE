@@ -17,7 +17,7 @@ Rows are tagged **built** (on the phone now) or **planned** (specified, not writ
 | **Main** | At the punch hole. The bubble. | built | Idle, Mod, Alert, Active, Haptic, Pull, Push |
 | **Satellite** | Beside the Main bubble, one a side, two at most. | built | Mod (by side), Active, Haptic, Push |
 | **Now** | Out at the clock, left end of the status bar. It takes the bar from its own spot to the punch hole, and the row stands aside for it. | built | Idle, Mod, Active, Haptic |
-| **Status** | Right end of the status bar, over the system's own icons. | planned | Idle, Mod, Active, Haptic |
+| **Status** | Right end of the status bar, over the system's own icons. | built | Idle, Modus, Active |
 | **Double** | Beside the punch hole, alongside whatever Main is doing. | planned | none of the common states — see below |
 | **Hidden** | Past the second satellite: a coloured dot, not a bubble face. | built | none; it is a count |
 | **Lock** | Where the lock icon is on the lock screen. | planned | none; it is an indicator that merges on unlock |
@@ -95,9 +95,17 @@ A Tab is the content of an Active state: its own container with its own layout, 
 
 ## Status
 
-**Planned.** The Now bubble's opposite number, at the right end of the bar, standing on the system's own icons the way the Now bubble stands on One UI's flashlight chip. It replaces battery, wifi / mobile connection and the signal bars, and it carries Modus as well.
+**Built.** The Now bubble's opposite number, at the right end of the bar, standing on the system's own icons the way the Now bubble stands on One UI's flashlight chip. It replaces battery, wifi / mobile connection and the signal bars, and it carries Modus as well.
 
-A Modus is not a mod in the sense the main bubble means: it colours the whole bubble rather than taking a slot in it. While one is active the Status bubble wears that Modus' colour and puts its icon on the left.
+A Modus is not a mod in the sense the main bubble means: it colours the whole bubble rather than taking a slot in it. While one is active the Status bubble wears that Modus' colour and puts its icon on the left. Hotspot, USB and Bluetooth are the three, in that order — the order is how much of the phone is currently being lent to something else, which is what the person holding it cares about — and exactly one is worn at a time.
+
+The colour arrives through the **border** rather than the background, because the skin reads its edge colour off the box it mirrors: written there it is in the liquid without a second rule keeping the two in step, the same way an alert's accent is on the main bubble.
+
+It is the one bubble with no Haptic and no arrival of its own past the first. There is nothing to hold it for — Active is the system's own settings screen for whatever it is currently reporting, and a panel of ours that toggled radios would be a second settings app rather than a status bubble. It is born at the punch hole once, when the first connectivity payload lands, and it never leaves: what it stands for is true all the time.
+
+What it can and cannot say about a link is a permission boundary, not a design choice. Wifi's strength rides on the capabilities the default-network callback already carries, so its bars are real; a cellular level needs `READ_PHONE_STATE`, which is a runtime prompt for a glyph, so mobile says *which* link it is and stops there rather than drawing a strength it guessed. A paired device's charge comes from the broadcast SystemUI's own meter reads (`android.bluetooth.device.action.BATTERY_LEVEL_CHANGED`), because asking `BluetoothDevice` for it is a hidden method and blocked — unheard, the level is simply unknown rather than wrong.
+
+The paired charge stands in front of the phone's own, and the phone's own is always rightmost. A phone is charged by the person holding it; a pair of headphones runs out in the middle of something.
 
 Everything in [bubbles.md](bubbles.md) still binds — born at the punch hole, liquid with whatever it comes near, drawn on the canvas, never a window of its own.
 

@@ -1,5 +1,6 @@
 import { lockPill } from './lock.js';
 import { nowPill } from './now.js';
+import { statusPill } from './status.js';
 import { satellites } from './row.js';
 import { CLOSED, MELT_MAX, MELT_MIN, bridge, pill, root, shared } from './state.js';
 
@@ -26,7 +27,7 @@ const liquidLayers = {
  * bubble in exactly this order, and setBlurFrame() sends the rectangles down in it.
  * A bubble added here and not there draws with no glass behind it.
  */
-const BLUR_PANES = ['main', 'left', 'right', 'now', 'lock'];
+const BLUR_PANES = ['main', 'left', 'right', 'now', 'lock', 'status'];
 
 const blobs = BLUR_PANES.map(name => ({
   name,
@@ -43,6 +44,7 @@ let meltNow = null;
 function sourceOf(name) {
   if (name === 'main') return pill;
   if (name === 'now') return nowPill;
+  if (name === 'status') return statusPill;
   if (name === 'lock') return lockPill;
   return satellites[name];
 }
@@ -64,6 +66,10 @@ function isSkinned(name) {
   // the bottom of the canvas, and a blob mirrored off it would be a permanent lump of
   // liquid over the wallpaper.
   if (name === 'lock') return lockPill.classList.contains('showing');
+  // Only once it has been born. Before the first connectivity payload it is a zero-opacity
+  // box at the right end of the bar, and a blob mirrored off it would be a lump of liquid
+  // standing over the system's icons from the moment the service starts.
+  if (name === 'status') return statusPill.classList.contains('lit');
   // Only while the row is a row. A grown bubble is one shape with nothing beside it,
   // and a satellite still holding a mod behind it is not standing on the bar — it
   // would be a frosted circle out at the side of an open panel.

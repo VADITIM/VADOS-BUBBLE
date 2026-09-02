@@ -85,7 +85,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * build step joining the two, so a bubble added on one side and not the other
          * is a bubble that draws without glass or a pane blurring nothing.
          */
-        private const val BLUR_PANES = 5
+        private const val BLUR_PANES = 6
 
         /** How long a touch on a bubble holds the screen on for. */
         private const val LOCK_AWAKE = 15_000L
@@ -170,6 +170,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.push("window.onBattery($battery)")
         }
 
+        /** What the phone is attached to, for the bubble at the right end of the bar. */
+        fun deliverConnectivity(state: JSONObject) {
+            instance?.push("window.onConnectivity($state)")
+        }
+
         /**
          * The light. It is not drawn in the bubble: it has a bubble of its own out at
          * the clock, standing on One UI's own flashlight chip — but that bubble is in
@@ -208,6 +213,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     /** The same again for the lock screen bubble, down at the bottom of the canvas. */
     private lateinit var lockProxy: View
     private lateinit var lockProxyParams: WindowManager.LayoutParams
+
+    /** Over the Status bubble at the right end of the bar, and no wider than it. */
+    private lateinit var statusProxy: View
+    private lateinit var statusProxyParams: WindowManager.LayoutParams
 
     /**
      * One empty view per bubble, carrying nothing but that bubble's glass: main, the
@@ -422,6 +431,32 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
+        statusProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, statusProxyParams, "status")
+                return true
+            }
+        }
+        // Hung on the left like the Now bubble's, because the page measures every proxy from the
+        // canvas's own left edge — a right-gravity window would need the screen width to place
+        // it, and the page is not the side that knows that.
+        statusProxyParams = WindowManager.LayoutParams(
+            0, 0,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            y = 0
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
         lockProxy = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
@@ -474,6 +509,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         windowManager.addView(touchProxy, proxyParams)
         windowManager.addView(nowProxy, nowProxyParams)
         windowManager.addView(lockProxy, lockProxyParams)
+        windowManager.addView(statusProxy, statusProxyParams)
         applyVisibility()
         ShizukuShell.bind(this)
         instance = this
@@ -483,11 +519,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // The battery never wakes the screen. Plugging in at night is exactly the case
         // this must not light up for, and the platform posts its own low-battery
         // warning for the one that matters with the phone in a pocket.
-        BatteryWatch.start(this) { battery -> deliverBattery(battery) }
+        BatteryWatch.start(
+            this,
+            { battery -> deliverBattery(battery) },
+            { percent, plugged -> instance?.push("window.onCharge($percent, $plugged)") }
+        )
 
         // The light is state the same way a song is, and it is read from the camera
         // service rather than from this app, so it is right whoever lit it.
         TorchWatch.start(this) { torch -> deliverTorch(torch) }
+
+        // Connectivity is the Status bubble's whole subject and it is always true, so unlike
+        // every other watcher this one has nothing to announce — it is read and drawn.
+        ConnectivityWatch.start(this) { state -> deliverConnectivity(state) }
 
         isScreenOff = !getSystemService(PowerManager::class.java).isInteractive
         screenWatch = object : BroadcastReceiver() {
@@ -550,6 +594,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.updateViewLayout(nowProxy, nowProxyParams) }
             lockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
+            statusProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
         } else {
             push("window.refitProxies()")
         }
@@ -562,11 +608,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance = null
             MediaControl.stop()
             BatteryWatch.stop(this)
+            ConnectivityWatch.stop(this)
             TorchWatch.stop()
             screenWatch?.let { runCatching { unregisterReceiver(it) } }
             screenWatch = null
             awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
+            runCatching { windowManager.removeView(statusProxy) }
             runCatching { windowManager.removeView(lockProxy) }
             runCatching { windowManager.removeView(nowProxy) }
             runCatching { windowManager.removeView(touchProxy) }
@@ -1068,6 +1116,53 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                     if (isLive) BASE_FLAGS
                     else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
+            }
+        }
+
+        /**
+         * The Status bubble's window, placed the same way the Now bubble's is. It is the width of
+         * the bubble and no more: it sits over the system's own icons at the right end of the bar,
+         * which is a stretch the shade swipe is started on as often as anywhere else.
+         */
+        @JavascriptInterface
+        fun setStatusProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
+            webView.post {
+                val isLive = widthDp > 0
+                statusProxyParams.width = if (isLive) dp(widthDp) else 0
+                statusProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
+                statusProxyParams.x = params.x + dp(leftDp)
+                statusProxyParams.flags =
+                    if (isLive) BASE_FLAGS
+                    else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
+            }
+        }
+
+        /**
+         * The settings screen for whatever the Status bubble is currently showing. The bubble
+         * reports a connection; changing one is the system's own job, and a panel of our own
+         * that toggled radios would be a second settings app rather than a status bubble.
+         */
+        @JavascriptInterface
+        fun openConnectionSettings(kind: String) {
+            val action = when (kind) {
+                "bluetooth" -> android.provider.Settings.ACTION_BLUETOOTH_SETTINGS
+                "wifi" -> android.provider.Settings.ACTION_WIFI_SETTINGS
+                "mobile" -> android.provider.Settings.ACTION_DATA_ROAMING_SETTINGS
+                "hotspot" -> "com.android.settings.WIFI_TETHER_SETTINGS"
+                "usb" -> "android.settings.USB_SETTINGS"
+                else -> android.provider.Settings.ACTION_SETTINGS
+            }
+            val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // A vendor screen that is not on this build is a settings app that never opens, which
+            // reads as the bubble being dead rather than as one intent being wrong.
+            if (!runCatching { startActivity(intent); true }.getOrDefault(false)) {
+                runCatching {
+                    startActivity(
+                        Intent(android.provider.Settings.ACTION_SETTINGS)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
             }
         }
 

@@ -3,6 +3,7 @@ import { mediaWindow } from './mods/media.js';
 import { show } from './mods/notification.js';
 import { timerWindow } from './mods/timer.js';
 import { nowHolds, nowOpen, nowPill, nowTouch } from './now.js';
+import { statusHolds, statusTouch } from './status.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
 
@@ -23,6 +24,8 @@ let proxyDown = null;
 let proxySource = 'main';
 /** True for the whole of a touch the Now bubble answered on its own. */
 let nowOwnsTouch = false;
+/** The same, for the bubble at the right end of the bar. */
+let statusOwnsTouch = false;
 /** Far enough that the release is a drag's end rather than a tap. Mirrors HOLD_SLOP. */
 export const PROXY_TAP_SLOP = 22;
 
@@ -94,6 +97,16 @@ window.onProxyTouch = (action, x, y, source) => {
   if (nowOwnsTouch) {
     nowTouch(action, x, y);
     if (action === 'up' || action === 'cancel') nowOwnsTouch = false;
+    return;
+  }
+  // The same question as the light's, at the other end of the bar: a touch this window heard
+  // is this bubble's, and a touch the row's window heard is decided by where it landed.
+  if (action === 'down') {
+    statusOwnsTouch = source === 'status' || statusHolds(x, y);
+  }
+  if (statusOwnsTouch) {
+    statusTouch(action, x, y);
+    if (action === 'up' || action === 'cancel') statusOwnsTouch = false;
     return;
   }
   if (action === 'down') {

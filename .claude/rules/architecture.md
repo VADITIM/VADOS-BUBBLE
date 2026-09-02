@@ -24,6 +24,7 @@ One file per source of truth, each pushing a JSON payload or `null`:
 | `CallWatch` | an ongoing call notification |
 | `TorchWatch` | `CameraManager.registerTorchCallback`, and setting strength |
 | `BatteryWatch`, `MicrophoneAccess` | charge, sensor privacy |
+| `ConnectivityWatch` | the default network, USB, tethering, and what is paired over bluetooth |
 
 A watcher decides *what is true*, never how it looks. Colours and names live in `AppStyles`; the payload carries them as data so the page never learns app names.
 
@@ -49,7 +50,7 @@ Every overlay window here follows the same shape:
 
 The canvas is the **whole screen**, not the status bar. It has to be: the lock screen carries a bubble of its own at the bottom, and a bubble is only liquid with what shares its surface — so the one page reaches from the cutout to the thumb. It is untouchable and transparent where nothing is drawn, so the extra room costs the surface and nothing else.
 
-There are four windows and no more: the canvas, and one proxy per bubble that can be touched — over the main bubble, over the Now bubble, and over the lock screen bubble. One proxy each rather than one wide one, because the gaps between them are most of the status bar and that has to stay somewhere the shade swipe can start. A proxy is no longer always at the top of the screen either: `forwardTouch` adds the proxy window's own `y` to the point it reports, or a touch on the lock screen bubble arrives in the page as a touch on the status bar.
+There are five windows and no more: the canvas, and one proxy per bubble that can be touched — over the main bubble, over the Now bubble, over the lock screen bubble, and over the Status bubble. One proxy each rather than one wide one, because the gaps between them are most of the status bar and that has to stay somewhere the shade swipe can start. A proxy is no longer always at the top of the screen either: `forwardTouch` adds the proxy window's own `y` to the point it reports, or a touch on the lock screen bubble arrives in the page as a touch on the status bar.
 
 ## The bridge
 
@@ -73,7 +74,7 @@ Touch is the one thing that travels the other way. A touch-proxy window has no c
 | `motion.js` | the rubber band, `toy`/`untoy`, and every gesture on the main bubble |
 | `liquid.js` | the mirror, the goo, the blur frames, `stirLiquid`, `catchInto` |
 | `row.js` | layout, satellites, dots, the swap, window sizing, the mod hand-over |
-| `now.js`, `lock.js` | the Now bubble and the lock screen's |
+| `now.js`, `lock.js`, `status.js` | the Now bubble, the lock screen's, and the one at the right end of the bar |
 | `mods/*.js` | one file per mod: `media`, `timer`, `call`, `battery`, `notification` |
 | `tabs.js` | the Tabs that are nobody's mod: history, quick settings |
 | `bridge.js` | the `window.on…` / `set…` entry points and forwarded touch |

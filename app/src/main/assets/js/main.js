@@ -22,6 +22,7 @@ import './mods/timer.js';
 import './mods/call.js';
 import './tabs.js';
 import './now.js';
+import './status.js';
 import './bridge.js';
 
 bridge.ready();
