@@ -9,7 +9,6 @@ export const faces = {
   call: document.getElementById('call-face'),
 
 
-  battery: document.getElementById('battery-face'),
   alert: document.getElementById('alert-face'),
   history: document.getElementById('history-face'),
   quick: document.getElementById('quick-face'),
@@ -38,9 +37,6 @@ export const SIZES = {
   timer:    { width: 340, height: 132 },
   // Five steps in a row and their label above them; nothing else belongs in it.
 
-  // As tall as the bubble already is: the battery says one short thing and a box
-  // that grew downwards for it would read as a different object.
-  battery:  { width: 190, height: -1 },
   history:  { width: 340, height: 320 },
 };
 export const DWELL = 5000;

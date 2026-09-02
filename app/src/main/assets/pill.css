@@ -481,7 +481,7 @@ html.lock-live #liquid { height: 100%; }
    background came from the same custom property as everyone else's still read as a
    different alpha — the rim was solid where the others were glass. */
 html.liquid #pill, html.liquid .satellite, html.liquid #now, html.liquid #lock-now,
-html.liquid #status, html.liquid #clock {
+html.liquid #status, html.liquid #clock, html.liquid #double {
   background: transparent;
   border-color: transparent;
 }
@@ -578,14 +578,12 @@ html.dragging #pill { transition: scale 350ms linear; }
 #media-face, #timer-face, #call-face {
   transition: opacity var(--face-fade, 0ms) ease var(--face-delay, 0ms);
 }
-#equalizer, #timer-remaining, #call-name, #call-time,
-#battery-reading {
+#equalizer, #timer-remaining, #call-name, #call-time {
   transition: opacity 380ms ease, transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
   transition-delay: var(--face-delay, 0ms);
 }
 .face:not(.showing) #equalizer, .face:not(.showing) #timer-remaining,
-.face:not(.showing) #call-name, .face:not(.showing) #call-time,
-.face:not(.showing) #battery-reading {
+.face:not(.showing) #call-name, .face:not(.showing) #call-time {
   opacity: 0;
   transform: translateY(30px);
   transition: none;
@@ -955,7 +953,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    the bubble's left edge is at the hole, so the hole is no longer under the middle of the
    bubble and this corridor is 40px the reading could have had. Wasted room, never covered
    text, and not worth a second geometry to recover. */
-#media-face, #timer-face, #call-face, #battery-face {
+#media-face, #timer-face, #call-face {
   column-gap: var(--hole-gap);
 }
 
@@ -1228,98 +1226,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   min-width: 0;
   /* Left-set here, so the end that overflows is the right one and the fade goes back. */
   mask-image: linear-gradient(90deg, #000 calc(100% - 1.2rem), transparent);
-}
-
-/* #endregion ───────────────────────────────────────────────────────────── */
-/* #region ── battery ───────────────────────────────────────────────────── */
-
-/* The battery is the one thing here that is always true, which is exactly why it
-   is never a mod: a bubble carrying it permanently would be a status bar. It is
-   shown at the moment it changes — past a mark, or plugged in — and then it is
-   gone, so it is an alert that happens to be about the phone itself. */
-#pill.battery { width: 190px; height: var(--pill-height); }
-/* No gap of its own: it takes the camera corridor with the other resting faces, and a
-   half-rem written here would have quietly won on source order and put the reading back
-   over the hole. */
-#battery-face { justify-content: space-between; padding: 0 0.55rem; }
-
-#battery-glyph {
-  position: relative;
-  width: 30px;
-  height: 15px;
-  flex: none;
-  box-sizing: border-box;
-  border: 1.5px solid var(--app-accent);
-  border-radius: 4px;
-}
-/* The terminal. Drawn rather than styled onto the box, because the fill inside
-   must not reach into it. */
-#battery-glyph::after {
-  content: "";
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  width: 2px;
-  height: 6px;
-  margin-left: 1.5px;
-  transform: translateY(-50%);
-  background: var(--app-accent);
-  border-radius: 0 2px 2px 0;
-}
-
-#battery-fill {
-  position: absolute;
-  inset: 1px;
-  width: var(--battery-level, 10%);
-  background: var(--app-accent);
-  border-radius: 2px;
-}
-/* Low is a heartbeat, not a strobe: the charge is still there, it is just not
-   going to be for long. */
-#pill.battery:not(.charging) #battery-fill {
-  animation: battery-low 1.6s ease-in-out infinite;
-}
-@keyframes battery-low {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-/* Charging is the charge arriving, over and over: it runs up from where the
-   battery actually is to full, holds a beat, fades, and starts again from the
-   real level — so the animation never lies about how full the thing is. */
-#pill.battery.charging #battery-fill {
-  animation: battery-charge 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-@keyframes battery-charge {
-  0% { width: var(--battery-level, 10%); opacity: 1; }
-  55% { width: calc(100% - 2px); opacity: 1; }
-  78% { width: calc(100% - 2px); opacity: 0.12; }
-  79% { width: var(--battery-level, 10%); opacity: 0.12; }
-  100% { width: var(--battery-level, 10%); opacity: 1; }
-}
-
-/* Filled with the bubble's own colour and outlined in the accent, so it reads
-   both against the charge behind it and against the empty part. */
-#battery-bolt {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 8px;
-  height: 12px;
-  display: none;
-  fill: var(--pill-background);
-  stroke: var(--app-accent);
-  stroke-width: 1.2;
-  stroke-linejoin: round;
-}
-#pill.battery.charging #battery-bolt { display: block; }
-
-#battery-reading {
-  font-size: 0.62rem;
-  letter-spacing: 0.02rem;
-  color: var(--text-bright);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* #endregion ───────────────────────────────────────────────────────────── */
@@ -2136,3 +2042,123 @@ html.now-flying #now-reading, .now-face:not(.showing) #now-reading {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+
+/* ── The Double ────────────────────────────────────────────────────────────────────────
+   A second bubble beside the punch hole. It is laid out from the middle of the screen the
+   way the main bubble is, and --double-out carries it out to the bubble's edge: the offset
+   is written every frame from the *measured* edge, so a growth pushes it along instead of
+   being drawn over it. */
+#double {
+  position: absolute;
+  z-index: 4;
+  top: var(--grab, 0px);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: 150px;
+  height: var(--pill-height);
+  box-sizing: border-box;
+  border-radius: calc(var(--pill-height) / 2);
+  background: var(--pill-background);
+  border: 1px solid var(--double-accent, var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.55rem;
+  color: #fff;
+  overflow: visible;
+  opacity: 0;
+  /* Born at the hole: no offset and half size, which is exactly where the bubble is. */
+  transform: translateX(var(--double-out, 0px)) scale(var(--double-pop, 0.5));
+  transition:
+    opacity 200ms ease,
+    transform 380ms var(--ease-split),
+    scale 320ms var(--ease-split);
+}
+#double.showing { opacity: 1; }
+#double.out { --double-pop: 1; }
+/* The charge meter this bubble wears. The battery is the one thing here that is always
+   true, which is exactly why it is never a mod: a bubble carrying it permanently would be a
+   status bar. It is shown at the moment it changes — past a mark, or plugged in — and then
+   it is gone. */
+#double-glyph {
+  position: relative;
+  width: 30px;
+  height: 15px;
+  flex: none;
+  box-sizing: border-box;
+  border: 1.5px solid var(--double-accent, #ffb300);
+  border-radius: 4px;
+}
+/* The terminal. Drawn rather than styled onto the box, because the fill inside
+   must not reach into it. */
+#double-glyph::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: 2px;
+  height: 6px;
+  margin-left: 1.5px;
+  transform: translateY(-50%);
+  background: var(--double-accent, #ffb300);
+  border-radius: 0 2px 2px 0;
+}
+
+#double-fill {
+  position: absolute;
+  inset: 1px;
+  width: var(--double-level, 10%);
+  background: var(--double-accent, #ffb300);
+  border-radius: 2px;
+}
+/* Low is a heartbeat, not a strobe: the charge is still there, it is just not
+   going to be for long. */
+#double:not(.charging) #double-fill {
+  animation: double-low 1.6s ease-in-out infinite;
+}
+@keyframes double-low {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Charging is the charge arriving, over and over: it runs up from where the
+   battery actually is to full, holds a beat, fades, and starts again from the
+   real level — so the animation never lies about how full the thing is. */
+#double.charging #double-fill {
+  animation: double-charge 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes double-charge {
+  0% { width: var(--double-level, 10%); opacity: 1; }
+  55% { width: calc(100% - 2px); opacity: 1; }
+  78% { width: calc(100% - 2px); opacity: 0.12; }
+  79% { width: var(--double-level, 10%); opacity: 0.12; }
+  100% { width: var(--double-level, 10%); opacity: 1; }
+}
+
+/* Filled with the bubble's own colour and outlined in the accent, so it reads
+   both against the charge behind it and against the empty part. */
+#double-bolt {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 8px;
+  height: 12px;
+  display: none;
+  fill: var(--pill-background);
+  stroke: var(--double-accent, #ffb300);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+#double.charging #double-bolt { display: block; }
+
+#double-reading {
+  font-size: 0.62rem;
+  letter-spacing: 0.02rem;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* #endregion ───────────────────────────────────────────────────────────── */

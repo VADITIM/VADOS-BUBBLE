@@ -21,7 +21,7 @@ Everything here binds every bubble, whichever kind it is. A rule that holds for 
 | **Lock Now** | Bottom of the lock screen, where a thumb reaches. Replaces the Now Bar. | built, partly | yes — stolen from the row |
 | **Status** | Right end of the bar, over the system's icons. | built | **no** — Modus instead |
 | **Clock** | Top-left, over the system clock. Merges visibly with Now, never overlaps it. | built | **no** |
-| **Double** | Beside the punch hole, alongside whatever Main is doing. | planned | no |
+| **Double** | Beside the punch hole, alongside whatever Main is doing. | built | no |
 | **Lock** | Where the lock icon is. Opens, then merges into Main on unlock. | planned | no |
 | **Notification** | Over the lock screen's own notification list, in its place. | planned | no |
 
@@ -36,7 +36,7 @@ A mod is content injected into a bubble, and which bubbles may carry it is part 
 | Media | Main, Satellite, Lock Now | built |
 | Clock / timer | Main, Satellite | built |
 | Call | Main, Satellite | built |
-| Battery | Main today, becoming the first **Double** | built, moving |
+| Battery | **Double only** — it is not a mod | built |
 | Torch | **Now only** | built |
 | Recording / screen share | Now only | planned |
 | Download, Upload | Now only | planned |

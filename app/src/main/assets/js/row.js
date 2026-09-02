@@ -37,7 +37,6 @@ function paintSize() {
   pill.classList.toggle('timing', shared.size === 'timing');
   pill.classList.toggle('calling', shared.size === 'calling');
 
-  pill.classList.toggle('battery', shared.size === 'battery');
   pill.classList.toggle('timer', shared.size === 'timer');
 
   // The skin only exists for the closed row: a grown panel is one shape with nothing to

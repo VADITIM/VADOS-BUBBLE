@@ -85,7 +85,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * build step joining the two, so a bubble added on one side and not the other
          * is a bubble that draws without glass or a pane blurring nothing.
          */
-        private const val BLUR_PANES = 7
+        private const val BLUR_PANES = 8
 
         /** How long a touch on a bubble holds the screen on for. */
         private const val LOCK_AWAKE = 15_000L

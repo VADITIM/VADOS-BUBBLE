@@ -75,7 +75,8 @@ Touch is the one thing that travels the other way. A touch-proxy window has no c
 | `liquid.js` | the mirror, the goo, the blur frames, `stirLiquid`, `catchInto` |
 | `row.js` | layout, satellites, dots, the swap, window sizing, the mod hand-over |
 | `now.js`, `lock.js`, `status.js`, `clock.js` | the Now bubble, the lock screen's, the one at the right end of the bar, and the time at the left |
-| `mods/*.js` | one file per mod: `media`, `timer`, `call`, `battery`, `notification` |
+| `mods/*.js` | one file per mod: `media`, `timer`, `call`, `notification` |
+| `double.js` | the second bubble at the hole, and the announcements it carries |
 | `tabs.js` | the Tabs that are nobody's mod: history, quick settings |
 | `bridge.js` | the `window.on…` / `set…` entry points and forwarded touch |
 | `main.js` | imports every module for its side effects, then `bridge.ready()` |

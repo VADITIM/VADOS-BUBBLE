@@ -18,7 +18,7 @@ Rows are tagged **built** (on the phone now) or **planned** (specified, not writ
 | **Satellite** | Beside the Main bubble, one a side, two at most. | built | Mod (by side), Active, Haptic, Push |
 | **Now** | Out at the clock, left end of the status bar. It takes the bar from its own spot to the punch hole, and the row stands aside for it. | built | Idle, Mod, Active, Haptic |
 | **Status** | Right end of the status bar, over the system's own icons. | built | Idle, Modus, Active |
-| **Double** | Beside the punch hole, alongside whatever Main is doing. | planned | none of the common states — see below |
+| **Double** | Beside the punch hole, alongside whatever Main is doing. | built | none of the common states — see below |
 | **Hidden** | Past the second satellite: a coloured dot, not a bubble face. | built | none; it is a count |
 | **Lock** | Where the lock icon is on the lock screen. | planned | none; it is an indicator that merges on unlock |
 | **Notification** | Over the lock screen's own notification list, replacing it. | planned | Active |
@@ -42,7 +42,7 @@ What a bubble *is*, independent of which mod or content it is showing.
 | **Haptic** | — | Held down, growing under the finger. In code this is the hold in progress, before it resolves either to opening a different Tab than Tap would, or to leaving for the mod's own app. |
 | **Pull** | — | Swiped down. Opens the notification Tab from any bubble at all — the one gesture no mod has claimed, so it can mean the same thing everywhere. |
 | **Push** | — | Swiped up. Dismisses: an alert back to Idle, a satellite out of existence, a mod off the bubble. Only meaningful when there is something to close. |
-| **Double** | Charging | **Planned.** A true second main bubble — standing beside the punch hole the way the bubble itself does, not owned by it, not a Mod and not a Satellite. It runs alongside whatever the main bubble is doing rather than taking its slot, which is what makes it Double. Not a Now bubble either — Now stands out at the clock; Double stays at the cutout. It holds the system's own short-lived announcements: charging, low battery, recording ended. It has no common states because it is never interacted with — it appears, it says one thing for a few seconds, it goes, and it overlaps everything because in that moment what it carries outranks everything. The hard part is that it has to merge with whatever it lands on top of: an alert arriving mid-charge has to read as two bodies of the same liquid touching, not as two unrelated shapes overlapping. |
+| **Double** | Charging | **Built.** A true second main bubble — standing beside the punch hole the way the bubble itself does, not owned by it, not a Mod and not a Satellite. It runs alongside whatever the main bubble is doing rather than taking its slot, which is what makes it Double. Not a Now bubble either — Now stands out at the clock; Double stays at the cutout. It holds the system's own short-lived announcements: charging, low battery, recording ended. It has no common states because it is never interacted with — it appears, it says one thing for a few seconds, it goes, and it overlaps everything because in that moment what it carries outranks everything. The hard part is that it has to merge with whatever it lands on top of: an alert arriving mid-charge has to read as two bodies of the same liquid touching, not as two unrelated shapes overlapping. Held by *measuring*: it rides the main bubble's own right edge every frame it is out, so a growth pushes it along rather than being drawn over it, and it costs no window because nothing about it is interactive. It goes home as a merge — the offset given up first, the shape following it in — and the bubble takes the knock. |
 
 Code's `state` variable carries `idle | alert | active | haptic`. Pull and Push are named states in the model but resolve inside the gesture handlers rather than living in that variable — Pull ends in Active on the notification Tab, Push ends in Idle or in a bubble that no longer exists. Do not add them to `state` unless something genuinely has to branch on being mid-gesture.
 
@@ -69,7 +69,7 @@ A mod is something that is simply true for as long as it is true, and it belongs
 | **Media** | `playing` / `player` | A song playing. | built |
 | **Clock** | `timing` / `timer` | The clock app's running timer. | built |
 | **Call** | `calling` | A connected call. No Active view of its own — tapping opens the call in its app. | built |
-| **Battery** | `battery` | Charging or low. Mod-shaped today; it becomes the first Double. | built, moving |
+| **Battery** | Double's own | Charging or low. **Not a mod**: it lives on the Double bubble beside the hole, because a charge level taking the bubble away from a song for four seconds is the one thing a Double exists to prevent. | built |
 | **Torch** | Now's own | The flashlight. Lives on the Now bubble, not in the Main row. | built |
 | **Recording** | — | Screen or voice recording. Now bubble, whole pill red, white content. | planned |
 | **Discord video** | — | A stream or camera live in a call. | planned |
