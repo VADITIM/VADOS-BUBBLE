@@ -147,6 +147,12 @@
      last, after the bubble, because an open panel has to be drawn over the row and a
      z-index alone was not enough: the bubble's own content was still coming out on top
      of it. Later in the markup is later in the paint, whatever else is going on. -->
+<!-- Over One UI's own clock, at the far left. It carries no mod and answers no touch: it is
+     the time, which is the one thing on this bar that is true without anything having
+     happened. Its width is capped against the Now bubble's stop so the two can neck without
+     ever overlapping. -->
+<div id="clock"><span id="clock-face"></span></div>
+
 <div id="now">
   <div class="now-face showing" id="now-closed">
     <div id="now-glyph"></div>

@@ -109,6 +109,16 @@ The paired charge stands in front of the phone's own, and the phone's own is alw
 
 Everything in [bubbles.md](bubbles.md) still binds — born at the punch hole, liquid with whatever it comes near, drawn on the canvas, never a window of its own.
 
+## Clock
+
+**Built.** The time, over One UI's own clock at the far left of the bar. It has no states at all: no mod, no Active, no press, and it never leaves — it is the one thing up there that is true without anything having happened. It is born at the punch hole once and stands where it lands.
+
+It is also the only bubble that costs no window. Nothing about it is interactive, so it needs no touch proxy, and that is the rule working the way it is meant to rather than an omission: a proxy exists for what can be touched and every pixel one covers is a pixel the shade swipe cannot start on.
+
+"Merges with Now, never overlaps it" is held as geometry rather than as care. The Now bubble stands on the flashlight chip and may not move off it, so the one that gives way is this one: its `max-width` is capped against `--now-left`, leaving `--clock-reach` between them — close enough that the skin necks across the gap the moment the light is on, and near enough to never that no arrangement of the two can put one over the other. A width picked to look right can be forgotten; a cap cannot.
+
+The tick is scheduled to the next minute boundary rather than every 60,000ms. A repeating interval drifts against the wall clock and eventually turns the minute over a second or two late, which on a clock is the whole of what it had to get right.
+
 ## Lock screen
 
 The lock-screen bubbles exist to replace what the lock screen already draws, not to stand next to it. All of them are planned.

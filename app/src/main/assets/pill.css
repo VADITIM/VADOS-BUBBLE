@@ -481,7 +481,7 @@ html.lock-live #liquid { height: 100%; }
    background came from the same custom property as everyone else's still read as a
    different alpha — the rim was solid where the others were glass. */
 html.liquid #pill, html.liquid .satellite, html.liquid #now, html.liquid #lock-now,
-html.liquid #status {
+html.liquid #status, html.liquid #clock {
   background: transparent;
   border-color: transparent;
 }
@@ -2094,3 +2094,45 @@ html.now-flying #now-reading, .now-face:not(.showing) #now-reading {
 /* Plugged in is the one thing about the phone's own charge worth saying in a bubble that is
    otherwise about everything else attached to it. */
 #status.plugged #status-charge { color: #5bfd5b; }
+
+
+/* ── The Clock bubble ──────────────────────────────────────────────────────────────────
+   Over One UI's own clock at the far left, and a few pixels shorter than the row for the
+   same reason the Status bubble is: it reports and cannot be worked.
+
+   Its width is capped against --now-left rather than chosen, which is how "merges with the
+   Now bubble, never overlaps it" is held. The Now bubble stands on the flashlight chip and
+   may not move off it, so the one that has to give way is this one — and a cap cannot be
+   forgotten the way a width picked to look right can. */
+#clock {
+  position: absolute;
+  z-index: 3;
+  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2);
+  left: var(--clock-left, 8px);
+  max-width: calc(var(--now-left, 53px) - var(--clock-left, 8px) - var(--clock-reach, 4px));
+  height: calc(var(--pill-height) - var(--status-short, 4px));
+  box-sizing: border-box;
+  border-radius: calc(var(--pill-height) / 2);
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+  color: #fff;
+  overflow: visible;
+  opacity: 0;
+  transform: translateX(var(--clock-fly, 0px)) scale(var(--clock-pop, 0.5));
+  transition:
+    opacity 200ms ease,
+    transform 420ms var(--ease-split),
+    scale 320ms var(--ease-split);
+}
+#clock.lit { opacity: 1; }
+#clock-face {
+  font-size: 0.74rem;
+  font-weight: 500;
+  /* Lining, tabular: a clock whose digits change width shifts the whole bubble every minute. */
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -27,7 +27,7 @@ never a working animation; the phone remains the check.
 | **Now** | Left end of the bar, at the clock | built | yes, its own set |
 | **Lock Now** | Bottom of the lock screen | built, partly | yes (stolen via `LOCK_STEALS`) |
 | **Status** | Right end of the bar | built | **no** — connectivity; battery always rightmost |
-| **Clock** | Top-left, over the system clock | planned | **no** — merges with Now, never overlaps |
+| **Clock** | Top-left, over the system clock | built | **no** — merges with Now, never overlaps |
 | **Double** | Beside the punch hole, alongside Main | planned | no — charging, low battery, recording ended |
 | **Lock** | Where the lock icon is | planned | no — opens, then merges into Main on unlock |
 | **Notification** | Over the lock screen's list | planned | no — scrollable, no drag radius yet |
@@ -200,7 +200,13 @@ One step each, one push each, naming the feature.
       is blocked. Active is the system's settings screen for what the bubble is reporting rather
       than a panel of ours — a panel that toggled radios would be a second settings app.
       **Not walked on the phone.**
-- [ ] **C2. Clock bubble** — top-left over the system clock; no mods; visible merge with Now.
+- [x] **C2. Clock bubble** — top-left over the system clock; no mods; visible merge with Now.
+      `js/clock.js`, a seventh blur pane, and **no window at all** — nothing about it is
+      interactive, so it needs no proxy. Never overlapping Now is held as geometry: its
+      `max-width` is capped against `--now-left` less `--clock-reach`, because the Now bubble
+      may not move off the chip it covers and a cap cannot be forgotten the way a chosen width
+      can. The tick is scheduled to the next minute boundary rather than on a 60s interval,
+      which drifts. **Not walked on the phone.**
 - [ ] **C3. Double** — charging leaves the Main row, magnetic against Main's edges when they overlap.
 - [ ] **C4. Now mods** — Recording (red pill, white content, tap pause/resume, haptic panel, elapsed),
       Download and Upload (animated glyph, timeline, x/x MB and speed, done-tick then merge). Per-mod
