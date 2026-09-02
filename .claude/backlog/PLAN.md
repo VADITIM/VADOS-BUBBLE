@@ -286,11 +286,53 @@ One step each, one push each, naming the feature.
 - [ ] **C12. Status bar replacement** — one-button set/reset of the Samsung settings. **Blocked**,
       the four screenshots were never attached. Disabling the bar itself is its own step now —
       see C15, last in this phase, because it depends on Status and Clock existing first.
-- [ ] **C13. Rendering order** — the bubble always at the lowest index system-wide so system
+- [~] **C13. Rendering order** — the bubble always at the lowest index system-wide so system
       notifications never overlap it, without suppressing them.
-- [ ] **C14. Blur over content** — an overlapped bubble's content is not inside the blur. The panes
+      **Answered, and the answer is that the z-order half cannot be had.** Window order between
+      *different* apps is the window manager's, keyed off the window type, and an unprivileged app
+      picks its type from a very short list. `TYPE_ACCESSIBILITY_OVERLAY` is already the highest
+      one available — that is why the bubble is an accessibility service at all — and SystemUI's
+      heads-up banner is drawn in a layer above every one of them. There is no ordering call: an
+      accessibility overlay has no z to set, and windows of one type from one app stack in the
+      order they were added, which is why nothing in this project reorders windows any more.
+      One avenue is real but is not this item: `attachAccessibilityOverlayToDisplay` (API 34)
+      takes a `SurfaceControl`, and a surface has a settable layer. That places our surface
+      *within the accessibility overlay layer* — it does not lift it above SystemUI's — so it
+      would change nothing about a heads-up banner while costing the whole window model. Worth
+      knowing about, not worth trying for this.
+      So the only lever that exists is the one already built: the heads-up itself is switched
+      off through Shizuku (`HeadsUp`), which is suppression — the thing this item asked to avoid.
+      It is also honest suppression rather than a hack: the notification still lands in the shade
+      and still reaches the listener, only the banner is gone. **What can still be built** is the
+      other half of the sentence — the bubble getting out of the way rather than being covered:
+      when a banner is on screen the row could stand aside for it the way it stands aside for the
+      Now bubble. That needs the phone to say when a banner is up, and with pop-ups suppressed
+      there are none to react to, so it waits behind C12.
+- [x] **C14. Blur over content** — an overlapped bubble's content is not inside the blur. The panes
       are host `View`s *behind* the WebView, so a pane cannot blur WebView pixels. **Research step
       with an honest answer**, not a promised fix.
+      **The answer.** The diagnosis in the item is right and it is structural: a pane blurs what is
+      *behind it in the window*, our content is drawn by the WebView *above* the panes, so no
+      arrangement of the existing pieces puts our own pixels inside our own glass. Three ways out
+      were considered and two are dead:
+      1. **Move a pane above the WebView.** It would blur our content, which is the opposite of
+         what is wanted: the bubble underneath would be smeared rather than seen through glass.
+      2. **Two WebViews, one under the panes and one over.** That splits the surface, and a goo
+         layer reaches exactly as far as its own surface — it would trade every merge in the
+         project for one blur. Not a trade, a demolition.
+      3. **Blur our own content inside the page.** `backdrop-filter` on an element blurs its
+         backdrop, and *within a page* that backdrop is the rest of the page: a bubble drawn over
+         another bubble can blur it, in the page, with no host involvement at all. The host pane
+         stays exactly as it is and goes on blurring the screen behind the window. The two are
+         different blurs of different things and they compose, because they are at different
+         levels of the stack.
+      So the honest answer is: the host can never do it, and it does not have to — the only case
+      that is missing is *our content over our content*, and that one is CSS. It is written down
+      rather than built because nothing today actually overlaps: the row's bubbles neck rather than
+      stack, and the states that cover the bar are drawn instead of the row rather than over it.
+      The first thing that genuinely overlaps — the Double landing on an open alert is the likely
+      one — is what should carry it, and it should carry it as `backdrop-filter` on the shape on
+      top, not as a new pane.
 - [ ] **C15. Disable the status bar.** The last step, and depends on C1 and C2 being on the phone
       first — the real bar is the only thing showing the clock and connectivity/battery until
       Status and Clock exist as bubbles, so hiding it earlier would delete information rather than

@@ -92,6 +92,14 @@ Two things hold this together, and both are load-bearing:
 
 One `Bubble` type carries what [bubbles.md](bubbles.md) says every bubble has; Main, Satellite, Now and Double are instances of it that differ in where they stand, which states they may enter, and what they carry — **not built yet**. There is no factory, no event bus and no configuration layer around it — one type is the whole abstraction.
 
+## What the blur cannot do
+
+A pane blurs what is behind it *in the window*, and everything this project draws is drawn by the WebView above the panes. So a bubble's glass can never contain our own pixels: two of our shapes overlapping means the one on top is glass over the screen, not glass over the shape underneath it.
+
+Moving a pane above the WebView would smear our content rather than show it through glass, and splitting the page across two WebViews to put one of them under the panes would trade every merge in the project for one blur — a goo layer reaches exactly as far as its own surface.
+
+The case that is actually missing is *our content over our content*, and that one never needed the host: `backdrop-filter` inside the page blurs the page behind the element. The host pane goes on blurring the screen; the CSS blurs us. Two blurs of two different things, at two different levels of the stack, composing for free. Nothing overlaps today — the row's bubbles neck rather than stack — so it is written down rather than built, and the first shape that genuinely lands on another one should carry it.
+
 ## Vendor reflection
 
 `SamsungBlur` reaches `android.view.SemBlurInfo` by reflection because AOSP's `FLAG_BLUR_BEHIND` is dead on this device. Anything else of that kind belongs in its own small file with the same shape: reflect, fail quietly, and leave the interface correct without it.
