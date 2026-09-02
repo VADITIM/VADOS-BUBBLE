@@ -75,6 +75,7 @@ class MainActivity : Activity() {
         .put("serviceRunning", BubbleService.isRunning)
         .put("shizuku", ShizukuShell.isRunning() && ShizukuShell.hasPermission())
         .put("headsUp", HeadsUp.read())
+        .put("statusBar", StatusBarPolicy.read())
         .put("preferences", Preferences.asJson(preferences))
         .put("defaults", JSONObject(Preferences.defaults as Map<*, *>))
 
@@ -180,6 +181,17 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun toggleHeadsUp() = runOnUiThread {
             HeadsUp.set(HeadsUp.read() != HeadsUp.SUPPRESSED)
+            webView.evaluateJavascript("window.onStateChanged(${state()})", null)
+        }
+
+        /**
+         * Hides the real status bar, or gives it back. One button for both, because it is one
+         * state — and it reads the setting back rather than assuming the write took, since
+         * whether One UI honours the flag at all can only be found out on the phone.
+         */
+        @JavascriptInterface
+        fun toggleStatusBar() = runOnUiThread {
+            StatusBarPolicy.set(StatusBarPolicy.read() != StatusBarPolicy.HIDDEN)
             webView.evaluateJavascript("window.onStateChanged(${state()})", null)
         }
 

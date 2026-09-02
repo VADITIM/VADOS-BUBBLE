@@ -353,30 +353,25 @@ One step each, one push each, naming the feature.
       The first thing that genuinely overlaps — the Double landing on an open alert is the likely
       one — is what should carry it, and it should carry it as `backdrop-filter` on the shape on
       top, not as a new pane.
-- [ ] **C15. Disable the status bar.** The last step, and depends on C1 and C2 being on the phone
-      first — the real bar is the only thing showing the clock and connectivity/battery until
-      Status and Clock exist as bubbles, so hiding it earlier would delete information rather than
-      replace it. This is the overhaul's own logic: nothing stock is removed until what it did is
-      fletched out and standing in its place.
+- [~] **C15. Disable the status bar.** The last step, and it still depends on C1 and C2 being on
+      the phone first — the real bar is the only thing showing the clock and connectivity until
+      Status and Clock have been walked there, so hiding it earlier deletes information rather
+      than replacing it. Both of those are built now but neither has been walked.
 
-      Mechanism, researched, not yet tried on the phone: no root and no privileged permission is
-      needed. `pm grant com.v.island android.permission.WRITE_SECURE_SETTINGS` (once, from an
-      `adb shell` — a normal app cannot grant itself a secure-settings permission) unlocks the
-      hidden AOSP flag `Settings.Global.policy_control`, which SystemUI reads on every window
-      layout: `settings put global policy_control immersive.full=*` hides status and nav bars
-      system-wide, `immersive.status=*` status bar alone, `null*` reverts. Grantable once at
-      install and then driven entirely from `onServiceConnected()` — no further adb step. It is a
-      swipe-revealable immersive mode, not a removal: the real bar still exists and a swipe from
-      the top edge brings it back momentarily, the way a fullscreen video player behaves — which
-      is the one property this project needs kept, since the shade swipe must never be blocked.
+      **The button is built.** `StatusBarPolicy` writes `Settings.Global.policy_control` through
+      Shizuku — `immersive.status=*` to hide, `null*` to give it back — and the System screen
+      carries one row for it, reading the setting back rather than assuming the write took. It is
+      a swipe-revealable immersive mode, not a removal: the bar still exists and a swipe from the
+      top edge brings it back momentarily, which is the one property that matters here, because
+      the shade swipe must never be blocked.
 
-      What is unverified: Samsung's own community reports `policy_control` as unreliable on One
-      UI, honoured on some builds and silently ignored on others, because their SystemUI fork
-      does not always take the AOSP path stock Android does. Whether One UI 8.5 on the SM-S931B
-      honours it at all **can only be answered on the phone** — this is a one-button
-      set/reset toggle to build and walk, not a promise. Good Lock's NavStar module was checked
-      as a fallback and rejected: it reports as icons-only, not a real hide, so there is no second
-      mechanism waiting if this one does not stick.
+      **What is unverified is the whole question.** Samsung's SystemUI fork does not always take
+      the AOSP path, and `policy_control` is reported as honoured on some One UI builds and
+      silently ignored on others. If the row reads "hidden" while the bar is plainly still there,
+      the mechanism is what failed and there is no second one — Good Lock's NavStar was checked
+      and rejected, it reports as icons-only rather than a real hide. One `adb shell pm grant
+      com.v.island android.permission.WRITE_SECURE_SETTINGS` is *not* needed for this route,
+      since Shizuku already runs the write as shell.
 
 - [ ] **C16. Fullscreen-game bubble visibility is backwards.** In Clash Royale the bubble is
       visible by default over the fullscreen game — it should be hidden by default, the way

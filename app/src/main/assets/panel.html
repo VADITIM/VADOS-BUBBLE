@@ -291,6 +291,11 @@
       <span class="status" id="status-headsup">checking</span>
       <button onclick="Panel.toggleHeadsUp()">Toggle</button>
     </div>
+    <div class="row">
+      <span class="row-name">Real status bar</span>
+      <span class="status" id="status-statusbar">checking</span>
+      <button onclick="Panel.toggleStatusBar()">Toggle</button>
+    </div>
     <div class="actions">
       <button class="wide" onclick="Panel.openApplicationInfo()">Open app info</button>
     </div>
@@ -476,6 +481,7 @@
     paintStatus('status-listener', state.notificationAccess, 'granted', 'blocked');
     paintStatus('status-shizuku', state.shizuku, 'connected', 'off');
     paintStatus('status-headsup', state.headsUp === 'suppressed', 'suppressed', state.headsUp === 'unavailable' ? 'no access' : 'showing');
+    paintStatus('status-statusbar', state.statusBar === 'hidden', 'hidden', state.statusBar === 'unavailable' ? 'no access' : 'showing');
     paintStatus('status-service', state.serviceRunning, 'running', 'stopped');
   };
 
