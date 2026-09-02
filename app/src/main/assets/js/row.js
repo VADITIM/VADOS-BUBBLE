@@ -1122,6 +1122,39 @@ function flyGlyphOut(name) {
   }, MOD_LEAVE_WAIT);
 }
 
+/**
+ * How long the bubble takes to come home from a panel, mirroring --grow-ms in pill.css, and how
+ * far into it the box is actually back at its resting width — the collapse curve overshoots and
+ * settles, so that is LAND rather than the end, the same share an arrival hands over at.
+ */
+const COLLAPSE = 340;
+let returnTimer = null;
+
+/**
+ * The mod's face coming back once the panel has closed around it, which is the glyph-as-cause rule
+ * read backwards: the width is given back first and the face is the consequence. Held off the
+ * bubble entirely while the box is still panel-wide, it then arrives the way it arrives anywhere —
+ * the glyph up out of the hole and the reading rising in behind it. Painted on the tap, as it was,
+ * the icon and its reading simply appeared inside a shrinking panel and nothing about the mod ever
+ * looked like it had come back.
+ */
+function faceAfterCollapse(name) {
+  clearTimeout(returnTimer);
+  stirLiquid(COLLAPSE + MOD_ENTER + 200);
+  returnTimer = setTimeout(() => {
+    returnTimer = null;
+    // Opened again, or taken over, while the bubble was closing: whatever is showing now is the
+    // user's own doing and asked for itself.
+    if (shared.state !== 'idle') return;
+    // The mod ended while the panel was closing over it — its own departure owns the bubble now.
+    const owner = liveMods()[0];
+    if (!owner || MOD_CLOSED[owner].face !== name) return;
+    showFace(name);
+    enterFrom('hole');
+    flyGlyphIn(name);
+  }, COLLAPSE * LAND);
+}
+
 /** Plays the glyph's arrival: up out of the middle and onto the left. */
 function flyGlyphIn(name) {
   const glyph = faces[name] && faces[name].querySelector('.glyph');
@@ -1226,6 +1259,9 @@ export function toClosed() {
   // Already mid-hand-over, and bare on purpose. Whatever has changed underneath
   // will be read again when the glyph lands.
   if (mergeHold && !takingIn) return;
+  // Read before the size is written: whether the bubble is coming home from something grown is the
+  // one thing this function cannot ask afterwards.
+  const wasOpen = !CLOSED.has(shared.size);
   shared.state = 'idle';
   shared.current = null;
   pill.classList.remove('alert', 'with-image', 'charging');
@@ -1284,6 +1320,22 @@ export function toClosed() {
   if (owner) {
     const mod = MOD_CLOSED[owner];
     mod.paint();
+    // Coming home from a panel or an alert: the bubble closes bare and the mod arrives into it
+    // afterwards, rather than the face being drawn inside a box still three times its resting width.
+    // A repaint landing while that arrival is still pending — a media tick, a satellite settling —
+    // must not draw the face it is holding back, and must not push the landing further out either.
+    if (returnTimer !== null && !settling) {
+      setSize(mod.size, mod.room(), true);
+      lastOwner = owner;
+      return;
+    }
+    if (wasOpen && !settling) {
+      showFace(null);
+      setSize(mod.size, mod.room(), true);
+      faceAfterCollapse(mod.face);
+      lastOwner = owner;
+      return;
+    }
     showFace(mod.face);
     // The bubble changing hands while it is already a mod bubble: no room is being
     // asked for, so there is only the glyph to swap, and it arrives the same way.
