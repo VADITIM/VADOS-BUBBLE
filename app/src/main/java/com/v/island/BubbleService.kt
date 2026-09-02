@@ -226,6 +226,22 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     /** The radius each pane is rounded by right now, in pixels. */
     private val paneCorners = FloatArray(BLUR_PANES)
+
+    /**
+     * What was last actually handed to the compositor for each pane, so a frame that changed nothing about a pane costs
+     * nothing: the blur is re-applied per pane per frame and each application is four reflective invocations plus a
+     * `SemBlurInfo` allocation, which at 120Hz over five panes was ~2,400 reflective calls a second for an effect that
+     * only changes when a bubble's width or rounding does. `-1` means cleared, which is a different answer from a
+     * radius of zero and has to survive a re-apply.
+     */
+    /** The region string each pane was last placed from, so an unchanged pane is not re-parsed or re-laid-out. */
+    private val paneSpec = arrayOfNulls<String>(BLUR_PANES)
+
+    private val paneBlurRadius = IntArray(BLUR_PANES) { -1 }
+    private val paneBlurCorner = FloatArray(BLUR_PANES) { -1f }
+
+    /** Mirrors `Preferences.BLUR`, re-read only when it changes — it was a `SharedPreferences` read per pane per frame. */
+    private var blurRadius = 0
     private lateinit var params: WindowManager.LayoutParams
     private lateinit var preferences: SharedPreferences
     private var pageReady = false
@@ -286,6 +302,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         preferences = Preferences.of(this)
         preferences.registerOnSharedPreferenceChangeListener(this)
+        blurRadius = Preferences.get(preferences, Preferences.BLUR)
         windowManager = getSystemService(WindowManager::class.java)
 
         webView = WebView(this).apply {
@@ -514,7 +531,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // The blur is the compositor's, not the view's, so a transparent view keeps
         // blurring: it has to be taken off by hand or it hangs over a landscape
         // screen with nothing drawn on it.
-        if (isHidden) blurPanes.forEach { SamsungBlur.clear(it) } else repaintBlur()
+        if (isHidden) blurPanes.forEachIndexed { index, pane -> clearBlur(index, pane) } else repaintBlur()
         // The canvas is never touchable; the proxy is what stops hearing fingers when
         // there is nothing on screen to touch.
         proxyParams.flags =
@@ -567,6 +584,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         proxyParams.height = dp(compactHeight() + topGrab() + GRAB + BLEED)
         proxyParams.x = params.x
         proxyParams.y = 0
+        blurRadius = Preferences.get(preferences, Preferences.BLUR)
         repaintBlur()
         runCatching { windowManager.updateViewLayout(stage, params) }
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
@@ -584,21 +602,30 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
      * or has blurs switched off in developer options, and says so rather than the
      * setting looking broken.
      */
-    private fun applyBlur(view: View, corner: Float) {
+    private fun applyBlur(index: Int, view: View, corner: Float, resized: Boolean = false) {
         // Nothing is drawn in landscape or under a fullscreen app, so nothing may be
         // blurred either — the page keeps pushing layouts it cannot see.
         if (isLandscape || isFullScreen || isScreenOff) {
-            SamsungBlur.clear(view)
+            clearBlur(index, view)
             return
         }
-        val radius = Preferences.get(preferences, Preferences.BLUR)
+        val radius = blurRadius
         if (radius == 0) {
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
             params.blurBehindRadius = 0
-            SamsungBlur.clear(view)
+            clearBlur(index, view)
             return
         }
-        if (SamsungBlur.apply(view, dp(radius), corner)) return
+        // A resize counts as a change even though radius and corner are identical: the blurred region is the view's
+        // size at the moment it was asked for, and a pill's corner is half its height — which does not move at all
+        // while the bubble is growing or closing. Keyed on radius and corner alone the whole animation was one apply
+        // on the first frame and skips after it, so the glass stayed the width the bubble started at.
+        if (!resized && paneBlurRadius[index] == radius && paneBlurCorner[index] == corner) return
+        if (SamsungBlur.apply(view, dp(radius), corner)) {
+            paneBlurRadius[index] = radius
+            paneBlurCorner[index] = corner
+            return
+        }
 
         // AOSP's path, for a build where the vendor one is gone. It is a no-op while
         // the compositor has blurs switched off, which is the case on this phone.
@@ -609,9 +636,20 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
     }
 
+    /** Takes the blur off a pane and forgets what it was wearing, so the next apply is never skipped as a repeat. */
+    private fun clearBlur(index: Int, view: View) {
+        // Forgotten even when there was no blur to take off: the pane's placement is what the next frame is diffed
+        // against, and a cleared pane has to be placed again whatever it was or was not wearing.
+        paneSpec[index] = null
+        if (paneBlurRadius[index] == -1) return
+        SamsungBlur.clear(view)
+        paneBlurRadius[index] = -1
+        paneSpec[index] = null
+    }
+
     /** Every pane that is showing, blurred again at the rounding it already has. */
     private fun repaintBlur() = blurPanes.forEachIndexed { index, pane ->
-        if (pane.visibility == View.VISIBLE) applyBlur(pane, paneCorners[index])
+        if (pane.visibility == View.VISIBLE) applyBlur(index, pane, paneCorners[index])
     }
 
     /**
@@ -761,28 +799,43 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         val density = resources.displayMetrics.density
         val regions = spec.split(';')
         blurPanes.forEachIndexed { index, pane ->
-            val numbers = regions.getOrNull(index)
-                ?.split(',')
-                ?.mapNotNull { it.toFloatOrNull() }
-                .orEmpty()
+            val region = regions.getOrNull(index).orEmpty()
+            // A pane whose region reads exactly as it did last frame is already standing where this frame would put
+            // it, so the parse, the layout and the blur are all skipped: the page sends every bubble every frame and
+            // most of them are not the one that is moving. The page's own dedupe cannot do this — it compares the
+            // whole spec, so one bubble moving re-sends all five. `clearBlur` forgets the region it belongs to, which
+            // is what keeps this honest at screen-off: the host clears the panes by hand there, and a pane that had
+            // been left believing it was still placed would never be given its blur back on wake.
+            if (paneSpec[index] == region) return@forEachIndexed
+            paneSpec[index] = region
+            val numbers = region
+                .split(',')
+                .mapNotNull { it.toFloatOrNull() }
             if (numbers.size < 5 || numbers[2] < 1f || numbers[3] < 1f) {
                 if (pane.visibility != View.GONE) {
                     pane.visibility = View.GONE
-                    SamsungBlur.clear(pane)
+                    clearBlur(index, pane)
                 }
                 return@forEachIndexed
             }
             val bounds = pane.layoutParams as FrameLayout.LayoutParams
-            bounds.width = (numbers[2] * density).toInt()
-            bounds.height = (numbers[3] * density).toInt()
-            pane.layoutParams = bounds
+            val width = (numbers[2] * density).toInt()
+            val height = (numbers[3] * density).toInt()
+            // Assigned only on a real change: writing layoutParams back is a layout pass, and it was being paid per
+            // pane per frame for a row that is standing still most of the time.
+            val resized = bounds.width != width || bounds.height != height
+            if (resized) {
+                bounds.width = width
+                bounds.height = height
+                pane.layoutParams = bounds
+            }
             pane.translationX = numbers[0] * density
             pane.translationY = numbers[1] * density
             pane.visibility = View.VISIBLE
-            // Re-applied every frame, because the bubble's own radius moves with its
-            // width: glass that kept a rounding of its own spilled past the corners.
+            // The bubble's own radius moves with its width, so the glass is re-rounded whenever it changes: glass that
+            // kept a rounding of its own spilled past the corners.
             paneCorners[index] = numbers[4] * density
-            applyBlur(pane, paneCorners[index])
+            applyBlur(index, pane, paneCorners[index], resized)
         }
     }
 

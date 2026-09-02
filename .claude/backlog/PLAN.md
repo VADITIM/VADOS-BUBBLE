@@ -155,20 +155,35 @@ Walked on the device and reported back, in the order they were reported.
 
 Everything here was read out of the code, not guessed. Ordered by cost.
 
-- [ ] **P1.** `applyBlur` runs per pane per changed frame; each call does a `SharedPreferences.getInt`
+- [x] **P1.** `applyBlur` runs per pane per changed frame; each call did a `SharedPreferences.getInt`
       plus four reflective invocations — **~2,400 reflective calls and ~600 preference reads per
       second at 120Hz**, allocating a `SemBlurInfo` each time. `SamsungBlur`'s own comment says
       reflection per frame at 120Hz is worth avoiding; the lookups were cached, the invocations were
-      not. Re-apply only when radius or corner actually changed.
-- [ ] **P2.** `pane.layoutParams = bounds` is assigned unconditionally — a layout pass per pane per
-      frame even when the size is unchanged.
-- [ ] **P3.** The blur spec is re-parsed with `split`/`mapNotNull` per pane per frame. `sendBlurFrame`
-      already diffs the whole spec; extend that per-pane.
-- [ ] **P4.** `getComputedStyle` allocates a fresh declaration per blob per frame. The object is
-      *live* — resolve once per element and re-read.
-- [ ] **P5.** `blobs.map(...)` builds a new array and object per blob every frame.
-- [ ] **P6.** `stirLiquid` defaults to 1,100ms, outliving its animation by up to a second; `TRACE_MERGES`
-      is marked "temporary" in the source and should be gated out of normal running.
+      not. Now: `blurRadius` mirrors the preference and is re-read only in `onSharedPreferenceChanged`,
+      and `paneBlurRadius`/`paneBlurCorner` hold what each pane was last actually given, so a pane
+      that has not changed costs nothing. Cleared is `-1` rather than a radius of zero, which is a
+      different answer and has to survive a re-apply — so every clear goes through `clearBlur(index)`
+      and no `SamsungBlur.clear` is called behind the cache's back.
+- [x] **P2.** `pane.layoutParams = bounds` was assigned unconditionally — a layout pass per pane per
+      frame even when the size is unchanged. Assigned only when width or height actually differs.
+- [x] **P3.** The blur spec was re-parsed with `split`/`mapNotNull` per pane per frame. `paneSpec` holds
+      the region string each pane was last placed from, so a pane that reads identical is skipped
+      whole — no parse, no layout, no blur. The page's own dedupe cannot do this: it compares the
+      entire spec, so one bubble moving re-sends all five. `clearBlur` forgets the region, which is
+      what keeps it honest at screen-off, where the host clears the panes behind the page's back.
+- [x] **P4.** `getComputedStyle` allocated a fresh declaration per blob per frame. The declaration is
+      *live*, so it is resolved once per blob and re-read.
+- [ ] **P5.** `blobs.map(...)` builds a new array and object per blob every frame. **Left alone
+      deliberately**: it is six short-lived objects a frame against a refactor that touches every
+      reader of `measured` (`settleSkin`, `sendBlurFrame`, the blob writes, `meltBy`, `renderMerges`)
+      and replaces a `null` that means "not skinned" with a flag every one of them has to honour.
+      Worth doing only if a profile on the phone says these allocations actually cost something.
+- [x] **P6.** `stirLiquid`'s default is 700ms rather than 1,100 — past the longest transition an
+      argument-less caller can start (a 460ms growth, a split of 380 after 150 of delay), where 1,100
+      was past the longest *choreography*, and a choreography states its own length when it asks.
+      `TRACE_MERGES` is off; it was building strings inside the frame loop it exists to measure.
+      **Unverified on the phone:** a stir that ends before its transition freezes the glass part-way,
+      so the close, the swap, the split and a mod being taken back in all need walking.
 
 ## Phase C — new bubbles and mods
 

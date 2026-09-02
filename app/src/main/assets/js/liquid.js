@@ -117,7 +117,10 @@ function mirrorFrame() {
   const measured = blobs.map(blob => {
     if (!isSkinned(blob.name)) return null;
     const source = sourceOf(blob.name);
-    const style = getComputedStyle(source);
+    // Resolved once per element and kept: the declaration getComputedStyle hands back is *live*, so re-reading it
+    // next frame gives this frame's values — asking for a fresh one per blob per frame was allocating five
+    // declarations a frame for numbers the same five objects already carry.
+    const style = blob.style || (blob.style = getComputedStyle(source));
     return {
       source,
       box: source.getBoundingClientRect(),
@@ -295,8 +298,11 @@ let liquidUntil = 0;
 let liquidFrame = null;
 
 export function stirLiquid(milliseconds) {
-  // Past the longest choreography there is, which is a mod being taken back in.
-  liquidUntil = Math.max(liquidUntil, performance.now() + (milliseconds || 1100));
+  // Past the longest transition an argument-less caller can have started, which is a growth (--grow-ms, 460 at its
+  // longest) or a split (380 after 150 of delay). It used to be 1,100 — past the longest *choreography* there is, a
+  // mod being taken back in — but a choreography says how long it needs when it asks, and paying its length on every
+  // resting repaint was up to a second of frame loop after everything had stopped moving.
+  liquidUntil = Math.max(liquidUntil, performance.now() + (milliseconds || 700));
   if (liquidFrame !== null) return;
   // Starting cold. The display idles down when nothing has drawn for a while, so the
   // first frames of the first animation after a quiet stretch arrive late and unevenly
@@ -379,11 +385,14 @@ const CATCH_CEILING = 900;
 const CATCH_STALL = 260;
 
 /**
- * Temporary. Every merge says what it did and how far in the traveller was when it
- * did it, because the only way to tell a threshold that is set wrong from a shape
- * that never got where it was going is to read the shares off the phone.
+ * Every merge says what it did and how far in the traveller was when it did it, because the only way to tell a
+ * threshold that is set wrong from a shape that never got where it was going is to read the shares off the phone.
+ *
+ * Off in normal running: it is a console line and a bridge hop per merge and, worse, one on eight frames of every
+ * cold start of the mirror — which is a string built inside the frame loop the tracing exists to measure. Switch it
+ * back on by hand while working on a merge.
  */
-const TRACE_MERGES = true;
+const TRACE_MERGES = false;
 
 function trace(what, caught, entry, now) {
   if (!TRACE_MERGES) return;
