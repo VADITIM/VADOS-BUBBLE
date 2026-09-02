@@ -474,14 +474,14 @@ html.liquid #liquid { display: block; }
    "no alpha and no blur, unless the main bubble happens to be open" was — an open
    bubble takes the whole filter off, and the double-painting with it. So while that
    bubble is standing there the region is the whole screen, and only then. */
-html.lock-live #liquid { height: 100%; }
+html.lock-live #liquid, html.locked #liquid { height: 100%; }
 /* The bubble stops painting itself the moment the skin does it instead. Every bubble
    on the row is in this rule, the Now bubble included: it was left out and went on
    painting its own opaque edge on top of the skin, which is why the one bubble whose
    background came from the same custom property as everyone else's still read as a
    different alpha — the rim was solid where the others were glass. */
 html.liquid #pill, html.liquid .satellite, html.liquid #now, html.liquid #lock-now,
-html.liquid #status, html.liquid #clock, html.liquid #double {
+html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #padlock {
   background: transparent;
   border-color: transparent;
 }
@@ -2369,3 +2369,131 @@ html.ringing #pill {
   -webkit-mask-composite: source-over;
 }
 #player-face > * { position: relative; z-index: 1; }
+
+
+/* ── The padlock ───────────────────────────────────────────────────────────────────────
+   Where One UI draws its own lock icon. It says one thing, answers no touch and costs no
+   window. --padlock-bottom is a measurement off the phone and the script owns it. */
+#padlock {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  bottom: var(--padlock-bottom, 232px);
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  opacity: 0;
+  overflow: visible;
+  transition:
+    opacity var(--padlock-fade-ms, 220ms) ease,
+    scale 320ms var(--ease-split);
+}
+#padlock.showing { opacity: 1; }
+#padlock-body { width: 56%; height: 56%; fill: currentColor; display: block; }
+/* The shackle lifts and tilts, which is what a padlock does when it opens, and it is the cause
+   of the leaving rather than a decoration on it. */
+#padlock-shackle {
+  transform-origin: 16px 10px;
+  transition: transform 260ms var(--ease-split);
+}
+#padlock.opened #padlock-shackle { transform: translateY(-2px) rotate(-22deg); }
+
+/* ── The lock screen's notifications ───────────────────────────────────────────────────
+   Bubbles rather than rows, standing where the system's own list is. The container is
+   overflow-visible — these are bubbles and a bubble's overshoot may not be clipped — and the
+   scroller inside it is what clips, which is the rule from bubbles.md doing its job. */
+#lock-notes {
+  position: absolute;
+  z-index: 2;
+  left: 16px;
+  right: 16px;
+  top: var(--notes-top, 196px);
+  max-height: 46vh;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+#lock-notes.showing { opacity: 1; pointer-events: auto; }
+#lock-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 46vh;
+  overflow-y: auto;
+  /* Room for the overshoot of the bubbles inside, since this is the element that clips. */
+  padding: 6px 4px;
+  margin: -6px -4px;
+  scrollbar-width: none;
+}
+.lock-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 22px;
+  corner-shape: squircle;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  color: #ffffff;
+  transition: scale 220ms var(--ease-split);
+}
+.lock-note:active { scale: 0.97; }
+.lock-note-mark {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--note-accent, #ffffff);
+}
+.lock-note-copy { min-width: 0; flex: 1; }
+.lock-note-who {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--note-accent, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  /* Faded at the end that runs out, which for a run set from its left is the right one. */
+  mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+}
+.lock-note-said {
+  font-size: 0.74rem;
+  color: var(--text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+}
+.lock-note-tally {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--note-accent, #ffffff);
+  color: #000000;
+  font-size: 0.6rem;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+/* What is left over is a count, the way the row's hidden mods are a dot rather than a face. */
+#lock-notes[data-more]:not([data-more=""])::after {
+  content: attr(data-more);
+  display: block;
+  margin: 0.45rem auto 0;
+  width: fit-content;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}

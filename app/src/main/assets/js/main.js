@@ -16,6 +16,8 @@ import './liquid.js';
 import './row.js';
 import './mods/notification.js';
 import './mods/media.js';
+import './padlock.js';
+import './notes.js';
 import './lock.js';
 import './mods/timer.js';
 import './mods/call.js';

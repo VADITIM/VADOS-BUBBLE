@@ -2,6 +2,7 @@ import { lockPill } from './lock.js';
 import { nowPill } from './now.js';
 import { clockPill, isClockLit } from './clock.js';
 import { doublePill, isDoubleOut } from './double.js';
+import { isPadlockShowing, padlockPill } from './padlock.js';
 import { statusPill } from './status.js';
 import { satellites } from './row.js';
 import { CLOSED, MELT_MAX, MELT_MIN, bridge, pill, root, shared } from './state.js';
@@ -29,7 +30,7 @@ const liquidLayers = {
  * bubble in exactly this order, and setBlurFrame() sends the rectangles down in it.
  * A bubble added here and not there draws with no glass behind it.
  */
-const BLUR_PANES = ['main', 'left', 'right', 'now', 'lock', 'status', 'clock', 'double'];
+const BLUR_PANES = ['main', 'left', 'right', 'now', 'lock', 'status', 'clock', 'double', 'padlock'];
 
 const blobs = BLUR_PANES.map(name => ({
   name,
@@ -49,6 +50,7 @@ function sourceOf(name) {
   if (name === 'status') return statusPill;
   if (name === 'clock') return clockPill;
   if (name === 'double') return doublePill;
+  if (name === 'padlock') return padlockPill;
   if (name === 'lock') return lockPill;
   return satellites[name];
 }
@@ -76,6 +78,7 @@ function isSkinned(name) {
   if (name === 'status') return statusPill.classList.contains('lit');
   if (name === 'clock') return isClockLit();
   if (name === 'double') return isDoubleOut();
+  if (name === 'padlock') return isPadlockShowing();
   // Only while the row is a row. A grown bubble is one shape with nothing beside it,
   // and a satellite still holding a mod behind it is not standing on the bar — it
   // would be a frosted circle out at the side of an open panel.

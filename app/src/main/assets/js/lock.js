@@ -2,6 +2,8 @@ import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
 import { clock, paintProgress, playPath, shownPosition } from './mods/media.js';
 import { cancelSpring, DEAD_ZONE, rubberBandPast, toy, untoy } from './motion.js';
 import { fitNowProxy } from './now.js';
+import { fitNotesProxy, paintNotes } from './notes.js';
+import { paintPadlock } from './padlock.js';
 import { fitStatusProxy } from './status.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
@@ -242,6 +244,7 @@ window.refitProxies = () => {
   fitNowProxy();
   fitLockProxy();
   fitStatusProxy();
+  fitNotesProxy();
 };
 
 /**
@@ -440,6 +443,14 @@ window.onLock = next => {
   // re-asserted anyway: the host cleared every pane when the screen went off. See resendBlur.
   resendBlur();
   if (locked === next) return;
+  // The other two lock-screen bubbles are told plainly and told first: neither of them is
+  // stolen from anywhere, so neither has anything to do with the flight below.
+  // The goo layer has to reach the bottom of the screen for as long as anything is drawn down
+  // there, and the padlock and the list are drawn there for the whole time the phone is locked —
+  // outside the region a bubble silently loses its skin and paints its own background instead.
+  root.classList.toggle('locked', next);
+  paintPadlock(next);
+  paintNotes(next);
   // Decided and flagged *before* the row is repainted, not after. Taking its mod back
   // is what repaints the row, and repainting the row repaints this bubble — which
   // asks lockMod() again, is told the keyguard has gone, and takes `showing` off the

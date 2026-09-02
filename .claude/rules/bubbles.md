@@ -22,8 +22,8 @@ Everything here binds every bubble, whichever kind it is. A rule that holds for 
 | **Status** | Right end of the bar, over the system's icons. | built | **no** — Modus instead |
 | **Clock** | Top-left, over the system clock. Merges visibly with Now, never overlaps it. | built | **no** |
 | **Double** | Beside the punch hole, alongside whatever Main is doing. | built | no |
-| **Lock** | Where the lock icon is. Opens, then merges into Main on unlock. | planned | no |
-| **Notification** | Over the lock screen's own notification list, in its place. | planned | no |
+| **Lock** | Where the lock icon is. Opens, then merges into Main on unlock. | built | no |
+| **Notification** | Over the lock screen's own notification list, in its place. | built | no |
 
 Status and Clock are the two that carry no mod at all — they stand for something the system already draws — and both sit a few pixels shorter than the rest, which is how the eye tells a bubble that can be worked from one that only reports.
 

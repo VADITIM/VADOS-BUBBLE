@@ -94,7 +94,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * build step joining the two, so a bubble added on one side and not the other
          * is a bubble that draws without glass or a pane blurring nothing.
          */
-        private const val BLUR_PANES = 8
+        private const val BLUR_PANES = 9
 
         /** How long a touch on a bubble holds the screen on for. */
         private const val LOCK_AWAKE = 15_000L
@@ -152,6 +152,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         /** How many notifications the shade is holding, as the badge sees it. */
         fun deliverCount(count: Int) {
             instance?.push("window.setUnreadCount($count)")
+            // The lock screen's own list is drawn from the shade, so it moves when the shade
+            // does — including when something is dismissed from the shade or read on the watch.
+            instance?.push("window.onNotesChanged()")
         }
 
         /** The running timer, or null once the clock app stops counting. */
@@ -238,6 +241,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     /** Over the Status bubble at the right end of the bar, and no wider than it. */
     private lateinit var statusProxy: View
     private lateinit var statusProxyParams: WindowManager.LayoutParams
+
+    /** Over the lock screen's notification bubbles, and only while they are standing there. */
+    private lateinit var notesProxy: View
+    private lateinit var notesProxyParams: WindowManager.LayoutParams
 
     /**
      * One empty view per bubble, carrying nothing but that bubble's glass: main, the
@@ -452,6 +459,31 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
+        notesProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, notesProxyParams, "notes")
+                return true
+            }
+        }
+        // The largest proxy here by a long way, and the one place that is affordable: it stands
+        // on the lock screen well below the strip the shade swipe starts on, and it is given no
+        // size at all while the phone is unlocked.
+        notesProxyParams = WindowManager.LayoutParams(
+            0, 0,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
         statusProxy = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
@@ -531,6 +563,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         windowManager.addView(nowProxy, nowProxyParams)
         windowManager.addView(lockProxy, lockProxyParams)
         windowManager.addView(statusProxy, statusProxyParams)
+        windowManager.addView(notesProxy, notesProxyParams)
         applyVisibility()
         ShizukuShell.bind(this)
         instance = this
@@ -617,6 +650,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
             statusProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
+            notesProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(notesProxy, notesProxyParams) }
         } else {
             push("window.refitProxies()")
         }
@@ -635,6 +670,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             screenWatch = null
             awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
+            runCatching { windowManager.removeView(notesProxy) }
             runCatching { windowManager.removeView(statusProxy) }
             runCatching { windowManager.removeView(lockProxy) }
             runCatching { windowManager.removeView(nowProxy) }
@@ -1159,6 +1195,22 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun recordingAction(index: Int) {
             IslandNotificationListener.recordingAction(index)
+        }
+
+        /** The lock screen's notification list, placed from the page like every other proxy. */
+        @JavascriptInterface
+        fun setNotesProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {
+            webView.post {
+                val isLive = widthDp > 0 && heightDp > 0
+                notesProxyParams.width = if (isLive) dp(widthDp) else 0
+                notesProxyParams.height = if (isLive) dp(heightDp) else 0
+                notesProxyParams.x = params.x + dp(leftDp)
+                notesProxyParams.y = dp(topDp)
+                notesProxyParams.flags =
+                    if (isLive) BASE_FLAGS
+                    else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager.updateViewLayout(notesProxy, notesProxyParams) }
+            }
         }
 
         @JavascriptInterface

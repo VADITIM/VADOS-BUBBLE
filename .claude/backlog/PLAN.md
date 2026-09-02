@@ -29,8 +29,8 @@ never a working animation; the phone remains the check.
 | **Status** | Right end of the bar | built | **no** — connectivity; battery always rightmost |
 | **Clock** | Top-left, over the system clock | built | **no** — merges with Now, never overlaps |
 | **Double** | Beside the punch hole, alongside Main | built | no — charging, low battery, recording ended |
-| **Lock** | Where the lock icon is | planned | no — opens, then merges into Main on unlock |
-| **Notification** | Over the lock screen's list | planned | no — scrollable, no drag radius yet |
+| **Lock** | Where the lock icon is | built | no — opens, then merges into Main on unlock |
+| **Notification** | Over the lock screen's list | built | no — scrollable, no drag radius yet |
 
 | Mod | Eligible bubbles | Built |
 |---|---|---|
@@ -268,8 +268,20 @@ One step each, one push each, naming the feature.
       Eligible for Lock Now too, so it joins `LOCK_STEALS` and needs a face there. Starts with
       checking whether a saved journey is readable at all. Plus **TimeTree** as a named type
       (green/white) and media speed-up for Telegram/WhatsApp voice notes.
-- [ ] **C10. Lock screen** — the Lock icon bubble; rubber-band response to unlock swipe progress;
+- [~] **C10. Lock screen** — the Lock icon bubble; rubber-band response to unlock swipe progress;
       real Notification bubbles in a scrollable overflow-visible container.
+      **Two of the three are built.** The padlock (`js/padlock.js`, a ninth blur pane, no window)
+      opens and *then* flies into the Main bubble as a measured merge — open first, then leave.
+      The notifications (`js/notes.js`, a fifth proxy) are one bubble per conversation in an
+      overflow-visible container whose inner scroller is what clips, with the overflow counted
+      rather than listed.
+      **The rubber-band is blocked and should be read as blocked, not deferred**: nothing exposes
+      the keyguard's own swipe progress to an unprivileged app — no callback, no inset animation,
+      and our windows do not receive those touches. It stays a wish until something on the device
+      turns out to publish it.
+      Two numbers are measurements only the phone can settle: `PADLOCK_BOTTOM` (where One UI
+      draws its lock icon) and `--notes-top` (where its notification list starts).
+      **Not walked on the phone.**
 - [ ] **C11. Notification quick settings** — **blocked**, the two screenshots were never attached.
 - [ ] **C12. Status bar replacement** — one-button set/reset of the Samsung settings. **Blocked**,
       the four screenshots were never attached. Disabling the bar itself is its own step now —

@@ -20,8 +20,8 @@ Rows are tagged **built** (on the phone now) or **planned** (specified, not writ
 | **Status** | Right end of the status bar, over the system's own icons. | built | Idle, Modus, Active |
 | **Double** | Beside the punch hole, alongside whatever Main is doing. | built | none of the common states — see below |
 | **Hidden** | Past the second satellite: a coloured dot, not a bubble face. | built | none; it is a count |
-| **Lock** | Where the lock icon is on the lock screen. | planned | none; it is an indicator that merges on unlock |
-| **Notification** | Over the lock screen's own notification list, replacing it. | planned | Active |
+| **Lock** | Where the lock icon is on the lock screen. | built | none; it is an indicator that merges on unlock |
+| **Notification** | Over the lock screen's own notification list, replacing it. | built | none of its own; a tap opens the app that posted it |
 | **Lock Now** | At the bottom of the lock screen, where a thumb reaches. Replaces the Now Bar. | built, partly | Mod, Active, Haptic; Pull and Push planned |
 
 While the Now bubble is out the row is allowed **one** satellite, not two: the bar left over is not wide enough for a second, and a row that overflows into the punch hole is worse than a row that counts. A satellite losing its place is not hidden — it is run into the bubble, which takes the knock, and it comes back as the first dot.
@@ -183,6 +183,11 @@ The steal outlives the keyguard by exactly one flight. `stealHeld` keeps `liveMo
 
 The flag saying it is flying is set *before* the row is repainted, never after. Taking the mod back is what repaints the row, and repainting the row repaints this bubble — which asks `lockMod()` again, is told the keyguard has gone, and takes `showing` off the very thing that is about to fly. It keeps `showing` for the whole journey: that class is what the skin reads to decide the shape is one of the row's at all, and taken off at the start it would spend the flight outside the liquid and arrive as a separate object fading on top of the bubble — the exact bug the torch drop had.
 
-- **Lock** stands where the lock icon is. Unlocking animates it open and then merges it into the Main bubble, which ripples for it.
-- **Notification** bubbles overlap the system's own lock-screen notifications and take their place.
+- **Lock** stands where the lock icon is. **Built.** Unlocking opens it — the shackle lifts and tilts — and *then* it flies into the Main bubble as a merge the mirror measures. Open first, then leave: a padlock that vanished the instant the phone unlocked would be a box being hidden; one that visibly opens and then goes is the same object answering what just happened, which is the glyph-as-cause rule with the shackle as the glyph. Where it stands (`PADLOCK_BOTTOM`) is a measurement off the phone and the only thing about it that cannot be decided in the page.
+- **Rubber-banding the unlock swipe is not built and cannot be**, at least not from here: nothing exposes the keyguard's own swipe progress to an unprivileged app. There is no callback, no window insets animation for it, and reading it off touches we do not receive is not reading it. It stays out of the plan as a wish rather than a task until something on the device turns out to publish it.
+- **Notification** bubbles overlap the system's own lock-screen notifications and take their place. **Built.** One bubble per *conversation*, newest line only — this is a glance from across the room, and the conversation itself is what the notification tab is for — with the rest counted rather than listed once past `NOTES_LIMIT`, the way the row counts its hidden mods. Redrawn whole rather than reconciled: a lock screen is looked at and not worked, so a diff of five rows costs more to get wrong than to redo.
+
+  Its container is `overflow: visible` and the scroller *inside* it is what clips, which is the no-clipping rule doing its job rather than an exception to it — these are bubbles and a bubble's overshoot may not be cut off.
+
+  It is the largest touch proxy in the project and the one place that is affordable: it stands on the lock screen well below the strip the shade swipe starts on, and it is given no size at all while the phone is unlocked.
 - **Bottom Now** replaces the Now Bar. A song playing shows as a wide bubble at the bottom carrying that mod's own controls — back, play/pause, next. Tap expands the controls; Haptic opens the app. It is the only lock-screen bubble with states of its own.

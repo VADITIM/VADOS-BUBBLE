@@ -52,7 +52,7 @@ Every overlay window here follows the same shape:
 
 The canvas is the **whole screen**, not the status bar. It has to be: the lock screen carries a bubble of its own at the bottom, and a bubble is only liquid with what shares its surface — so the one page reaches from the cutout to the thumb. It is untouchable and transparent where nothing is drawn, so the extra room costs the surface and nothing else.
 
-There are five windows and no more: the canvas, and one proxy per bubble that can be touched — over the main bubble, over the Now bubble, over the lock screen bubble, and over the Status bubble. One proxy each rather than one wide one, because the gaps between them are most of the status bar and that has to stay somewhere the shade swipe can start. A proxy is no longer always at the top of the screen either: `forwardTouch` adds the proxy window's own `y` to the point it reports, or a touch on the lock screen bubble arrives in the page as a touch on the status bar.
+There are six windows and no more: the canvas, and one proxy per bubble that can be touched — over the main bubble, over the Now bubble, over the lock screen bubble, over the Status bubble, and over the lock screen's notification list. The bubbles that answer no touch at all — the Clock, the Double, the padlock — cost no window, which is the rule working rather than an omission. One proxy each rather than one wide one, because the gaps between them are most of the status bar and that has to stay somewhere the shade swipe can start. A proxy is no longer always at the top of the screen either: `forwardTouch` adds the proxy window's own `y` to the point it reports, or a touch on the lock screen bubble arrives in the page as a touch on the status bar.
 
 ## The bridge
 
@@ -77,6 +77,7 @@ Touch is the one thing that travels the other way. A touch-proxy window has no c
 | `liquid.js` | the mirror, the goo, the blur frames, `stirLiquid`, `catchInto` |
 | `row.js` | layout, satellites, dots, the swap, window sizing, the mod hand-over |
 | `now.js`, `lock.js`, `status.js`, `clock.js` | the Now bubble, the lock screen's, the one at the right end of the bar, and the time at the left |
+| `padlock.js`, `notes.js` | the lock screen's padlock, and its notifications as bubbles |
 | `mods/*.js` | one file per mod: `media`, `timer`, `call`, `notification` |
 | `double.js` | the second bubble at the hole, and the announcements it carries |
 | `tabs.js` | the Tabs that are nobody's mod: history, quick settings |

@@ -20,7 +20,7 @@ export const bridge = window.Android || {
   setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
   openNotification() {}, dismissNotification() {}, timerAction() {},
   setTorch() {}, setNowProxy() {}, setLockProxy() {}, setStatusProxy() {}, openConnectionSettings() {},
-  recordingAction() {}, alarmAction() {},
+  recordingAction() {}, alarmAction() {}, setNotesProxy() {},
   note() {}, wakeFrames() {},
 };
 // The host window tracks the bubble in both directions. It sits above the status

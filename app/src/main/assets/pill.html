@@ -204,6 +204,23 @@
   <span id="status-charge"></span>
 </div>
 
+<!-- The padlock, standing where One UI draws its own lock icon. It says one thing and answers
+     no touch, so it costs no window. On unlock it opens and then leaves: the shackle lifting is
+     the cause and the flight home is the consequence. -->
+<div id="padlock">
+  <svg id="padlock-body" viewBox="0 0 24 24">
+    <path id="padlock-shackle" d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/>
+    <rect x="5" y="10" width="14" height="10" rx="3"/>
+  </svg>
+</div>
+
+<!-- The lock screen's notifications, as bubbles standing where the system's own list is. The
+     container is overflow-visible because these are bubbles and a bubble's overshoot may not be
+     clipped; the scroller inside it is what clips instead. -->
+<div id="lock-notes">
+  <div id="lock-notes-list"></div>
+</div>
+
 <!-- The lock screen's own bubble, down where a thumb reaches. It is not a second copy
      of the main bubble and it is not the Now bubble moved: it is the bubble the row's
      mods belong to while the phone is locked. Its glyph is at the left like every other
