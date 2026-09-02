@@ -210,7 +210,6 @@
     color: var(--text-muted);
     margin-top: 0.9rem;
   }
-  .note b { color: var(--text-body); font-weight: 500; }
 
   /* The nav is the one piece of global chrome, so every screen reserves the same
      token for it and none of them has to know its shape. */
@@ -292,25 +291,10 @@
       <span class="status" id="status-headsup">checking</span>
       <button onclick="Panel.toggleHeadsUp()">Toggle</button>
     </div>
-    <p class="note">
-      With system pop-ups suppressed the bubble is the only thing that announces a notification —
-      it still lands in the shade, nothing is dropped. Needs Shizuku: the switch is a global
-      setting no sideloaded app may write.
-    </p>
-    <p class="note">
-      Shizuku powers the microphone-access toggle on the pill. It has to be started after every
-      reboot, from the Shizuku app.
-    </p>
-    <p class="note">
-      A toggle greyed out as <b>Restricted setting</b> means Android is blocking a sideloaded app.
-      Open <b>App info</b>, use the three-dot menu, choose <b>Allow restricted settings</b>, then grant it again.
-    </p>
     <div class="actions">
       <button class="wide" onclick="Panel.openApplicationInfo()">Open app info</button>
     </div>
   </section>
-
-  <span class="module-caption stagger">Access is granted once; the accessibility toggle brings the bubble up.</span>
 </section>
 
 <section class="screen" data-screen="settings" data-accent="#5bfd5b" data-side="right">
@@ -323,10 +307,7 @@
   <section class="module stagger">
     <span class="module-label">Pill</span>
     <div id="fields"></div>
-    <p class="note">Transparency applies to the pill background only. Icons and text stay fully opaque.</p>
   </section>
-
-  <span class="module-caption stagger">Every change applies to the live overlay immediately.</span>
 </section>
 
 <section class="screen" data-screen="debug" data-accent="#ffb020" data-side="right">
@@ -342,11 +323,6 @@
       <span class="row-name">Service</span>
       <span class="status" id="status-service">checking</span>
     </div>
-    <p class="note">
-      The bubble runs as an accessibility service: that is the only window an ordinary app can
-      put <b>above</b> the status bar, which is what makes the whole bubble tappable. Android
-      starts and stops it with the toggle — there is nothing to start from here.
-    </p>
     <div class="actions">
       <button class="wide" onclick="Panel.testNotification()">Send test notification</button>
     </div>
@@ -354,12 +330,6 @@
 
   <section class="module stagger">
     <span class="module-label">States</span>
-    <p class="note">
-      Every state the bubble can be in, without waiting for a real song, a real timer or a real
-      call. Each button sets up what that state needs and then shows it. <b>Walk every state</b>
-      runs the whole list in a fixed order, slowly enough to record — two recordings, before and
-      after a change, are what a regression shows up in.
-    </p>
     <div class="actions">
       <button class="wide" onclick="Panel.stageSequence()">Walk every state</button>
       <button onclick="Panel.stage('idle')">Idle</button>
@@ -391,20 +361,11 @@
 
   <section class="module stagger">
     <span class="module-label">Touch</span>
-    <p class="note">
-      Where the last finger landed, and what the bubble made of it. Touch the bar, then come back
-      here and read it — there is no adb on this phone, so this is the only way a question about a
-      coordinate gets an answer instead of a guess.
-    </p>
     <pre class="note" id="trace">—</pre>
   </section>
 
   <section class="module stagger">
     <span class="module-label">Replay</span>
-    <p class="note">
-      Each button replays that app's most recent real notification, image and all. If nothing has
-      arrived from it yet, a stand-in with its colours is sent instead.
-    </p>
     <div class="actions" id="replays"></div>
   </section>
 </section>
