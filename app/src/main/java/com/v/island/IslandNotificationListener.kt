@@ -122,6 +122,35 @@ class IslandNotificationListener : NotificationListenerService() {
             BubbleService.deliverTimer(timer()?.let { TimerWatch.describe(it) })
         }
 
+        /** The recording that is running, or null when nothing is being recorded. */
+        fun recording(): StatusBarNotification? =
+            instance?.activeNotifications?.firstOrNull { NowWatch.isRecording(it) }
+
+        /** The transfer in flight, or null. The oldest wins, so a second one waits its turn. */
+        fun transfer(): StatusBarNotification? =
+            instance?.activeNotifications
+                ?.filter { NowWatch.isTransfer(it) }
+                ?.minByOrNull { it.postTime }
+
+        /** The recorder's own buttons — pause, resume, stop — fired from the bubble. */
+        fun recordingAction(index: Int) {
+            recording()?.let { NowWatch.act(it, index) }
+        }
+
+        /**
+         * Both of the Now bubble's notification-borne mods in one push, because the bubble
+         * shows one thing at a time and deciding which is the page's job: it is the side that
+         * knows what it is already carrying and what that would cost to swap.
+         */
+        fun publishNowMods() {
+            if (instance == null) return
+            BubbleService.deliverNowMods(
+                JSONObject()
+                    .put("recording", recording()?.let { NowWatch.describeRecording(it) } ?: JSONObject.NULL)
+                    .put("transfer", transfer()?.let { NowWatch.describeTransfer(it) } ?: JSONObject.NULL)
+            )
+        }
+
         /** The Discord call that is connected, or null when none is. */
         fun call(): StatusBarNotification? =
             instance?.activeNotifications?.firstOrNull { CallWatch.isCall(it) }
@@ -185,6 +214,14 @@ class IslandNotificationListener : NotificationListenerService() {
             publishCall()
             return
         }
+        // A recording and a transfer are states in the same sense, and they belong to the
+        // bubble out at the clock rather than to the row: what is happening, not what is
+        // connected. A progress notification re-posts on every tick, so this is also how the
+        // timeline moves.
+        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
+            publishNowMods()
+            return
+        }
         // Same for a player: its notification is the song, and the song is a closed
         // mod. Ask the session again first — it is the richer source and it carries
         // the transport — and hand over the notification only if it cannot answer.
@@ -226,6 +263,9 @@ class IslandNotificationListener : NotificationListenerService() {
         BubbleService.deliverGone(statusBarNotification.key)
         if (TimerWatch.isTimer(statusBarNotification)) publishTimer()
         if (CallWatch.isCall(statusBarNotification)) publishCall()
+        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
+            publishNowMods()
+        }
         // The song may have ended with its notification, or only changed players.
         if (isPlayer(statusBarNotification)) MediaControl.refresh()
         // The badge is the shade, so it moves whenever the shade does — including

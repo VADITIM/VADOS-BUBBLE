@@ -1856,7 +1856,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #now-glyph { width: var(--mod-glyph); height: var(--mod-glyph); display: grid; place-items: center; }
 #now-glyph svg { width: 82%; height: 82%; fill: #ffffff; display: block; }
 /* Breathing, because a torch left on is a thing worth being reminded of. */
-#now.lit:not(.open) #now-glyph svg { animation: breathe 2.4s ease-in-out infinite; }
+#now.lit:not(.open):not(.recording):not(.transferring) #now-glyph svg {
+  animation: breathe 2.4s ease-in-out infinite;
+}
 @keyframes breathe { 50% { opacity: 0.55; } }
 
 /* The glyph leads the way home: it pulls out ahead, the pill is dragged after it,
@@ -2162,3 +2164,84 @@ html.now-flying #now-reading, .now-face:not(.showing) #now-reading {
 }
 
 /* #endregion ───────────────────────────────────────────────────────────── */
+
+
+/* ── What else the Now bubble can carry ────────────────────────────────────────────────
+   One face for every Now mod rather than one face each: they are all a glyph, a short
+   reading and — for a transfer — a line along the bottom edge. What changes between them is
+   the colour of the pill and what the glyph is doing. */
+
+/* A recording is red, whole. Not an accent on a black pill: it is the one state on this bar
+   that has to be readable from the corner of the eye, and a coloured icon is not. The content
+   goes white against it, which is why nothing here reads --app-accent. */
+#now.recording {
+  background: #e5342b;
+  border-color: #e5342b;
+}
+#now.recording #now-glyph svg { fill: #ffffff; animation: now-record 1.6s ease-in-out infinite; }
+/* The dot pulses while it is running and stands still while it is paused, which is the whole
+   difference between the two states said without a second glyph. */
+#now.recording.paused #now-glyph svg { animation: none; opacity: 0.55; }
+@keyframes now-record { 50% { opacity: 0.35; } }
+
+/* A transfer's glyph moves the way the file is moving: down for a download, up for an upload,
+   and the direction *is* the reading — the arrow alone would be a static icon of a thing that
+   is by definition in flight. */
+#now.transferring #now-glyph svg { animation: now-carry 1.4s ease-in-out infinite; }
+#now.transferring[data-now="upload"] #now-glyph svg { animation-name: now-carry-up; }
+@keyframes now-carry {
+  0%, 100% { transform: translateY(-2px); opacity: 0.7; }
+  50% { transform: translateY(2px); opacity: 1; }
+}
+@keyframes now-carry-up {
+  0%, 100% { transform: translateY(2px); opacity: 0.7; }
+  50% { transform: translateY(-2px); opacity: 1; }
+}
+
+/* The timeline, along the bottom edge of the pill rather than inside it: this bubble is
+   bar-height, and a bar drawn inside a bar is the same reading given twice. It is inset from
+   the ends by the corner radius so the line belongs to the shape instead of being cut by it. */
+#now-line {
+  position: absolute;
+  left: calc(var(--pill-height) / 2);
+  right: calc(var(--pill-height) / 2);
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+#now-line.showing { opacity: 1; }
+#now-line-done {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: #ffffff;
+  /* Long, because progress is not an animation of ours: the notification re-posts every few
+     hundred milliseconds and each new figure is a fresh target, so a short curve reads as the
+     line stuttering forward while a long one reads as it filling. */
+  transition: width 600ms cubic-bezier(0.16, 0.8, 0.3, 1);
+}
+
+/* The recording's half of the panel. The panel is one box — it is the same bubble held down,
+   not a second thing opening over it — so the two halves take turns inside it. */
+#now-record { display: none; align-items: center; gap: 1rem; }
+#now.recording-panel #now-record { display: flex; }
+#now.recording-panel #now-slider { display: none; }
+#now-elapsed {
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+#now-stop {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1.4rem;
+  background: #e5342b;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+}

@@ -170,6 +170,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.push("window.onBattery($battery)")
         }
 
+        /** What is happening — a recording, a transfer — for the bubble out at the clock. */
+        fun deliverNowMods(mods: JSONObject) {
+            instance?.push("window.onNowMods($mods)")
+        }
+
         /** What the phone is attached to, for the bubble at the right end of the bar. */
         fun deliverConnectivity(state: JSONObject) {
             instance?.push("window.onConnectivity($state)")
@@ -905,6 +910,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setNotificationIdentity(${Preferences.get(preferences, Preferences.NOTIFICATION_IDENTITY)})")
         push("window.setGoo(${Preferences.get(preferences, Preferences.GOO)})")
         push("window.setModWidth(${Preferences.get(preferences, Preferences.MOD_WIDTH)})")
+        push("window.setNowPushes(${Preferences.get(preferences, Preferences.NOW_PUSHES)})")
         push("window.setUnreadCount(${IslandNotificationListener.count()})")
         // The closed mods are state, not events: whatever was already true before this
         // page existed has to be asked for, because nothing will announce it again.
@@ -1124,6 +1130,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * the bubble and no more: it sits over the system's own icons at the right end of the bar,
          * which is a stretch the shade swipe is started on as often as anywhere else.
          */
+        /** A recorder's own button, pressed from the Now bubble. */
+        @JavascriptInterface
+        fun recordingAction(index: Int) {
+            IslandNotificationListener.recordingAction(index)
+        }
+
         @JavascriptInterface
         fun setStatusProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
             webView.post {

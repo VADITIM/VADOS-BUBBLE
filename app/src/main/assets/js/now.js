@@ -23,8 +23,9 @@ const nowFaces = {
 };
 
 /** A beam rather than a bulb: a cone says the light is pointed somewhere. */
-nowGlyph.innerHTML =
+const TORCH_GLYPH =
   '<svg viewBox="0 0 24 24"><path d="M8.4 2h7.2a1 1 0 0 1 .97 1.24l-.9 3.6a1 1 0 0 1-.97.76H9.3a1 1 0 0 1-.97-.76l-.9-3.6A1 1 0 0 1 8.4 2zm1.1 7.6h5a1 1 0 0 1 1 1V21a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V10.6a1 1 0 0 1 1-1zm1.5 3.4a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2z"/></svg>';
+nowGlyph.innerHTML = TORCH_GLYPH;
 
 /** Kept in step with the CSS above: five slots and four gaps. */
 const NOW_SLOT = 40;
@@ -96,6 +97,44 @@ const NOW_CLEAR = 0.2;
 const NOW_COLLAPSE = 260;
 
 let torch = null;
+
+/**
+ * What is happening, in the order it started happening.
+ *
+ * The Now bubble carries one thing at a time and the row's rule decides which: first come,
+ * first served. A recording that started before a download keeps the bubble until it stops,
+ * and nothing here ranks one kind of event above another — the phone has no way of knowing
+ * which of two true things the person cares about, and guessing is how a bubble ends up
+ * flickering between two states that are both correct.
+ *
+ * Torch is one of these rather than the special case it used to be: it is a Now mod like the
+ * others, and everything below reads the owner instead of reading `torch`.
+ */
+const nowLive = {};
+let nowOrder = [];
+
+/** How wide each mod asks the bubble to stand, before the floors below are applied. */
+const NOW_WIDTHS = {
+  torch: 116,
+  recording: 138,
+  download: 178,
+  upload: 178,
+};
+
+/** A finished transfer stands still for this long wearing a tick, then goes home. */
+const NOW_DONE_DWELL = 1100;
+
+const NOW_GLYPHS = {
+  recording: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>',
+  download: '<svg viewBox="0 0 24 24"><path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4L11 12.2zM5 18h14v2H5z"/></svg>',
+  upload: '<svg viewBox="0 0 24 24"><path d="M12 3l5.7 5.7-1.4 1.4L13 6.8V16h-2V6.8L7.7 10.1 6.3 8.7zM5 18h14v2H5z"/></svg>',
+  done: '<svg viewBox="0 0 24 24"><path d="M9.8 16.2 5.6 12l-1.4 1.4 5.6 5.6L20.4 7.9 19 6.5z"/></svg>',
+};
+
+function nowOwner() {
+  return nowOrder[0];
+}
+
 export let nowOpen = false;
 let nowDot = null;
 let nowDotAt = 0;
@@ -128,7 +167,13 @@ function showNowFace(name) {
  * each other and the neck between them holds.
  */
 function nowResting() {
-  return Math.max(NOW_RESTING, NOW_COVER, rowLeftEdge() - nowLeft - NOW_REACH);
+  // The mod's own width is a *floor* like the other two, never a ceiling: this bubble grows
+  // into whatever the row leaves it either way, and a download asking for 178 is asking not to
+  // be squeezed below that when the row is wide. NOW_COVER is still the hard one — below it the
+  // bubble hands back the piece of bar it exists to stand on — which is also why "Torch
+  // narrowed" is as narrow as the torch gets: its own ask is under the cover it owes.
+  const asked = NOW_WIDTHS[nowOwner()] || NOW_RESTING;
+  return Math.max(asked, NOW_COVER, rowLeftEdge() - nowLeft - NOW_REACH);
 }
 
 /**
@@ -228,8 +273,114 @@ export function fitNowProxy() {
   bridge.setNowProxy(Math.round(nowWidth), shared.compact.height, Math.round(nowLeft));
 }
 
+const nowLine = document.getElementById('now-line');
+const nowLineDone = document.getElementById('now-line-done');
+const nowElapsed = document.getElementById('now-elapsed');
+
+/** Seconds since a recording started, counted here because the shade counts its own. */
+let elapsedTick = null;
+
+function nowClock(milliseconds) {
+  const whole = Math.max(0, Math.round(milliseconds / 1000));
+  const minutes = Math.floor(whole / 60);
+  const seconds = whole % 60;
+  return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+}
+
+/**
+ * The face the owner wears. One face rather than one per mod: every Now mod is a glyph, a
+ * short reading and — for a transfer — a line along the bottom, which is the same two-run
+ * shape every resting face on this bar has.
+ */
+function paintNowFace() {
+  const owner = nowOwner();
+  const live = nowLive[owner];
+  // Written as data rather than as a class per mod: the CSS needs to know *which* transfer it
+  // is drawing to point the glyph the right way, and two classes for one answer is two things
+  // to keep in step.
+  nowPill.dataset.now = owner || '';
+  nowPill.classList.toggle('recording', owner === 'recording');
+  nowPill.classList.toggle('transferring', owner === 'download' || owner === 'upload');
+  nowPill.classList.toggle('paused', Boolean(live && live.isPaused));
+
+  if (owner === 'torch') {
+    nowGlyph.innerHTML = TORCH_GLYPH;
+    nowReading.textContent = torch && torch.dimmable ? torch.step + '/' + torch.steps : '';
+    nowLine.classList.remove('showing');
+    return;
+  }
+  if (owner === 'recording') {
+    nowGlyph.innerHTML = NOW_GLYPHS.recording;
+    nowReading.textContent = nowClock(Date.now() - (live ? live.since : Date.now()));
+    nowLine.classList.remove('showing');
+    return;
+  }
+  if (owner === 'download' || owner === 'upload') {
+    const isDone = Boolean(live && live.isDone);
+    nowGlyph.innerHTML = isDone ? NOW_GLYPHS.done : NOW_GLYPHS[owner];
+    nowReading.textContent = live ? live.detail : '';
+    nowLine.classList.add('showing');
+    const share = live && live.total ? Math.min(1, live.done / live.total) : 0;
+    nowLineDone.style.width = (isDone ? 100 : Math.round(share * 100)) + '%';
+  }
+}
+
 function paintNowReading() {
-  nowReading.textContent = torch && torch.dimmable ? torch.step + '/' + torch.steps : '';
+  paintNowFace();
+}
+
+/**
+ * The elapsed reading, ticking only while a recording is the thing being shown. A second is
+ * the resolution the number is written at, so a second is how often it is asked for — and the
+ * mirror is not stirred for it: the text changes inside a bubble whose box does not.
+ */
+function fitElapsedTick() {
+  const isRecording = nowOwner() === 'recording' && !nowLive.recording?.isPaused;
+  if (isRecording && elapsedTick === null) {
+    elapsedTick = setInterval(() => {
+      const live = nowLive.recording;
+      if (!live) return;
+      const reading = nowClock(Date.now() - live.since);
+      nowReading.textContent = reading;
+      if (nowOpen) nowElapsed.textContent = reading;
+    }, 1000);
+    return;
+  }
+  if (!isRecording && elapsedTick !== null) {
+    clearInterval(elapsedTick);
+    elapsedTick = null;
+  }
+}
+
+/**
+ * A Now mod arriving, changing or ending. Everything about which bubble is out, how wide it
+ * stands and what it says is worked out from the order here, so this is the one place a mod's
+ * life is written down — the flight out happens when the first one starts and the flight home
+ * when the last one ends, whichever mods those happen to be.
+ */
+function setNowMod(name, payload) {
+  const had = nowOrder.length;
+  if (payload) {
+    nowLive[name] = payload;
+    if (!nowOrder.includes(name)) nowOrder.push(name);
+  } else {
+    delete nowLive[name];
+    nowOrder = nowOrder.filter(mod => mod !== name);
+  }
+  fitElapsedTick();
+  if (!had && nowOrder.length) {
+    lightNow();
+    return;
+  }
+  if (had && !nowOrder.length) {
+    douseNow();
+    return;
+  }
+  if (!nowOrder.length) return;
+  paintNowFace();
+  // The width belongs to the mod, so a swap between two of them is a growth like any other.
+  fitNowWidth();
+  fitNowProxy();
 }
 
 /**
@@ -244,7 +395,7 @@ function paintNowReading() {
  * the thing two windows could never do, and the reason this page is the way it is.
  */
 function lightNow() {
-  traceEvent('torch on');
+  traceEvent('now out: ' + nowOwner());
   stopNowFlight();
   paintNowReading();
   root.classList.add('now-flying');
@@ -281,7 +432,7 @@ function lightNow() {
  * there opens up again as it arrives — because it is the thing arriving.
  */
 function douseNow() {
-  traceEvent('torch off');
+  traceEvent('now home');
   stopNowFlight();
   if (nowOpen) closeNowPanel();
   // First, before the width goes: the reading belongs to width the pill is about to
@@ -421,6 +572,15 @@ function nowPanelShift() {
 
 function openNowPanel() {
   nowOpen = true;
+  // Which half of the panel is showing belongs to the mod, and the panel is one box either
+  // way: it is the same bubble held down, not a second thing opening over it.
+  const owner = nowOwner();
+  nowPill.classList.toggle('recording-panel', owner === 'recording');
+  document.getElementById('now-label').textContent =
+    owner === 'recording' ? 'Recording' : 'Flashlight';
+  if (owner === 'recording' && nowLive.recording) {
+    nowElapsed.textContent = nowClock(Date.now() - nowLive.recording.since);
+  }
   buildNowSlider();
   if (!nowSliding) nowDotAt = (torch ? torch.step : 1) - 1;
   paintNowSlider();
@@ -446,7 +606,7 @@ function openNowPanel() {
 
 export function closeNowPanel() {
   nowOpen = false;
-  nowPill.classList.remove('open');
+  nowPill.classList.remove('open', 'recording-panel');
   showNowFace('closed');
   // Back to its spot by the clock, which paints the glass and stirs the skin on the
   // same curve — the panel was centred by this same offset on the way out.
@@ -534,8 +694,38 @@ export function nowTouch(action, x, y) {
   nowDownAt = null;
   if (action !== 'up' || nowHeld || travelled >= PROXY_TAP_SLOP) return;
   bridge.triggerHaptic('expand');
-  if (nowOpen) closeNowPanel();
-  else openNowPanel();
+  if (nowOpen) {
+    closeNowPanel();
+    return;
+  }
+  // What a tap means belongs to the mod. The torch has a panel behind it and nothing else to
+  // do; a recording has one obvious act and it is the one you want without looking — pause,
+  // and again to carry on. A transfer has none: there is nothing to do to a file that is on
+  // its way, so the tap opens the app that is moving it.
+  const owner = nowOwner();
+  if (owner === 'recording') {
+    pressRecording();
+    return;
+  }
+  if (owner === 'download' || owner === 'upload') {
+    const live = nowLive[owner];
+    if (live && live.key) bridge.openNotification(live.key);
+    return;
+  }
+  openNowPanel();
+}
+
+/**
+ * Pause or resume, by pressing the recorder's own button rather than by telling the recorder
+ * anything of ours. Which button that is is read off its title, because the notification is
+ * the only place either word is ever written and it is written in the phone's language.
+ */
+function pressRecording() {
+  const live = nowLive.recording;
+  if (!live || !live.actions) return;
+  const wanted = live.isPaused ? /resume|fortsetzen|weiter/i : /pause|anhalten/i;
+  const button = live.actions.find(action => wanted.test(action.title));
+  if (button) bridge.recordingAction(button.index);
 }
 
 /** Where its left edge rests: the host measures it off One UI's own chip. */
@@ -547,14 +737,64 @@ window.setNowLeft = value => {
 window.onTorchUpdate = payload => {
   const wasLit = Boolean(torch);
   torch = payload;
-  if (torch && !wasLit) lightNow();
-  else if (!torch && wasLit) douseNow();
-  else if (torch) {
-    paintNowReading();
-    if (nowOpen && !nowSliding) {
-      nowDotAt = torch.step - 1;
-      buildNowSlider();
-      paintNowSlider();
-    }
+  setNowMod('torch', payload);
+  if (torch && wasLit && nowOpen && !nowSliding) {
+    nowDotAt = torch.step - 1;
+    buildNowSlider();
+    paintNowSlider();
   }
 };
+
+/**
+ * A recording and a transfer, pushed together because the host reads them off the same shade
+ * in one pass. A transfer that reaches its total is not dropped on the spot: it stands there
+ * wearing a tick for a moment first, or the only thing the person ever sees of a finished
+ * download is the bubble disappearing.
+ */
+window.onNowMods = payload => {
+  setNowMod('recording', payload.recording || null);
+
+  const transfer = payload.transfer || null;
+  const kind = transfer ? transfer.mod : (nowLive.download ? 'download' : 'upload');
+  const standing = nowLive[kind];
+  if (transfer) {
+    const isDone = transfer.total > 0 && transfer.done >= transfer.total;
+    setNowMod(transfer.mod, Object.assign({ isDone }, transfer));
+    if (isDone) holdTheTick(transfer.mod);
+    return;
+  }
+  // Gone from the shade. If it was nearly there when it went, it finished — apps take a
+  // progress notification away the moment it completes — so the tick is owed either way.
+  if (standing && !standing.isDone) {
+    const share = standing.total ? standing.done / standing.total : 0;
+    if (share >= 0.95) {
+      setNowMod(kind, Object.assign({}, standing, { isDone: true }));
+      holdTheTick(kind);
+      return;
+    }
+  }
+  if (standing && standing.isDone) return;
+  setNowMod('download', null);
+  setNowMod('upload', null);
+};
+
+let tickTimer = null;
+function holdTheTick(kind) {
+  clearTimeout(tickTimer);
+  tickTimer = setTimeout(() => setNowMod(kind, null), NOW_DONE_DWELL);
+}
+
+/**
+ * Stop, which is the recorder's own button again. The panel closes on it rather than waiting
+ * to be told the recording ended: the shade will say so a moment later, and a panel still
+ * standing open over a recording that has stopped is the interface disagreeing with itself.
+ */
+document.getElementById('now-stop').addEventListener('click', event => {
+  event.stopPropagation();
+  const live = nowLive.recording;
+  const button = live && live.actions &&
+    live.actions.find(action => /stop|beenden|stopp/i.test(action.title));
+  if (button) bridge.recordingAction(button.index);
+  bridge.triggerHaptic('tap');
+  closeNowPanel();
+});

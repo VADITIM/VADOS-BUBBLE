@@ -168,6 +168,8 @@ export const shared = {
   pullReach: 0,
   /** The melt ceiling in force, which the settings panel scales. */
   goo: MELT_MAX,
+  /** Whether the row stands aside for the Now bubble. The panel owns it; the row reads it. */
+  nowPushes: true,
   /** How much wider than the bare bubble a mod makes it, from the settings panel. */
   modWidth: 56,
 };

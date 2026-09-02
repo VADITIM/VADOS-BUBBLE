@@ -39,7 +39,7 @@ never a working animation; the phone remains the check.
 | Call | Main, Satellite | built |
 | Battery | **Double only** — it is not a mod | built |
 | Torch | **Now only** | built |
-| Recording, Download, Upload | **Now only** — what is *happening* | planned |
+| Recording, Download, Upload | **Now only** — what is *happening* | built |
 | Bluetooth, USB, Hotspot | **Status only** — what is *connected* | built |
 | Discord video | Main, Satellite | planned |
 | DB Navigator | Main, Satellite, **Lock Now** | planned |
@@ -214,9 +214,20 @@ One step each, one push each, naming the feature.
       opening pushes it along instead of being drawn over it, and the same measurement is what
       lets the two neck. It costs no window — nothing about it is interactive. Home is a merge
       through `catchInto`, not a fade. **Not walked on the phone.**
-- [ ] **C4. Now mods** — Recording (red pill, white content, tap pause/resume, haptic panel, elapsed),
+- [x] **C4. Now mods** — Recording (red pill, white content, tap pause/resume, haptic panel, elapsed),
       Download and Upload (animated glyph, timeline, x/x MB and speed, done-tick then merge). Per-mod
       widths; Torch narrowed. Settings toggle for whether Now pushes the left satellite aside.
+      `NowWatch` reads both off ongoing notifications; `setNowMod` in `now.js` is the one place a
+      Now mod's life is written, and torch is now one of the set rather than the special case the
+      file was built around. Two things are honest rather than pretended: **"Torch narrowed" is
+      bounded by `NOW_COVER`** — below it the bubble uncovers the bar it exists to stand on, so
+      the torch is the narrowest of the four and no narrower — and the **x/x MB and speed line is
+      the app's own text**, not a parse, because every app writes it differently and a wrong parse
+      is worse than the app's words. Indeterminate progress bars are left in the shade: there is
+      no honest timeline for an app that says it does not know. The toggle is `nowPushesRow`,
+      default on, and it governs both the row's shift and its satellite limit. **Not walked on
+      the phone** — in particular the recorder package names and the pause/resume button titles
+      are the two things only the device can confirm.
 - [ ] **C5. Now geometry** — same width and position Spotify covers; swipe up dismisses to the punch
       hole on the Lock-Now-derived bounce.
 - [ ] **C6. Alarm state** — full screen with the top margin, orange, circular squircle buttons.

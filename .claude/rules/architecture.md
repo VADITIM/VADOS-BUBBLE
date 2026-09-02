@@ -23,6 +23,7 @@ One file per source of truth, each pushing a JSON payload or `null`:
 | `TimerWatch` | the clock app's ongoing notification |
 | `CallWatch` | an ongoing call notification |
 | `TorchWatch` | `CameraManager.registerTorchCallback`, and setting strength |
+| `NowWatch` | a recording running, a transfer in flight — both read off ongoing notifications |
 | `BatteryWatch`, `MicrophoneAccess` | charge, sensor privacy |
 | `ConnectivityWatch` | the default network, USB, tethering, and what is paired over bluetooth |
 

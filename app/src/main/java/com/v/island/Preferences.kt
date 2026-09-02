@@ -32,6 +32,14 @@ object Preferences {
     /** How much wider than the bare bubble a mod makes it. */
     const val MOD_WIDTH = "modWidthDp"
 
+    /**
+     * Whether the row stands aside while the Now bubble is out. On, the bubble is pushed
+     * right until its left edge is at the punch hole and the row is allowed one satellite
+     * instead of two; off, the row keeps its place and the Now bubble takes only the bar
+     * that is actually free. 1 or 0 — the store holds ints.
+     */
+    const val NOW_PUSHES = "nowPushesRow"
+
     private const val STORE = "island"
 
     /**
@@ -55,7 +63,8 @@ object Preferences {
         BLUR to 60,
         NOTIFICATION_IDENTITY to 2,
         GOO to 100,
-        MOD_WIDTH to 56
+        MOD_WIDTH to 56,
+        NOW_PUSHES to 1
     )
 
     fun of(context: Context): SharedPreferences =

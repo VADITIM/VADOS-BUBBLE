@@ -268,7 +268,7 @@ const HOLE_WIDTH = 34;
 function rowShift(resting) {
   // A bare bubble has no glyph to protect and is the bubble drawn around the hole in
   // the first place, so it does not move at all — it is the mods that are pushed.
-  if (!chipOut || !liveMods().length) return 0;
+  if (!chipOut || !liveMods().length || !shared.nowPushes) return 0;
   // Mirrors --mod-glyph and --glyph-inset in the CSS above, which are the same two
   // numbers off the same bubble height.
   const glyph = shared.compact.height - 10;
@@ -291,7 +291,10 @@ export function rowLeftEdge() {
  * hole is worse than a row that counts.
  */
 function satelliteLimit() {
-  return chipOut ? 1 : 2;
+  // Only when the row is actually standing aside. With the push switched off the row keeps
+  // its place and its bar, so the reason for dropping to one circle — there is not enough
+  // left over for two — is not true any more.
+  return chipOut && shared.nowPushes ? 1 : 2;
 }
 
 /** How far the circle stands off the bubble, which depends on how much bar there is. */

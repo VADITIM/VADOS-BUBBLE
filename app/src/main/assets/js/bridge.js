@@ -179,6 +179,11 @@ window.setNotificationIdentity = value => { pill.dataset.identity = String(value
  */
 window.setGoo = percent => {
   shared.goo = MELT_MAX * (Number(percent) || 100) / 100;
+};
+
+window.setNowPushes = value => {
+  shared.nowPushes = Number(value) !== 0;
+  paintShift();
   stirLiquid(240);
 };
 

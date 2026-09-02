@@ -38,8 +38,8 @@ A mod is content injected into a bubble, and which bubbles may carry it is part 
 | Call | Main, Satellite | built |
 | Battery | **Double only** — it is not a mod | built |
 | Torch | **Now only** | built |
-| Recording / screen share | Now only | planned |
-| Download, Upload | Now only | planned |
+| Recording / screen share | Now only | built |
+| Download, Upload | Now only | built |
 | Bluetooth, USB, Hotspot | **Status only**, as a Modus | built |
 | Discord video | Main, Satellite | planned |
 | DB Navigator | Main, Satellite, **Lock Now** | planned |
@@ -47,6 +47,8 @@ A mod is content injected into a bubble, and which bubbles may carry it is part 
 Now carries what is *happening* — a torch burning, a recording running, a download in flight. Status carries what is *connected*. That is the line between the two, and it is why bluetooth is not a Now mod even though it would fit there.
 
 The line has a second half worth naming, because it decides how the Status bubble is written: what is happening **starts and stops**, and what is connected is **true all the time**. So Now is watched and announced — it flies out when the light comes on and home when it goes — while Status is read and drawn, born once and standing there for as long as the bar does. A Modus is not a mod arriving in it: the bubble is being true about something else, so the swap is a repaint and its own width carries the change.
+
+The Now bubble carries one of its mods at a time and picks by the row's own rule: first come, first served. Nothing ranks a recording above a download — the phone cannot know which of two true things matters more, and guessing is how a bubble ends up flickering between two states that are both correct.
 
 Torch is the one to read twice. It is not a mod the row is currently not showing — it is a mod the row may never show, because the Now bubble exists to cover One UI's flashlight chip and a torch drawn anywhere else covers nothing. Eligibility is what stops a new Now mod from being written as a row mod that happens to start out there.
 

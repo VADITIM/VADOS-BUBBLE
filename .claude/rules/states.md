@@ -71,7 +71,8 @@ A mod is something that is simply true for as long as it is true, and it belongs
 | **Call** | `calling` | A connected call. No Active view of its own — tapping opens the call in its app. | built |
 | **Battery** | Double's own | Charging or low. **Not a mod**: it lives on the Double bubble beside the hole, because a charge level taking the bubble away from a song for four seconds is the one thing a Double exists to prevent. | built |
 | **Torch** | Now's own | The flashlight. Lives on the Now bubble, not in the Main row. | built |
-| **Recording** | — | Screen or voice recording. Now bubble, whole pill red, white content. | planned |
+| **Recording** | Now's own | Screen or voice recording. Now bubble, whole pill red, white content: it is the one state on this bar that has to be readable from the corner of the eye, and a coloured icon is not. Tap pauses and resumes, hold opens its panel — elapsed, and the button that ends it. | built |
+| **Download / Upload** | Now's own | A file in flight. The glyph moves the way the file is moving, the timeline runs along the bubble's bottom edge, and the app's own line under the title is the reading — every app writes "12,4 MB/s" differently and a wrong parse is worse than the app's own words. It wears a tick for a moment when it finishes, then goes home. | built |
 | **Discord video** | — | A stream or camera live in a call. | planned |
 
 The first column is the name to use in prose and in new code; the second is what the existing code still calls it. Each mod pairs a resting shape with its own separate open shape, and there is no single string that could stand for both without collapsing two real states into one.
@@ -91,7 +92,19 @@ A Tab is the content of an Active state: its own container with its own layout, 
 | **Flashlight** | Tap on the Now torch bubble. | built |
 | **Picture** | Tap on an alert carrying a photo. Sized to the image rather than to a fixed box. | built |
 | **Discord video** | Tap on the Discord video mod. 16:9 to screen width, or the video's own ratio if it is vertical. | planned |
-| **Recording** | Haptic on the Now recording bubble: time, pause/resume, stop. | planned |
+| **Recording** | Haptic on the Now recording bubble: elapsed and stop. It shares the flashlight panel's box rather than opening a second one — it is the same bubble held down. | built |
+
+## What the Now bubble carries
+
+**Built.** Torch, Recording, Download and Upload. They are one set with one owner at a time, chosen first-come-first-served, and `setNowMod` is the only place a Now mod's life is written down: the flight out happens when the first one starts and the flight home when the last one ends, whichever mods those happen to be. Torch is one of them rather than the special case it used to be.
+
+Each asks for its own width, and the ask is a **floor** rather than a width — the bubble still grows into whatever the row leaves it. `NOW_COVER` is the hard floor underneath all of them, because below it the bubble hands back the piece of bar it exists to stand on, and that is also the honest answer to "Torch narrowed": the torch's own ask is under the cover it owes, so it is as narrow as this bubble ever gets and the other three are what stand wider.
+
+Neither a recording nor a transfer is watched by a source of its own. Both are ongoing notifications, which is what the platform means by "this is still going on" — the same reading that puts a running timer in the row. A transfer with an *indeterminate* bar is left in the shade: an app saying it has no idea how far along it is has nothing a timeline can honestly draw. A finished one is not dropped on the spot either, because apps take a progress notification away the instant it completes and the only thing the person would ever see is the bubble vanishing; it stands there wearing a tick first.
+
+Paused is read off the recorder's buttons, not off a field — no recorder posts a state, but a running one offers "pause" and a paused one offers "resume". Both words are matched in both languages the phone speaks, because neither word is ours.
+
+Whether the row stands aside for this bubble is a setting (`nowPushesRow`, on by default). Off, the row keeps its place and its two satellites, and the Now bubble takes only the bar that is actually free.
 
 ## Status
 
