@@ -228,6 +228,16 @@ object MediaControl {
         return state.position + (since * state.playbackSpeed).toLong()
     }
 
+    /**
+     * How fast it plays, which for a voice note is the difference between listening to it and
+     * waiting for it. It is a transport control like any other — the session either honours it
+     * or ignores it, and there is no way to ask which beforehand, so the bubble offers it where
+     * it is worth having and lets the player answer.
+     */
+    fun setSpeed(rate: Float) {
+        controller?.transportControls?.setPlaybackSpeed(rate)
+    }
+
     fun seek(milliseconds: Long) {
         controller?.transportControls?.seekTo(milliseconds)
     }

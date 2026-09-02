@@ -1198,6 +1198,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * the bubble and no more: it sits over the system's own icons at the right end of the bar,
          * which is a stretch the shade swipe is started on as often as anywhere else.
          */
+        /** How fast the session plays, for a voice note that is being waited through. */
+        @JavascriptInterface
+        fun mediaSpeed(rate: String) {
+            MediaControl.setSpeed(rate.toFloatOrNull() ?: 1f)
+        }
+
         /** Snooze or dismiss, pressed from the alarm the bubble is showing. */
         @JavascriptInterface
         fun alarmAction(index: Int) {

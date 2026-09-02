@@ -94,6 +94,24 @@ function swapArt(element, art, milliseconds) {
   }, milliseconds);
 }
 
+/**
+ * The players whose "songs" are people talking. A voice note is the one kind of playback where
+ * the rate is worth a control of its own, and the two messengers are where they arrive — a
+ * speed button on an album would be an option nobody asked for on every song they play.
+ */
+const TALKERS = ['telegram', 'whatsapp'];
+const SPEEDS = [1, 1.5, 2];
+const playerSpeed = document.getElementById('player-speed');
+let speedAt = 0;
+
+playerSpeed.addEventListener('click', event => {
+  event.stopPropagation();
+  speedAt = (speedAt + 1) % SPEEDS.length;
+  playerSpeed.textContent = SPEEDS[speedAt] + '×';
+  bridge.mediaSpeed(String(SPEEDS[speedAt]));
+  bridge.triggerHaptic('tap');
+});
+
 export function paintMedia() {
   if (!shared.media || shared.isScrubbing) return;
   document.documentElement.style.setProperty(
@@ -106,6 +124,14 @@ export function paintMedia() {
   document.getElementById('player-artist').textContent = shared.media.artist || '';
   document.getElementById('player-duration').textContent = clock(shared.media.duration || 0);
   document.getElementById('player-play-path').setAttribute('d', playPath());
+  // A session that has been swapped underneath us is a different thing playing, so the rate
+  // goes back to normal with it rather than being inherited by whatever arrives next.
+  const talks = TALKERS.includes(shared.media.app);
+  if (!talks && speedAt !== 0) {
+    speedAt = 0;
+    playerSpeed.textContent = '1×';
+  }
+  playerSpeed.hidden = !talks;
   paintProgress(shared.media.position || 0);
   paintLock();
 }

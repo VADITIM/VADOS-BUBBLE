@@ -55,6 +55,9 @@ object AppStyles {
             GOOGLE
         ),
         Style("db", "DB Navigator", "de.hafas.android.db", "#ec0016"),
+        // Green on white is the app's own identity, and a shared calendar is the one thing on
+        // this phone whose notifications are somebody else writing in your day.
+        Style("timetree", "TimeTree", "works.jubilee.timetree", "#2ecc71"),
         Style("comdirect", "Comdirect", "de.comdirect.app", "#ffd200"),
         Style("spotify", "Spotify", "com.spotify.music", "#1db954"),
         Style("clock", "Clock", "com.sec.android.app.clockpackage", "#ff8a00")

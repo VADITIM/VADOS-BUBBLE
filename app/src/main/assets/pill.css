@@ -2497,3 +2497,19 @@ html.ringing #pill {
   color: var(--text-muted);
   font-size: 0.62rem;
 }
+
+
+/* The speed control. A word rather than a glyph, because the rate is the reading — and the same
+   squircle the rest of the transport wears, since it is one of them. */
+#player-speed {
+  width: 34px;
+  height: 34px;
+  border-radius: 34%;
+  corner-shape: squircle;
+  border: 1px solid var(--border-strong);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+#player-speed[hidden] { display: none; }

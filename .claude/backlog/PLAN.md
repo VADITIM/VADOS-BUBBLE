@@ -271,11 +271,23 @@ One step each, one push each, naming the feature.
       squircles: the rule keeping squircle off the bubbles is about bubbles, and a button is a
       square with a radius. **Not walked on the phone**, and the dither in particular is a thing
       only the panel can judge.
-- [ ] **C9. Discord video**; **DB Navigator** (Zugnummer/remaining while travelling, Gleis/departure at
+- [~] **C9. Discord video**; **DB Navigator** (Zugnummer/remaining while travelling, Gleis/departure at
       an Umstieg; tap expands the journey, tap again opens the app, haptic goes to the Abo tab).
       Eligible for Lock Now too, so it joins `LOCK_STEALS` and needs a face there. Starts with
       checking whether a saved journey is readable at all. Plus **TimeTree** as a named type
       (green/white) and media speed-up for Telegram/WhatsApp voice notes.
+      **The two small halves are built.** TimeTree is in `AppStyles`. The speed control is a
+      transport button that only exists for Telegram and WhatsApp — a voice note is the one kind
+      of playback where the rate is worth a control, and a speed button on an album is an option
+      nobody asked for on every song. It cycles 1 / 1.5 / 2 and resets when the session changes
+      underneath it. The session either honours `setPlaybackSpeed` or ignores it and there is no
+      way to ask beforehand, so the button offers it and the player answers — **which of the two
+      messengers actually honours it is a device question.**
+      **The two large halves are not started, and both begin on the phone.** DB Navigator's item
+      says so itself: it starts with finding out whether a saved journey is readable at all, and
+      the only way to know is to look at what the app posts while travelling. Discord video is
+      the same shape — whether a stream or camera being live is visible in the notification at
+      all decides whether there is a mod to build. Neither is worth guessing a payload for.
 - [~] **C10. Lock screen** — the Lock icon bubble; rubber-band response to unlock swipe progress;
       real Notification bubbles in a scrollable overflow-visible container.
       **Two of the three are built.** The padlock (`js/padlock.js`, a ninth blur pane, no window)
