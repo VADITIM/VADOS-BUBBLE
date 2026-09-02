@@ -1335,7 +1335,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   border-radius: 999px;
   background: var(--border-strong);
   position: relative;
-  overflow: hidden;
+  /* Not hidden: the dot marking the head stands proud of the line, and a track that clipped
+     its own marker would draw half a dot at the start of the song and none at the end. */
+  overflow: visible;
 }
 #player-elapsed {
   position: absolute;
@@ -1344,6 +1346,21 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: var(--app-accent);
   border-radius: 999px;
 }
+/* The head of the filled part, not a second thing placed from the ratio: one number, one
+   owner, and it cannot disagree with the line it stands on. The same dot the lock bubble's
+   timeline wears, because it is the same timeline. */
+#player-dot {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--app-accent);
+}
+/* Under the thumb it grows with the bar: the thing being dragged says that it is. */
+#player-timeline.scrubbing #player-dot { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; }
 /* Under the thumb the bar doubles: the thing being dragged says that it is. */
 #player-timeline.scrubbing #player-track { height: 8px; }
 
@@ -2306,3 +2323,49 @@ html.ringing #pill {
 /* The one that ends it is the solid one. At six in the morning the difference between the two
    has to be visible before either word is read. */
 .alarm-stop { background: #ffffff; color: #ff6a00; }
+
+
+/* ── The player, polished ──────────────────────────────────────────────────────────────
+   Squircles rather than circles on the transport. The rule that keeps squircle off the
+   bubbles is about *bubbles* — a pill or a satellite has corners already eaten by its own
+   radius, so a superellipse there is a different shape rather than a subtler one. A button
+   is a square with a radius and has room for the difference to read. */
+#player-buttons .transport {
+  border-radius: 34%;
+  corner-shape: squircle;
+}
+#player-play {
+  border-radius: 34%;
+  corner-shape: squircle;
+}
+
+/* The album's own colour, poured up from the bottom of the tab and gone by about a third of
+   the way. It is the record's hue standing behind the controls rather than a panel tinted with
+   it, which is why it fades out rather than stopping at an edge.
+
+   Dithered on purpose. A gradient this long across this few stops bands on an OLED — the eye
+   picks out the steps as horizontal stripes exactly where the colour is faintest — so a fine
+   repeating noise is laid over it at an alpha low enough to be invisible on its own and strong
+   enough to break the steps up. It is drawn as a mask over the hue rather than over the tab, so
+   nothing above it is touched.
+
+   Behind everything: it is a ground, and a ground that sits over the artwork is a tint. */
+#player-face::before {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 35%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(to top, var(--app-accent), transparent);
+  opacity: 0.34;
+  /* The dither: two offset radial grids at sub-pixel scale, which is a noise field cheap
+     enough to be composited every frame the tab is open. */
+  -webkit-mask-image:
+    radial-gradient(circle at 0 0, #000 40%, transparent 41%),
+    linear-gradient(#000, #000);
+  -webkit-mask-size: 3px 3px, 100% 100%;
+  -webkit-mask-composite: source-over;
+}
+#player-face > * { position: relative; z-index: 1; }

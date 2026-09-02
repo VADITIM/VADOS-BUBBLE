@@ -253,7 +253,16 @@ One step each, one push each, naming the feature.
       was being drawn. The bubble does not grow — the stack is anchored to its bottom edge once
       it outgrows the alert, so the oldest is pushed up and off the top under a fade, which is
       what was asked for over a growing box.
-- [ ] **C8. Spotify polish** — dithered hue bottom to ~35%, dot at the timeline head, squircle buttons.
+- [x] **C8. Spotify polish** — dithered hue bottom to ~35%, dot at the timeline head, squircle buttons.
+      The hue is the album's own colour poured up from the bottom of the media tab and gone by a
+      third of the way, drawn *behind* everything — a ground, not a tint over the artwork — and
+      dithered with a sub-pixel noise mask, because a gradient this long over this few stops
+      bands on an OLED exactly where it is faintest. The dot rides the head of the filled part
+      rather than being placed from the ratio a second time, which also meant taking
+      `overflow: hidden` off the track — it was clipping its own marker. The transport wears
+      squircles: the rule keeping squircle off the bubbles is about bubbles, and a button is a
+      square with a radius. **Not walked on the phone**, and the dither in particular is a thing
+      only the panel can judge.
 - [ ] **C9. Discord video**; **DB Navigator** (Zugnummer/remaining while travelling, Gleis/departure at
       an Umstieg; tap expands the journey, tap again opens the app, haptic goes to the Abo tab).
       Eligible for Lock Now too, so it joins `LOCK_STEALS` and needs a face there. Starts with
