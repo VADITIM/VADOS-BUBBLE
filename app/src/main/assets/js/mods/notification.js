@@ -1,5 +1,5 @@
 import { setSize, showFace, toClosed } from '../row.js';
-import { DWELL, PICTURE_MAX_HEIGHT, bridge, pill, shared } from '../state.js';
+import { PICTURE_MAX_HEIGHT, bridge, pill, shared } from '../state.js';
 
 /**
  * The words worth picking out of a message at a glance: what kind of thing it is,
@@ -233,8 +233,32 @@ function paintStack(notification, appending) {
   addLine(next[next.length - 1] || '', false);
 }
 
+/**
+ * Who the alert is from, which for a message in a server channel is not what the notification
+ * calls itself.
+ *
+ * A channel message titles itself after the *place* — `#general (Some Server)` — and the person
+ * who actually wrote is only in the message's own sender field. The place is worth one word of
+ * it and the channel is worth none: what a glance wants is who said something and where, so the
+ * head reads `Sender · Server`. Anything without a sender of its own is a notification titled
+ * after whoever sent it already, and it is left exactly as it was.
+ */
+function whoSent(notification) {
+  const title = notification.title || '';
+  const lines = notification.lines || [];
+  const sender = lines.length ? lines[lines.length - 1].sender : '';
+  if (!sender || sender === title) return title;
+  // Whatever is left of the title once the channel is taken out of it: in brackets when the app
+  // puts it there, and otherwise the title with its leading `#channel` removed.
+  const bracketed = title.match(/\(([^)]+)\)\s*$/);
+  const place = (bracketed ? bracketed[1] : title.replace(/#\S+/, '')).replace(/[\s\-—•·]+$/, '').trim();
+  return place && place !== sender ? sender + ' · ' + place : sender;
+}
+
 export function show(notification) {
   clearTimeout(shared.dwellTimer);
+  // Whatever was taken away is being replaced rather than ended — see onNotificationGone.
+  clearTimeout(goneTimer);
 
   const picture = document.getElementById('picture');
   const hasImage = Boolean(notification.imageBase64);
@@ -250,7 +274,7 @@ export function show(notification) {
   shared.current = notification;
 
   document.getElementById('app-name').textContent = notification.appName || '';
-  document.getElementById('title').textContent = notification.title || '';
+  document.getElementById('title').textContent = whoSent(notification);
   paintStack(notification, appending);
   document.documentElement.style.setProperty(
     '--app-accent', notification.accent || '#ffffff'
@@ -272,7 +296,7 @@ export function show(notification) {
   bridge.triggerHaptic('notification');
 
   // The dwell starts again, so a conversation being had is a bubble that stays up.
-  shared.dwellTimer = setTimeout(toClosed, DWELL);
+  shared.dwellTimer = setTimeout(toClosed, shared.dwell);
 }
 
 /**
@@ -282,8 +306,15 @@ export function show(notification) {
  * An open panel is the user's own doing and is left alone.
  */
 window.onNotificationGone = key => {
-  if (shared.state === 'alert' && shared.current && shared.current.key === key) toClosed();
+  if (shared.state !== 'alert' || !shared.current || shared.current.key !== key) return;
+  // Not on the spot, because an app that posts a fresh notification per message takes the old one away and puts the new one up in the same breath — and the announcement of the new one is held back by KILL_GRACE while the removal of the old one is not. Closed immediately, every real messenger's second message read as the alert being taken away and a brand new one arriving: the bubble shut, played its whole arrival again, and the conversation could not be read. Waited out, the alert is still standing and still holding the old notification when the replacement lands, so show() recognises the conversation and appends to it. It is longer than KILL_GRACE in IslandNotificationListener.kt deliberately — a grace shorter than the delay it is waiting for is no grace at all.
+  clearTimeout(goneTimer);
+  goneTimer = setTimeout(toClosed, GONE_GRACE);
 };
+
+/** Mirrors KILL_GRACE in IslandNotificationListener.kt, which it has to outlast. */
+const GONE_GRACE = 900;
+let goneTimer = null;
 
 /** The picture opens to its own shape, never to a fixed box that crops it. */
 export function openPicture() {

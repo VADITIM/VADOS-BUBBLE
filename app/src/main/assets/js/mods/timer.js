@@ -1,4 +1,4 @@
-import { closedTarget, setSize, showFace, toClosed } from '../row.js';
+import { becomeExtended, closedTarget, setSize, showFace, toClosed } from '../row.js';
 import { bridge, mods, pill, setSweepPhase, shared } from '../state.js';
 
 const timerRemaining = document.getElementById('timer-remaining');
@@ -65,7 +65,7 @@ function runTimerClock() {
 
 /** The clock app's own buttons — pause, resume, cancel — fired from the bubble. */
 export function openTimer() {
-  shared.state = 'active';
+  becomeExtended();
   paintTimer();
 
   const actions = document.getElementById('timer-actions');

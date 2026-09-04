@@ -1,7 +1,7 @@
 import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
-import { clock, paintProgress, playPath, shownPosition } from './mods/media.js';
-import { cancelSpring, DEAD_ZONE, rubberBandPast, toy, untoy } from './motion.js';
-import { fitNowProxy } from './now.js';
+import { clock, flipPlaying, paintProgress, playPath, livePosition, shownPosition, songSwapping, typeLabels } from './mods/media.js';
+import { cancelSpring, HOLD_BLOCK, rubberBandPast, toy, untoy } from './motion.js';
+import { fitClockProxy } from './clock.js';
 import { fitNotesProxy, paintNotes } from './notes.js';
 import { paintPadlock } from './padlock.js';
 import { fitStatusProxy } from './status.js';
@@ -9,16 +9,19 @@ import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js'
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 import { leaveForMod } from './tabs.js';
 
-/**
- * Mirrors #lock-now in the CSS above and LOCK_INSET / LOCK_BOTTOM / LOCK_HEIGHT in
- * BubbleService, which places the touch proxy from them. There is no build step
- * joining the three, so a size changed in one of them and not the others is a bubble
- * being aimed at through a hole somewhere else.
- */
-const LOCK_INSET = 16;
-const LOCK_BOTTOM = 20;
+/** How far along the screen the settings panel has moved the lock screen stack, in dp. Mirrors --lock-x. */
+let lockShift = 0;
+
+/** Now and the notes share one container now, so one shift slides both of them together. */
+window.setLockShift = lockX => {
+  lockShift = Number(lockX) || 0;
+  root.style.setProperty('--lock-x', lockShift + 'px');
+  fitLockProxy();
+  fitNotesProxy();
+};
+/** Mirrors --lock-height in pill.css: what settleLock animates the box to when it closes. */
 const LOCK_HEIGHT = 124;
-/** Open, it is the media tab: the same parts with the room to be worked rather than read. */
+/** Open, it is the media tab: the same parts with the room to be worked rather than read. Mirrors --lock-open-height. */
 const LOCK_OPEN_HEIGHT = 546;
 
 /** A flick up opens the bubble and a flick down closes it, past this much travel. */
@@ -125,11 +128,14 @@ export function paintLock() {
   fitLockProxy();
   if (!showing) return;
   lockPill.style.setProperty('--lock-accent', shared.media.accent || 'var(--section-color)');
-  document.getElementById('lock-title').textContent = shared.media.title || '';
-  document.getElementById('lock-artist').textContent = shared.media.artist || '';
+  // Both bubbles' lines are typed by one owner, and while a song is changing over they belong to
+  // that changeover — the cover leaves, the picture is decoded, the cover comes back, and only
+  // then is the new song read out. Typed here as well, this bubble would name a song whose cover
+  // is still on its way.
+  if (!songSwapping) typeLabels();
   document.getElementById('lock-duration').textContent = clock(shared.media.duration || 0);
   document.getElementById('lock-play-path').setAttribute('d', playPath());
-  paintLockProgress(shared.media.position || 0);
+  paintLockProgress(livePosition());
 }
 
 /**
@@ -158,10 +164,15 @@ function settleLock(change) {
   // height. Measured against a box that had not grown yet, the transforms below put
   // the contents back to somewhere neither layout ever had them.
   const to = lockOpen ? LOCK_OPEN_HEIGHT : LOCK_HEIGHT;
-  lockPill.animate(
+  const growth = lockPill.animate(
     [{ height: from + 'px' }, { height: to + 'px' }],
     { duration: LOCK_GROW, easing: LOCK_EASE }
   );
+  // The proxy is measured off the box, and mid-growth the box still measures as the height it
+  // is leaving — so the window is placed again once the box is actually the size it was going
+  // to be. Asked of the animation rather than of a timer of the same length, because the two
+  // would be the same number written twice.
+  growth.addEventListener('finish', fitLockProxy);
   lockMovers.forEach((mover, index) => {
     const from = before[index];
     const to = mover.element.getBoundingClientRect();
@@ -198,11 +209,9 @@ function openLock() {
   lockOpen = true;
   settleLock(() => lockPill.classList.add('open'));
   fitLockProxy();
-  // The payload's position is from whenever the session last reported one, which can
-  // be minutes ago. Asked for, so the line is right the moment it is big enough to
-  // read rather than a tick later — the same reason openPlayer asks.
-  const now = Number(bridge.readMediaPosition());
-  paintLockProgress(Number.isFinite(now) && now > 0 ? now : (shared.media && shared.media.position) || 0);
+  // Where the song is at this instant rather than where the last payload said it was, and worked
+  // out in the page — asking the host is a binder round-trip in the frame the box starts growing.
+  paintLockProgress(livePosition());
   stirLiquid(600);
 }
 
@@ -222,17 +231,44 @@ export function paintLockProgress(position) {
   document.getElementById('lock-position').textContent = clock(position);
 }
 
-/** The proxy is exactly the bubble, and it exists only while the bubble does. */
+/**
+ * The proxy is exactly the bubble, and it exists only while the bubble does.
+ *
+ * Measured rather than derived, for the same reason the skin and the glass are: this bubble is
+ * laid out by #lock-stack now — a flex column it shares with the notification list — so where
+ * its top edge falls is the flex algorithm's answer and not a sum of LOCK_BOTTOM and a height
+ * this file happens to name. Three constants agreeing with the CSS by hand is three chances to
+ * disagree with it, and a proxy that disagrees is a bubble that is drawn and cannot be touched.
+ */
+let shownProxy = '';
+
 function fitLockProxy() {
-  if (lockFlying || !lockPill.classList.contains('showing')) {
-    bridge.setLockProxy(0, 0, 0, 0);
-    return;
-  }
-  const height = lockOpen ? LOCK_OPEN_HEIGHT : LOCK_HEIGHT;
-  bridge.setLockProxy(
-    Math.round(window.innerWidth - LOCK_INSET * 2), height,
-    LOCK_INSET, Math.round(window.innerHeight - LOCK_BOTTOM - height)
-  );
+  const hidden = lockFlying || !lockPill.classList.contains('showing');
+  const box = hidden ? null : lockPill.getBoundingClientRect();
+  const proxy = hidden
+    ? [0, 0, 0, 0]
+    : [Math.round(box.width), Math.round(box.height), Math.round(box.left), Math.round(box.top)];
+  // paintLock() runs on every media payload, several a second, and each one crossed into Kotlin to
+  // move a window that had not moved. The measurement is cheap; the JNI hop on the frame the
+  // player is animating is not.
+  if (proxy.join() === shownProxy) return;
+  shownProxy = proxy.join();
+  bridge.setLockProxy(proxy[0], proxy[1], proxy[2], proxy[3]);
+}
+
+/**
+ * Whether a point belongs to this bubble, asked the way every other bubble here is asked.
+ *
+ * It needs asking because this bubble is not the only thing over that part of the screen: the
+ * notification list stands above it in the markup and its own proxy window is added after this
+ * one, so a tap on the player was answered by whatever the hit-test found stacked over it and
+ * the bubble read as untouchable — pressed, held, swiped, nothing. The window that heard the
+ * finger cannot settle it; where the finger fell can.
+ */
+export function lockHolds(x, y) {
+  if (lockFlying || !lockPill.classList.contains('showing')) return false;
+  const box = lockPill.getBoundingClientRect();
+  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 }
 
 /**
@@ -241,9 +277,9 @@ function fitLockProxy() {
  * only the page knows which of them should have it back.
  */
 window.refitProxies = () => {
-  fitNowProxy();
   fitLockProxy();
   fitStatusProxy();
+  fitClockProxy();
   fitNotesProxy();
 };
 
@@ -397,7 +433,7 @@ function takeLockBack() {
  * transform on the bubble belongs to whatever is dragging it this frame — set outright it
  * would fight the drag and the row's own place.
  */
-function bumpPill() {
+export function bumpPill() {
   pill.animate(
     [
       { transform: 'translateY(0px)' },
@@ -481,7 +517,7 @@ window.onLock = next => {
 
 /**
  * The lock bubble is an object too, and it is the one most likely to be idly pushed
- * about: it is the bubble a thumb is already resting on. Same band and same dead zone
+ * about: it is the bubble a thumb is already resting on. Same band and same block
  * as the bubble at the cutout — the numbers belong to the interface, not to a bubble.
  * Nothing is asked for by it, so there is no threshold and no release to interpret;
  * the transport's own taps still land, because a touch that travelled is not a tap.
@@ -506,7 +542,7 @@ lockPill.addEventListener('touchstart', event => {
   stirLiquid(420);
   // Held, it means what a hold means on every bubble here: out to the app the mod
   // stands for. It runs underneath the play drag exactly as the main bubble's does —
-  // the dead zone is what keeps the two out of each other's way.
+  // the block is what keeps the two out of each other's way.
   clearTimeout(lockHoldTimer);
   lockHoldTimer = setTimeout(() => {
     lockHeld = true;
@@ -521,7 +557,7 @@ lockPill.addEventListener('touchmove', event => {
   if (!lockStart || lockHeld) return;
   const dx = event.touches[0].clientX - lockStart.x;
   const dy = event.touches[0].clientY - lockStart.y;
-  if (Math.hypot(dx, dy) <= DEAD_ZONE) return;
+  if (Math.hypot(dx, dy) <= HOLD_BLOCK) return;
   // Up opens it, down closes it — the direction the box itself moves, so the gesture
   // is the animation asked for by hand. It fires the moment the threshold is passed
   // rather than on release, for the same reason the row's trade does: a threshold
@@ -578,10 +614,15 @@ lockPill.addEventListener('click', () => {
  */
 function knock(element) {
   element.classList.add('knocked');
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    element.classList.remove('knocked');
-  }));
+  // Held for the length of the shrink rather than let go of on the next frame: released after two
+  // frames the scale had travelled about a third of the way to 0.82 before it turned round, which
+  // is a press that technically animates and visibly does nothing.
+  clearTimeout(knocking.get(element));
+  knocking.set(element, setTimeout(() => element.classList.remove('knocked'), KNOCK_MILLIS));
 }
+/** Mirrors the .knocked transition in pill.css. */
+const KNOCK_MILLIS = 90;
+const knocking = new WeakMap();
 
 /**
  * A control inside the bubble owns its whole touch stream, not only the click it ends with.
@@ -598,8 +639,17 @@ function ownsTouch(element) {
     element.addEventListener(type, event => event.stopPropagation(), { passive: true });
   }
 }
-ownsTouch(document.getElementById('lock-buttons'));
+// Each button, never the row holding them. The row is the full width of the bubble and most of
+// its middle, and a control owning its touch means the *control* — given the row, every touch
+// that landed in the space between the three glyphs was swallowed on the way to the bubble, so
+// the bubble had no press, no drag, no hold and no tap across the widest band it has. The
+// timeline is the row that genuinely is one control: it is scrubbed along its whole width.
+document.querySelectorAll('#lock-buttons .transport').forEach(ownsTouch);
 ownsTouch(document.getElementById('lock-timeline'));
+// The player at the cutout has the same three buttons and had none of this: a press on play also
+// swelled the pill and started its hold, and the style work that comes with those is what ate the
+// button's own knock.
+document.querySelectorAll('#player-buttons .transport').forEach(ownsTouch);
 
 /**
  * Dragging the lock bubble's timeline. It had none — the scrub was written for the main
@@ -645,43 +695,45 @@ document.getElementById('lock-timeline')
 document.getElementById('lock-timeline')
   .addEventListener('touchcancel', () => { shared.isScrubbing = false; }, { passive: true });
 
-function lockTransport(id, action) {
-  document.getElementById(id).addEventListener('click', event => {
-    event.stopPropagation();
-    knock(event.currentTarget);
-    bridge.triggerHaptic('tap');
-    bridge.mediaControl(action);
-  });
-}
-
-lockTransport('lock-previous', 'previous');
-lockTransport('lock-next', 'next');
-document.getElementById('lock-play').addEventListener('click', event => {
-  event.stopPropagation();
-  knock(event.currentTarget);
-  bridge.triggerHaptic('tap');
-  bridge.mediaControl(shared.media && shared.media.isPlaying ? 'pause' : 'play');
-});
-
-
+/**
+ * Every transport button on this page, wired once.
+ *
+ * A button used to do all of its work on `click`, and on this page a click is late by
+ * construction: no finger touches the document, so the click is synthesised by the bridge at
+ * *release* and only when the touch did not travel. Pressing a button therefore looked dead for
+ * as long as the thumb was on it, and the play glyph then waited a second time for the media
+ * session to report back — two delays stacked on one tap, which is the whole of "the buttons
+ * feel dreadful". The press is answered on touchdown now, where the finger is, and the action
+ * still fires on the click so a thumb that slid off the button does not act.
+ *
+ * Play is optimistic on top of that: the glyph is flipped here and the session's own report
+ * corrects it a moment later, because the button says what it did rather than what it asked for.
+ */
 function transport(id, action) {
-  document.getElementById(id).addEventListener('click', event => {
-    event.stopPropagation();
-    knock(event.currentTarget);
+  const button = document.getElementById(id);
+  button.addEventListener('touchstart', () => {
+    knock(button);
     bridge.triggerHaptic('tap');
-    bridge.mediaControl(action);
+  }, { passive: true });
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    bridge.mediaControl(typeof action === 'function' ? action() : action);
   });
 }
 
+/** The two ends of the same control, so the glyph and the request cannot disagree. */
+function pressPlay() {
+  const wanted = shared.media && shared.media.isPlaying ? 'pause' : 'play';
+  flipPlaying();
+  return wanted;
+}
+
+transport('lock-previous', 'previous');
+transport('lock-next', 'next');
+transport('lock-play', pressPlay);
 transport('player-previous', 'previous');
 transport('player-next', 'next');
-
-document.getElementById('player-play').addEventListener('click', event => {
-  event.stopPropagation();
-  knock(event.currentTarget);
-  bridge.triggerHaptic('tap');
-  bridge.mediaControl(shared.media && shared.media.isPlaying ? 'pause' : 'play');
-});
+transport('player-play', pressPlay);
 
 /**
  * Scrubbing follows the finger. The seek itself is sent once, on release — asking

@@ -7,33 +7,36 @@ export const faces = {
   timer: document.getElementById('timer-face'),
   timerPanel: document.getElementById('timer-panel'),
   call: document.getElementById('call-face'),
-  alarm: document.getElementById('alarm-face'),
 
 
   alert: document.getElementById('alert-face'),
   history: document.getElementById('history-face'),
-  quick: document.getElementById('quick-face'),
 };
 export const bridge = window.Android || {
   ready() {}, setWindowSize() {}, setWindowBounds() {}, setBlurFrame() {}, triggerHaptic() {}, onSwipeDismiss() {},
   mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, setTorchLit() {},
   setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
   openNotification() {}, dismissNotification() {}, timerAction() {},
-  setTorch() {}, setNowProxy() {}, setLockProxy() {}, setStatusProxy() {}, openConnectionSettings() {},
-  recordingAction() {}, alarmAction() {}, setNotesProxy() {}, mediaSpeed() {},
-  setCarryProxy() {}, setCarried() {},
+  setTorch() {}, setLockProxy() {}, setStatusProxy() {}, setClockProxy() {},
+  openConnectionSettings() {}, openClock() {}, requestToggles() {}, setToggle() {},
+  recordingAction() {}, setNotesProxy() {}, mediaSpeed() {},
   note() {}, wakeFrames() {},
 };
 // The host window tracks the bubble in both directions. It sits above the status
 // bar, so anything it covers is a pixel the shade swipe cannot start on — at rest
 // that must be the bubble and nothing more. Negative means "the user's own size".
+/** Mirrors --grown-pad in pill.css: how far a grown bubble stands off the line the closed row rests on, so the goo has
+ *  somewhere to put the squash a merge writes on it. Every grown window owes the same pixels back, or the pad is paid
+ *  for out of the bottom of the state and the last row of a list is clipped. */
+export const GROWN_PAD = 26;
+
 export const SIZES = {
   idle:     { width: -1,  height: -1  },
   // The alert begins where the closed bubble does and grows downwards, so the
   // window only needs the height — a few pixels over the bubble's own, since the
   // bubble cannot be drawn outside the window holding it.
-  alert:    { width: 300, height: 115 },
-  image:    { width: 300, height: 159 },
+  alert:    { width: 300, height: 162 },
+  image:    { width: 300, height: 197 },
   haptic:   { width: 340, height: 150 },
   picture:  { width: 340, height: 320 },
   player:   { width: 340, height: 190 },
@@ -41,10 +44,9 @@ export const SIZES = {
   // Five steps in a row and their label above them; nothing else belongs in it.
 
   history:  { width: 340, height: 320 },
-  // The whole screen less the margin the bubble is already standing in. An alarm is the one
-  // state allowed to cost the shade swipe: while it rings there is nothing else to be doing.
-  alarm:    { width: 356, height: 720 },
 };
+/** The default an alert stands for, in milliseconds. The setting overwrites shared.dwell; this is
+ *  only what is true before the host has said anything. */
 export const DWELL = 5000;
 export const HOLD_MILLIS = 350;
 export const HOLD_SCALE = 1.14;
@@ -103,14 +105,6 @@ export const SWAP_FLICK = 1.4;
 export const SWAP_STILL = 90;
 // How long a press has to last before the window is allowed to grow under it.
 export const HOLD_GRACE = 140;
-/**
- * How far a resting finger may wander before it counts as a drag rather than a
- * hold. A finger pressing for a third of a second travels further than it feels
- * like it does, and this is one threshold for both answers: under it nothing moves
- * and the hold survives, over it the drag owns the touch. The swipe that dismisses
- * starts at 24, so this stays under it.
- */
-export const HOLD_SLOP = 22;
 document.documentElement.style.setProperty('--hold-scale', HOLD_SCALE);
 export const PICTURE_MAX_HEIGHT = 460;
 export const CLOSED = new Set(['idle', 'playing', 'timing', 'calling']);
@@ -135,7 +129,7 @@ export const shared = {
    *
    *   idle     the bubble as configured, nothing added
    *   alert    a notification has taken it over for its dwell
-   *   active   it was tapped open
+   *   extended it was tapped open: the bigger module of the mod, with its options
    *   haptic   it is being held down
    *
    * Closed mods are not a state but a set: things that are simply true for as long
@@ -171,9 +165,13 @@ export const shared = {
   // The call that is connected, or null.
   call: null,
   hasHeld: false,
-  pullReach: 0,
   /** The melt ceiling in force, which the settings panel scales. */
   goo: MELT_MAX,
+  // How long an alert stands before it closes itself. Written by setAlertDwell from the setting,
+  // which counts tenths of a second because the store holds ints.
+  dwell: DWELL,
+  // Whether a bubble near the side of the screen reaches out and wets it. Written by setEdgeMerge.
+  edgeMerge: true,
   /** Whether the row stands aside for the Now bubble. The panel owns it; the row reads it. */
   nowPushes: true,
   /** How much wider than the bare bubble a mod makes it, from the settings panel. */

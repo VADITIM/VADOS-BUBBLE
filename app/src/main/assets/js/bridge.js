@@ -2,8 +2,10 @@ import { stirLiquid } from './liquid.js';
 import { mediaWindow } from './mods/media.js';
 import { show } from './mods/notification.js';
 import { timerWindow } from './mods/timer.js';
-import { nowHolds, nowOpen, nowPill, nowTouch } from './now.js';
-import { statusHolds, statusTouch } from './status.js';
+import { nowOpen, nowOwnsClock, nowTouch } from './now.js';
+import { statusHolds, statusOpen, statusPill, statusTouch } from './status.js';
+import { clockHolds, clockPill, clockTouch } from './clock.js';
+import { lockHolds, lockPill } from './lock.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
 
@@ -26,7 +28,9 @@ let proxySource = 'main';
 let nowOwnsTouch = false;
 /** The same, for the bubble at the right end of the bar. */
 let statusOwnsTouch = false;
-/** Far enough that the release is a drag's end rather than a tap. Mirrors HOLD_SLOP. */
+let clockOwnsTouch = false;
+/** Far enough that the release is a drag's end rather than a tap. Its own number: this is about
+ *  a tap, not about the block, and a touch that ended inside the block is still a tap. */
 export const PROXY_TAP_SLOP = 22;
 
 /** An element, short enough to read off a debug line. */
@@ -34,7 +38,7 @@ function describe(element) {
   if (!element) return 'nothing';
   return (element.id || element.className || element.tagName) +
     (pill.contains(element) ? ' (in the bubble)' : '') +
-    (nowPill.contains(element) ? ' (in the light)' : '');
+    (clockPill.contains(element) ? ' (in the clock)' : '');
 }
 
 function proxyEvent(type, target, x, y, isEnd) {
@@ -49,64 +53,74 @@ function proxyEvent(type, target, x, y, isEnd) {
 }
 
 /**
- * What a touch from this proxy is allowed to land on. A proxy is placed over one
- * bubble and nothing else, so a touch it heard belongs to that bubble however the
- * page happens to be stacked at that moment — a grown panel is drawn across most of
- * the bar and sits above the Now bubble in the DOM, so without this every tap and
- * every hold aimed at the light was answered by whatever mod owned the main bubble.
+ * What a touch from this proxy is allowed to land on. A proxy is placed over one bubble and
+ * nothing else, so a touch it heard belongs to that bubble however the page happens to be
+ * stacked at that moment — a grown panel is drawn across most of the bar and sits above the
+ * others in the DOM, so without this every tap and every hold aimed at one of them was answered
+ * by whatever mod owned the main bubble.
+ *
+ * The lock screen's bubble is here for the same reason and it is not a hypothetical one: the
+ * notification list stands above it in the markup and its proxy is added to the window manager
+ * after the lock bubble's, so a tap on the player was landing on whichever of the two the
+ * hit-test happened to answer with — which is exactly what "I cannot tap it, it goes straight
+ * through" is. Where the finger fell decides, not what is stacked over it.
  */
 function proxyPoint(x, y, source) {
   const hit = document.elementFromPoint(x, y);
-  // Where it landed decides, not which window heard it and not what is stacked over
-  // it. The two proxies each carry a grab margin and the two bubbles now stand a few
-  // pixels apart, so their margins lie over each other: a touch on the light was
-  // being answered by the main bubble whenever the main proxy heard it first, and a
-  // touch on the main bubble's left edge was being eaten by the light whenever the
-  // Now proxy did. The one thing neither window knows is where the shapes are.
-  // The closed light never gets here — it answers its own touches, see nowTouch. This
-  // is the open panel, which is drawn across the bar and above everything on it: a
-  // touch inside it is the panel's whatever the DOM has stacked where the finger fell.
-  if (!nowOpen || !nowHolds(x, y)) return hit;
-  return hit && nowPill.contains(hit) ? hit : nowPill;
+  if (statusOpen && statusHolds(x, y)) {
+    return hit && statusPill.contains(hit) ? hit : statusPill;
+  }
+  if (lockHolds(x, y)) {
+    return hit && lockPill.contains(hit) ? hit : lockPill;
+  }
+  if (nowOpen && clockHolds(x, y)) {
+    return hit && clockPill.contains(hit) ? hit : clockPill;
+  }
+  // And the main bubble's own proxy, by geometry rather than by what the hit-test answers: that window is the bubble plus the grab margin and the bleed either side, so a finger landing in the margin — which is most of the finger, on a 30dp pill — hit the canvas behind it, and the bubble's own listeners never heard a touch it had plainly been given. That is the whole of "the clock and the Status bubble are easy to get a grip on and the main one is not": those two are routed by where the finger fell and this one was routed by what happened to be under it. Inside the bubble the element still wins, because an open panel is full of controls that have to be clicked.
+  if (source === 'main') return hit && pill.contains(hit) ? hit : pill;
+  return hit;
 }
 
 window.onProxyTouch = (action, x, y, source) => {
   if (action !== 'move') {
-    const box = nowPill.getBoundingClientRect();
+    const box = clockPill.getBoundingClientRect();
     bridge.note(
       'page: ' + action + ' at ' + Math.round(x) + ', ' + Math.round(y) +
-      ' — the light is ' + (nowPill.classList.contains('lit') ? 'lit' : 'dark') +
-      ' at ' + Math.round(box.left) + '–' + Math.round(box.right) +
+      ' — the clock is at ' + Math.round(box.left) + '–' + Math.round(box.right) +
       ', ' + Math.round(box.top) + '–' + Math.round(box.bottom) +
-      ' — owner ' + (nowHolds(x, y) && !nowOpen ? 'the light' : 'the row') +
+      ' — owner ' + (clockHolds(x, y) ? (nowOwnsClock() ? 'a Now mod' : 'the clock') : 'the row') +
       ' — under it ' + describe(document.elementFromPoint(x, y))
     );
   }
-  // The light first, and by geometry alone. Its panel is the exception: the rail in
-  // there is dragged, so once it is open the touches go the ordinary way and reach the
-  // elements that know what to do with them.
-  // A touch this window heard is this bubble's, whatever the coordinates work out to:
-  // the window is placed over the light and over nothing else, which is the same thing
-  // that made this simple when the light was a page in a window of its own. The row's
-  // window can hear one too — the two stand six pixels apart — and that one is decided
-  // by where it landed, which is all the row's window can tell us.
+  // The bubble at the right end first, and by geometry alone: a touch this window heard is that
+  // bubble's, and one the row's window heard is decided by where it landed. Only while it is
+  // closed — an open panel is full of switches that have to be clicked, so once it is open the
+  // touches go the ordinary way and reach the elements that know what to do with them.
   if (action === 'down') {
-    nowOwnsTouch = !nowOpen &&
-      (source === 'now' || (nowHolds(x, y) && CLOSED.has(shared.size)));
+    statusOwnsTouch = !statusOpen && (source === 'status' || statusHolds(x, y));
+  }
+  if (statusOwnsTouch) {
+    statusTouch(action, x, y);
+    if (action === 'up' || action === 'cancel') statusOwnsTouch = false;
+    return;
+  }
+  // And the bubble at the left end, which is two bubbles' worth of meaning in one box: the time,
+  // and whichever Now mod has taken it over. Which of the two answers is not a question about
+  // where the finger fell — both are the same box — so it is asked of the mods, and the clock
+  // gets the touch only when nothing is standing in it. The open panel is the exception both of
+  // them share: the intensity rail in there is dragged, so the touches go the ordinary way.
+  if (action === 'down') {
+    clockOwnsTouch = !nowOpen && (source === 'clock' || clockHolds(x, y));
+    nowOwnsTouch = clockOwnsTouch && nowOwnsClock();
   }
   if (nowOwnsTouch) {
     nowTouch(action, x, y);
     if (action === 'up' || action === 'cancel') nowOwnsTouch = false;
     return;
   }
-  // The same question as the light's, at the other end of the bar: a touch this window heard
-  // is this bubble's, and a touch the row's window heard is decided by where it landed.
-  if (action === 'down') {
-    statusOwnsTouch = source === 'status' || statusHolds(x, y);
-  }
-  if (statusOwnsTouch) {
-    statusTouch(action, x, y);
-    if (action === 'up' || action === 'cancel') statusOwnsTouch = false;
+  if (clockOwnsTouch) {
+    clockTouch(action, x, y);
+    if (action === 'up' || action === 'cancel') clockOwnsTouch = false;
     return;
   }
   if (action === 'down') {
@@ -148,6 +162,8 @@ window.setUnreadCount = count => {
   badge.textContent = count > 9 ? '9+' : String(count);
   badge.classList.toggle('present', count > 0);
 };
+/** The one lit colour, repointed at the token every rule on the bar already reads it through. */
+window.setAccent = hex => root.style.setProperty('--section-color', hex);
 window.setPillBackground = rgba => {
   root.style.setProperty('--pill-background', rgba);
   // Split for the skin: solid colour on the shapes, transparency on the layer.
@@ -179,6 +195,17 @@ window.setNotificationIdentity = value => { pill.dataset.identity = String(value
  */
 window.setGoo = percent => {
   shared.goo = MELT_MAX * (Number(percent) || 100) / 100;
+};
+
+/** The alert's dwell, in tenths of a second because the store holds ints. */
+window.setAlertDwell = tenths => {
+  shared.dwell = Math.max(500, (Number(tenths) || 50) * 100);
+};
+
+/** Whether the liquid wets the sides of the screen. The mirror reads it every frame. */
+window.setEdgeMerge = value => {
+  shared.edgeMerge = Number(value) !== 0;
+  stirLiquid(240);
 };
 
 window.setNowPushes = value => {

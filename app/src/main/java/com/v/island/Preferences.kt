@@ -16,6 +16,14 @@ object Preferences {
     const val BLUE = "blue"
     const val BACKGROUND_ALPHA = "backgroundAlpha"
 
+    /**
+     * The one colour everything on the bar is lit in — a live switch, a mod's glyph, an open
+     * panel's accent. Stored as 0xRRGGBB in a single int because the store holds ints and because
+     * it is picked as a colour rather than as three numbers: the three sliders above it are the
+     * pill's *background*, which is a different thing and stays where it is.
+     */
+    const val ACCENT = "accentColor"
+
     /** Radius in dp of the system blur behind the window. 0 = plain transparency. */
     const val BLUR = "blurRadius"
 
@@ -41,12 +49,54 @@ object Preferences {
     const val NOW_PUSHES = "nowPushesRow"
 
     /**
+     * How long an alert stands on the bar before it closes itself, in tenths of a second — the
+     * store holds ints and a slider that counted milliseconds would be four thousand steps wide.
+     * It is a setting because how long is long enough is a reading speed, and that is the one
+     * number here nobody else can guess.
+     */
+    const val ALERT_DWELL = "alertDwellTenths"
+
+    /**
+     * Whether the bubbles wet the sides of the screen. On, a bubble standing near an edge grows a
+     * neck into it and a grown one closes the corner it is held in; off, every bubble floats its
+     * own margin clear of the glass. 1 or 0 — the store holds ints.
+     */
+    const val EDGE_MERGE = "edgeMerge"
+
+    /**
      * Where the bubble has been carried to, in dp from the punch hole. Kept because a bubble
      * that went home every time the phone slept was never really put anywhere — persistence is
      * part of the feature rather than a polish pass on it.
      */
-    const val CARRY_X = "carriedX"
-    const val CARRY_Y = "carriedY"
+    /**
+     * How far along the screen the lock screen's stack — the Now bubble and the notes above it,
+     * one shared container now — stands, in dp from where it sits by default. It is a full-width
+     * box held by an inset either side, so the shift is added to one inset and taken off the
+     * other: the box moves and its width does not change.
+     */
+    const val LOCK_X = "lockOffsetDp"
+
+    /**
+     * Whether the lock screen carries its notification bubbles at all, and whether it carries the
+     * padlock. 1 or 0 — the store holds ints. Both are the whole bubble rather than a detail of
+     * it: off, nothing is drawn, nothing is skinned and the touch proxy is given no size, so the
+     * lock screen is left exactly as One UI drew it.
+     */
+    const val NOTES_SHOWN = "notesShown"
+    const val PADLOCK_SHOWN = "padlockShown"
+
+    /**
+     * How far above its own default the padlock stands, in dp — positive lifts it higher. The
+     * default itself (PADLOCK_BOTTOM in padlock.js) is a measurement off the phone, same as it
+     * always was; this is the fine adjustment on top of it, needed now that the notes stand
+     * below it and the default has to clear a stack whose real height was never walked here.
+     */
+    const val PADLOCK_Y = "padlockOffsetDp"
+
+    /**
+     * Whether the shade swipe is locked out, 1 or 0 — the store holds ints. Hiding the real bar (StatusBarPolicy) is a reveal and leaves the swipe behind it; this is the other half, and there is no unprivileged way to ask SystemUI for it: the only thing that stops the gesture is a touchable window standing on the strip it starts from, which is exactly the window every other rule here exists to avoid. It is a mode rather than a default for that reason — on, the top of the screen belongs to us and the shade cannot be pulled at all.
+     */
+    const val BAR_LOCKED = "barLocked"
 
     private const val STORE = "island"
 
@@ -68,13 +118,20 @@ object Preferences {
         GREEN to 0,
         BLUE to 0,
         BACKGROUND_ALPHA to 80,
+        // The neon green --section-color in dna.css was born as, mirrored here as an int.
+        ACCENT to 0x5BFD5B,
         BLUR to 60,
         NOTIFICATION_IDENTITY to 2,
         GOO to 100,
         MOD_WIDTH to 56,
         NOW_PUSHES to 1,
-        CARRY_X to 0,
-        CARRY_Y to 0
+        ALERT_DWELL to 50,
+        EDGE_MERGE to 1,
+        LOCK_X to 0,
+        NOTES_SHOWN to 1,
+        PADLOCK_SHOWN to 1,
+        PADLOCK_Y to 0,
+        BAR_LOCKED to 0
     )
 
     fun of(context: Context): SharedPreferences =
@@ -98,4 +155,8 @@ object Preferences {
         val alpha = get(preferences, BACKGROUND_ALPHA) / 100f
         return "rgba($red,$green,$blue,$alpha)"
     }
+
+    /** The accent as CSS, which is the only form anything downstream of here wants it in. */
+    fun accentCss(preferences: SharedPreferences): String =
+        "#%06X".format(get(preferences, ACCENT) and 0xFFFFFF)
 }

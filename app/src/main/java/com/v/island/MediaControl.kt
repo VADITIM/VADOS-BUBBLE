@@ -12,6 +12,7 @@ import android.media.session.PlaybackState
 import android.os.SystemClock
 import android.util.Base64
 import java.io.ByteArrayOutputStream
+import kotlin.math.abs
 import org.json.JSONObject
 
 /**
@@ -48,6 +49,26 @@ object MediaControl {
     /** Re-encoding the same album art on every playback tick would be pure waste. */
     private var artKey: String? = null
     private var artUri: String? = null
+
+    /**
+     * What the page was last *given*, which is a different question from what was last encoded.
+     *
+     * A cover is a few hundred kilobytes of base64 and it was in every payload — and a payload
+     * goes over the bridge as a string of JavaScript that the WebView parses on its own main
+     * thread. A player reports its state several times a second, so the page was parsing the same
+     * picture again dozens of times a minute, in the middle of exactly the animations that then
+     * read as stuttering. The picture is sent when it changes and the key is simply absent
+     * otherwise; the page keeps the one it already has.
+     */
+    private var artSent: String? = null
+
+    /** How far the page's own count may be from the player's before it is worth correcting. */
+    private const val POSITION_SLACK = 2_000L
+
+    private var publishedState: String? = null
+    private var publishedPosition = 0L
+    private var publishedPlaying = false
+    private var publishedAt = 0L
 
     private val controllerCallback = object : MediaController.Callback() {
         // select() rather than publish(): a state change can mean this session is no
@@ -215,18 +236,6 @@ object MediaControl {
         return runCatching { context.startActivity(fallback) }.isSuccess
     }
 
-    /**
-     * Where the song is *now*. The session reports a position only when something
-     * changes, so a player that has been running untouched for a minute still says
-     * what it said a minute ago — the elapsed time since that report has to be added
-     * back on, or the open player draws a timeline that is a minute behind.
-     */
-    fun position(): Long {
-        val state = controller?.playbackState ?: return 0L
-        if (state.state != PlaybackState.STATE_PLAYING) return state.position
-        val since = SystemClock.elapsedRealtime() - state.lastPositionUpdateTime
-        return state.position + (since * state.playbackSpeed).toLong()
-    }
 
     /**
      * How fast it plays, which for a voice note is the difference between listening to it and
@@ -247,6 +256,8 @@ object MediaControl {
         if (current == null) {
             artKey = null
             artUri = null
+            artSent = null
+            publishedState = null
             onChanged(null)
             return
         }
@@ -262,18 +273,39 @@ object MediaControl {
         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
             ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST).orEmpty()
 
-        onChanged(
-            JSONObject()
-                .put("app", AppStyles.of(current.packageName).key)
-                .put("accent", AppStyles.of(current.packageName).accent)
-                .put("package", current.packageName)
-                .put("title", title)
-                .put("artist", artist)
-                .put("artBase64", encodeArt(metadata, title + artist) ?: JSONObject.NULL)
-                .put("isPlaying", state?.state == PlaybackState.STATE_PLAYING)
-                .put("position", state?.position ?: 0L)
-                .put("duration", metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L)
-        )
+        val art = encodeArt(metadata, title + artist)
+        val payload = JSONObject()
+            .put("app", AppStyles.of(current.packageName).key)
+            .put("accent", AppStyles.of(current.packageName).accent)
+            .put("package", current.packageName)
+            .put("title", title)
+            .put("artist", artist)
+            .put("isPlaying", state?.state == PlaybackState.STATE_PLAYING)
+            .put("duration", metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L)
+        if (art != artSent) {
+            artSent = art
+            payload.put("artBase64", art ?: JSONObject.NULL)
+        }
+
+        // A player that is merely still playing says so several times a second with nothing new to
+        // report, and every one of those was a full repaint of two bubbles and a relayout under
+        // whatever was animating. The page counts the seconds itself, so a payload that says only
+        // what the page already believes is not worth sending — but a position that has *jumped*
+        // is a seek from somewhere else and has to arrive, or the timeline stays on a count that
+        // is no longer where the song is.
+        val position = state?.position ?: 0L
+        val elapsed = SystemClock.elapsedRealtime() - publishedAt
+        val expected = if (publishedPlaying) publishedPosition + elapsed else publishedPosition
+        // Everything but the position, since the position is the one field that is allowed to have
+        // moved on its own.
+        val fingerprint = payload.toString()
+        if (fingerprint == publishedState && abs(position - expected) < POSITION_SLACK) return
+        publishedState = fingerprint
+        publishedPosition = position
+        publishedPlaying = state?.state == PlaybackState.STATE_PLAYING
+        publishedAt = SystemClock.elapsedRealtime()
+
+        onChanged(payload.put("position", position))
     }
 
     /**
@@ -297,8 +329,8 @@ object MediaControl {
         val stamp = "$key#${bitmap.generationId}#${bitmap.width}x${bitmap.height}"
         if (stamp == artKey) return artUri
         artKey = stamp
-        artUri = "data:image/png;base64," + Base64.encodeToString(
-            toPng(scaleDown(bitmap)), Base64.NO_WRAP
+        artUri = "data:image/webp;base64," + Base64.encodeToString(
+            toWebp(scaleDown(bitmap)), Base64.NO_WRAP
         )
         return artUri
     }
@@ -312,8 +344,15 @@ object MediaControl {
         )
     }
 
-    private fun toPng(bitmap: Bitmap): ByteArray = ByteArrayOutputStream().use { stream ->
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+    /**
+     * WEBP rather than PNG, and lossy. A 320px cover as lossless PNG is a couple of hundred
+     * kilobytes, which becomes a third more again as base64 and every byte of it is parsed by the
+     * WebView's main thread — the thread the animations are on. The same picture at quality 85 is
+     * around a tenth of that, and it is album art behind glass at 320px: there is nothing in it
+     * that survives to be lost.
+     */
+    private fun toWebp(bitmap: Bitmap): ByteArray = ByteArrayOutputStream().use { stream ->
+        bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 85, stream)
         stream.toByteArray()
     }
 }

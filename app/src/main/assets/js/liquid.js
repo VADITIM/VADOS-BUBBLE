@@ -1,7 +1,7 @@
 import { lockPill } from './lock.js';
-import { nowPill } from './now.js';
 import { clockPill, isClockLit } from './clock.js';
 import { doublePill, isDoubleOut } from './double.js';
+import { noteAt } from './notes.js';
 import { isPadlockShowing, padlockPill } from './padlock.js';
 import { statusPill } from './status.js';
 import { satellites } from './row.js';
@@ -29,8 +29,15 @@ const liquidLayers = {
  * Mirrored in BubbleService's BLUR_PANES: the host keeps one pane of glass per
  * bubble in exactly this order, and setBlurFrame() sends the rectangles down in it.
  * A bubble added here and not there draws with no glass behind it.
+ *
+ * 'note0'…'note4' are five reserved panes rather than one per notification actually
+ * showing, because the host's panes are a fixed `View` list stood up once at start — the
+ * same shape the two satellites already are. Mirrors NOTES_LIMIT in notes.js.
  */
-const BLUR_PANES = ['main', 'left', 'right', 'now', 'lock', 'status', 'clock', 'double', 'padlock'];
+const BLUR_PANES = [
+  'main', 'left', 'right', 'lock', 'status', 'clock', 'double', 'padlock',
+  'note0', 'note1', 'note2', 'note3', 'note4',
+];
 
 const blobs = BLUR_PANES.map(name => ({
   name,
@@ -46,12 +53,12 @@ let meltNow = null;
 /** Which box each blob is the skin of. */
 function sourceOf(name) {
   if (name === 'main') return pill;
-  if (name === 'now') return nowPill;
   if (name === 'status') return statusPill;
   if (name === 'clock') return clockPill;
   if (name === 'double') return doublePill;
   if (name === 'padlock') return padlockPill;
   if (name === 'lock') return lockPill;
+  if (name.startsWith('note')) return noteAt(Number(name.slice(4)));
   return satellites[name];
 }
 
@@ -64,10 +71,6 @@ function sourceOf(name) {
  */
 function isSkinned(name) {
   if (name === 'main') return true;
-  // The Now bubble has a skin only while the light is on. Dark it is still in the
-  // page, a zero-opacity box standing at its spot, and a blob mirrored off it would
-  // be a permanent lump of liquid out by the clock.
-  if (name === 'now') return nowPill.classList.contains('lit');
   // Only while it is standing there. Off the lock screen it is a zero-opacity box at
   // the bottom of the canvas, and a blob mirrored off it would be a permanent lump of
   // liquid over the wallpaper.
@@ -79,6 +82,9 @@ function isSkinned(name) {
   if (name === 'clock') return isClockLit();
   if (name === 'double') return isDoubleOut();
   if (name === 'padlock') return isPadlockShowing();
+  // Only as many as are actually standing there. A repaint can shrink the list from five notes
+  // to two without this frame knowing in advance, which is exactly what noteAt() answers.
+  if (name.startsWith('note')) return Boolean(noteAt(Number(name.slice(4))));
   // Only while the row is a row. A grown bubble is one shape with nothing beside it,
   // and a satellite still holding a mod behind it is not standing on the bar — it
   // would be a frosted circle out at the side of an open panel.
@@ -96,25 +102,13 @@ let mirroredAt = 0;
 let mirroring = false;
 
 /**
- * The skin takes the bubble over again when the shape has come home, which is measured
- * rather than announced: a bubble bigger than the filter's own region has its skin
- * silently dropped, so blanking its background the frame a close *begins* leaves the
- * whole close painting nothing at all. paintSize takes the skin off when a growth
- * starts; this is the only thing that puts it back.
+ * The skin is on from the first frame and never comes off. It used to be dropped the moment the bubble grew, because a
+ * grown bubble stood outside the filter's own region and would have painted nothing at all — the region is the whole
+ * screen while the bubble is grown now, so there is nothing left to drop it for, and an extended state is in the same
+ * body of liquid the closed row is. That is exactly what "the alert overlapped the row instead of merging with it" was:
+ * a bubble painting its own background is not in the goo layer, so it can only ever stack on top of what it meets.
  */
-function settleSkin(seen) {
-  if (root.classList.contains('liquid') || !CLOSED.has(shared.size)) return;
-  // Its own resting height and a little over for the border, since the box is measured
-  // and the number it is measured against is the one Kotlin last pushed down.
-  if (!seen || !seen.box.height || seen.box.height > shared.compact.height + 3) return;
-  // Temporary: the bubble was reported going opaque for a frame exactly as it lands, and this is the one place the
-  // skin and the bubble's own background trade over. Pull back out once diagnosed.
-  console.log(
-    'liquid on: size=' + shared.size + ' box=' + Math.round(seen.box.width) + 'x' +
-    Math.round(seen.box.height) + ' compact=' + shared.compact.height + ' alpha=' + seen.alpha
-  );
-  root.classList.add('liquid');
-}
+root.classList.add('liquid');
 
 /** Every rect first, every write after: one layout per frame instead of three. */
 export function paintLiquidFrame() {
@@ -138,10 +132,15 @@ function mirrorFrame() {
   const measured = blobs.map(blob => {
     if (!isSkinned(blob.name)) return null;
     const source = sourceOf(blob.name);
-    // Resolved once per element and kept: the declaration getComputedStyle hands back is *live*, so re-reading it
+    // Resolved once per *element* and kept: the declaration getComputedStyle hands back is *live*, so re-reading it
     // next frame gives this frame's values — asking for a fresh one per blob per frame was allocating five
-    // declarations a frame for numbers the same five objects already carry.
-    const style = blob.style || (blob.style = getComputedStyle(source));
+    // declarations a frame for numbers the same five objects already carry. Kept per element rather than per blob
+    // forever, because a note pane's element is not the same one twice: notes.js redraws its list whole rather than
+    // reconciling it, so blob.source is compared here and the declaration is re-resolved whenever it disagrees —
+    // otherwise a note pane went on reading the computed style of whatever card used to be at that position.
+    if (blob.source !== source) blob.style = getComputedStyle(source);
+    blob.source = source;
+    const style = blob.style;
     return {
       source,
       box: source.getBoundingClientRect(),
@@ -158,7 +157,6 @@ function mirrorFrame() {
     };
   });
 
-  settleSkin(measured[0]);
   sendBlurFrame(measured);
 
   blobs.forEach((blob, index) => {
@@ -178,6 +176,7 @@ function mirrorFrame() {
     blob.edge.style.background = seen.colour;
   });
 
+  paintWalls(measured);
   meltBy(measured);
   // Last, because a threshold crossing here can change state — and a state change
   // repaints, which can land back in this function. Everything this frame is meant
@@ -292,6 +291,96 @@ function sendBlurFrame(measured) {
   if (spec === blurSent) return;
   blurSent = spec;
   bridge.setBlurFrame(spec);
+}
+
+/**
+ * The screen's own edges, as something the liquid can touch.
+ *
+ * A bubble standing a few pixels off the side of the screen is a drop next to a wall, and a drop
+ * next to a wall does not stand apart from it — it reaches out and wets it. So a bubble close
+ * enough to an edge grows a neck into it: a shape from off-screen up to the bubble's own edge,
+ * narrower than the bubble is tall, which the goo then fillets into the bubble exactly as it
+ * fillets a satellite. It is drawn rather than blurred into place because the melt is one number
+ * for the whole layer — raising it far enough to bridge fourteen pixels of gap would weld the
+ * row into a bar, which is the one thing meltBy() exists to prevent.
+ *
+ * A grown bubble takes its neck all the way up to the top of the screen instead, so the two meet
+ * in the corner and the goo rounds it: the panel is held in the corner of the screen rather than
+ * floating a margin away from it.
+ */
+const walls = ['left', 'right'].map(side => ({
+  side,
+  edge: liquidLayers.edge.appendChild(document.createElement('div')),
+  fill: liquidLayers.fill.appendChild(document.createElement('div')),
+}));
+walls.forEach(wall => { wall.edge.className = 'blob'; wall.fill.className = 'blob'; });
+
+/** How near an edge a bubble has to be before the liquid reaches it. */
+const WALL_REACH = 44;
+
+/** How far the neck hangs off the screen, so its own outer end is never seen. */
+const WALL_OVER = 12;
+
+/** What the neck keeps of the bubble's height. Under half, or it is a bar rather than a neck. */
+const WALL_WAIST = 0.42;
+
+function paintWalls(measured) {
+  const grown = root.classList.contains('grown');
+  walls.forEach(wall => {
+    // Whichever skinned bubble is nearest this edge, and only if the setting is on and it is
+    // near enough to be reaching. The main bubble grown is the one that takes the corners.
+    // Grown, the main bubble takes both edges whatever else is standing near them: the corner is
+    // the panel's to close, and a neck drawn to the clock instead would leave the panel floating
+    // a margin off the very edge it is supposed to be held by.
+    const near = !shared.edgeMerge ? null
+      : grown ? withinReach(measured[0], wall.side)
+      : nearestTo(wall.side, measured);
+    if (!near) {
+      wall.edge.style.display = 'none';
+      wall.fill.style.display = 'none';
+      return;
+    }
+    const waist = near.box.height * WALL_WAIST;
+    // Up to the top of the screen while the bubble is grown, so the neck and the panel close the
+    // corner between them; on the row it is a neck at the bubble's own middle and nothing more.
+    const top = grown ? 0 : near.box.top + (near.box.height - waist) / 2;
+    const box = {
+      left: wall.side === 'left' ? -WALL_OVER : near.box.right - 1,
+      top,
+      width: (wall.side === 'left' ? near.box.left + 1 : window.innerWidth - near.box.right + 1) + WALL_OVER,
+      height: (grown ? near.box.top - top + near.box.height : 0) + waist,
+    };
+    box.right = box.left + box.width;
+    box.bottom = box.top + box.height;
+    wall.edge.style.display = '';
+    wall.fill.style.display = '';
+    const seen = { radius: (waist / 2) + 'px', corner: near.corner, colour: near.colour };
+    write(wall.edge, box, 0, seen);
+    write(wall.fill, box, -1, seen);
+    wall.edge.style.background = near.colour;
+  });
+}
+
+/** How far this bubble's own edge stands off that side of the screen. */
+function gapTo(seen, side) {
+  return side === 'left' ? seen.box.left : window.innerWidth - seen.box.right;
+}
+
+/** The same box back, or nothing when it is too far from the edge to be reaching for it. */
+function withinReach(seen, side) {
+  if (!seen || !seen.box.width) return null;
+  const gap = gapTo(seen, side);
+  return gap >= 0 && gap <= WALL_REACH ? seen : null;
+}
+
+/** The bubble this edge would reach for: the nearest one to it, if any is near enough at all. */
+function nearestTo(side, measured) {
+  let found = null;
+  for (const seen of measured) {
+    if (!withinReach(seen, side)) continue;
+    if (!found || gapTo(seen, side) < gapTo(found, side)) found = seen;
+  }
+  return found;
 }
 
 function write(shape, box, grow, seen) {

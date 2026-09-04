@@ -1,17 +1,90 @@
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
-import { fitCarry } from './carry.js';
 import { isStolen } from './lock.js';
 import { paintAvatar, paintCall } from './mods/call.js';
 import { carryArt, mediaWindow, paintMedia, runBars } from './mods/media.js';
 import { paintTimer, timerWindow } from './mods/timer.js';
 import { endHold } from './motion.js';
-import { fitNowWidth } from './now.js';
-import { BUMP_MAX, BUMP_MIN, CHIP_ROOM, CLOSED, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, SWAP_FLICK, SWAP_STILL, bridge, faces, mods, pill, root, setSweepPhase, shared } from './state.js';
+import { closeNowPanel, nowOpen } from './now.js';
+import { closeStatusPanel, statusOpen } from './status.js';
+import { BUMP_MAX, BUMP_MIN, CHIP_ROOM, CLOSED, GROWN_PAD, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, SWAP_FLICK, SWAP_STILL, bridge, faces, mods, pill, root, setSweepPhase, shared } from './state.js';
+
+/**
+ * How long a picture takes to cross between two faces. Past --grow-ms (340ms) in pill.css on purpose: the box is what
+ * stops first and the thing carried into it lands after it, or the picture is standing still while the bubble is still
+ * opening out around it.
+ */
+const MORPH_MS = 420;
+/** Mirrors --ease-grow in pill.css: the crossing is the growth, so it carries the growth's overshoot. */
+const MORPH_EASE = 'cubic-bezier(0.22, 1.12, 0.36, 1)';
+/** Enough samples for the curve to read as one; a quadratic needs no more. */
+const MORPH_STEPS = 14;
+
+/** Where every part of a face that is also part of another face is standing, by the name the two share. */
+function measureMorphs(face) {
+  const places = new Map();
+  face.querySelectorAll('[data-morph]').forEach(element => {
+    const box = element.getBoundingClientRect();
+    if (box.width) places.set(element.dataset.morph, box);
+  });
+  return places;
+}
+
+/**
+ * A mod's picture is one picture, and a mod opening moves it rather than fading one copy out behind another. The two
+ * faces hold two elements because only one of them is ever drawing, so the crossing is measured the way a reflow is put
+ * back: where it was, where it now is, and the transform that returns it there for the length of the move.
+ *
+ * It travels on an arc rather than a straight line, and the arc's control point is the punch hole — everything on this
+ * screen is born there and goes back through it, so a thing crossing the bubble dips towards the hole underneath it and
+ * comes up into its new place instead of sliding along the shortest line, which is the one path that reads as a box
+ * being repositioned rather than as something moving.
+ *
+ * Additive, because the box it is landing in is still growing underneath it: the animation is the difference between
+ * the two places and nothing else, so whatever the layout does during the growth is carried for free, and the picture
+ * is exactly right at both ends — the old place at the start and the new one at the end. Only what resamples carries a
+ * scale (`data-morph-scale`); text and icons stretch.
+ */
+function morphInto(face, before) {
+  if (!before || !before.size) return;
+  const hole = pill.getBoundingClientRect();
+  const holeX = hole.left + hole.width / 2;
+  const holeY = hole.top + hole.height / 2;
+  let crossed = false;
+  face.querySelectorAll('[data-morph]').forEach(element => {
+    const from = before.get(element.dataset.morph);
+    const to = element.getBoundingClientRect();
+    if (!from || !to.width) return;
+    const startX = from.left + from.width / 2;
+    const startY = from.top + from.height / 2;
+    const endX = to.left + to.width / 2;
+    const endY = to.top + to.height / 2;
+    const scale = element.hasAttribute('data-morph-scale') ? from.width / to.width : 1;
+    const frames = [];
+    for (let step = 0; step <= MORPH_STEPS; step += 1) {
+      const at = step / MORPH_STEPS;
+      const rest = 1 - at;
+      const x = rest * rest * startX + 2 * rest * at * holeX + at * at * endX;
+      const y = rest * rest * startY + 2 * rest * at * holeY + at * at * endY;
+      const size = 1 + (scale - 1) * rest;
+      frames.push({
+        transform: 'translate(' + (x - endX).toFixed(1) + 'px,' + (y - endY).toFixed(1) + 'px)' +
+          ' scale(' + size.toFixed(3) + ')',
+      });
+    }
+    element.animate(frames, { duration: MORPH_MS, easing: MORPH_EASE, composite: 'add' });
+    crossed = true;
+  });
+  if (crossed) stirLiquid(MORPH_MS + 120);
+}
 
 export function showFace(name) {
+  const arriving = faces[name];
+  const leaving = Object.values(faces).find(element => element.classList.contains('showing'));
+  const before = arriving && leaving && leaving !== arriving ? measureMorphs(leaving) : null;
   for (const [key, element] of Object.entries(faces)) {
     element.classList.toggle('showing', key === name);
   }
+  if (arriving) morphInto(arriving, before);
 }
 
 /**
@@ -40,19 +113,12 @@ function paintSize() {
 
   pill.classList.toggle('timer', shared.size === 'timer');
 
-  // The skin only exists for the closed row: a grown panel is one shape with nothing to
-  // merge into, so it paints its own background and the filter stops. Taken off here the
-  // moment a growth starts, because from that frame on the bubble is bigger than the
-  // filter's region and has to paint itself — but it is *not* put back here. The way back
-  // is measured in the mirror, at the frame the shape has come home; switched on the
-  // state's word, the whole close was drawn blanked with the skin dropped outside the
-  // region, which is what "no alpha and no blur while closing" was, and the unfiltered
-  // edge blob standing in for it is the large accent-coloured hue an alert closed with.
+  // A grown bubble keeps its skin and grows the filter's region instead of coming out of the liquid, which is what the
+  // class says: the skin used to be dropped here on the theory that a grown panel has nothing to merge into, and that
+  // was only ever true of the region, not of the row — an alert is exactly as wide as the Now bubble is near, and a
+  // bubble painting its own background can only stack on top of what it meets rather than neck with it.
+  root.classList.toggle('grown', !CLOSED.has(shared.size));
   if (!CLOSED.has(shared.size)) {
-    // Temporary, with the log in settleSkin: which of the two paints owns the bubble at every moment of an open and
-    // a close, since one frame with both or neither is exactly the reported flash.
-    if (root.classList.contains('liquid')) console.log('liquid off: size=' + shared.size);
-    root.classList.remove('liquid');
     // Opening is a growth, not a split, and must not inherit the split's curve or
     // the wait a departing satellite left behind.
     root.style.setProperty('--width-ease', 'var(--ease-grow)');
@@ -214,13 +280,12 @@ function glyphAligned(box) {
 }
 
 /**
- * True while the Now bubble is standing out on the bar.
+ * True while a Now mod is standing in the clock bubble at the left end of the bar.
  *
- * It used to mean one small thing — the closed bubble gave up a little width so that
- * two pills fitted on one status bar — and it means something larger now: the bar is
- * the Now bubble's as well, so the row stands aside for it rather than shaving
- * itself. Everything below reads this: where the row stands, how many circles it is
- * allowed, and how wide the Now bubble may grow.
+ * It used to mean one small thing — the closed bubble gave up a little width so that two pills
+ * fitted on one status bar — and it means something larger now: that end of the bar is the
+ * clock's while it is carrying a mod, so the row stands aside for it rather than shaving itself.
+ * Everything below reads this: where the row stands and how many circles it is allowed.
  */
 let chipOut = false;
 
@@ -230,7 +295,7 @@ const SHIFT_HOME = 100;
 let shiftingHome = false;
 let shiftTimer = null;
 
-window.onTorchChip = out => {
+window.onNowStanding = out => {
   if (chipOut === out) return;
   chipOut = out;
   // Standing aside is not a growth and does not take a growth's time. The row is not
@@ -418,7 +483,6 @@ export function paintSatellites() {
   // is not forbidden — it simply has one side to be on.
   if (chipOut && satSide === 'left') satSide = 'right';
   layoutSatellites();
-  fitNowWidth();
   stirLiquid();
   // Under a finger the skin cannot be a frame behind what it is the skin of: the
   // content would slide out of its own fill. Everything else has a transition to
@@ -1005,8 +1069,12 @@ let deferredTarget = null;
 
 export function applyWindow(target) {
   windowWidth = target.width < 0 ? shared.compact.width : target.width;
+  // A grown state stands --grown-pad lower than the closed row, and it is not allowed to pay for that out of its own
+  // bottom edge — the window is the one place the room can come from, and a bubble cannot be drawn outside it.
   bridge.setWindowBounds(
-    target.width, target.height, target.rise || 0, Math.round(target.shift || 0)
+    target.width,
+    target.height < 0 || CLOSED.has(shared.size) ? target.height : target.height + GROWN_PAD,
+    target.rise || 0, Math.round(target.shift || 0)
   );
 }
 
@@ -1030,11 +1098,6 @@ function windowFor(next, override) {
 export function setSize(next, override) {
   if (shared.size === next && !override) return;
   shared.size = next;
-  // Anything past a mod happens at the cutout: an alert is a thing *arriving* there and every
-  // open panel is centred on the screen. A carried bubble is fetched home for it and given its
-  // place back when it closes — one rule, and the honest one, because the alternative is
-  // re-deriving every geometry in the row against a moving origin.
-  fitCarry();
   const target = windowFor(next, override);
   const width = target.width < 0 ? shared.compact.width : target.width;
 
@@ -1157,8 +1220,18 @@ function faceAfterCollapse(name) {
     // Opened again, or taken over, while the bubble was closing: whatever is showing now is the
     // user's own doing and asked for itself.
     if (shared.state !== 'idle') return;
-    // The mod ended while the panel was closing over it — its own departure owns the bubble now.
     const owner = liveMods()[0];
+    // The bare bubble comes home the same way, and it is the same rule that says so: the width
+    // is given back first and the face is the consequence. It has no glyph to fly in — there is
+    // no mod behind an idle bubble — so the face is simply the last thing to arrive rather than
+    // the first, which is what it used to be, painted inside a panel three times its width.
+    if (name === 'idle') {
+      if (owner) return;
+      showFace('idle');
+      root.style.removeProperty('--app-accent');
+      return;
+    }
+    // The mod ended while the panel was closing over it — its own departure owns the bubble now.
     if (!owner || MOD_CLOSED[owner].face !== name) return;
     showFace(name);
     enterFrom('hole');
@@ -1265,6 +1338,21 @@ function leavingSatellite() {
  * width is the consequence; the glyph is the cause. Played together, as it was,
  * there is nothing to see but a box changing size for no stated reason.
  */
+/**
+ * The main bubble entering its Extended state, and the one place that happens.
+ *
+ * Only one bubble on the canvas is extended at a time: two open panels are two answers to the
+ * same screen, and the one that was already standing there is the one nobody is looking at any
+ * more. So whichever bubble is opening puts the others back to idle first — main here, and the
+ * other two at the top of their own open functions, because the rule belongs to whoever is
+ * arriving rather than to a watcher counting them.
+ */
+export function becomeExtended() {
+  if (nowOpen) closeNowPanel();
+  if (statusOpen) closeStatusPanel();
+  shared.state = 'extended';
+}
+
 export function toClosed() {
   clearTimeout(shared.dwellTimer);
   // Already mid-hand-over, and bare on purpose. Whatever has changed underneath
@@ -1367,6 +1455,16 @@ export function toClosed() {
     // again by anything that repaints the closed row, and repainting the bare bubble
     // over a mod that is still going is the abrupt close this exists to stop.
     if (leaveTimer !== null) return;
+    // Coming home from a panel with no mod to come back to — the notification tab, most of the
+    // time. The face is held off for the length of the collapse exactly as a mod's is: swapped
+    // on the tap, the idle face was simply *there*, inside a box that had not started shrinking
+    // yet, and the whole close read as the content being deleted rather than as the bubble
+    // coming back. Everything else here is already a shrink with nothing said over it.
+    if (wasOpen) {
+      showFace(null);
+      faceAfterCollapse('idle');
+      return;
+    }
     showFace('idle');
     root.style.removeProperty('--app-accent');
     return;

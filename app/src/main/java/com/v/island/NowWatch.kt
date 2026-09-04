@@ -80,6 +80,8 @@ object NowWatch {
             .put("key", statusBarNotification.key)
             .put("label", title.ifEmpty { style.label })
             .put("accent", style.accent)
+            // When the transfer was posted, so the page can average a rate and say how long is left: no field carries a remaining time, and the app's own detail line says a speed in words rather than a number.
+            .put("since", statusBarNotification.postTime)
             .put("done", extras.getInt(PROGRESS, 0))
             .put("total", extras.getInt(PROGRESS_MAX, 0))
             // The app's own line under the title, which is where "12,4 MB/s" and "3 von 8"

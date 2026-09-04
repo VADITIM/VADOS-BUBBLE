@@ -18,7 +18,7 @@
     position: absolute;
     inset: 0;
     padding: 1.5rem 1.25rem var(--nav-reserve-bottom);
-    padding-top: calc(1.5rem + env(safe-area-inset-top));
+    padding-top: calc(1.5rem + 10px + env(safe-area-inset-top));
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: none;
@@ -168,41 +168,106 @@
   .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin-top: 0.9rem; }
   .actions .wide { grid-column: 1 / -1; }
 
-  .field { padding: 0.5rem 0 0.7rem; }
+  /* One card per setting, so the list reads as separate things rather than as a column of
+     controls: the name, its value, and the three buttons on one line, and the slider under
+     them with room of its own. Two settings running into each other is most of why the wrong
+     one was touched. */
+  .field {
+    padding: 0.75rem 0.85rem 0.85rem;
+    margin-bottom: 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    corner-shape: squircle;
+    background: var(--sunken);
+  }
   .field-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.5rem;
     font-size: 0.63rem;
     letter-spacing: 0.19rem;
     text-transform: uppercase;
-    color: var(--text-label);
-    margin-bottom: 0.4rem;
+    /* The name in the screen's own colour and the value in plain bright: at a glance the card
+       says which setting it is before it says what it is set to. */
+    color: var(--section-color);
+    margin-bottom: 0.55rem;
   }
-  .field-head .value { color: var(--text-bright); letter-spacing: 0.1rem; }
+  .field-head .value {
+    color: var(--text-bright);
+    letter-spacing: 0.1rem;
+    font-variant-numeric: tabular-nums;
+  }
+  /* The three buttons on one line, each the same size and the same shape as everything else
+     that is pressed here. Aligned right, because the value they change is above them. */
+  .field-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+  }
+  /* The swatch is the control: a native colour input draws its own box, and stretched across the
+     card it reads as the colour rather than as a button that opens one. */
+  #accent-picker {
+    flex: 1;
+    height: 2.2rem;
+    padding: 0;
+    border: 1px solid var(--border-control);
+    border-radius: 14px;
+    corner-shape: squircle;
+    background: transparent;
+  }
+  .field-buttons button {
+    min-width: 3rem;
+    padding: 0.42rem 0.7rem;
+    border-radius: 14px;
+    corner-shape: squircle;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+  }
 
-  /* A slider is a wide horizontal target on a screen that scrolls vertically, and a
-     drag down the settings list used to land on one and move it. pan-y hands the
-     vertical gesture back to the page; only a sideways drag is a value change, and
-     the step buttons cover the case where the value wanted is one away. */
-  input[type="range"] {
-    -webkit-appearance: none;
+  /* A slider that cannot be pressed by accident, because it is never pressed at all: it only
+     answers a *drag*. A native range jumps to wherever it was touched, so a finger that meant
+     to scroll the list past it moved the value it landed on — and on a settings screen that is
+     a change nobody asked for and nobody saw. This one takes the value from how far the finger
+     has travelled since it went down, so a tap does nothing, a vertical scroll does nothing,
+     and only sideways movement past a slop is a change. pan-y keeps the scroll the page's. */
+  .slider {
     touch-action: pan-y;
-    width: 100%;
-    height: 2px;
-    background: var(--border-strong);
-    border-radius: 999px;
-    margin: 0.4rem 0;
+    padding: 0.55rem 0;
+    cursor: ew-resize;
   }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+  .slider-track {
+    position: relative;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-strong);
+  }
+  .slider-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--section-color) 55%, transparent);
+  }
+  .slider-thumb {
+    position: absolute;
+    top: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
     border-radius: 999px;
     background: var(--ground);
     border: 1px solid var(--section-color);
   }
+  /* Only while a finger is actually driving it: written per frame during a drag, so it must not
+     be eased then, and it is what makes a step button read as a move rather than a jump. */
+  .slider:not(.dragging) .slider-fill,
+  .slider:not(.dragging) .slider-thumb {
+    transition: width 0.18s var(--ease-leave), left 0.18s var(--ease-leave);
+  }
+  .slider.dragging .slider-thumb { scale: 1.15; }
 
   .note {
     font-size: 0.7rem;
@@ -311,6 +376,19 @@
 
   <section class="module stagger">
     <span class="module-label">Pill</span>
+    <!-- The one lit colour, picked as a colour. A native colour input is the platform's own wheel
+         on this WebView, which is a better picker than anything this page would grow and is the
+         only control here that does not need a slider's drag rules. -->
+    <div class="field">
+      <div class="field-head">
+        <span>Accent</span>
+        <span class="value" id="accent-value">#5BFD5B</span>
+      </div>
+      <div class="field-buttons">
+        <input type="color" id="accent-picker">
+        <button id="accent-reset">Reset</button>
+      </div>
+    </div>
     <div id="fields"></div>
   </section>
 </section>
@@ -367,7 +445,6 @@
       <button onclick="Panel.stage('connectivity')">Wifi</button>
       <button class="wide" onclick="Panel.stage('connectivity-bluetooth')">Bluetooth, with charge</button>
       <button class="wide" onclick="Panel.stage('connectivity-hotspot')">Hotspot on mobile</button>
-      <button onclick="Panel.stage('alarm')">Alarm</button>
       <button onclick="Panel.stage('locked')">Lock screen</button>
     </div>
   </section>
@@ -404,7 +481,24 @@
     { key: 'modWidthDp',         name: 'Mod width',         min: 20,   max: 160 },
     { key: 'notificationIdentity', name: 'App identity',    min: 0,    max: 2,
       labels: ['Icon', 'Name', 'Both'] },
+    { key: 'lockOffsetDp',       name: 'Lock screen X',     min: -150, max: 150 },
+    { key: 'notesShown',         name: 'Lock screen notes', min: 0,    max: 1,
+      labels: ['No', 'Yes'] },
+    { key: 'padlockShown',       name: 'Lock icon',         min: 0,    max: 1,
+      labels: ['No', 'Yes'] },
+    { key: 'padlockOffsetDp',    name: 'Lock icon Y',       min: -150, max: 150 },
     { key: 'nowPushesRow',       name: 'Now pushes the row', min: 0,   max: 1,
+      labels: ['No', 'Yes'] },
+    // Tenths of a second, because the store holds ints — read as seconds, stepped by half
+    // a second, since a tenth is under what anyone can tell an alert apart by.
+    { key: 'alertDwellTenths',   name: 'Alert stands for',  min: 10,  max: 200, step: 5,
+      read: tenths => (tenths / 10).toFixed(1) + 's' },
+    { key: 'edgeMerge',          name: 'Wet the screen edges', min: 0, max: 1,
+      labels: ['No', 'Yes'] },
+    // On, nothing can pull the shade down: a touchable strip stands on the top of the screen and
+    // swallows the gesture before SystemUI sees it. It is the one place this project spends the
+    // shade swipe on purpose, which is why it is a switch rather than how the bar behaves.
+    { key: 'barLocked',          name: 'Lock the shade out', min: 0, max: 1,
       labels: ['No', 'Yes'] },
   ];
 
@@ -427,43 +521,103 @@
       name.textContent = field.name;
       const value = document.createElement('span');
       value.className = 'value';
+      head.append(name, value);
+
+      const slider = document.createElement('div');
+      slider.className = 'slider';
+      const track = document.createElement('div');
+      track.className = 'slider-track';
+      const fill = document.createElement('div');
+      fill.className = 'slider-fill';
+      const thumb = document.createElement('div');
+      thumb.className = 'slider-thumb';
+      track.append(fill, thumb);
+      slider.append(track);
+
+      const buttons = document.createElement('div');
+      buttons.className = 'field-buttons';
       const down = document.createElement('button');
-      down.className = 'quiet step';
-      down.textContent = '\u2212';
+      down.textContent = '−';
       const up = document.createElement('button');
-      up.className = 'quiet step';
       up.textContent = '+';
       const reset = document.createElement('button');
-      reset.className = 'quiet';
       reset.textContent = 'Reset';
-      head.append(name, value, down, up, reset);
+      buttons.append(down, up, reset);
 
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = field.min;
-      slider.max = field.max;
-
+      let current = field.min;
+      const clamp = to => Math.min(field.max, Math.max(field.min, Math.round(to)));
       const apply = written => {
-        slider.value = written;
-        value.textContent = field.labels ? field.labels[Number(written)] : written;
-        Panel.setPreference(field.key, Number(written));
+        current = clamp(Number(written));
+        const share = (current - field.min) / (field.max - field.min);
+        fill.style.width = (share * 100) + '%';
+        thumb.style.left = (share * 100) + '%';
+        value.textContent = field.labels ? field.labels[current]
+          : field.read ? field.read(current)
+          : current;
+        Panel.setPreference(field.key, current);
       };
 
       apply(preferences[field.key]);
-      // One step at a time, clamped, for the value that is next to the one showing —
-      // the case a finger on a 2px track is worst at.
-      const step = by => apply(
-        Math.min(field.max, Math.max(field.min, Number(slider.value) + by))
-      );
+      const step = by => apply(current + by);
 
-      slider.addEventListener('input', () => apply(slider.value));
-      down.addEventListener('click', () => step(-1));
-      up.addEventListener('click', () => step(1));
+      // The value comes from how far the finger has travelled since it went down, never from
+      // where it landed: a tap changes nothing, a scroll past a slider changes nothing, and a
+      // whole track's width of movement is the whole range whatever the screen is.
+      let from = null;
+      slider.addEventListener('pointerdown', event => {
+        from = { x: event.clientX, value: current, armed: false };
+      });
+      slider.addEventListener('pointermove', event => {
+        if (!from) return;
+        const travelled = event.clientX - from.x;
+        // Under the slop this is not a drag yet, so a finger on its way down the list is free
+        // to pass over a slider without moving it.
+        if (!from.armed) {
+          if (Math.abs(travelled) < 8) return;
+          from.armed = true;
+          slider.classList.add('dragging');
+          slider.setPointerCapture(event.pointerId);
+        }
+        apply(from.value + travelled / track.clientWidth * (field.max - field.min));
+      });
+      const release = () => {
+        from = null;
+        slider.classList.remove('dragging');
+      };
+      slider.addEventListener('pointerup', release);
+      slider.addEventListener('pointercancel', release);
+
+      down.addEventListener('click', () => step(-(field.step || 1)));
+      up.addEventListener('click', () => step(field.step || 1));
       reset.addEventListener('click', () => apply(defaults[field.key]));
 
-      wrapper.append(head, slider);
+      wrapper.append(head, slider, buttons);
       container.appendChild(wrapper);
     }
+  }
+
+  /**
+   * The accent, which is a colour rather than three numbers and so is not a slider. It is stored
+   * as one 0xRRGGBB int because the store holds ints, and the settings screen wears it live: the
+   * screen that owns the setting is the one place a colour can be judged before it is committed.
+   */
+  function buildAccent(preferences, defaults) {
+    const picker = document.getElementById('accent-picker');
+    const value = document.getElementById('accent-value');
+    const screen = document.querySelector('.screen[data-screen="settings"]');
+    const apply = number => {
+      const hex = '#' + (number & 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
+      picker.value = hex;
+      value.textContent = hex;
+      screen.dataset.accent = hex;
+      if (screen.classList.contains('active')) {
+        document.documentElement.style.setProperty('--section-color', hex);
+      }
+      Panel.setPreference('accentColor', number & 0xFFFFFF);
+    };
+    apply(preferences.accentColor);
+    picker.addEventListener('input', () => apply(parseInt(picker.value.slice(1), 16)));
+    document.getElementById('accent-reset').addEventListener('click', () => apply(defaults.accentColor));
   }
 
   // #endregion ────────────────────────────────────────────────────────────────
@@ -578,6 +732,7 @@
 
   const initialState = JSON.parse(Panel.readState());
   buildFields(initialState.preferences, initialState.defaults);
+  buildAccent(initialState.preferences, initialState.defaults);
   buildReplays();
   window.onStateChanged(initialState);
   document.documentElement.style.setProperty('--section-color', screens[0].dataset.accent);

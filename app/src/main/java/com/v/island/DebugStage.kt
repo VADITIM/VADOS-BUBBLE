@@ -35,7 +35,7 @@ object DebugStage {
         "timer-paused", "call-phone",
         "now-flight", "torch", "recording", "download", "upload",
         "connectivity", "connectivity-bluetooth", "connectivity-hotspot",
-        "battery-charging", "battery-low", "alarm", "locked", "clear"
+        "battery-charging", "battery-low", "locked", "clear"
     )
 
     /** A transfer at a share of the way through, wearing the line the app's own text would. */
@@ -50,6 +50,7 @@ object DebugStage {
                         .put("key", "stage-transfer")
                         .put("label", name)
                         .put("accent", "#4285f4")
+                        .put("since", System.currentTimeMillis() - 30_000)
                         .put("done", done)
                         .put("total", 100)
                         .put("detail", "$done,4 von 118 MB · 12,1 MB/s")
@@ -213,21 +214,6 @@ object DebugStage {
                 bluetooth = JSONObject().put("name", "Buds3 Pro").put("charge", 64)
             )
             "connectivity-hotspot" -> attached(link = "mobile", level = -1, hotspot = true)
-
-            // An alarm ringing, which is the one state that takes the whole screen. Its buttons
-            // carry the clock app's own words for the same reason the recorder's do.
-            "alarm" -> BubbleService.deliverAlarm(
-                JSONObject()
-                    .put("key", "stage-alarm")
-                    .put("label", "Wecker")
-                    .put("detail", "")
-                    .put(
-                        "actions",
-                        JSONArray()
-                            .put(JSONObject().put("index", 0).put("title", "Schlummern"))
-                            .put(JSONObject().put("index", 1).put("title", "Beenden"))
-                    )
-            )
 
             // The lock screen without locking the phone: the padlock, the notification bubbles
             // and the bottom Now bubble all stand up, and the unlock is the merge home.

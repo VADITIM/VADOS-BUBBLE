@@ -61,40 +61,25 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          */
         private const val BLEED = 14
 
+        /** Room under the closed bubble that exists for one gesture: the swipe down. A pull starts on the bubble and immediately leaves it — the pill is 30dp tall and a thumb travels further than that before the threshold is anywhere near — so without this the finger was off the proxy a few frames in and the rest of the gesture went to whatever was underneath. It is taken below the bar rather than around it, which is the one direction that costs the shade swipe nothing. */
+        private const val PULL_GRAB = 40
+
+        /** How tall the strip the shade swipe starts in is, in dp. One UI takes the gesture anywhere in the status bar and a little under it, and every pixel past that is a pixel taken from the app for nothing. */
+        private const val SHADE_STRIP = 48
+
         /** Kept in step with the grown states' border-radius in pill.html. */
         private const val GROWN_CORNER = 26
 
         /**
-         * Where the Now bubble's left edge comes to rest, measured from the left edge of
-         * the screen. It stands at the very start of the bar, over One UI's clock as well
-         * as over the Now bar beside it: the light is what that end of the bar says while
-         * it is on, and half-covering the row it replaces is worse than covering none of
-         * it. Mirrors the --now-left property in pill.html.
-         *
-         * The WebView fills the canvas and never changes size — resizing it reallocates
-         * its surface, which showed up as the bubble blinking out for a frame at the end
-         * of every animation — so this is a position in the page, not a window.
-         */
-        private const val NOW_LEFT = 16
-
-        /**
-         * The narrowest that bubble may ever stand, which is what One UI's own Now Bar chip covers:
-         * below it our pill hands back a piece of the bar it exists to be instead of, and Samsung's
-         * shows past its end. Here rather than in the page because it is one measurement with
-         * NOW_LEFT — where the chip starts and how wide it is — and split across two files the two
-         * halves drift. Mirrors NOW_COVER in js/now.js, which holds it until this arrives.
-         */
-        private const val NOW_COVER = 128
-
-
-        /**
          * One pane of glass per bubble that can stand anywhere on this screen: the main
-         * bubble, a satellite each side, the Now bubble, and the lock screen's own. Mirrored in pill.html's BLUR_PANES,
-         * which sends exactly this many regions in exactly this order — there is no
-         * build step joining the two, so a bubble added on one side and not the other
-         * is a bubble that draws without glass or a pane blurring nothing.
+         * bubble, a satellite each side, the clock, the status bubble, the lock screen's own bubble, the padlock, and
+         * five reserved for the lock screen's notification list — a fixed run of panes rather than one per
+         * notification actually showing, the same shape the two satellites already are. Mirrored in pill.html's
+         * BLUR_PANES, which sends exactly this many regions in exactly this order — there is no build step joining
+         * the two, so a bubble added on one side and not the other is a bubble that draws without glass or a pane
+         * blurring nothing.
          */
-        private const val BLUR_PANES = 9
+        private const val BLUR_PANES = 13
 
         /** How long a touch on a bubble holds the screen on for. */
         private const val LOCK_AWAKE = 15_000L
@@ -195,13 +180,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.push("window.onLock($locked)")
         }
 
-        /** An alarm ringing, or null once it has been answered. */
-        fun deliverAlarm(alarm: JSONObject?) {
-            val service = instance ?: return
-            service.wakeScreen()
-            service.push("window.onAlarm(${alarm ?: "null"})")
-        }
-
         /** What is happening — a recording, a transfer — for the bubble out at the clock. */
         fun deliverNowMods(mods: JSONObject) {
             instance?.push("window.onNowMods($mods)")
@@ -220,10 +198,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          */
         fun deliverTorch(torch: JSONObject?) {
             instance?.push("window.onTorchUpdate(${torch ?: "null"})")
-            // The Haptic panel carries a switch for it, and that switch is painted from
-            // the camera service rather than from its own tap: lit from Samsung's tile
-            // or from the panel it stands in, it has to read the same either way.
-            instance?.push("window.onTorchLit(${torch != null})")
+            // There was a second push here for the flashlight switch the main bubble's Haptic
+            // panel used to carry. The panel moved to the Status bubble and left the torch
+            // behind — the light has a bubble of its own, with its own slider in its own panel,
+            // and a second switch for it somewhere else is the same state said twice.
         }
 
 
@@ -239,14 +217,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private lateinit var touchProxy: View
     private lateinit var proxyParams: WindowManager.LayoutParams
 
-    /**
-     * The same thing again, over the Now bubble out at the clock. Two proxies rather
-     * than one wide one: the gap between them is most of the status bar, and it has to
-     * stay somewhere the shade swipe can start.
-     */
-    private lateinit var nowProxy: View
-    private lateinit var nowProxyParams: WindowManager.LayoutParams
-
     /** The same again for the lock screen bubble, down at the bottom of the canvas. */
     private lateinit var lockProxy: View
     private lateinit var lockProxyParams: WindowManager.LayoutParams
@@ -254,6 +224,21 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     /** Over the Status bubble at the right end of the bar, and no wider than it. */
     private lateinit var statusProxy: View
     private lateinit var statusProxyParams: WindowManager.LayoutParams
+
+    /**
+     * Over the Clock bubble at the left end of the bar. It used to cost no window at all,
+     * because nothing about it was interactive; it is held now — that is the way to the clock
+     * app — so it owes exactly the pixels it stands on and not one more.
+     */
+    private lateinit var clockProxy: View
+    private lateinit var clockProxyParams: WindowManager.LayoutParams
+
+    /**
+     * The shade lock: a full-width strip standing on the top of the screen that hears a finger and does nothing with it.
+     *
+     * It is the one window here that deliberately spends the shade swipe, and there is no second way to do it — SystemUI's own DISABLE_EXPAND needs a signature permission and dies with the caller's token, and immersive.status only *hides* the bar, leaving the swipe that reveals it. So the gesture is stopped by standing on the pixels it starts from. It exists only while the switch is on, and every proxy is put back on top of it when it appears: windows of one type stack in the order they were added, and a strip added last would eat the bubbles' own touches along with the shade's.
+     */
+    private var shadeGuard: View? = null
 
     /** Over the lock screen's notification bubbles, and only while they are standing there. */
     private lateinit var notesProxy: View
@@ -273,10 +258,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
      * out from under a shape that was scaled, dragged or handed over mid-flight.
      */
     private lateinit var blurPanes: List<View>
-
-    /** Where the bubble has been carried to, which the proxy has to follow. */
-    private var carriedX = 0
-    private var carriedY = 0
 
     /** The radius each pane is rounded by right now, in pixels. */
     private val paneCorners = FloatArray(BLUR_PANES)
@@ -332,10 +313,34 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
      * it lays out beyond every limit — so the display's metrics are asked instead,
      * and a window change is the only moment the answer can have changed.
      */
+    /**
+     * Whether the status bar is hidden because *we* hid it, which is the one case where an
+     * invisible bar says nothing about what is on screen.
+     *
+     * The interface hides itself over a fullscreen app, and the only evidence it has for one is
+     * the status bar not being there. Then the switch that hides the real bar arrived and made
+     * that evidence permanently true: `policy_control=immersive.status=*` takes the bar away
+     * everywhere, so the phone looked like it was in a fullscreen app on the home screen, in
+     * Settings, on the keyguard — and the bubbles went away exactly where they are the whole
+     * point. The two features said opposite things about the same pixel.
+     *
+     * Read from the setting rather than asked of [StatusBarPolicy], because that one shells out
+     * through Shizuku and this question is asked on every accessibility event. Watched, so the
+     * answer is current without being polled.
+     */
+    private var isBarOurs = false
+
+    private fun readBarPolicy() {
+        val value = runCatching {
+            android.provider.Settings.Global.getString(contentResolver, "policy_control")
+        }.getOrNull().orEmpty()
+        isBarOurs = value.contains("immersive.status") || value.contains("immersive.full")
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (instance !== this) return
         val isBarHidden = !windowManager.currentWindowMetrics.windowInsets
-            .isVisible(android.view.WindowInsets.Type.statusBars())
+            .isVisible(android.view.WindowInsets.Type.statusBars()) && !isBarOurs
         // Temporary: logs every read so a swipe-to-reveal or back-gesture peek in a
         // fullscreen game can be compared against what the bubbles actually did — see
         // C15 in PLAN.md, the reveal was reported to hide the bubbles instead of showing them.
@@ -448,22 +453,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             setCanPlayMoveAnimation(false)
         }
 
-        nowProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, nowProxyParams, "now")
-                return true
-            }
-        }
-
         // The proxy is the old bubble window, emptied out: the same size, the same
         // place, the same grab margin — it simply has no picture in it any more.
         proxyParams = WindowManager.LayoutParams(
             dp(compactWidth() + (GRAB + BLEED) * 2),
-            dp(compactHeight() + topGrab() + GRAB + BLEED),
+            dp(compactHeight() + topGrab() + GRAB + BLEED + PULL_GRAB),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             BASE_FLAGS,
             PixelFormat.TRANSLUCENT
@@ -527,6 +521,29 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
+        clockProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, clockProxyParams, "clock")
+                return true
+            }
+        }
+        clockProxyParams = WindowManager.LayoutParams(
+            0, 0,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            y = 0
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
         lockProxy = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
@@ -553,21 +570,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
-        // Hung on the left, where the Now bubble stands, rather than centred like the
-        // bubble's own. It is given no size until the light is on.
-        nowProxyParams = WindowManager.LayoutParams(
-            0, 0,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            y = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
         // No pane is painted here: every one of them is hidden until the page sends the
         // first frame of rectangles, which is the only side that knows what it is drawing.
         // The refresh rate is only half of it: the platform also throttles a view that
@@ -577,10 +579,30 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // After the canvas, so a finger reaches the proxy rather than being caught by
         // a window that is only there to draw.
         windowManager.addView(touchProxy, proxyParams)
-        windowManager.addView(nowProxy, nowProxyParams)
         windowManager.addView(lockProxy, lockProxyParams)
         windowManager.addView(statusProxy, statusProxyParams)
+        windowManager.addView(clockProxy, clockProxyParams)
         windowManager.addView(notesProxy, notesProxyParams)
+        applyBarLock()
+        readBarPolicy()
+        // The switch is thrown in the settings app, in another process, so the service hears
+        // about it the only way it can: by watching the setting the switch writes.
+        contentResolver.registerContentObserver(
+            android.provider.Settings.Global.getUriFor("policy_control"),
+            false,
+            object : android.database.ContentObserver(android.os.Handler(mainLooper)) {
+                override fun onChange(selfChange: Boolean) {
+                    readBarPolicy()
+                    // The bar going away under our own policy is not a fullscreen app, so
+                    // whatever was concluded while the switch was in the other position is
+                    // wrong now and the interface has to be told to come back.
+                    if (isBarOurs && isFullScreen) {
+                        isFullScreen = false
+                        applyVisibility()
+                    }
+                }
+            }
+        )
         applyVisibility()
         ShizukuShell.bind(this)
         instance = this
@@ -635,12 +657,74 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         applyVisibility()
     }
 
+    /** Nothing is drawn in landscape, under a fullscreen app or with the screen off. */
+    private fun isHidden() = isLandscape || isFullScreen || isScreenOff
+
+    /**
+     * What a proxy window's flags are, asked in one place because every proxy owes the same
+     * answer. A proxy is touchable only when the page says it is standing over something *and*
+     * there is anything on screen at all — and the second half is exactly what the page cannot
+     * know: it is never told about landscape or a fullscreen app, so every repaint that refit a
+     * proxy while the interface was hidden handed its touchability straight back. That is a
+     * Status bubble answering taps beside the camera on a landscape screen with nothing drawn
+     * on it: the window was made untouchable when the rotation landed, and the next connectivity
+     * payload quietly undid it.
+     */
+    /**
+     * The shade lock, put up or taken down. The strip is as tall as the bar the gesture starts in and no taller: below that is the app's own screen, and a window over that is dead pixels for a swipe nobody makes there.
+     */
+    private fun applyBarLock() {
+        val wanted = Preferences.get(preferences, Preferences.BAR_LOCKED) == 1
+        if (wanted == (shadeGuard != null)) return
+        if (!wanted) {
+            runCatching { windowManager.removeView(shadeGuard) }
+            shadeGuard = null
+            return
+        }
+        val guard = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean = true
+        }
+        val guardParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            dp(SHADE_STRIP),
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = 0
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
+        runCatching { windowManager.addView(guard, guardParams) }
+        shadeGuard = guard
+        // Back on top of it, in the order they were added the first time: the strip is full width and would otherwise be standing over every bubble on the bar.
+        listOf(
+            touchProxy to proxyParams,
+            lockProxy to lockProxyParams,
+            statusProxy to statusProxyParams,
+            clockProxy to clockProxyParams,
+            notesProxy to notesProxyParams,
+        ).forEach { (view, viewParams) ->
+            runCatching {
+                windowManager.removeView(view)
+                windowManager.addView(view, viewParams)
+            }
+        }
+    }
+
+    private fun proxyFlags(isLive: Boolean) =
+        if (isLive && !isHidden()) BASE_FLAGS
+        else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+
     /**
      * Hidden means transparent *and* untouchable: the window stays attached so it
      * keeps receiving the insets that say the fullscreen app has gone away.
      */
     private fun applyVisibility() {
-        val isHidden = isLandscape || isFullScreen || isScreenOff
+        val isHidden = isHidden()
         // One canvas, so the Now bubble goes with it: it is drawn in the same page.
         stage.alpha = if (isHidden) 0f else 1f
         // The blur is the compositor's, not the view's, so a transparent view keeps
@@ -661,12 +745,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // perfectly and cannot be touched. The page is the only side that knows what is
         // interactive, so it is asked rather than guessed at.
         if (isHidden) {
-            nowProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            runCatching { windowManager.updateViewLayout(nowProxy, nowProxyParams) }
             lockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
             statusProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
+            clockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(clockProxy, clockProxyParams) }
             notesProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(notesProxy, notesProxyParams) }
         } else {
@@ -688,9 +772,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
             runCatching { windowManager.removeView(notesProxy) }
+            runCatching { windowManager.removeView(clockProxy) }
             runCatching { windowManager.removeView(statusProxy) }
             runCatching { windowManager.removeView(lockProxy) }
-            runCatching { windowManager.removeView(nowProxy) }
             runCatching { windowManager.removeView(touchProxy) }
             runCatching { windowManager.removeView(stage) }
             webView.destroy()
@@ -703,13 +787,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // canvas only ever moves for the horizontal offset: its size is the screen's.
         params.x = dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET))
         proxyParams.width = dp(compactWidth() + (GRAB + BLEED) * 2)
-        proxyParams.height = dp(compactHeight() + topGrab() + GRAB + BLEED)
+        proxyParams.height = dp(compactHeight() + topGrab() + GRAB + BLEED + PULL_GRAB)
         proxyParams.x = params.x
         proxyParams.y = 0
         blurRadius = Preferences.get(preferences, Preferences.BLUR)
         repaintBlur()
         runCatching { windowManager.updateViewLayout(stage, params) }
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+        applyBarLock()
         pushAppearance()
     }
 
@@ -972,20 +1057,20 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     }
 
     private fun pushAppearance() {
-        push("window.setNowLeft($NOW_LEFT)")
-        push("window.setNowCover($NOW_COVER)")
         push("window.setPillBackground('${Preferences.backgroundCss(preferences)}')")
+        push("window.setAccent('${Preferences.accentCss(preferences)}')")
         push("window.setCompactSize(${Preferences.get(preferences, Preferences.WIDTH)},${Preferences.get(preferences, Preferences.HEIGHT)})")
         push("window.setGrab(${topGrab()})")
         push("window.setNotificationIdentity(${Preferences.get(preferences, Preferences.NOTIFICATION_IDENTITY)})")
         push("window.setGoo(${Preferences.get(preferences, Preferences.GOO)})")
         push("window.setModWidth(${Preferences.get(preferences, Preferences.MOD_WIDTH)})")
         push("window.setNowPushes(${Preferences.get(preferences, Preferences.NOW_PUSHES)})")
-        push(
-            "window.setCarried(" +
-                "${Preferences.get(preferences, Preferences.CARRY_X)}," +
-                "${Preferences.get(preferences, Preferences.CARRY_Y)})"
-        )
+        push("window.setAlertDwell(${Preferences.get(preferences, Preferences.ALERT_DWELL)})")
+        push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
+        push("window.setLockShift(${Preferences.get(preferences, Preferences.LOCK_X)})")
+        push("window.setPadlockOffset(${Preferences.get(preferences, Preferences.PADLOCK_Y)})")
+        push("window.setNotesShown(${Preferences.get(preferences, Preferences.NOTES_SHOWN)})")
+        push("window.setPadlockShown(${Preferences.get(preferences, Preferences.PADLOCK_SHOWN)})")
         push("window.setUnreadCount(${IslandNotificationListener.count()})")
         // The closed mods are state, not events: whatever was already true before this
         // page existed has to be asked for, because nothing will announce it again.
@@ -995,8 +1080,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // it binds, and on an install that happens before this service exists — the
         // push was dropped on the floor and nothing was ever going to say it again.
         IslandNotificationListener.publishCall()
-        // And an alarm that was already ringing when this page was built.
-        IslandNotificationListener.publishAlarm()
     }
 
     private fun push(js: String) {
@@ -1007,8 +1090,15 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // on an animation that has not played for a while, and the reason the second
         // one looks fine. So the frames are asked for before the thing that needs them,
         // exactly as window room is.
-        wakeFrames()
+        //
+        // Inside the post rather than before it, because this touches the view hierarchy and a
+        // view may only be touched from the thread that made it. Every caller used to be on the
+        // main thread and it read as safe; the first one that was not — a shell round-trip
+        // answered off a worker so the panel could open without waiting for it — took the whole
+        // process down with a CalledFromWrongThreadException. `post` is what makes push callable
+        // from anywhere, and half of it being outside the post made it callable from one place.
         webView.post {
+            wakeFrames()
             if (pageReady) webView.evaluateJavascript(js, null) else pending.addLast(js)
         }
     }
@@ -1087,6 +1177,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             .vibrate(VibrationEffect.createPredefined(effect))
     }
 
+    private fun vibrate(effect: VibrationEffect) {
+        getSystemService(VibratorManager::class.java).defaultVibrator.vibrate(effect)
+    }
+
     inner class Bridge {
         @JavascriptInterface
         fun ready() {
@@ -1128,20 +1222,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 proxyParams.width =
                     dp((if (widthDp < 0) compactWidth() else widthDp) + (GRAB + BLEED) * 2)
                 proxyParams.height =
-                    dp((if (isGrown) heightDp else compactHeight()) + topGrab() + GRAB + BLEED)
+                    dp(
+                        (if (isGrown) heightDp else compactHeight()) + topGrab() + GRAB + BLEED +
+                            (if (isGrown) 0 else PULL_GRAB)
+                    )
                 // riseDp is what the page wants to draw above the resting bubble. It is
                 // room, not a move: the proxy already starts at the top of the screen,
                 // so the height covers it and the y never changes.
-                // Plus wherever the bubble has been carried to. The proxy is exactly as big as
-                // the bubble either way — free placement rather than an edge-snap dock is what
-                // keeps it that size — so carrying costs no extra pixels of shade swipe, only
-                // different ones.
-                proxyParams.y = dp(carriedY)
+                proxyParams.y = 0
                 // A satellite hangs off one side, so the proxy is wider on that side
                 // only. Without this the centred proxy would sit off the bubble to make
                 // the room, and every touch would land shifted by half the difference.
                 proxyParams.x =
-                    dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + shiftDp + carriedX)
+                    dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + shiftDp)
                 runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
             }
         }
@@ -1199,9 +1292,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 // moved by the user's horizontal offset.
                 lockProxyParams.x = params.x + dp(leftDp)
                 lockProxyParams.y = dp(topDp)
-                lockProxyParams.flags =
-                    if (isLive) BASE_FLAGS
-                    else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                lockProxyParams.flags = proxyFlags(isLive)
                 runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
             }
         }
@@ -1211,43 +1302,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * the bubble and no more: it sits over the system's own icons at the right end of the bar,
          * which is a stretch the shade swipe is started on as often as anywhere else.
          */
-        /**
-         * Where the bubble has been carried to, told on every move and stored when it is put
-         * down. The page owns the position — it is the side that knows where it is drawing —
-         * and the host only has to keep the window under it and remember it for next time.
-         */
-        @JavascriptInterface
-        fun setCarryProxy(xDp: Int, yDp: Int) {
-            webView.post {
-                carriedX = xDp
-                carriedY = yDp
-                push("window.refitProxies()")
-                proxyParams.y = dp(yDp)
-                proxyParams.x = dp(
-                    Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + xDp
-                )
-                runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
-            }
-        }
-
-        @JavascriptInterface
-        fun setCarried(xDp: Int, yDp: Int) {
-            Preferences.set(preferences, Preferences.CARRY_X, xDp)
-            Preferences.set(preferences, Preferences.CARRY_Y, yDp)
-            setCarryProxy(xDp, yDp)
-        }
-
         /** How fast the session plays, for a voice note that is being waited through. */
         @JavascriptInterface
         fun mediaSpeed(rate: String) {
             MediaControl.setSpeed(rate.toFloatOrNull() ?: 1f)
         }
 
-        /** Snooze or dismiss, pressed from the alarm the bubble is showing. */
-        @JavascriptInterface
-        fun alarmAction(index: Int) {
-            IslandNotificationListener.alarmAction(index)
-        }
 
         /** A recorder's own button, pressed from the Now bubble. */
         @JavascriptInterface
@@ -1264,10 +1324,20 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 notesProxyParams.height = if (isLive) dp(heightDp) else 0
                 notesProxyParams.x = params.x + dp(leftDp)
                 notesProxyParams.y = dp(topDp)
-                notesProxyParams.flags =
-                    if (isLive) BASE_FLAGS
-                    else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                notesProxyParams.flags = proxyFlags(isLive)
                 runCatching { windowManager.updateViewLayout(notesProxy, notesProxyParams) }
+            }
+        }
+
+        @JavascriptInterface
+        fun setClockProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
+            webView.post {
+                val isLive = widthDp > 0
+                clockProxyParams.width = if (isLive) dp(widthDp) else 0
+                clockProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
+                clockProxyParams.x = params.x + dp(leftDp)
+                clockProxyParams.flags = proxyFlags(isLive)
+                runCatching { windowManager.updateViewLayout(clockProxy, clockProxyParams) }
             }
         }
 
@@ -1278,9 +1348,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 statusProxyParams.width = if (isLive) dp(widthDp) else 0
                 statusProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
                 statusProxyParams.x = params.x + dp(leftDp)
-                statusProxyParams.flags =
-                    if (isLive) BASE_FLAGS
-                    else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                statusProxyParams.flags = proxyFlags(isLive)
                 runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
             }
         }
@@ -1298,8 +1366,22 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 "mobile" -> android.provider.Settings.ACTION_DATA_ROAMING_SETTINGS
                 "hotspot" -> "com.android.settings.WIFI_TETHER_SETTINGS"
                 "usb" -> "android.settings.USB_SETTINGS"
+                // AOSP's battery screen has no charging limit on it — "Protect battery" is Samsung's, and it lives in Device care rather than in Settings, so the component is named and the ordinary battery screen is what the fallback below lands on.
+                "battery" -> android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
                 else -> android.provider.Settings.ACTION_SETTINGS
             }
+            if (kind == "battery" && runCatching {
+                    startActivity(
+                        Intent(Intent.ACTION_MAIN)
+                            .setClassName(
+                                "com.samsung.android.lool",
+                                "com.samsung.android.sm.battery.ui.BatteryActivity"
+                            )
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                    true
+                }.getOrDefault(false)
+            ) return
             val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             // A vendor screen that is not on this build is a settings app that never opens, which
             // reads as the bubble being dead rather than as one intent being wrong.
@@ -1313,41 +1395,49 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             }
         }
 
+        /**
+         * The clock bubble's way out. `SHOW_ALARMS` rather than a package name: every phone has
+         * a clock and none of them agree on what it is called, and this is the intent the
+         * platform put there for exactly this question.
+         */
         @JavascriptInterface
-        fun setNowProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
-            webView.post {
-                val isLive = widthDp > 0
-                // Exactly the bubble, with none of the bubble's grab margin: that margin
-                // exists for a drag and a hold that overshoots, and this bubble has
-                // neither — it is tapped and held in place. It cost more than it was
-                // worth, too. The light now reaches most of the way to the punch hole,
-                // so a margin either side of it lay over the bubble standing there, and
-                // two windows claiming the same pixels means the one that hears a finger
-                // is whichever won the race.
-                nowProxyParams.width = if (isLive) dp(widthDp) else 0
-                nowProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
-                // Plus the canvas's own x: the page measures this from the left edge of
-                // the canvas, and the canvas is moved by the horizontal offset. Without
-                // it the window stands beside the bubble it is meant to be over by
-                // exactly that offset, and every touch it hears lands somewhere else.
-                nowProxyParams.x = params.x + dp(leftDp)
-                nowProxyParams.flags =
-                    if (isLive) BASE_FLAGS
-                    else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                runCatching { windowManager.updateViewLayout(nowProxy, nowProxyParams) }
-            }
+        fun openClock() {
+            val intent = Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { startActivity(intent) }
+                .onFailure { android.util.Log.w("IslandBubble", "no clock app", it) }
         }
 
-
+        /**
+         * A switch being thrown is the one thing on this bar that is *worked* rather than
+         * answered, and a predefined EFFECT_CLICK — which is what every toggle in the quick
+         * panel used to get — is the same buzz a tap on a bubble gets. That is why the battery
+         * saver felt like the only switch with a real action behind it: it was the only one One
+         * UI itself confirmed, with its own richer pattern on top of ours. So a throw gets a
+         * composition rather than a primitive: a short rise into a full click, which is the
+         * shape of something latching. Compositions are a real vibrator's own waveform rather
+         * than a canned constant, so this is a different *feel* and not just more of the same.
+         */
         @JavascriptInterface
-        fun triggerHaptic(type: String) = vibrate(
-            when (type) {
-                "tap" -> VibrationEffect.EFFECT_CLICK
-                "expand" -> VibrationEffect.EFFECT_HEAVY_CLICK
-                "dismiss" -> VibrationEffect.EFFECT_DOUBLE_CLICK
-                else -> VibrationEffect.EFFECT_TICK
+        fun triggerHaptic(type: String) {
+            if (type == "toggle") {
+                vibrate(
+                    VibrationEffect.startComposition()
+                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.45f)
+                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 40)
+                        .compose()
+                )
+                return
             }
-        )
+            vibrate(
+                when (type) {
+                    "tap" -> VibrationEffect.EFFECT_CLICK
+                    "expand" -> VibrationEffect.EFFECT_HEAVY_CLICK
+                    "dismiss" -> VibrationEffect.EFFECT_DOUBLE_CLICK
+                    else -> VibrationEffect.EFFECT_TICK
+                }
+            )
+        }
 
         /**
          * Swiping an alert away only sends it back to closed. The badge counts what
@@ -1403,6 +1493,31 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         /**
+         * Every switch in the quick settings panel, asked for when it opens and answered when
+         * the shell has answered. Asked rather than returned: a bridge method runs on the
+         * WebView's own JavaScript thread, and a shell round-trip through Shizuku is long
+         * enough that returning the reading would hold the page still for the first frames of
+         * the very animation that asked for it.
+         */
+        @JavascriptInterface
+        fun requestToggles() {
+            Thread { push("window.onTogglesChanged(${SystemToggles.read()})") }.start()
+        }
+
+        /**
+         * One switch moved. The page has already drawn it in the position the finger asked for,
+         * so what comes back is the correction: a command the shell refused must not be left
+         * standing as a switch that says it worked.
+         */
+        @JavascriptInterface
+        fun setToggle(name: String, isOn: Boolean) {
+            Thread {
+                SystemToggles.set(name, isOn)
+                push("window.onTogglesChanged(${SystemToggles.read()})")
+            }.start()
+        }
+
+        /**
          * The app behind an open mod, opened by holding it. A mod has no notification
          * of its own to tap through — the song is a media session and the timer's
          * notification is the clock's, so the launcher intent is the honest way in.
@@ -1433,10 +1548,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         @JavascriptInterface
         fun mediaControl(action: String) = MediaControl.command(action)
-
-        /** Where the song is right now, for the moment the player is opened. */
-        @JavascriptInterface
-        fun readMediaPosition(): String = MediaControl.position().toString()
 
         /** One of the clock app's own notification buttons, by position. */
         @JavascriptInterface

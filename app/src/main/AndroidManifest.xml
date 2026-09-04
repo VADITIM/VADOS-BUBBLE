@@ -5,6 +5,18 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <!-- The mobile link's generation, which is the reading the Status bubble stands on. Granted
+         over adb by grant.ps1: One UI greys the toggle out for a sideloaded app anyway. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- What the phone is attached to at all. Both are granted at install and neither is asked
+         for, and the Status bubble had no link icon for as long as they were missing: without
+         ACCESS_NETWORK_STATE registerDefaultNetworkCallback throws a SecurityException, and the
+         runCatching around it turned that into a bubble that quietly never knew about wifi. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- The Clock bubble's hold. SHOW_ALARMS lands on the clock app whatever it is called, and
+         the platform gates that intent behind this — it is granted at install, not asked for. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <!--
         Without this, `getLaunchIntentForPackage` returns null for every other app on

@@ -17,15 +17,18 @@ Everything here binds every bubble, whichever kind it is. A rule that holds for 
 | **Main** | At the punch hole. The bubble. | built | yes |
 | **Satellite** | Beside Main, one a side, two at most. | built | borrowed — a mod that is live but not the owner |
 | **Hidden** | Past the second satellite. A coloured dot: a count, not a face. | built | no |
-| **Now** | Left end of the bar, at the clock, over One UI's own chip. | built | yes, its own set |
-| **Lock Now** | Bottom of the lock screen, where a thumb reaches. Replaces the Now Bar. | built, partly | yes — stolen from the row |
+| **Now** | Bottom of the lock screen, where a thumb reaches. Replaces One UI's Now Bar, and the lock screen is the only place it exists. | built, partly | yes — stolen from the row |
 | **Status** | Right end of the bar, over the system's icons. | built | **no** — Modus instead |
-| **Clock** | Top-left, over the system clock. Merges visibly with Now, never overlaps it. | built | **no** |
+| **Clock** | Top-left, over the system clock and One UI's flashlight chip beside it. | built | yes, the Now mods |
 | **Double** | Beside the punch hole, alongside whatever Main is doing. | built | no |
 | **Lock** | Where the lock icon is. Opens, then merges into Main on unlock. | built | no |
 | **Notification** | Over the lock screen's own notification list, in its place. | built | no |
 
-Status and Clock are the two that carry no mod at all — they stand for something the system already draws — and both sit a few pixels shorter than the rest, which is how the eye tells a bubble that can be worked from one that only reports.
+Status carries no mod at all — it stands for something the system already draws — and it and the Clock both sit a few pixels shorter than the rest, which is how the eye tells a bubble that can be worked from one that only reports. Both are pressed, both are pulled and both are held: Status opens the quick settings panel it owns and holds out to the system's settings, and the Clock holds out to the clock app while nothing is standing in it.
+
+The Clock is the one that changed. There was a Now bubble on the bar as well, standing on One UI's flashlight chip a few pixels to its right, and the two wanted the same corner: the clock had to leave whenever a mod came out and the row had to stand aside for both of them, which is a lot of motion spent on two shapes getting out of each other's way. The mods are shown in the Clock now — the time when nothing is happening, the thing that is happening when something is — and the name Now belongs to the lock screen's bubble alone.
+
+The two lock screen bubbles — Now and the notification list — are both full-width boxes held by an inset either side, and both of those insets carry a shift from the settings panel (`lockOffsetDp`, `notesOffsetDp`). It is added to one inset and taken off the other so the bubble slides and its width does not, which also keeps `transform` free for the drag that is already using it. The lock proxy is placed from a constant rather than measured, so it carries the same shift by hand.
 
 ## Mods are eligible by bubble, not by availability
 
@@ -33,26 +36,27 @@ A mod is content injected into a bubble, and which bubbles may carry it is part 
 
 | Mod | Eligible bubbles | Built |
 |---|---|---|
-| Media | Main, Satellite, Lock Now | built |
+| Media | Main, Satellite, Now (lock screen) | built |
 | Clock / timer | Main, Satellite | built |
 | Call | Main, Satellite | built |
 | Battery | **Double only** — it is not a mod | built |
-| Torch | **Now only** | built |
-| Recording / screen share | Now only | built |
-| Download, Upload | Now only | built |
-| Bluetooth, USB, Hotspot | **Status only**, as a Modus | built |
+| Torch | **Clock only** | built |
+| Recording / screen share | Clock only | built |
+| Download, Upload | Clock only | built |
+| Bluetooth, Hotspot, Do not disturb | **Status only**, as a Modus | built |
+| Quick settings | **Status only**, as its panel rather than as a mod | built |
 | Discord video | Main, Satellite | planned |
-| DB Navigator | Main, Satellite, **Lock Now** | planned |
+| DB Navigator | Main, Satellite, **Now (lock screen)** | planned |
 
-Now carries what is *happening* — a torch burning, a recording running, a download in flight. Status carries what is *connected*. That is the line between the two, and it is why bluetooth is not a Now mod even though it would fit there.
+The Now mods are what is *happening* — a torch burning, a recording running, a download in flight — and the Clock is where they are shown. Status carries what is *connected*. That is the line between the two, and it is why bluetooth is not a Now mod even though it would fit there.
 
-The line has a second half worth naming, because it decides how the Status bubble is written: what is happening **starts and stops**, and what is connected is **true all the time**. So Now is watched and announced — it flies out when the light comes on and home when it goes — while Status is read and drawn, born once and standing there for as long as the bar does. A Modus is not a mod arriving in it: the bubble is being true about something else, so the swap is a repaint and its own width carries the change.
+The line has a second half worth naming, because it decides how the Status bubble is written: what is happening **starts and stops**, and what is connected is **true all the time**. So a Now mod is watched and announced — the time stands aside when the light comes on and comes back when it goes — while Status is read and drawn, born once and standing there for as long as the bar does. A Modus is not a mod arriving in it: the bubble is being true about something else, so the swap is a repaint and its own width carries the change. USB left the Modus family and became a slot of its own — a cable is not something riding on top of the link, it is a second thing attached — and do not disturb joined it, because a phone that has been put quiet is exactly a mode it is being kept in.
 
-The Now bubble carries one of its mods at a time and picks by the row's own rule: first come, first served. Nothing ranks a recording above a download — the phone cannot know which of two true things matters more, and guessing is how a bubble ends up flickering between two states that are both correct.
+The Clock carries one Now mod at a time and picks by the row's own rule: first come, first served. Nothing ranks a recording above a download — the phone cannot know which of two true things matters more, and guessing is how a bubble ends up flickering between two states that are both correct.
 
-Torch is the one to read twice. It is not a mod the row is currently not showing — it is a mod the row may never show, because the Now bubble exists to cover One UI's flashlight chip and a torch drawn anywhere else covers nothing. Eligibility is what stops a new Now mod from being written as a row mod that happens to start out there.
+Torch is the one to read twice. It is not a mod the row is currently not showing — it is a mod the row may never show, because the bubble at the left end of the bar is the one standing over One UI's flashlight chip and a torch drawn anywhere else covers nothing. Eligibility is what stops a new Now mod from being written as a row mod that happens to start out there. It is also the one mod with no closed face: a light that is on is shown as its panel and nothing else.
 
-The Lock Now bubble is the exception that proves the shape: it does not have its own copy of Media, it **takes** the row's for as long as the keyguard is up (`LOCK_STEALS`, one filter in `liveMods()` — see [states.md](states.md#the-steal)). One mod, one bubble at a time, moved rather than duplicated.
+The lock screen's Now bubble is the exception that proves the shape: it does not have its own copy of Media, it **takes** the row's for as long as the keyguard is up (`LOCK_STEALS`, one filter in `liveMods()` — see [states.md](states.md#the-steal)). One mod, one bubble at a time, moved rather than duplicated.
 
 ## Every bubble is born at the punch hole
 
@@ -62,7 +66,7 @@ Departure is the same journey backwards, and it is a departure rather than a rep
 
 ## Every bubble is a fluid
 
-This is the contract the whole window model exists to serve: **every bubble merges with every bubble it comes near, and none of them are exempt.** Not Main with its satellites only — Now with Main when the row stands aside, Clock with Now, Lock with Main on the unlock, Double with whatever it lands over, a dot with the bubble that takes it back in. Two of ours near each other and not necking is a bug, not a bubble that happens not to merge.
+This is the contract the whole window model exists to serve: **every bubble merges with every bubble it comes near, and none of them are exempt.** Not Main with its satellites only — the Clock with Main when the row stands aside for a mod standing in it, Now with Main on the unlock, Lock with Main too, Double with whatever it lands over, a dot with the bubble that takes it back in. Two of ours near each other and not necking is a bug, not a bubble that happens not to merge.
 
 What follows, and none of it is negotiable:
 
@@ -71,12 +75,14 @@ What follows, and none of it is negotiable:
 - **The strength is read off the gap**, never fixed (`meltBy()`): shapes fuse as they close and let go as they part, because that is what liquid does. A constant strong enough to fuse a leaving satellite welds the resting row into a bar.
 - **Nearness is measured only between shapes that share a row.** The melt strength is read off the smallest gap between bubbles, and a gap only means anything horizontally when the two are side by side. Measured as one sorted line it broke the moment a bubble was drawn somewhere other than the bar: the lock bubble is nearly full-width at the bottom of the canvas, so against anything on the row it reported a gap of most of the screen negative, pinned the deviation at its ceiling, and welded the whole row into one bar for as long as the keyguard was up. Five boxes make ten pairs — there is nothing to save by being clever.
 - **The skin is mirrored, not told.** One per-frame `getBoundingClientRect()` pass feeds both the goo and the host's blur panes, so the glass cannot disagree with the bubble it is read off. A size change owes that mirror a `stirLiquid()` long enough to cover the whole transition, including every close.
-- **A new bubble needs a blur pane on both sides** — a name in `BLUR_PANES` in `pill.html` and a pane counted in `BubbleService.BLUR_PANES`. Nothing joins the two at build time; a missing pane is a bubble with no glass.
+- **A new bubble needs a blur pane on both sides** — a name in `BLUR_PANES` in `pill.html` and a pane counted in `BubbleService.BLUR_PANES`. Nothing joins the two at build time; a missing pane is a bubble with no glass. A bubble that is really a *list* of a variable number of things — the lock screen's notification bubbles — still needs a fixed run of panes reserved up front (`note0`…`note4`, matching `NOTES_LIMIT`) rather than one created and destroyed per notification, because the host's panes are a fixed `View` list stood up once at start. `sourceOf()`'s per-pane `getComputedStyle` is cached per *element*, not per pane, for exactly this reason: a list redrawn whole hands a pane a different element on every repaint, and a style cached against the pane rather than the element it currently mirrors goes stale the moment the list changes under it.
 - **A bubble standing outside the row grows the filter region while it is there, and only while it is there.** Outside the region the skin is silently dropped and the bubble goes on painting its own background — which reads as a colour bug and is a geometry one.
+- **The screen has edges, and the liquid may wet them** (`edgeMerge`, on by default). A bubble standing within `WALL_REACH` of a side grows a neck into it — a shape from off-screen up to the bubble's own edge, narrower than the bubble is tall, which the goo fillets in exactly as it fillets a satellite — and a grown bubble takes that neck up to the top of the screen so the two close the corner between them. It is *drawn* rather than blurred into place because the melt is one number for the whole layer: raising it far enough to bridge fourteen pixels of gap would weld the row into a bar, which is the one thing `meltBy()` exists to prevent.
+- **A grown bubble stands clear of the bar it grew out of.** `--grown-pad` (mirrored as `GROWN_PAD`, and added to every grown window height so it is not paid for out of the bottom) holds an extended state below the row: on the row its first line is drawn behind the camera and behind the bubbles standing there, and below them it has the whole width to read across. Growing is otherwise the same case as the lock screen, not an exception to it. An extended state — an alert, a panel, any Active tab — is taller than the row's band, so it grows the region (`html.grown`) rather than leaving the liquid. The skin used to be taken off for the whole of a growth, and that is what "the alert overlapped the Now bubble instead of merging with it" was: a bubble painting its own background is not in the goo layer at all, so it can only stack on what it meets. No state comes out of the liquid.
 
 ## Every bubble is bouncy
 
-One press response, one arrival curve, one family of easing across all of them. The Lock Now bubble is the reference because it is the one that is right today:
+One press response, one arrival curve, one family of easing across all of them. The lock screen's Now bubble is the reference because it is the one that is right today:
 
 - `--ease-split`, `cubic-bezier(0.2, 1.7, 0.35, 1)` — it lands past its mark and settles back.
 - `scale 320ms var(--ease-split)` for the swell, and **1.03 under a finger** for the press.

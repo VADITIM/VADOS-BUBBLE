@@ -1,25 +1,46 @@
-import { CARRY_GRAB, carryTo, dropCarry, isCarrying } from './carry.js';
 import { stirLiquid } from './liquid.js';
 import { openPlayer } from './mods/media.js';
 import { openCurrent, openPicture } from './mods/notification.js';
 import { openTimer } from './mods/timer.js';
-import { closeNowPanel, nowOpen, nowPill } from './now.js';
-import { abandonSwap, applyClosedWindow, applyWindow, closedTarget, dragSwap, ensureClosedWindow, liveMods, releaseSwap, toClosed } from './row.js';
-import { CLOSED, HOLD_GRACE, HOLD_MILLIS, HOLD_SCALE, HOLD_SLOP, bridge, pill, root, shared } from './state.js';
-import { MOD_FACES, leaveForMod, openHistory, openMod, openQuick } from './tabs.js';
+import { closeNowPanel, nowOpen } from './now.js';
+import { clockPill } from './clock.js';
+import { closeStatusPanel, statusOpen, statusPill } from './status.js';
+import { abandonSwap, becomeExtended, applyClosedWindow, applyWindow, closedTarget, dragSwap, ensureClosedWindow, liveMods, releaseSwap, toClosed } from './row.js';
+import { CLOSED, HOLD_GRACE, HOLD_MILLIS, HOLD_SCALE, bridge, pill, root, shared } from './state.js';
+import { MOD_FACES, leaveForMod, openHistory, openMod } from './tabs.js';
 
 /**
- * The room a resting finger is given before anything at all reads it as movement.
+ * The block: the one radius every gesture on a bubble has to leave before it is a gesture at
+ * all, and the whole of what the hold is protected by.
  *
- * A finger pressing for a third of a second wanders, and every pixel of that wander
- * used to reach some gesture or other — which is why the hold felt unreliable even
- * after it was made the senior one: it was not being cancelled any more, but the
- * bubble was still twitching under it and the swell was fighting a lean nobody asked
- * for. Inside this nothing moves and nothing is measured. It is subtracted from the
- * travel rather than compared against it, so the play drag still starts from zero
- * once the finger is genuinely going somewhere.
+ * A finger pressing for a third of a second wanders, and every pixel of that wander used to
+ * reach something: the play drag started at 12, the sideways trade at 22, the lean at 12, and
+ * the hold was called off somewhere along a hyperbola at 80% of the band's radius. Four numbers
+ * for one question — has the finger stopped resting and started asking — and a hold that failed
+ * differently depending on which direction the wander happened to go.
+ *
+ * One number now, and it is the same for the drag and for the swipe down, because they are the
+ * same question asked in two directions. Inside it **the hold has priority over everything**:
+ * nothing leans, nothing trades, nothing is picked up, and the swell goes on growing. Outside
+ * it the touch belongs to whichever gesture the direction names, and the hold is over — its
+ * precondition has failed, and the swell springs back from wherever it had got to rather than
+ * from where it would have ended up.
+ *
+ * Small enough that a real swipe is never swallowed, wide enough that a press is never mistaken
+ * for one. It is subtracted from the travel rather than compared against it, so the band still
+ * starts from zero once the finger is genuinely going somewhere.
  */
-export const DEAD_ZONE = 12;
+export const HOLD_BLOCK = 18;
+
+/**
+ * The extra time a hold is given when the finger wanders inside the block.
+ *
+ * A finger that moves and then settles is a finger that is still deciding, and the third of a
+ * second it had been counting for was measured from before it started. Granted once per touch,
+ * not per frame — the point is a little more patience, not a hold that can be kept alive
+ * indefinitely by never quite standing still.
+ */
+export const HOLD_WANDER = 150;
 
 /**
  * How far a bubble may be pulled from where it rests, however hard it is dragged.
@@ -48,28 +69,13 @@ function dragRadius() {
 }
 
 /**
- * How far into the band the finger may go before the hold is called off, as a share of the
- * radius. The band was doubled to give the bubble more to say when it is pushed about, and
- * doubling it alone would have doubled the room a finger has to wander while a hold is
- * counting underneath — so the distance the *hold* tolerates is pinned where it already was,
- * at the old radius, which is 80% of the new one.
- *
- * Past it the finger has plainly stopped resting and started dragging, so the hold resets to
- * idle and does not fire. This is the one thing that outranks the hold from below: everywhere
- * else the hold runs underneath whatever the finger is doing and wins if it is still down
- * when the timer comes up. Here it is not a competing gesture that takes the touch, it is the
- * hold's own precondition failing — a finger this far out was never holding.
- */
-const HOLD_ABANDON = 0.8;
-
-/**
  * The band itself: a hyperbola, so the first pixels are nearly free and the last are
  * nearly immovable, and the bubble never leaves the circle however hard it is pulled.
- * Past the dead zone by `travel`, it has come `DRAG_RADIUS * travel / (travel + R)`.
+ * Past the block by `travel`, it has come `DRAG_RADIUS * travel / (travel + R)`.
  */
 function rubberBand(travel) {
   const radius = dragRadius();
-  const past = Math.max(0, travel - DEAD_ZONE);
+  const past = Math.max(0, travel - HOLD_BLOCK);
   return radius * past / (past + radius);
 }
 
@@ -119,17 +125,17 @@ export function cancelSpring(element) {
  * here, which is the difference between one rule and two that drift.
  */
 export function rubberBandPast(dx, dy) {
-  return rubberBand(Math.hypot(dx, dy)) > dragRadius() * HOLD_ABANDON;
+  return Math.hypot(dx, dy) > HOLD_BLOCK;
 }
 
 export function toy(element, prefix, dx, dy) {
   const travel = Math.hypot(dx, dy);
   const reach = rubberBand(travel);
   const scale = travel > 0 ? reach / travel : 0;
-  // Measured on the band rather than on the finger: the band is what the user can see, so
-  // the threshold fires where the bubble looks like it has been dragged rather than at a
-  // raw travel that means different things at different points along a hyperbola.
-  if (reach > dragRadius() * HOLD_ABANDON) endHold();
+  // Measured on the finger rather than on the band: the block is a distance the *hand* has
+  // moved, and the same distance has to mean the same thing whichever bubble is under it — the
+  // band's own hyperbola says different things at different points along itself.
+  if (travel > HOLD_BLOCK) endHold();
   cancelSpring(element);
   element.style.setProperty(prefix + '-x', (dx * scale).toFixed(2) + 'px');
   element.style.setProperty(prefix + '-y', (dy * scale).toFixed(2) + 'px');
@@ -166,23 +172,16 @@ export function untoy(element, prefix) {
  * keeps the whole gesture until the finger lifts however far outside itself it goes.
  * So nothing here is bounded by a window — the only limit left is what reads well.
  */
-// The lean begins where the dead zone ends: one number for "the finger is genuinely
-// going somewhere", not two that disagree by eight pixels.
-const PULL_START = DEAD_ZONE;
-const PULL_TRIGGER = 28;
-const PULL_TRAVEL = 24;
-/** How much of the way there a finger that *lifted* counts as having asked. */
-const PULL_SETTLE = 0.7;
+/** How far down the finger goes before the pull is an ask rather than a wander. Mirrors STATUS_PULL: it is one gesture and it must not need a different hand at two ends of the same bar. */
+const PULL_TRIGGER = 22;
+
 /**
- * The same, for a finger that was taken away rather than lifted. Lower, and it has to
- * be: over an app SystemUI has its own shade gesture on this strip and it pilfers the
- * pointer partway down, which arrives here as a cancel with the finger still moving.
- * That is stronger evidence of an ask than a lift is, not weaker — the gesture did not
- * stop, it was stopped. Discarding it is why the pull worked on the home and lock
- * screens and did nothing at all inside an app, and why it got worse the further the
- * pull had to travel.
+ * The same ask, in pixels, when the gesture was taken away rather than finished. Lower, and it
+ * has to be: over an app SystemUI has its own shade gesture on this strip and it pilfers the
+ * pointer partway down, which arrives here as a cancel with the finger still moving. That is
+ * stronger evidence of an ask than a lift is, not weaker.
  */
-const PULL_STOLEN = 0.35;
+const PULL_STOLEN = 12;
 
 // The window shrinks back only once the collapse has finished, so the resize
 // never lands mid-frame.
@@ -196,6 +195,43 @@ let startX = 0;
 let hasMoved = false;
 let hasGrown = false;
 let hasSwiped = false;
+
+/** True once the pull has opened the list, so a stream of touchmoves cannot open it again. */
+let hasPulled = false;
+
+/** The furthest down the finger has got, kept so a gesture the shade confiscates can still be read. */
+let pullDrop = 0;
+
+/** The wander's extra time, granted once per touch. */
+let hasWandered = false;
+
+/** What the hold does when its timer comes up, held so the wander can restart the same step. */
+let heldStep = null;
+
+/** When the current hold was armed, so a restart can carry the time it had already served. */
+let holdArmedAt = 0;
+
+/**
+ * The hold's timer, restarted with HOLD_WANDER added, when the finger moves inside the block.
+ *
+ * Restarted rather than lengthened, because a timer that has been counting cannot be asked how
+ * long it has left. It is granted once, so the finger cannot keep a hold alive by twitching.
+ */
+function grantHoldWander() {
+  if (hasWandered || !holdPending || !heldStep) return;
+  hasWandered = true;
+  // What it had left plus the grant, never the grant alone: a wander at fifty milliseconds
+  // would otherwise make the hold *shorter* than a finger that never moved at all.
+  const served = Date.now() - holdArmedAt;
+  clearTimeout(shared.holdTimer);
+  shared.holdTimer = setTimeout(heldStep, Math.max(0, HOLD_MILLIS - served) + HOLD_WANDER);
+}
+
+/** True once the upward dismiss has fired, and it may fire once per touch. A touchmove is a
+ *  stream, not an event: every frame the finger stayed above the line met the same condition and
+ *  fired the dismiss again — the haptic, the host call and the close, over and over until the
+ *  bubble was left in a state nothing had asked for. A gesture that has already acted is over. */
+let hasDismissed = false;
 
 /**
  * The window is exactly the resting bubble, so a bubble that scales past it is
@@ -240,8 +276,11 @@ function beginHold() {
   }, HOLD_GRACE);
 }
 
+/** True while a hold is counting and has neither fired nor been called off: inside the block the hold outranks everything, and this is what the gestures below read to know it has not resolved yet. */
+let holdPending = false;
 export function endHold() {
   clearTimeout(shared.holdTimer);
+  holdPending = false;
   root.classList.remove('pressing');
   clearTimeout(shared.growTimer);
   hasGrown = false;
@@ -259,46 +298,66 @@ pill.addEventListener('touchstart', event => {
   shared.hasHeld = false;
   hasGrown = false;
   hasSwiped = false;
+  hasDismissed = false;
+  hasPulled = false;
+  pullDrop = 0;
+  hasWandered = false;
+  // Cleared, not left standing: a bare bubble arms no hold, and a step left over from the last
+  // touch is a hold the wander could restart for a bubble that never had one.
+  heldStep = null;
 
-  if (shared.state === 'idle') {
+  // A bare bubble has no hold at all. It is the way out to the app behind whatever the bubble is
+  // wearing, and an idle one is wearing nothing — there is no app and no panel to fall back on,
+  // since the quick settings belong to the Status bubble. It used to be armed anyway and then
+  // quietly do nothing when its timer came up, which bought the swell, the window growth and a
+  // third of a second of the touch for a gesture that was never going to happen. Not armed, the
+  // press is answered by the band and by nothing else, and the finger is free the whole time.
+  if (shared.state === 'idle' && liveMods().length) {
     shared.state = 'haptic';
+    holdPending = true;
     beginHold();
-    shared.holdTimer = setTimeout(() => {
+    // Held rather than written inline, so the wander can restart the same step with more time
+    // on it: a timer that is already counting cannot be asked how long it has left.
+    heldStep = () => {
+      holdPending = false;
+      // Read again rather than closed over: the mod can end between the press and the timer, and
+      // leaving for an app that has stopped playing is worse than doing nothing.
+      const held = liveMods()[0];
+      if (!held) {
+        endHold();
+        return;
+      }
       shared.hasHeld = true;
       root.classList.remove('holding');
       // Whatever else the finger had started underneath the hold is let go of here,
-      // and let go of without being asked what it wanted: the hold has the touch now,
-      // and a trade committing or a list opening behind the panel this is about to
-      // put up is two gestures answering one finger.
+      // and let go of without being asked what it wanted: the hold has the touch now, and a
+      // trade committing behind what this is about to do is two gestures answering one finger.
       abandonSwap();
-      endPull();
       bridge.triggerHaptic('expand');
-      // The hold on a mod is the way out to its app — the one thing the bubble
-      // itself can never be. A bare bubble has no app to leave for, so it holds to
-      // the settings it owns; a call taps out to Discord already, so it does too.
-      const held = liveMods()[0];
-      if (!held || held === 'call') {
-        openQuick();
-        return;
-      }
       leaveForMod(held);
       toClosed();
-    }, HOLD_MILLIS);
+    };
+    holdArmedAt = Date.now();
+    shared.holdTimer = setTimeout(heldStep, HOLD_MILLIS);
     return;
   }
 
   // An open mod holds too, and it means the one thing the panel cannot do: leave
   // for the app itself. No growth under the finger for this one — the window is
   // already exactly the open bubble, so a scale would only be clipped by it.
-  if (shared.state === 'active' && MOD_FACES[shared.size]) {
+  if (shared.state === 'extended' && MOD_FACES[shared.size]) {
     root.classList.add('pressing');
-    shared.holdTimer = setTimeout(() => {
+    holdPending = true;
+    heldStep = () => {
+      holdPending = false;
       shared.hasHeld = true;
       root.classList.remove('pressing');
       bridge.triggerHaptic('expand');
       openMod();
       toClosed();
-    }, HOLD_MILLIS);
+    };
+    holdArmedAt = Date.now();
+    shared.holdTimer = setTimeout(heldStep, HOLD_MILLIS);
   }
 }, { passive: true });
 
@@ -312,106 +371,49 @@ pill.addEventListener('touchmove', event => {
   const verticalTravel = event.touches[0].clientY - startY;
   const horizontalTravel = Math.abs(event.touches[0].clientX - startX);
   const sideways = event.touches[0].clientX - startX;
-  // Inside the dead zone nothing moves and nothing is measured. This is the room the
-  // hold needs: a finger pressing for a third of a second wanders, and every pixel of
-  // that wander used to reach some gesture or other.
-  if (Math.hypot(horizontalTravel, verticalTravel) <= DEAD_ZONE) return;
-  // Past this the bubble comes off its spot and is being *carried*: it stops rubber-banding
-  // and goes exactly where the finger goes, and it stays where it is let go of. Under it,
-  // everything behaves as it always has — the band, the springback, the trade — so the
-  // gesture is additive rather than a mode the bubble is put into.
-  //
-  // Only from a closed bubble. An open panel is centred on the screen and an alert is a thing
-  // arriving at the hole; neither is a shape to pick up, and a drag on one of them already
-  // means something else.
-  if (isCarrying() ||
-      (Math.hypot(horizontalTravel, verticalTravel) > CARRY_GRAB &&
-        CLOSED.has(shared.size) && shared.state === 'idle' &&
-        !root.classList.contains('dragging') && !root.classList.contains('pulling'))) {
-    untoy(pill, '--drag');
-    carryTo(sideways, verticalTravel);
+  // Inside the block nothing moves, nothing is measured and nothing may be claimed: the hold
+  // has priority there, full stop. What the finger buys by wandering is a little more patience
+  // — the hold's timer is given HOLD_WANDER once, because a finger that moved and then settled
+  // is still deciding and the third of a second it was counting began before it started.
+  if (Math.hypot(horizontalTravel, verticalTravel) <= HOLD_BLOCK) {
+    grantHoldWander();
     return;
   }
-  // Until something claims the touch the bubble simply follows the finger on its
-  // band. Once a real gesture has it — a trade, a lean — the play drag lets go and
-  // the row's own motion takes over, or the bubble would be carried twenty pixels off
-  // its place for the whole of a swap.
-  if (root.classList.contains('dragging') || root.classList.contains('pulling') ||
-      hasSwiped) {
-    untoy(pill, '--drag');
-  } else {
-    toy(pill, '--drag', sideways, verticalTravel);
-  }
-  // The hold is no longer called off by travel at all. It used to be — one slop for
-  // both answers, whatever cancels the hold is the same travel that starts the drag —
-  // and that made the drag the senior gesture: a finger that moved was a finger that
-  // had given up on holding, so the swell stopped growing and the haptic never came.
-  // It is the other way round now. The hold runs underneath whatever else the finger
-  // is doing, swelling on `scale` while the drag trades width and the pull leans, and
-  // if the finger is still down when its timer comes up the hold takes the touch and
-  // the others are let go of without asking for anything. A gesture that has to be
-  // held still to work is one the user has to be careful to make.
-  // Sideways across a closed bubble trades width with the satellite, live. The
-  // vertical limit only decides whether a drag may *start*: once it has, the
-  // finger is free to wander down the screen, which it does — the bubble is at the
-  // very top and there is nowhere else for a long drag to go.
+  pullDrop = Math.max(pullDrop, verticalTravel);
+  // Until something claims the touch the bubble simply follows the finger on its band, which is
+  // the whole of what a pull looks like here now: the bubble is an object being drawn down, and
+  // the list opens when the finger has gone far enough. There is no second lean written on top
+  // of the band and no share of a threshold to settle from — that machinery is what made the
+  // same gesture open the list at one distance and do nothing at another.
   const dragging = root.classList.contains('dragging');
-  // The pull down comes before the sideways trade, and wins whenever the finger is
-  // going down more than it is going across. It is the fallback gesture, so it must
-  // be the easy one to make: no aiming, and it starts moving almost at once.
-  // Once it has started it keeps the touch until the finger lifts. A pull is now long
-  // enough that the finger wanders well past the drag's slop sideways on the way
-  // down, and the frame where that wander read as wider than the travel handed the
-  // touch to the sideways trade — which sets hasSwiped and kills the pull for good.
-  // The direction only decides which gesture this is, and it is decided once.
-  const pulling = root.classList.contains('pulling');
-  if (shared.state !== 'active' && CLOSED.has(shared.size) && !hasSwiped && !dragging &&
-      (pulling || (verticalTravel > PULL_START && verticalTravel > horizontalTravel))) {
-    // The hold is not called off while the bubble is merely leaning: the finger that
-    // is about to be held still wanders a few pixels, and cancelling on that wander
-    // is exactly what broke the hold on the sideways drag. Only a pull that has
-    // actually asked for something takes the touch away from it.
-    if (verticalTravel >= PULL_TRIGGER) {
-      hasMoved = true;
-      endHold();
-      endPull();
-      bridge.triggerHaptic('expand');
-      openHistory();
-      return;
-    }
-    // Clamped low because the latch above lets the finger come back up without
-    // handing the touch on, and a negative reach would push the bubble upwards.
-    const reached = Math.max(0, (verticalTravel - PULL_START) / (PULL_TRIGGER - PULL_START));
-    shared.pullReach = reached;
-    root.classList.add('pulling');
-    // Under the finger nothing eases, so a springback still running has to be taken off
-    // before the lean is written — the same handover toy() makes for the drag.
-    cancelSpring(pill);
-    root.style.setProperty('--pull', (PULL_TRAVEL * reached).toFixed(2) + 'px');
-    // A touch of shrink with it, so the bubble reads as being drawn out of the
-    // cutout under tension rather than simply sliding down the screen.
-    root.style.setProperty('--pull-scale', (1 - 0.03 * reached).toFixed(3));
-    // The glass and the goo are mirrored off the bubble, and the bubble is now
-    // travelling far enough that a mirror standing still is a pane left behind at
-    // the cutout. Short, because the next move re-stirs it.
-    stirLiquid(160);
+  if (dragging || hasSwiped) untoy(pill, '--drag');
+  else toy(pill, '--drag', sideways, verticalTravel);
+  // The pull, exactly as the Status bubble reads it: far enough down, and more down than
+  // across. Felt at the crossing rather than on the lift, because the crossing is the moment
+  // there was still a decision to make.
+  if (!hasPulled && shared.state !== 'extended' && CLOSED.has(shared.size) && !hasSwiped &&
+      !dragging && verticalTravel > PULL_TRIGGER && verticalTravel > horizontalTravel) {
+    hasPulled = true;
+    hasMoved = true;
+    endHold();
+    untoy(pill, '--drag');
+    bridge.triggerHaptic('expand');
+    openHistory();
     return;
   }
-  // The drag starts where the hold gives up and not a pixel sooner. It used to
-  // begin at three pixels of travel — a quarter of the wander a resting finger
-  // makes in a third of a second — so a hold was regularly cancelled by its own
-  // drag before it ever reached the haptic. The slop is taken off the travel, so
-  // the swap still starts from nothing once it does begin.
-  const committed = Math.abs(sideways) - HOLD_SLOP;
-  if (shared.state !== 'active' && CLOSED.has(shared.size) && committed > 0 &&
-      (dragging || Math.abs(verticalTravel) < 30)) {
+  // Sideways across a closed bubble trades width with the satellite, live. The block is taken
+  // off the travel, so the swap still starts from nothing once it begins.
+  const committed = Math.abs(sideways) - HOLD_BLOCK;
+  if (!hasPulled && shared.state !== 'extended' && CLOSED.has(shared.size) && committed > 0 &&
+      horizontalTravel > Math.abs(verticalTravel)) {
     if (dragSwap(Math.sign(sideways) * committed)) {
       hasSwiped = true;
       hasMoved = true;
       return;
     }
   }
-  if (verticalTravel < -24 && horizontalTravel < 40) {
+  if (!hasDismissed && verticalTravel < -24 && horizontalTravel < 40) {
+    hasDismissed = true;
     hasMoved = true;
     // The one gesture the hold does not get to run underneath: this one has already
     // acted, and there is nothing left to hold.
@@ -423,46 +425,9 @@ pill.addEventListener('touchmove', event => {
   }
 }, { passive: true });
 
-/**
- * The bubble lets go of the finger and eases back to where it rests — or, if the
- * finger had all but asked already, finishes the ask itself. A flick can lift
- * between two frames, and a gesture that was visibly most of the way there and did
- * nothing is the same bug as one that needs aiming.
- */
-function endPull(settle, threshold) {
-  if (!root.classList.contains('pulling')) return;
-  const asked = settle && shared.pullReach > (threshold || PULL_SETTLE);
-  const leant = PULL_TRAVEL * shared.pullReach;
-  const shrunk = 1 - 0.03 * shared.pullReach;
-  shared.pullReach = 0;
-  root.classList.remove('pulling');
-  // The lean lives inside `transform`, which is the per-frame property and has no
-  // duration of its own — that is the whole point of the split, and it is why letting
-  // go of a pull put the bubble back at the cutout in one frame. The way home is the
-  // play drag's, because it is the same journey: one added animation off where the lean
-  // had got to, rather than a second curve written for the pull alone.
-  root.style.removeProperty('--pull');
-  root.style.removeProperty('--pull-scale');
-  springHome(pill, `translate(0px, ${leant.toFixed(2)}px) scale(${shrunk.toFixed(3)})`);
-  // The glass and the goo are mirrored off the bubble, so they have to ride the
-  // springback home rather than snapping back the frame the class came off.
-  stirLiquid(600);
-  if (asked) {
-    // The tap that follows a touchend is not this gesture asking twice — it would
-    // close what the pull has just opened.
-    hasMoved = true;
-    bridge.triggerHaptic('expand');
-    openHistory();
-  }
-}
-
 pill.addEventListener('touchend', () => {
   releaseSwap();
-  endPull(true);
   endHold();
-  // Let go of where it was let go of, before the play drag's springback is asked for: a carried
-  // bubble has no home to spring to, which is the whole point of carrying it.
-  dropCarry();
   untoy(pill, '--drag');
 }, { passive: true });
 /**
@@ -474,9 +439,18 @@ pill.addEventListener('touchend', () => {
  */
 pill.addEventListener('touchcancel', () => {
   releaseSwap();
-  dropCarry();
-  endPull(true, PULL_STOLEN);
   untoy(pill, '--drag');
+  // Taken away rather than finished, with the finger still on its way down: over an app the
+  // shade has the pointer now and there will be no lift to wait for, so the ask is answered
+  // here and at a lower bar than a lift would need.
+  if (!hasPulled && !shared.hasHeld && shared.state !== 'extended' && CLOSED.has(shared.size) &&
+      pullDrop > PULL_STOLEN) {
+    hasPulled = true;
+    endHold();
+    bridge.triggerHaptic('expand');
+    openHistory();
+    return;
+  }
   if (shared.state === 'haptic' && hasGrown) return;
   endHold();
 }, { passive: true });
@@ -485,7 +459,7 @@ pill.addEventListener('click', () => {
   if (hasMoved || shared.hasHeld) return;
 
   // Open closes on any tap, its own included.
-  if (shared.state === 'active') {
+  if (shared.state === 'extended') {
     bridge.triggerHaptic('tap');
     toClosed();
     return;
@@ -507,7 +481,7 @@ pill.addEventListener('click', () => {
   // Closed. What a tap opens depends on which mod owns the closed bubble: the song
   // if one is playing, and on the bare bubble the list — the thing a bubble with
   // nothing to say is most often being asked for.
-  shared.state = 'active';
+  becomeExtended();
   bridge.triggerHaptic('expand');
   // Whichever mod owns the closed bubble owns the tap on it — the head of the
   // order, not whichever mod would rank first: a swipe can have handed the bubble
@@ -547,9 +521,11 @@ window.onOutsideTap = (x, y) => {
   // had been down a tenth of a second. The point is hit-tested here rather than in
   // Kotlin, because the page is the only side that knows where anything is.
   const hit = document.elementFromPoint(x, y);
-  if (hit && (pill.contains(hit) || nowPill.contains(hit))) return;
-  if (shared.state === 'active') toClosed();
+  if (hit && (pill.contains(hit) || clockPill.contains(hit) || statusPill.contains(hit))) return;
+  if (shared.state === 'extended') toClosed();
   // The Now bubble's panel closes on the same tap, and for the same reason: it is
-  // one page now, so one message closes whatever on it is open.
+  // one page now, so one message closes whatever on it is open. The Status bubble's
+  // quick settings are the third of them.
   if (nowOpen) closeNowPanel();
+  if (statusOpen) closeStatusPanel();
 };

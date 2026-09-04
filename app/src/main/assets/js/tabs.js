@@ -1,117 +1,20 @@
 import { markUp } from './mods/notification.js';
-import { setSize, showFace, toClosed } from './row.js';
+import { becomeExtended, setSize, showFace, toClosed } from './row.js';
+import { swipeToDismiss } from './swipeDismiss.js';
 import { SIZES, bridge, root, shared } from './state.js';
 
-/** How far a row has to travel before the release counts as "gone". */
-const SWIPE_AWAY = 90;
-
-/**
- * A row is dismissed the way it would be in the shade: sideways. The list scrolls
- * vertically, so the gesture only claims the touch once it has committed to the
- * horizontal — otherwise a scroll would throw notifications away.
- */
-function swipeToDismiss(row, keys) {
-  let originX = 0;
-  let travel = 0;
-  let isHorizontal = false;
-
-  let originY = 0;
-
-  row.addEventListener('touchstart', event => {
-    originX = event.touches[0].clientX;
-    originY = event.touches[0].clientY;
-    travel = 0;
-    isHorizontal = false;
-    row.dataset.swiped = 'false';
-    row.dataset.scrolled = 'false';
-    row.style.transition = 'none';
-  }, { passive: true });
-
-  row.addEventListener('touchmove', event => {
-    const dx = event.touches[0].clientX - originX;
-    const dy = event.touches[0].clientY - originY;
-    // Scrolling the list is not choosing a row. The finger that drags this panel to
-    // read further down lifts on whichever row it happened to stop over, and that
-    // lift arrives as a click on it — which opened a notification nobody asked for
-    // and closed the panel they were still reading. Once the finger has travelled
-    // far enough to be a scroll, this row is out of the running for the rest of the
-    // touch, exactly as a horizontal swipe already takes it out.
-    if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) row.dataset.scrolled = 'true';
-    if (!isHorizontal && Math.abs(dx) < 12) return;
-    // A drag that began as a scroll stays a scroll: the list is already moving under
-    // it, and taking the row sideways halfway down would be two answers to one drag.
-    if (row.dataset.scrolled === 'true') return;
-    isHorizontal = true;
-    travel = dx;
-    if (Math.abs(dx) > 12) row.dataset.swiped = 'true';
-    row.style.transform = 'translateX(' + dx + 'px)';
-    row.style.opacity = String(Math.max(0, 1 - Math.abs(dx) / (SWIPE_AWAY * 2)));
-    dragNeighbours(row, dx);
-  }, { passive: true });
-
-  row.addEventListener('touchend', () => {
-    row.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
-    if (Math.abs(travel) < SWIPE_AWAY) {
-      row.style.transform = '';
-      row.style.opacity = '';
-      releaseNeighbours(row);
-      return;
-    }
-    // Gone from the shade, not only from this list: this is the same act. A row is
-    // a conversation, so all of it goes.
-    keys.forEach(one => bridge.dismissNotification(one));
-    bridge.triggerHaptic('dismiss');
-    row.style.transform = 'translateX(' + (travel > 0 ? 400 : -400) + 'px)';
-    row.style.opacity = '0';
-    releaseNeighbours(row);
-    row.addEventListener('transitionend', () => {
-      // Measured while it is still in the flow: once it is out, the height it was
-      // taking up is exactly the distance everything under it is about to jump.
-      const gap = row.offsetHeight;
-      const below = [...document.querySelectorAll('.history-row')];
-      row.remove();
-      closeGap(below.slice(below.indexOf(row) + 1), gap);
-      // The number in the header is the notifications, not the rows they were
-      // folded into, so a row takes its whole group out of the count with it.
-      const left = [...document.querySelectorAll('.history-row')]
-        .reduce((sum, node) => sum + Number(node.dataset.count || 1), 0);
-      document.getElementById('history-count').textContent = left ? String(left) : '';
-    }, { once: true });
-    // A row that took the last notification with it leaves nothing to hold open.
-    setTimeout(() => {
-      if (shared.size === 'history' && !document.querySelector('.history-row')) toClosed();
-    }, 220);
-  }, { passive: true });
-}
-
-/** How much of a row's travel the rows beside it are dragged along by. */
-const ROW_PULL = 0.18;
-
-/**
- * The rows either side leaning after the one being pulled. A list where only the
- * row under the finger moves is a list of separate cards; one where its neighbours
- * are tugged a little is a single sheet with something being drawn out of it. The
- * neighbours never take the swipe — they lean and come straight back — so the pull
- * is a fraction of the travel and it dies off with distance.
- */
-function dragNeighbours(row, dx) {
-  const rows = [...document.querySelectorAll('.history-row')];
-  const at = rows.indexOf(row);
-  rows.forEach((other, index) => {
-    if (other === row) return;
-    const distance = Math.abs(index - at);
-    if (distance > 2) return;
-    other.style.transition = 'none';
-    other.style.transform = 'translateX(' + (dx * ROW_PULL / distance).toFixed(2) + 'px)';
-  });
-}
-
-function releaseNeighbours(row) {
-  for (const other of document.querySelectorAll('.history-row')) {
-    if (other === row) continue;
-    other.style.transition = 'transform 260ms var(--ease-grow)';
-    other.style.transform = '';
-  }
+/** What the panel does once a swipe has actually taken a row out — see closeGap() below. */
+function afterRowRemoved(below, gap) {
+  closeGap(below, gap);
+  // The number in the header is the notifications, not the rows they were folded into, so a
+  // row takes its whole group out of the count with it.
+  const left = [...document.querySelectorAll('.history-row')]
+    .reduce((sum, node) => sum + Number(node.dataset.count || 1), 0);
+  document.getElementById('history-count').textContent = left ? String(left) : '';
+  // A row that took the last notification with it leaves nothing to hold open.
+  setTimeout(() => {
+    if (shared.size === 'history' && !document.querySelector('.history-row')) toClosed();
+  }, 220);
 }
 
 /**
@@ -168,14 +71,6 @@ export function leaveForMod(mod) {
   if (mod === 'call' && shared.call && shared.call.key) bridge.openNotification(shared.call.key);
 }
 
-/** The settings the bubble owns itself, rather than anything the phone sent it. */
-export function openQuick() {
-  shared.state = 'active';
-  showFace('quick');
-  setSize('haptic');
-  paintMicrophoneAccess(bridge.readMicrophoneAccess());
-  flashlightSwitch.classList.toggle('on', bridge.readTorchLit());
-}
 
 /**
  * The list, as conversations rather than as notifications. Three messages from the
@@ -242,7 +137,10 @@ export function openHistory() {
     row.dataset.count = String(group.entries.length);
     // A swipe throws away the conversation, not the newest line of it: the row is
     // the whole group, and leaving the rest behind would redraw it a line shorter.
-    swipeToDismiss(row, group.entries.map(one => one.key));
+    swipeToDismiss(row, group.entries.map(one => one.key), {
+      rowSelector: '.history-row',
+      afterRemove: afterRowRemoved,
+    });
 
     const mark = document.createElement('div');
     mark.className = 'history-mark';
@@ -324,7 +222,7 @@ export function openHistory() {
     list.appendChild(row);
   }
 
-  shared.state = 'active';
+  becomeExtended();
   showFace('history');
   setSize('history', historyWindow());
 }
@@ -349,39 +247,3 @@ function historyWindow() {
   root.style.setProperty('--history-height', height + 'px');
   return { width: SIZES.history.width, height };
 }
-
-
-const microphoneSwitch = document.getElementById('microphone-switch');
-const flashlightSwitch = document.getElementById('flashlight-switch');
-
-function paintMicrophoneAccess(reading) {
-  microphoneSwitch.classList.toggle('unavailable', reading === 'unavailable');
-  microphoneSwitch.classList.toggle('on', reading === 'allowed');
-}
-
-window.onMicrophoneAccessChanged = paintMicrophoneAccess;
-
-microphoneSwitch.addEventListener('click', event => {
-  event.stopPropagation();
-  if (microphoneSwitch.classList.contains('unavailable')) return;
-  const next = !microphoneSwitch.classList.contains('on');
-  paintMicrophoneAccess(next ? 'allowed' : 'blocked');
-  bridge.triggerHaptic('tap');
-  bridge.setMicrophoneAccess(next);
-});
-
-/**
- * The light is not this bubble's own state — it has a window of its own out by the
- * clock — but it is a thing worth being able to reach without hunting for a tile,
- * which is what this panel is for. The switch is painted from the camera service's
- * own reading rather than from the tap, so it is right whoever lit the torch.
- */
-window.onTorchLit = isLit => flashlightSwitch.classList.toggle('on', isLit);
-
-flashlightSwitch.addEventListener('click', event => {
-  event.stopPropagation();
-  const next = !flashlightSwitch.classList.contains('on');
-  flashlightSwitch.classList.toggle('on', next);
-  bridge.triggerHaptic('tap');
-  bridge.setTorchLit(next);
-});

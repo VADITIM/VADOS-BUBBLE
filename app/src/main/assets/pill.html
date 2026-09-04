@@ -39,13 +39,13 @@
          It leads, because every mod's glyph is at the left and the satellite's is
          too: that is what lets the same picture be in both places at once and
          travel between them without moving a pixel at the hand-over. -->
-    <div id="media-art-slot" class="glyph"><img id="media-art" alt=""></div>
+    <div id="media-art-slot" class="glyph"><img id="media-art" data-morph="art" data-morph-scale alt=""></div>
     <div id="equalizer"><span></span><span></span><span></span></div>
   </div>
 
   <div class="face" id="timer-face">
     <div id="timer-glyph" class="glyph"></div>
-    <span id="timer-remaining"></span>
+    <span id="timer-remaining" data-morph="reading"></span>
   </div>
 
   <!-- The name and the clock are one run, not two children of the face. Flat, they were
@@ -53,18 +53,6 @@
        the clock — which is the middle of the bubble, which is the camera. Wrapped, this
        face is the same two-part shape every other resting face has: glyph on the left,
        reading on the right, and the corridor between them belongs to neither. -->
-  <!-- The alarm is a state of the bubble, not a bubble of its own: it arrives out of the row
-       the way every other state does and it is the same shape all the way up, which is the
-       whole reason it can take the screen without reading as a dialog appearing over one. -->
-  <div class="face" id="alarm-face">
-    <div id="alarm-clock"></div>
-    <div id="alarm-label"></div>
-    <div id="alarm-buttons">
-      <button class="alarm-button" id="alarm-snooze">Snooze</button>
-      <button class="alarm-button alarm-stop" id="alarm-dismiss">Stop</button>
-    </div>
-  </div>
-
   <div class="face" id="call-face">
     <div id="call-avatar" class="avatar glyph"></div>
     <div id="call-reading">
@@ -76,13 +64,13 @@
 
   <div class="face" id="timer-panel">
     <span id="timer-label"></span>
-    <span id="timer-clock"></span>
+    <span id="timer-clock" data-morph="reading"></span>
     <div id="timer-actions"></div>
   </div>
 
   <div class="face" id="player-face">
     <div id="player-cover">
-      <img id="player-art" alt="">
+      <img id="player-art" data-morph="art" data-morph-scale alt="">
     </div>
     <div id="player-meta">
       <div id="player-title"></div>
@@ -121,43 +109,15 @@
     <div id="history-list"></div>
   </div>
 
-  <div class="face" id="quick-face">
-    <div class="quick-row">
-      <span class="quick-label">Microphone</span>
-      <div id="microphone-switch" class="liquid-switch">
-        <div class="switch-rail"></div>
-        <div class="switch-flow">
-          <div class="switch-pool"></div>
-          <div class="switch-knob"></div>
-        </div>
-      </div>
-    </div>
-    <div class="quick-row">
-      <span class="quick-label">Flashlight</span>
-      <div id="flashlight-switch" class="liquid-switch">
-        <div class="switch-rail"></div>
-        <div class="switch-flow">
-          <div class="switch-pool"></div>
-          <div class="switch-knob"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- The quick settings face used to stand here. It is the Status bubble's panel now: every
+       switch in it is something the phone is attached to or doing, which is that bubble's
+       subject and not this one's, and a panel belongs to the bubble it grows out of. -->
 
   <div id="indicators">
     <div id="microphone-dot" class="indicator"></div>
     <div id="camera-dot" class="indicator"></div>
   </div>
 </div>
-<!-- The Now bubble, out by the clock. In this page rather than a window of its own so
-     that it reaches the same goo layer everything else on the row is drawn in — and
-     last, after the bubble, because an open panel has to be drawn over the row and a
-     z-index alone was not enough: the bubble's own content was still coming out on top
-     of it. Later in the markup is later in the paint, whatever else is going on. -->
-<!-- Over One UI's own clock, at the far left. It carries no mod and answers no touch: it is
-     the time, which is the one thing on this bar that is true without anything having
-     happened. Its width is capped against the Now bubble's stop so the two can neck without
-     ever overlapping. -->
 <!-- The Double: a second bubble beside the punch hole, standing where the bubble stands
      rather than inside it. It carries the system's own short-lived announcements — a charge
      level, a low battery — which are news about the phone itself and have no business taking
@@ -170,10 +130,10 @@
   <span id="double-reading"></span>
 </div>
 
-<div id="clock"><span id="clock-face"></span></div>
-
-<div id="now">
-  <div class="now-face showing" id="now-closed">
+<!-- The clock bubble, and the Now mods with it. There is no second bubble out on the bar any more: a torch, a recording or a transfer is shown *here*, because the time is the one thing this bubble carries that anything else is allowed to interrupt — the digits stand aside, the box grows to the mod, and the bar keeps the one shape it had. -->
+<div id="clock">
+  <div id="clock-time"><span id="clock-face"></span><span id="clock-seconds"></span></div>
+  <div class="now-face" id="now-closed">
     <div id="now-glyph"></div>
     <span id="now-reading"></span>
     <!-- A transfer's timeline, drawn along the bottom edge of the pill rather than inside
@@ -201,10 +161,49 @@
      and announces nothing: what the phone is attached to is true all the time, so this bubble
      is read rather than watched. A Modus — a paired device, a cable, a hotspot — colours the
      whole of it and takes the left slot, the way a mod's glyph does in every other bubble. -->
+<!-- Two faces, the way the Now bubble has two: the row of icons it rests as, and the panel it
+     opens into. The quick settings live here rather than on the main bubble because they are
+     this bubble's own subject — every switch in them is something the phone is attached to or
+     doing — and because a panel belongs to the bubble it grows out of. The closed face is empty
+     in the markup: its slots are built from what is true, in slot order, and nothing about them
+     is a fixed list. -->
 <div id="status">
-  <div id="status-modus" class="glyph"></div>
-  <div id="status-link" class="glyph"></div>
-  <span id="status-charge"></span>
+  <div class="status-face showing" id="status-closed"></div>
+  <div class="status-face" id="status-panel">
+    <!-- One column, read top to bottom in the order the readings matter: the charge first and across the whole width, because it is the one thing in here that is a level rather than a state; the three links under it; the six states under those. It used to be two side-by-side halves, which made the reading that matters most a narrow strip at the edge. -->
+    <!-- The charge, drawn large enough to be read rather than counted. Tapped it puts the phone into power saving, which is the one thing worth doing to a battery from a bar; held it opens the system's own battery screen, where the charging limit lives — the same meaning a hold has on every other bubble here. -->
+    <div id="quick-battery">
+      <!-- The charge drawn as a level rather than only as an icon: the liquid stands at the percentage and is coloured by the band it is in, so the reading is had before the number is read. Two crests, not one: the darker one rides a few units higher and behind, drifting the other way at a slower pace, so all that is ever seen of it is a shaded edge running along the top of the surface — which is what tells the eye it is looking at liquid with depth rather than at a line that was drawn. Each path spans six wavelengths against a viewBox four wide, and the drift is exactly one wavelength: the slack is what keeps a leading edge from walking into view, which is the whole of why the first version stuttered at the loop. -->
+      <div id="battery-fill">
+        <svg id="battery-waves" viewBox="0 0 200 24" preserveAspectRatio="none">
+          <path class="battery-wave back" d="M0 12 q25 -9 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
+          <path class="battery-wave front" d="M0 12 q25 -9 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
+        </svg>
+      </div>
+      <span id="battery-glyph"></span>
+      <span id="battery-reading"></span>
+    </div>
+
+    <!-- The three that are links rather than states: they are buttons, not switches, and what says
+         they are on is that they are lit rather than a knob having travelled. Each carries its own
+         off glyph where one exists — a wifi with a slash through it says more than a dimmed wifi,
+         and the icon is the reading rather than the colour under it. -->
+    <div id="quick-modes">
+      <button class="quick-mode" data-toggle="usb"></button>
+      <button class="quick-mode" data-toggle="bluetooth"></button>
+      <button class="quick-mode" data-toggle="wifi"></button>
+    </div>
+
+    <!-- The six states, as buttons rather than as switches. A switch draws a track it does not need — these are on or off with nothing in between, exactly as the three above are — so what is left is the knob the icon was already riding in. Pressed, it turns a full circle and swaps its glyph halfway through: the turn is the cause and the new icon is the consequence, and a whole revolution is the one rotation that leaves nothing crooked behind it. -->
+    <div id="quick-grid">
+      <button class="quick-knob" data-toggle="modus"><span class="quick-icon"></span></button>
+      <button class="quick-knob" data-toggle="dim"><span class="quick-icon"></span></button>
+      <button class="quick-knob" data-toggle="rotate"><span class="quick-icon"></span></button>
+      <button class="quick-knob" data-toggle="saver"><span class="quick-icon"></span></button>
+      <button class="quick-knob" data-toggle="recording"><span class="quick-icon"></span></button>
+      <button class="quick-knob" data-toggle="mic"><span class="quick-icon"></span></button>
+    </div>
+  </div>
 </div>
 
 <!-- The padlock, standing where One UI draws its own lock icon. It says one thing and answers
@@ -217,42 +216,48 @@
   </svg>
 </div>
 
-<!-- The lock screen's notifications, as bubbles standing where the system's own list is. The
-     container is overflow-visible because these are bubbles and a bubble's overshoot may not be
-     clipped; the scroller inside it is what clips instead. -->
-<div id="lock-notes">
-  <div id="lock-notes-list"></div>
-</div>
+<!-- The lock screen's own two bubbles, one container: both stand where a thumb reaches, and the
+     Now bubble growing open is the notifications' business as much as it is its own — see
+     motion.md. Roughly 60% of the screen height, bottom-anchored: Now is the last child, so it
+     stays glued to the bottom edge and grows upward into the room the notifications give up. -->
+<div id="lock-stack">
+  <!-- The lock screen's notifications, as bubbles standing where the system's own list is. The
+       container is overflow-visible because these are bubbles and a bubble's overshoot may not
+       be clipped; the scroller inside it is what clips instead. -->
+  <div id="lock-notes">
+    <div id="lock-notes-list"></div>
+  </div>
 
-<!-- The lock screen's own bubble, down where a thumb reaches. It is not a second copy
-     of the main bubble and it is not the Now bubble moved: it is the bubble the row's
-     mods belong to while the phone is locked. Its glyph is at the left like every other
-     bubble's, so a mod arriving here arrives the same way it arrives anywhere. -->
-<div id="lock-now">
-  <div id="lock-head">
-    <div id="lock-art-slot" class="glyph"><img id="lock-art" alt=""></div>
-    <div id="lock-meta">
-      <div id="lock-title"></div>
-      <div id="lock-artist"></div>
+  <!-- The lock screen's own bubble, down where a thumb reaches. It is not a second copy
+       of the main bubble and it is not the Now bubble moved: it is the bubble the row's
+       mods belong to while the phone is locked. Its glyph is at the left like every other
+       bubble's, so a mod arriving here arrives the same way it arrives anywhere. -->
+  <div id="lock-now">
+    <div id="lock-head">
+      <div id="lock-art-slot" class="glyph"><img id="lock-art" alt=""></div>
+      <div id="lock-meta">
+        <div id="lock-title"></div>
+        <div id="lock-artist"></div>
+      </div>
     </div>
-  </div>
-  <div id="lock-buttons">
-    <div class="transport" id="lock-previous">
-      <svg viewBox="0 0 24 24"><path d="M7 6h2v12H7zm3 6 8-6v12z"/></svg>
+    <div id="lock-buttons">
+      <div class="transport" id="lock-previous">
+        <svg viewBox="0 0 24 24"><path d="M7 6h2v12H7zm3 6 8-6v12z"/></svg>
+      </div>
+      <div class="transport" id="lock-play">
+        <svg viewBox="0 0 24 24"><path id="lock-play-path" d="M8 5v14l11-7z"/></svg>
+      </div>
+      <div class="transport" id="lock-next">
+        <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg>
+      </div>
     </div>
-    <div class="transport" id="lock-play">
-      <svg viewBox="0 0 24 24"><path id="lock-play-path" d="M8 5v14l11-7z"/></svg>
+    <!-- Flush against the bottom edge, not inset from it: the bubble clips its own
+         corners, so the ends of the line are cut by the squircle and it reads as part of
+         the shape rather than as a bar sitting inside it. -->
+    <div id="lock-timeline">
+      <div id="lock-clock"><span id="lock-position">0:00</span><span id="lock-duration">0:00</span></div>
+      <div id="lock-track"><div id="lock-elapsed"><div id="lock-dot"></div></div></div>
     </div>
-    <div class="transport" id="lock-next">
-      <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg>
-    </div>
-  </div>
-  <!-- Flush against the bottom edge, not inset from it: the bubble clips its own
-       corners, so the ends of the line are cut by the squircle and it reads as part of
-       the shape rather than as a bar sitting inside it. -->
-  <div id="lock-timeline">
-    <div id="lock-clock"><span id="lock-position">0:00</span><span id="lock-duration">0:00</span></div>
-    <div id="lock-track"><div id="lock-elapsed"><div id="lock-dot"></div></div></div>
   </div>
 </div>
 
