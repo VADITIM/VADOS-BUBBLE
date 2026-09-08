@@ -192,6 +192,7 @@ class IslandNotificationListener : NotificationListenerService() {
 
     /** Media sessions become readable only once this binding exists. */
     override fun onListenerConnected() {
+        AppStyles.learnFrom(this)
         instance = this
         MediaControl.refresh()
         publishTimer()

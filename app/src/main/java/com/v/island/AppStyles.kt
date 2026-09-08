@@ -1,5 +1,8 @@
 package com.v.island
 
+import android.content.Context
+import android.content.pm.PackageManager
+
 /**
  * Per-app presentation for the apps this phone actually gets notifications from.
  * The colour lives here and travels to the bubble as data, so the markup never
@@ -73,7 +76,20 @@ object AppStyles {
         Style("timetree", "TimeTree", "works.jubilee.timetree", "#2ecc71"),
         Style("comdirect", "Comdirect", "de.comdirect.app", "#ffd200"),
         Style("spotify", "Spotify", "com.spotify.music", "#1db954"),
-        Style("clock", "Clock", "com.sec.android.app.clockpackage", "#ff8a00")
+        Style("clock", "Clock", "com.sec.android.app.clockpackage", "#ff8a00"),
+        // Gemini is the second identity here that is genuinely several colours rather than one, so
+        // it is written the way Google's four are: its own ramp for the two places that can take a
+        // gradient, and the blue it starts from for the nine that cannot. It is not given GOOGLE —
+        // Gemini wears its own mark everywhere Google draws it, which is the whole point of it.
+        Style(
+            "gemini", "Gemini", "com.google.android.apps.bard", "#4285f4",
+            "linear-gradient(100deg, #4285f4 0%, #9b72cb 52%, #d96570 100%)"
+        ),
+        Style("claude", "Claude", "com.anthropic.claude", "#d97757"),
+        Style("chatgpt", "ChatGPT", "com.openai.chatgpt", "#10a37f"),
+        Style("reddit", "Reddit", "com.reddit.frontpage", "#ff4500"),
+        Style("vinted", "Vinted", "fr.vinted", "#09b1ba"),
+        Style("kleinanzeigen", "Kleinanzeigen", "com.ebay.kleinanzeigen", "#86bd3a")
     )
 
     /** Second packages of the same app: the business build, the web build, the token app. */
@@ -86,10 +102,35 @@ object AppStyles {
 
     private val byPackage = styles.associateBy { it.packageName }
 
+    /**
+     * The phone's own package list, so an app nobody named here can still be asked what colour it
+     * is. It is handed over once rather than passed to every `of()` — the watchers call this from
+     * eight places and none of them have a Context to spare, and this object is already the one
+     * place presentation lives.
+     */
+    private var packages: PackageManager? = null
+
+    fun learnFrom(context: Context) {
+        if (packages == null) packages = context.applicationContext.packageManager
+    }
+
+    /**
+     * The style an app wears. Named first, then whatever its own icon says, and white only for an
+     * app with no icon or an icon with no colour in it at all — a phone where every unnamed app is
+     * the same white is a bubble that says an app arrived and never which one.
+     */
     fun of(packageName: String): Style =
         byPackage[packageName]
             ?: aliases[packageName]?.let { key -> styles.first { it.key == key } }
+            ?: fromIcon(packageName)
             ?: generic
+
+    private fun fromIcon(packageName: String): Style? {
+        val colour = packages?.let { IconColour.of(it, packageName) } ?: return null
+        // Keyed by package rather than by a name of ours: the key is what the page switches a
+        // layout on, and an app that was never given one has no layout to switch to.
+        return Style(generic.key, packageName, packageName, colour)
+    }
 
     fun byKey(key: String): Style? = styles.firstOrNull { it.key == key }
 

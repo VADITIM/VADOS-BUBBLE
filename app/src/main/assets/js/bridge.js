@@ -3,7 +3,7 @@ import { mediaWindow } from './mods/media.js';
 import { show } from './mods/notification.js';
 import { timerWindow } from './mods/timer.js';
 import { nowOpen, nowOwnsClock, nowTouch } from './now.js';
-import { statusHolds, statusOpen, statusPill, statusTouch } from './status.js';
+import { statusHolds, statusOpen, statusPanelPush, statusPill, statusTouch } from './status.js';
 import { clockHolds, clockPill, clockTouch } from './clock.js';
 import { lockHolds, lockPill } from './lock.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize } from './row.js';
@@ -82,6 +82,11 @@ function proxyPoint(x, y, source) {
 }
 
 window.onProxyTouch = (action, x, y, source) => {
+  // Before any routing, because it is not a question about which bubble was touched: it is
+  // whether *a* finger is down anywhere on this interface, which is what tells the row whether
+  // it may shrink a window right now or has to wait for the lift.
+  if (action === 'down') shared.isTouchDown = true;
+  else if (action === 'up' || action === 'cancel') shared.isTouchDown = false;
   if (action !== 'move') {
     const box = clockPill.getBoundingClientRect();
     bridge.note(
@@ -99,6 +104,11 @@ window.onProxyTouch = (action, x, y, source) => {
   if (action === 'down') {
     statusOwnsTouch = !statusOpen && (source === 'status' || statusHolds(x, y));
   }
+  // Alongside the ordinary routing rather than instead of it: the flick that puts an open panel
+  // away has to be heard while every switch under the finger goes on being clickable, and the
+  // two are told apart by how far the finger travelled — which both readings can agree on
+  // without either taking the gesture off the other.
+  if (statusOpen && (source === 'status' || statusHolds(x, y))) statusPanelPush(action, x, y);
   if (statusOwnsTouch) {
     statusTouch(action, x, y);
     if (action === 'up' || action === 'cancel') statusOwnsTouch = false;

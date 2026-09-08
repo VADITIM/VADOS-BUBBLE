@@ -2,7 +2,7 @@ import { PROXY_TAP_SLOP } from './bridge.js';
 import { clockPill, fitClockProxy } from './clock.js';
 import { stirLiquid, traceEvent } from './liquid.js';
 import { toClosed } from './row.js';
-import { closeStatusPanel, statusOpen } from './status.js';
+import { closeStatusPanel, setTransfer, statusOpen } from './status.js';
 import { HOLD_MILLIS, bridge, root, shared } from './state.js';
 
 /**
@@ -59,7 +59,7 @@ let torch = null;
  * What is happening, in the order it started happening.
  *
  * The Now bubble carries one thing at a time and the row's rule decides which: first come,
- * first served. A recording that started before a download keeps the bubble until it stops,
+ * first served. A recording that started before a torch keeps the bubble until it stops,
  * and nothing here ranks one kind of event above another — the phone has no way of knowing
  * which of two true things the person cares about, and guessing is how a bubble ends up
  * flickering between two states that are both correct.
@@ -73,8 +73,6 @@ let nowOrder = [];
 /** How wide each mod asks the bubble to stand, before the floors below are applied. */
 const NOW_WIDTHS = {
   recording: 112,
-  download: 146,
-  upload: 146,
 };
 
 /**
@@ -88,14 +86,8 @@ const nowDismissed = {};
 /** How far up the finger has to travel for the swipe to be a dismissal. Mirrors LOCK_SWIPE. */
 const NOW_SWIPE = 24;
 
-/** A finished transfer stands still for this long wearing a tick, then goes home. */
-const NOW_DONE_DWELL = 1100;
-
 const NOW_GLYPHS = {
   recording: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>',
-  download: '<svg viewBox="0 0 24 24"><path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4L11 12.2zM5 18h14v2H5z"/></svg>',
-  upload: '<svg viewBox="0 0 24 24"><path d="M12 3l5.7 5.7-1.4 1.4L13 6.8V16h-2V6.8L7.7 10.1 6.3 8.7zM5 18h14v2H5z"/></svg>',
-  done: '<svg viewBox="0 0 24 24"><path d="M9.8 16.2 5.6 12l-1.4 1.4 5.6 5.6L20.4 7.9 19 6.5z"/></svg>',
 };
 
 function nowOwner() {
@@ -162,8 +154,6 @@ function setClockWidth(next, milliseconds) {
   nowAfter(milliseconds, fitClockProxy);
 }
 
-const nowLine = document.getElementById('now-line');
-const nowLineDone = document.getElementById('now-line-done');
 const nowElapsed = document.getElementById('now-elapsed');
 
 /** Seconds since a recording started, counted here because the shade counts its own. */
@@ -177,54 +167,24 @@ function nowClock(milliseconds) {
 }
 
 /**
- * A transfer's reading: how far along in megabytes, and how long is left.
- *
- * The app's own detail line is not shown any more — it is a sentence ("12,4 von 118 MB · 12,1 MB/s") written for a shade three times this bubble's width — and the remaining time is worked out from the rate this transfer has actually averaged since it was posted, because no notification field carries an estimate and parsing the detail line is a guess that breaks per app; the progress numbers have no unit either, so the scale is read off the total (bytes, kilobytes, or already megabytes).
- */
-function transferReading(live) {
-  const scale = live.total >= 1e6 ? 1e6 : live.total >= 1e3 ? 1e3 : 1;
-  const inMegabytes = value => (value / scale).toFixed(live.total / scale < 10 ? 1 : 0);
-  const elapsed = live.since ? Date.now() - live.since : 0;
-  const left = live.done > 0 && elapsed > 0 ? (elapsed * (live.total - live.done)) / live.done : 0;
-  const size = inMegabytes(live.done) + '/' + inMegabytes(live.total) + 'MB';
-  return left > 0 ? size + ' - ' + nowClock(left) : size;
-}
-
-/**
- * The face the owner wears. One face rather than one per mod: every Now mod is a glyph, a
- * short reading and — for a transfer — a line along the bottom, which is the same two-run
- * shape every resting face on this bar has.
+ * The face the owner wears. One face rather than one per mod: every Now mod is a glyph and a
+ * short reading, which is the same two-run shape every resting face on this bar has.
  */
 function paintNowFace() {
   const owner = nowOwner();
   const live = nowLive[owner];
-  // Written as data rather than as a class per mod: the CSS needs to know *which* transfer it
-  // is drawing to point the glyph the right way, and two classes for one answer is two things
-  // to keep in step.
   clockPill.dataset.now = owner || '';
   clockPill.classList.toggle('recording', owner === 'recording');
-  clockPill.classList.toggle('transferring', owner === 'download' || owner === 'upload');
   clockPill.classList.toggle('paused', Boolean(live && live.isPaused));
 
   if (owner === 'torch') {
     nowGlyph.innerHTML = TORCH_GLYPH;
     nowReading.textContent = torch && torch.dimmable ? torch.step + '/' + torch.steps : '';
-    nowLine.classList.remove('showing');
     return;
   }
   if (owner === 'recording') {
     nowGlyph.innerHTML = NOW_GLYPHS.recording;
     nowReading.textContent = nowClock(Date.now() - (live ? live.since : Date.now()));
-    nowLine.classList.remove('showing');
-    return;
-  }
-  if (owner === 'download' || owner === 'upload') {
-    const isDone = Boolean(live && live.isDone);
-    nowGlyph.innerHTML = isDone ? NOW_GLYPHS.done : NOW_GLYPHS[owner];
-    nowReading.textContent = live ? transferReading(live) : '';
-    nowLine.classList.add('showing');
-    const share = live && live.total ? Math.min(1, live.done / live.total) : 0;
-    nowLineDone.style.width = (isDone ? 100 : Math.round(share * 100)) + '%';
   }
 }
 
@@ -339,7 +299,7 @@ function restNowMod() {
   showNowFace('');
   // Back to what the digits are worth, in pixels so the way back eases as the way out did, and
   // released to `auto` once it is there — an offset at rest is removed, never written as zero.
-  clockPill.classList.remove('now-live', 'recording', 'transferring', 'paused');
+  clockPill.classList.remove('now-live', 'recording', 'paused');
   const time = clockTime.getBoundingClientRect().width;
   setClockWidth(Math.round(time + 22), NOW_EXPAND);
   window.onNowStanding(false);
@@ -597,16 +557,9 @@ export function nowTouch(action, x, y) {
   }
   // What a tap means belongs to the mod. The torch has a panel behind it and nothing else to
   // do; a recording has one obvious act and it is the one you want without looking — pause,
-  // and again to carry on. A transfer has none: there is nothing to do to a file that is on
-  // its way, so the tap opens the app that is moving it.
-  const owner = nowOwner();
-  if (owner === 'recording') {
+  // and again to carry on.
+  if (nowOwner() === 'recording') {
     pressRecording();
-    return;
-  }
-  if (owner === 'download' || owner === 'upload') {
-    const live = nowLive[owner];
-    if (live && live.key) bridge.openNotification(live.key);
     return;
   }
   openNowPanel();
@@ -637,43 +590,17 @@ window.onTorchUpdate = payload => {
 };
 
 /**
- * A recording and a transfer, pushed together because the host reads them off the same shade
- * in one pass. A transfer that reaches its total is not dropped on the spot: it stands there
- * wearing a tick for a moment first, or the only thing the person ever sees of a finished
- * download is the bubble disappearing.
+ * A recording and a transfer, pushed together because the host reads them off the same shade in
+ * one pass — and shown in two bubbles, because they are two different kinds of true. A recording
+ * is something the person started and it stands in the clock with the torch; a file in flight is
+ * something the phone is doing for whatever it is attached to, and that is the Status bubble's
+ * subject. So the payload arrives here and its transfer half is handed straight over, rather than
+ * the host learning that one shade reading now feeds two places.
  */
 window.onNowMods = payload => {
   setNowMod('recording', payload.recording || null);
-
-  const transfer = payload.transfer || null;
-  const kind = transfer ? transfer.mod : (nowLive.download ? 'download' : 'upload');
-  const standing = nowLive[kind];
-  if (transfer) {
-    const isDone = transfer.total > 0 && transfer.done >= transfer.total;
-    setNowMod(transfer.mod, Object.assign({ isDone }, transfer));
-    if (isDone) holdTheTick(transfer.mod);
-    return;
-  }
-  // Gone from the shade. If it was nearly there when it went, it finished — apps take a
-  // progress notification away the moment it completes — so the tick is owed either way.
-  if (standing && !standing.isDone) {
-    const share = standing.total ? standing.done / standing.total : 0;
-    if (share >= 0.95) {
-      setNowMod(kind, Object.assign({}, standing, { isDone: true }));
-      holdTheTick(kind);
-      return;
-    }
-  }
-  if (standing && standing.isDone) return;
-  setNowMod('download', null);
-  setNowMod('upload', null);
+  setTransfer(payload.transfer || null);
 };
-
-let tickTimer = null;
-function holdTheTick(kind) {
-  clearTimeout(tickTimer);
-  tickTimer = setTimeout(() => setNowMod(kind, null), NOW_DONE_DWELL);
-}
 
 /**
  * Stop, which is the recorder's own button again. The panel closes on it rather than waiting

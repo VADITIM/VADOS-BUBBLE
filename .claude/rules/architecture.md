@@ -26,7 +26,7 @@ One file per source of truth, each pushing a JSON payload or `null`:
 | `NowWatch` | a recording running, a transfer in flight — both read off ongoing notifications |
 | `AlarmWatch` | an alarm ringing, told apart by its full-screen intent — recognised only so that nothing is drawn for it |
 | `BatteryWatch`, `MicrophoneAccess` | charge, sensor privacy |
-| `ConnectivityWatch` | the default network, USB, tethering, and what is paired over bluetooth |
+| `ConnectivityWatch` | the default network and its name, USB, tethering, and what is paired over bluetooth |
 
 A watcher decides *what is true*, never how it looks. Colours and names live in `AppStyles`; the payload carries them as data so the page never learns app names.
 
@@ -54,7 +54,9 @@ The canvas is the **whole screen**, not the status bar. It has to be: the lock s
 
 There are six windows and no more: the canvas, and one proxy per bubble that can be touched — over the main bubble, over the lock screen's Now bubble, over the Status bubble, over the Clock, and over the lock screen's notification list. There was a seventh over a Now bubble on the bar; the mods it carried are shown in the Clock now, so the Clock's proxy is the one that grows to a mod's width and to the panel a mod opens into, and the window went with the bubble. The Clock's is the one that moves most: it answered no touch at all until it was given the hold that opens the clock app, and it is now the window that has to be the size of the digits, of a mod, or of an open panel in turn — measured off the box every time, because the page is the only side that knows which of the three it is drawing. The two that still answer nothing — the Double and the padlock — cost no window, which is the rule working rather than an omission. One proxy each rather than one wide one, because the gaps between them are most of the status bar and that has to stay somewhere the shade swipe can start. A proxy is no longer always at the top of the screen either: `forwardTouch` adds the proxy window's own `y` to the point it reports, or a touch on the lock screen bubble arrives in the page as a touch on the status bar.
 
-**One window exists to swallow a gesture rather than to answer one**, and it is off by default: the shade lock (`barLocked`). Hiding the real bar with `immersive.status` is a *reveal* — the swipe still brings it back — and nothing unprivileged can ask SystemUI to stop the gesture: `IStatusBarService.disable(DISABLE_EXPAND)` needs a signature permission and dies with the caller's binder token, and `cmd statusbar` exposes no subcommand for it. So the only mechanism left is standing on the pixels the gesture starts from: a full-width, `SHADE_STRIP`-tall touchable window that returns true and does nothing. It is the deliberate exception to the rule above it, which is why it is a switch and not a default, and every proxy is removed and re-added when it goes up — windows of one type stack in the order they were added, so a strip added last would eat the bubbles' own touches with the shade's.
+**One window exists to swallow a gesture rather than to answer one**, and it is off by default: the shade lock (`barLocked`). Hiding the real bar with `immersive.status` is a *reveal* — the swipe still brings it back — and nothing unprivileged can ask SystemUI to stop the gesture: `IStatusBarService.disable(DISABLE_EXPAND)` needs a signature permission and dies with the caller's binder token, and `cmd statusbar` exposes no subcommand for it. So the only mechanism left is standing on the pixels the gesture starts from: a full-width, `SHADE_STRIP`-tall touchable window that returns true and does nothing. It is the deliberate exception to the rule above it, which is why it is a switch and not a default, and every proxy is removed and re-added when it goes up — windows of one type stack in the order they were added, so a strip added last would eat the bubbles' own touches with the shade's. It goes through `applyVisibility()` like every other window here, and it did not: left standing while the interface is hidden it is an invisible bar across the top of a landscape screen, swallowing every touch aimed at whatever the phone is actually drawing there. A window that protects a bubble has no business taking touches at a moment the bubble is not on screen.
+
+**A proxy comes down at the start of a collapse, not at the end of one.** Growing, the window has to be bigger before the bubble animates into it. Shrinking used to be the mirror of that — the bubble finishes first, then the window follows — and that reasoning is about the *drawing*, which has not lived in this window for a long time: the canvas spans the bar, is never resized, and `setWindowBounds` moves the touch proxy alone. So a proxy left at the open size for the length of a collapse is an invisible window most of the bar wide, and every pixel of it is a pixel the shade swipe and the app underneath cannot have — which is exactly "I closed the bubble and the scroll I started was eaten by it". `setSize` applies the smaller window immediately and the bubble animates home inside a window already the size it will land at, clipped by nothing because it is not drawn there. The one exception is a live finger: pulling the surface out from under a touch makes the system cancel the gesture, so `shared.isTouchDown` — written by the bridge for the whole of any proxy touch, whichever bubble it turned out to belong to — keeps the old deferral and the restore timer is what puts the window back. The Status bubble obeyed this rule and broke it anyway, which is the trap worth writing down: it called `fitStatusProxy()` at the top of the collapse exactly as the rule says, and that function places the window from `getBoundingClientRect()` — which on the frame a transition *starts* still reads the size being left. So the small window it thought it was asking for was the open panel, held for the whole 420ms, and the swipe was eaten and a pull inside it read as `openStatusPanel()` on a bubble that was already closed. **Coming down at the start of a collapse means handing the room back, not re-measuring** — there is no box to measure, because the box the bubble is going to is not the box it is in. So `panel-closing` makes both `fitStatusProxy` and `statusHolds` answer nothing for the length of the close, and the window is taken again at the settle. `statusHolds` matters as much as the window: the row's own proxy covers the bar too, and `bridge.js` asks the bubble whether a touch the row heard belongs to it — off the same rect.
 
 **A proxy is placed from a measurement, never from a constant that agrees with the CSS by hand.** Every `set*Proxy` call now carries a `getBoundingClientRect()` of the bubble it stands over, because the page is the only side that knows where anything is and the layout is increasingly not a sum the script can do: the lock screen's Now bubble is placed by the flex column it shares with the notification list, so the three constants that used to derive its window (an inset, a bottom, a height) were three chances to disagree with the stylesheet — and a proxy that disagrees is a bubble that is drawn and cannot be touched. Where a box is animated by hand rather than by a transition, the window is placed again when that animation *finishes*, since a box measured mid-growth still measures as the size it is leaving.
 
@@ -64,6 +66,8 @@ There are six windows and no more: the canvas, and one proxy per bubble that can
 
 The page is served from `https://appassets.androidplatform.net/` rather than `file:///android_asset/`, over a `shouldInterceptRequest` in `AssetOrigin` that reads straight out of `assets/`. It is not about security: Chromium gives every `file://` document its own opaque origin and refuses the module fetches an import graph is made of, so a page loaded from `file://` can carry inline script and nothing else — which is the whole reason `pill.html` was one file for as long as it was. The domain resolves nowhere, so a path the interceptor does not answer fails instead of reaching a network. `panel.html` stays on `file://`: it is one page with no imports, and it has nothing to gain from moving.
 
+A **switch** is set and the whole panel is read back, because a command the shell refused must not be left standing as a switch that says it worked. A **level** is not: `setLevel` writes and answers nothing, since it is called per frame under a moving thumb and a round-trip on each of those is a queue the hand outruns. The page owns a value while it is being dragged.
+
 Page-to-host calls are `@JavascriptInterface` methods on an inner `Bridge`; host-to-page calls are `window.on…` / `window.set…` functions pushed as script. Scripts sent before the page says `ready()` queue and replay in order.
 
 The page decides *when*, because it is the only side that knows where its own animation has got to. Do not re-derive an animation's timing on the Kotlin side. Sequencing between two bubbles is not a message at all any more: the clock telling the row to stand aside for a mod used to be a relay through the host, and on one canvas it is one page calling its own function.
@@ -72,7 +76,69 @@ Two things about touch follow from there being more than one proxy. A forwarded 
 
 Touch is the one thing that travels the other way. A touch-proxy window has no content and makes no decisions: it forwards the raw event stream and the page decides what was touched and what the gesture means. Never put hit-testing in Kotlin — the page is the only side that knows where anything is.
 
+## The control panel
+
+`panel.html` is three screens and stays one file — it has no imports and nothing to gain from the
+module split `pill.html` needed. Three rules decide its shape and are the ones to keep:
+
+- **A module is one kind of thing, never one page of things.** Both the settings and the debug
+  states are built from a table in the script — `FIELDS` and `STATES` — where each entry names its
+  group, and a module is generated per group in the order the table lists them. Adding a setting is
+  a line in a table; a group appearing is that line naming a group nothing else does. A screen with
+  one module called after the screen is the thing this replaced.
+- **A setting with named answers is buttons, never a slider.** A slider makes the reader translate
+  a position back into a word, and where there are two answers a position means nothing at all — so
+  a field carrying `labels` is built as one button per answer with a marker sliding between them,
+  and only a genuine number gets the drag-only slider beside it.
+- **On the System screen the state and the control are one button.** A row saying "blocked" beside
+  a button saying "Grant" is two words for one fact; the button wears the state, the press changes
+  it, and the change is announced by the same accent bar that writes every heading — a grant with a
+  shell UID behind it lands a second after a different app was on screen, so nothing about it is
+  where the finger was. A row marked `*` is a system setting rather than a permission of ours and
+  reads as broken without the mark on a phone with no Shizuku.
+
+**The System screen can stop the bubbles without stopping the app.** Testing leaves the overlay in
+states no repaint gets out of, and the only fix was revoking accessibility in the system settings
+and granting it again. `Panel.stopBubbles()` is that in one press: `BubbleService.disableSelf()`,
+which is what draws every window, and which takes this component out of
+`enabled_accessibility_services` on its way out — so the Accessibility button on the same screen is
+the way back and cannot end up adding a second copy of it. It kills the service, never the process:
+the panel is the thing being worked and has to survive the press.
+
+**A watcher decides what is true; `AppStyles` decides what it looks like — including for apps
+nobody named.** An app with no `Style` of its own used to be white, which is honest and is also
+every unnamed app on the phone wearing one identity. Its icon already carries the answer, so
+`IconColour` reads it: the launcher icon drawn into a 24×24 bitmap, greys and near-blacks and the
+transparent margin thrown away before the count, what is left bucketed by *hue* rather than by
+colour — an icon is a gradient far more often than it is a flat fill, and thirty shades of one blue
+have to count as one blue or they lose to a flat accent covering a tenth of the area — and each
+pixel weighted by how colourful it is, so a pale wash over the whole icon cannot outvote the mark in
+the middle of it. One read per package for the life of the process. It needs a `PackageManager`,
+which none of the eight `AppStyles.of()` callers has to spare, so the object is handed one once
+(`learnFrom`, from both services' connect) rather than the signature growing a parameter everywhere.
+
+**A permission grants itself where the shell can grant it.** With Shizuku bound, accessibility is
+`settings put secure enabled_accessibility_services` (read and *appended to* — that key holds every
+accessibility service on the phone), the listener is `cmd notification allow_listener`, and
+`POST_NOTIFICATIONS` is `pm grant`; the settings deep link is the fallback for the one run before
+Shizuku exists. `HeadsUp` is no longer asked about at all — see the README.
+
 ## The page
+
+**`window.innerWidth` is not the screen, and on this phone it is out by 44.** The canvas window is
+exactly the display — 1080×2340 at a device ratio of 3, so 360×780 to the page — and inside it the
+WebView reports `innerWidth` 404 and `innerHeight` 877: the layout viewport it hands out is larger
+than the surface it is drawn on. Anything sized or centred off it is wrong by half that, which is
+invisible while it is only deciding where a drop starts its flight and very visible the moment
+something is sized to fill the screen — the full-screen Status panel came out 384 wide on a 360-wide
+screen and overhung both edges. `document.documentElement.clientWidth` / `clientHeight` is the
+surface. `status.js` asks through `screenWidth()` / `screenHeight()` for this reason.
+
+It is still live elsewhere and deliberately left alone for now, because several of these place the
+row and the user's `horizontalOffset` may already be calibrated against them: `row.js` (the punch
+hole's centre and so the main bubble's resting place), `clock.js` and `now.js` (a flight home, a
+panel's centre), and `liquid.js` (how far a bubble is from the right wall for `edgeMerge`). Fixing
+them moves every bubble on the bar and wants its own pass on the phone.
 
 Every lit thing on the bar reads its colour through the one `--section-color` token in `dna.css`, and that token is a **setting**: `accentColor` holds it as a single `0xRRGGBB` int (the store holds ints), the settings panel picks it with a native colour input rather than a control of its own, and `pushAppearance` repoints the token over `setAccent`. It is not the `red`/`green`/`blue` sliders beside it — those are the pill's *background*, which is a different thing.
 
@@ -89,6 +155,7 @@ Every lit thing on the bar reads its colour through the one `--section-color` to
 | `mods/*.js` | one file per mod: `media`, `timer`, `call`, `notification` |
 | `double.js` | the second bubble at the hole, and the announcements it carries |
 | `tabs.js` | the Tabs that are nobody's mod. History, now that the quick settings have gone to the Status bubble's own panel |
+| `labels.js` | which readings have run out of room, for every bubble at once — the one answer the masks and the scroll both hang off |
 | `bridge.js` | the `window.on…` / `set…` entry points and forwarded touch |
 | `main.js` | imports every module for its side effects, then `bridge.ready()` |
 

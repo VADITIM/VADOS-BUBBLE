@@ -27,7 +27,33 @@ object SystemToggles {
             "settings get global zen_mode;" +
             "settings get secure reduce_bright_colors_activated;" +
             "settings get system accelerometer_rotation;" +
-            "settings get global low_power"
+            "settings get global low_power;" +
+            "settings get global mobile_data;" +
+            "settings get system screen_brightness;" +
+            // Greped on the phone: this one command narrates what it is doing over several lines, and
+            // every line of it would shift the index of everything read after it.
+            "cmd media_session volume --stream 3 --get 2>&1 | grep -m1 'volume is'"
+
+    /**
+     * What the phone calls full brightness, which is not 255 on this device and is not a number
+     * anything public will say. It lives in the framework's own resources, and `Resources.getSystem()`
+     * is exactly the handle to those — no context, no permission, no guess. A phone that will not
+     * answer leaves the slider at nothing rather than writing a value against a range we invented.
+     */
+    private val brightnessMax: Int by lazy {
+        val resources = android.content.res.Resources.getSystem()
+        val id = resources.getIdentifier("config_screenBrightnessSettingMaximum", "integer", "android")
+        if (id == 0) 0 else runCatching { resources.getInteger(id) }.getOrDefault(0)
+    }
+
+    /** The media stream's own scale, off the same line the level is read from: `volume is 3 in range [0..15]`. */
+    private fun volumeOf(line: String): Int {
+        val index = line.substringAfter("volume is ", "").substringBefore(' ').toIntOrNull() ?: return -1
+        val top = line.substringAfter("..", "").substringBefore(']').toIntOrNull() ?: return -1
+        if (top <= 0) return -1
+        volumeTop = top
+        return index * 100 / top
+    }
 
     fun read(): JSONObject {
         val answer = JSONObject()
@@ -44,12 +70,52 @@ object SystemToggles {
         answer.put("dim", line(4) == "1")
         answer.put("rotate", line(5) == "1")
         answer.put("saver", line(6) == "1")
+        answer.put("mobile", line(7) == "1")
         answer.put("mic", MicrophoneAccess.read() == MicrophoneAccess.ALLOWED)
+        // The two levels, as percentages: the ranges are the phone's business and the panel draws a
+        // share of a bar. Missing rather than zero where the phone would not say — a slider standing
+        // at the floor is a reading, and "we could not ask" is not one.
+        val brightness = line(8).toIntOrNull() ?: -1
+        if (brightness >= 0 && brightnessMax > 0) {
+            answer.put("brightness", brightness * 100 / brightnessMax)
+        }
+        volumeOf(line(9)).takeIf { it >= 0 }?.let { answer.put("volume", it) }
         // Nothing about a recording is read here: the page is already told when one starts and
         // stops, because that is the Now bubble's own mod arriving. Asking the shell for it as
         // well would be a second answer to a question that already has one.
         return answer
     }
+
+    /**
+     * A level put where the finger left it, as a percentage of whatever the phone's own range is.
+     *
+     * Nothing is read back afterwards, unlike a switch: this is written per frame while a thumb is
+     * moving, and a shell round-trip returning the whole panel's state on each of those would be a
+     * command queue the finger outruns. The page owns the value while it is being dragged.
+     */
+    fun setLevel(name: String, percent: Int): Boolean {
+        val share = percent.coerceIn(0, 100)
+        val command = when (name) {
+            // Auto brightness put back what the finger asked for a moment later, which reads as a
+            // slider that will not stay where it is put, so a drag is also the switch off it.
+            "brightness" -> if (brightnessMax <= 0) return false else
+                "settings put system screen_brightness_mode 0;" +
+                    "settings put system screen_brightness " +
+                    (share * brightnessMax / 100).coerceAtLeast(1)
+            "volume" -> "cmd media_session volume --stream 3 --set " + volumeIndex(share)
+            else -> return false
+        }
+        return ShizukuShell.run(command) != null
+    }
+
+    /** The media stream's steps are few and coarse, so the share is put back onto its own scale. */
+    private fun volumeIndex(share: Int): Int {
+        val top = volumeTop.takeIf { it > 0 } ?: return 0
+        return share * top / 100
+    }
+
+    /** How many steps the media stream has, learned from the same line its level is read off. */
+    private var volumeTop = 0
 
     /** True when the command was actually run, which is not the same as the switch having moved. */
     fun set(name: String, isOn: Boolean): Boolean {
@@ -59,6 +125,7 @@ object SystemToggles {
             "bluetooth" -> "svc bluetooth " + if (isOn) "enable" else "disable"
             // An empty function list is the charging-only state, which is what USB off means here.
             "usb" -> "svc usb setFunctions " + if (isOn) "mtp" else ""
+            "mobile" -> "svc data " + if (isOn) "enable" else "disable"
             "modus" -> "cmd notification set_dnd " + if (isOn) "on" else "off"
             "dim" -> "settings put secure reduce_bright_colors_activated $one"
             "rotate" -> "settings put system accelerometer_rotation $one"

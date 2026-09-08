@@ -223,9 +223,16 @@ time, and the alternative is matching on channel names in whatever language the 
 
 Some states do not belong at the punch hole. The flashlight is one: One UI draws its own blue chip
 for it at the far left of the status bar, right beside the clock, and a bubble that says the light is
-on has to stand exactly there or Samsung's chip shows through next to it. A recording, a download and
-an upload are the same kind of thing — something that is *happening*, as against the row's mods,
-which are something that is *playing* or *running*.
+on has to stand exactly there or Samsung's chip shows through next to it. A recording is the same kind
+of thing — something that is *happening*, as against the row's mods, which are something that is
+*playing* or *running*.
+
+A download and an upload were here too, and they are the Status bubble's now. The line between the
+two ends of the bar turns out to be **who started it**: a torch and a recording are things the person
+did, and a file in flight is the phone working for whatever it is attached to, which is the same kind
+of fact as a cable being in. It stands over there as one slot beside USB — an arrow pointing the way
+the file is moving, and a tick for a moment when it lands — and it gave up the reading and the
+timeline it had here, because a slot is not a bubble and the shape it can take is not the same shape.
 
 There was a second bubble out there for them, standing on the chip a few pixels right of the clock.
 There is not any more, and the reason is that the two wanted the same corner: the clock had to leave
@@ -271,8 +278,13 @@ exactly what "the pop-ups are not suppressed" looked like:
 - Samsung's own **brief** pop-up, drawn by `com.samsung.systemui.notilus` off its own notification
   listener, off with `cmd notification disallow_listener`.
 
-Both need the shell UID, so the **System pop-ups** row does both through Shizuku and `grant.ps1`
-sets both directly. The notification still lands in the shade and still reaches the listener.
+Both need the shell UID, so both go through Shizuku, and `grant.ps1` sets them directly. The
+notification still lands in the shade and still reaches the listener.
+
+It is **not a switch any more**. It was a row in the panel, and a row is a question — and there is
+no answer to it but yes: the bubble exists to be the pop-up, so a phone showing both is a phone
+half set up. It is applied on every resume the moment a shell UID exists, and there is nothing to
+find and nothing to press.
 
 `NotificationAssistantService` would be the per-notification way to do this, but it is a `@SystemApi`
 and cannot be compiled against from a normal app.
@@ -304,10 +316,19 @@ are edge-triggered and remembered, so a slow drain announces once rather than on
 charging clears them for the next time down. The first, sticky broadcast only primes the state --
 without that a low battery would pop up on every install.
 
-Charging is drawn as the charge arriving: the fill runs from where the battery actually is up to
-full, holds, fades and starts again from the real level, so the animation never lies about how full
-the thing is. Low is the same fill at rest, breathing. Both can be exercised without waiting for a
-real battery:
+**The three do not all land in the same place.** Being plugged in is announced by the **Status
+bubble**, which is the one already carrying the charge — the news and the reading it is news about
+belong to one shape, and a bubble opening at the bottom of the screen to say something about a
+number standing at the top of it is two places for one fact. It is a takeover rather than a second
+shape: the readings in there shake where they stand and are pulled inwards one after another, left
+to right, and only once the bubble is empty does it open out around the bolt, which is the
+glyph-as-cause order read at bubble scale. No percentage — the number was on the bar a second ago
+and the news is that it is going up. After a few seconds the readings grow back one by one the same
+way any of them arrives.
+
+Running low stays on the **Double** at the bottom of the screen, which is where an announcement with
+no home on the bar belongs. It is drawn as the fill at rest, breathing. Both can be exercised
+without waiting for a real battery:
 
 ```
 adb shell cmd battery unplug; adb shell cmd battery set level 14

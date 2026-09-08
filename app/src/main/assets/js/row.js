@@ -1110,6 +1110,20 @@ export function setSize(next, override) {
   deferredTarget = target;
   paintSize();
   ensureClosedWindow();
+  // And the window comes down *now* rather than when the bubble has finished coming down.
+  //
+  // The comment above is about the drawing, and the drawing has not lived in this window for a
+  // long time: the canvas spans the whole bar and is never resized, so what setWindowBounds moves
+  // is the touch proxy alone. A proxy left at the open size for the length of a collapse is an
+  // invisible window most of the bar wide, and every pixel of it is a pixel the shade swipe and
+  // the app underneath cannot have — which is exactly "I closed the bubble and my scroll was
+  // eaten by it". The bubble goes on animating home inside a window that is already the size it
+  // will land at, and it is clipped by nothing because it is not drawn here.
+  //
+  // Not under a live finger: pulling the surface out from under a touch makes the system cancel
+  // the gesture, so a close that happens mid-drag keeps the old deferral and the restore timer
+  // above is what puts the window back.
+  if (!shared.isTouchDown) applyClosedWindow();
 }
 
 /**

@@ -172,7 +172,7 @@ export function untoy(element, prefix) {
  * keeps the whole gesture until the finger lifts however far outside itself it goes.
  * So nothing here is bounded by a window — the only limit left is what reads well.
  */
-/** How far down the finger goes before the pull is an ask rather than a wander. Mirrors STATUS_PULL: it is one gesture and it must not need a different hand at two ends of the same bar. */
+/** How far down the finger goes before the pull is an ask rather than a wander. Mirrors STATUS_PULL: it is one gesture and it must not need a different hand at two ends of the same bar. It is also mirrored by PULL_GRAB in BubbleService.kt, which is the room under the bubble the proxy window has to hold for the finger to still be on it when this threshold is crossed — raise one and the other owes it the same. */
 const PULL_TRIGGER = 22;
 
 /**

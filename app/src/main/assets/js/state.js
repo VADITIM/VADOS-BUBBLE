@@ -18,7 +18,7 @@ export const bridge = window.Android || {
   setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
   openNotification() {}, dismissNotification() {}, timerAction() {},
   setTorch() {}, setLockProxy() {}, setStatusProxy() {}, setClockProxy() {},
-  openConnectionSettings() {}, openClock() {}, requestToggles() {}, setToggle() {},
+  openConnectionSettings() {}, openClock() {}, requestToggles() {}, setToggle() {}, setLevel() {},
   recordingAction() {}, setNotesProxy() {}, mediaSpeed() {},
   note() {}, wakeFrames() {},
 };
@@ -138,6 +138,8 @@ export const shared = {
    * non-empty `mods` is the closed mod state.
    */
   state: 'idle',
+  /** True for the whole of a proxy touch, whichever bubble it turned out to belong to. It lives here rather than being exported from the bridge because the row reads it and the bridge already imports the row — the other direction is a cycle. Resizing a window out from under a live finger makes the system cancel the gesture, so anything that wants to move a window in a hurry has to ask this first. */
+  isTouchDown: false,
   /**
    * Which mod owns the bubble when several are true at once. It is an order, not a
    * ranking, because a swipe rotates it: the timer leads by default — one of them is

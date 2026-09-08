@@ -17,10 +17,10 @@ import org.json.JSONObject
 object BatteryWatch {
 
     /** Yellow: worth knowing. */
-    private const val LOW = 15
+    private const val LOW = 30
 
     /** Red: do something about it. */
-    private const val CRITICAL = 5
+    private const val CRITICAL = 10
 
     /** The lowest mark already announced, so a slow drain says it once and not per percent. */
     private var announced = Int.MAX_VALUE
@@ -89,7 +89,7 @@ object BatteryWatch {
             percent <= LOW -> LOW
             else -> return
         }
-        // Lower than anything said so far: 15 announces, then 5 announces again.
+        // Lower than anything said so far: 30 announces, then 10 announces again.
         if (mark >= announced) return
         announced = mark
         onEvent(event(if (mark == CRITICAL) "critical" else "low", percent))

@@ -26,6 +26,9 @@ import './now.js';
 import './status.js';
 import './clock.js';
 import './double.js';
+// Last of the modules that draw, because it measures what they wrote: its observers have to be
+// standing before the host starts replaying, and everything it measures has to exist by then.
+import './labels.js';
 import './bridge.js';
 
 bridge.ready();

@@ -44,6 +44,15 @@ object ConnectivityWatch {
         "dumpsys notification --noredact | grep -oE \"ZenRule\\[[^]]*\" | " +
             "grep enabled=TRUE | grep state=STATE_TRUE | grep -oE \"name=[^,]*\" | head -1"
 
+    /**
+     * Which network the phone is actually on, by name. `WifiManager` will not say: since Android 10
+     * the SSID is behind ACCESS_FINE_LOCATION *and* location being switched on, and a status bar
+     * that stops naming the network because the user turned location off is worse than one that
+     * never named it. The shell already bound for the zen rule has no such condition on it, and
+     * the grep runs on the phone so one line comes back rather than the whole of `wifi status`.
+     */
+    private const val WIFI_SSID = "cmd -w wifi status | grep -m1 'Wifi is connected to'"
+
     private const val BLUETOOTH_BATTERY = "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
     private const val BLUETOOTH_BATTERY_EXTRA = "android.bluetooth.device.extra.BATTERY_LEVEL"
 
@@ -55,6 +64,7 @@ object ConnectivityWatch {
     private var link = "none"
     private var level = -1
     private var generation = ""
+    private var ssid = ""
     private var isUsbConnected = false
     private var isZen = false
     private var zenName = ""
@@ -112,6 +122,7 @@ object ConnectivityWatch {
             override fun onLost(network: Network) {
                 link = "none"
                 level = -1
+                ssid = ""
                 publish()
             }
         }
@@ -135,6 +146,7 @@ object ConnectivityWatch {
         zenName = ""
         link = "none"
         level = -1
+        ssid = ""
         isUsbConnected = false
         isHotspotOn = false
         pairedName = null
@@ -230,6 +242,10 @@ object ConnectivityWatch {
         return rule.removePrefix("name=").trim()
     }
 
+    /** The name out of `Wifi is connected to "Vodafone-AF28"`, which is all the grep leaves behind. */
+    private fun readSsid(): String =
+        ShizukuShell.run(WIFI_SSID)?.substringAfter('"', "")?.substringBefore('"').orEmpty()
+
     private fun nameOfNetwork(type: Int): String = when (type) {
         android.telephony.TelephonyManager.NETWORK_TYPE_NR -> "5G"
         android.telephony.TelephonyManager.NETWORK_TYPE_LTE -> "4G"
@@ -265,6 +281,9 @@ object ConnectivityWatch {
         // capabilities carry the RSSI and WifiManager knows what the bars mean. A mobile link
         // says which generation it is instead of drawing bars, which is what the icon it stands
         // on did — the number of bars up there was never the cellular one anyway.
+        // Asked once per network rather than per callback: capabilities arrive every time the signal
+        // moves, and a shell round-trip on each of those is the polling this file exists not to do.
+        ssid = if (link == "wifi") ssid.ifEmpty { readSsid() } else ""
         level = if (link == "wifi") {
             val rssi = seen.signalStrength
             val wifi = context.getSystemService(WifiManager::class.java)
@@ -282,6 +301,9 @@ object ConnectivityWatch {
         // before there is anything to run it. Asked again while it is still missing, it costs one
         // command until it is answered and nothing at all afterwards.
         if (isZen && zenName.isEmpty()) zenName = readZenName()
+        // The same late-binding trap as the mode's name, for the same reason: the phone is already
+        // on a network before this service exists, so the read that matters is the one at boot.
+        if (link == "wifi" && ssid.isEmpty()) ssid = readSsid()
         val paired = pairedName?.let {
             JSONObject().put("name", it).put("charge", pairedCharge)
         } ?: if (pairedCharge >= 0) JSONObject().put("charge", pairedCharge) else null
@@ -290,6 +312,7 @@ object ConnectivityWatch {
                 .put("link", link)
                 .put("level", level)
                 .put("generation", generation)
+                .put("ssid", ssid)
                 .put("usb", isUsbConnected)
                 .put("hotspot", isHotspotOn)
                 .put("zen", isZen)

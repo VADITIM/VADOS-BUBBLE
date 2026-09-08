@@ -8,11 +8,12 @@ import { GROWN_PAD, HOLD_MILLIS, bridge, root, shared } from './state.js';
 /**
  * The bubble at the right end of the bar, standing on the system's own icons.
  *
- * It carries no mod and never announces anything: what the phone is *attached* to is true all
- * the time, so this bubble is read rather than watched. That is the line between it and the Now
- * bubble at the other end — Now carries what is happening, a torch burning or a file arriving,
- * and it comes and goes with it; Status carries what is connected and stands there for as long
- * as the bar does.
+ * It carries no mod: what the phone is *attached* to is true all the time, so this bubble is read
+ * rather than watched. That is the line between it and the Now bubble at the other end — Now
+ * carries what is happening, a torch burning or a file arriving, and it comes and goes with it;
+ * Status carries what is connected and stands there for as long as the bar does. The one thing it
+ * announces is the phone being plugged in, which is news about the reading it is already holding —
+ * see the charge announcement below.
  *
  * It is still a bubble, and it answers everything a bubble answers: it is pressed, it is held,
  * it is pulled down, and it opens. It was a box that only reported for a long time and it read
@@ -23,6 +24,7 @@ export const statusPill = document.getElementById('status');
 const statusClosed = document.getElementById('status-closed');
 const statusFaces = {
   closed: statusClosed,
+  charge: document.getElementById('status-charge'),
   panel: document.getElementById('status-panel'),
 };
 
@@ -33,14 +35,49 @@ const STATUS_RIGHT = 14;
 const STATUS_TRAVEL = 420;
 const STATUS_LAND = 0.42;
 
-/* The panel it opens into. Mirrored into the CSS below, so the size is written once.
-   The width the media player opens to, because a panel is a panel: two open bubbles at two
-   widths read as two different kinds of thing. The height is its own — it is nine controls
-   rather than a song — and it is all taken downwards, since the top edge is the line the whole
-   row rests on and an open bubble that climbs is one that has left the bar. */
-const STATUS_PANEL = { width: 340, height: 300, ms: 420 };
-root.style.setProperty('--status-panel-width', STATUS_PANEL.width + 'px');
-root.style.setProperty('--status-panel-height', STATUS_PANEL.height + 'px');
+/* The panel it opens into, and it is the screen now.
+   It was the media player's box — a panel is a panel, and two open bubbles at two widths read as
+   two different kinds of thing — and what that bought was nine controls and a battery crammed into
+   a card while the rest of the screen sat empty behind them. The charge is a *level*, and a level
+   wants height more than anything else in this project; the controls want a thumb's worth of room
+   each. Both of those are the whole screen, so it takes the whole screen.
+   What does not change is that it is still one bubble: it grows out of the closed one, it is drawn
+   on the same canvas, it merges with whatever it passes, and it is still taken downwards — the top
+   edge is the line the row rests on and an open bubble that climbs is one that has left the bar.
+   Its size is measured rather than written down, because the screen is not a constant. */
+/** How far the panel stands off the screen's edges. The foot is its own number and much the larger: the bottom row of controls is what lands there, and ten pixels put it on the gesture handle. */
+const STATUS_MARGIN = 10;
+const STATUS_MARGIN_FOOT = 30;
+const STATUS_PANEL = { width: 0, height: 0, ms: 420 };
+
+/**
+ * The screen, in the page's own units — and **never `window.innerWidth`**, which is not it.
+ *
+ * The canvas window is exactly the display (1080×2340 at a device ratio of 3, so 360×780 to the
+ * page), and the WebView reports `innerWidth` 404 and `innerHeight` 877 inside it: the layout
+ * viewport it hands out is wider and taller than the surface it is drawn on, by 44 and 97. Sized
+ * off that, the panel was 384 wide on a 360-wide screen and overhung both edges — the battery glyph
+ * cut off at the left, the percentage cut off at the right, and the controls pushed off the bottom.
+ * The document's own client box is the surface, so it is the one to measure. This is the same trap
+ * as "the page does not know how wide the screen is" in [bubbles.md] — it does, but only if it asks
+ * the right question, and the wrong one is the one that reads as correct on every smaller shape.
+ */
+const screenWidth = () => document.documentElement.clientWidth;
+const screenHeight = () => document.documentElement.clientHeight;
+
+/**
+ * The panel's box, from the screen's. The top is the closed bubble's own — the CSS places the open
+ * one at exactly that line plus the pad every grown bubble drops by — so it is read off the bubble
+ * instead of re-derived from the three custom properties the host writes it from.
+ */
+function fitStatusPanel() {
+  const top = statusPill.getBoundingClientRect().top + GROWN_PAD;
+  STATUS_PANEL.width = Math.round(screenWidth() - STATUS_MARGIN * 2);
+  STATUS_PANEL.height = Math.round(screenHeight() - top - STATUS_MARGIN_FOOT);
+  root.style.setProperty('--status-panel-width', STATUS_PANEL.width + 'px');
+  root.style.setProperty('--status-panel-height', STATUS_PANEL.height + 'px');
+}
+fitStatusPanel();
 
 /** How far down the finger has to pull before the pull is an ask rather than a wander. */
 const STATUS_PULL = 34;
@@ -70,7 +107,7 @@ const SLOT_BOUNCE = 220;
  * what appears between two existing icons is decided by the number rather than by where the
  * code happened to push it.
  */
-const SLOTS = { usb: 0, modus: 7, link: 8, battery: 9 };
+const SLOTS = { usb: 0, transfer: 1, modus: 7, link: 8, battery: 9 };
 
 /**
  * The one glyph set. Every icon here is drawn rather than named, because the payload is
@@ -83,6 +120,12 @@ const GLYPHS = {
   ethernet: '<svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v5h-3v3h-2v-3h-4v3H8v-3H5V5a2 2 0 0 1 2-2zm-2 12h14v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/></svg>',
   bluetooth: '<svg viewBox="0 0 24 24"><path fill="none" d="M7 17L17 7L12 2V22L17 17L7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   usb: '<svg viewBox="0 0 24 24"><path d="M11 2h2l1.5 2.5h-5zM11 5h2v10.2l3-2.4V10h-1.5V7.5h4V10H17v3.4l-4.8 3.8V19a2 2 0 1 1-2 0v-3.6l-3.4-2.6V10.9a2 2 0 1 1 2 0v.9l1.4 1.1z"/></svg>',
+  // A file in flight. The same three drawings the clock bubble wore for it, moved here with the
+  // mod: an arrow pointing the way the file is moving, and the tick it wears for a moment when it
+  // lands. One shape for the two directions, because which of them it is *is* the direction.
+  download: '<svg viewBox="0 0 24 24"><path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4L11 12.2zM5 18h14v2H5z"/></svg>',
+  upload: '<svg viewBox="0 0 24 24"><path d="M12 3l5.7 5.7-1.4 1.4L13 6.8V16h-2V6.8L7.7 10.1 6.3 8.7zM5 18h14v2H5z"/></svg>',
+  transferDone: '<svg viewBox="0 0 24 24"><path d="M9.8 16.2 5.6 12l-1.4 1.4 5.6 5.6L20.4 7.9 19 6.5z"/></svg>',
   hotspot: '<svg viewBox="0 0 24 24"><path d="M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM7.8 5.8 6.4 4.4a10 10 0 0 0 0 15.2l1.4-1.4a8 8 0 0 1 0-12.4zm9.8-1.4-1.4 1.4a8 8 0 0 1 0 12.4l1.4 1.4a10 10 0 0 0 0-15.2z"/></svg>',
   // Do not disturb, drawn as the bar through the circle rather than as a crossed-out bell: it
   // is a mode the phone is in, not a notification that was refused.
@@ -117,7 +160,11 @@ const GLYPHS = {
  */
 const GLYPHS_OFF = {
   wifi: '<svg viewBox="0 0 24 24" fill="none"><path d="M1.33309 8.07433C0.92156 8.44266 0.886539 9.07485 1.25487 9.48638C1.62319 9.89791 2.25539 9.93293 2.66691 9.5646L1.33309 8.07433ZM21.3331 9.5646C21.7446 9.93293 22.3768 9.89791 22.7451 9.48638C23.1135 9.07485 23.0784 8.44266 22.6669 8.07433L21.3331 9.5646ZM12 19C11.4477 19 11 19.4477 11 20C11 20.5523 11.4477 21 12 21V19ZM12.01 21C12.5623 21 13.01 20.5523 13.01 20C13.01 19.4477 12.5623 19 12.01 19V21ZM14.6905 17.04C15.099 17.4116 15.7315 17.3817 16.1031 16.9732C16.4748 16.5646 16.4448 15.9322 16.0363 15.5605L14.6905 17.04ZM18.0539 13.3403C18.4624 13.7119 19.0949 13.682 19.4665 13.2734C19.8381 12.8649 19.8082 12.2324 19.3997 11.8608L18.0539 13.3403ZM7.96372 15.5605C7.55517 15.9322 7.52524 16.5646 7.89687 16.9732C8.2685 17.3817 8.90095 17.4116 9.3095 17.04L7.96372 15.5605ZM4.60034 11.8608C4.19179 12.2324 4.16185 12.8649 4.53348 13.2734C4.90511 13.682 5.53756 13.7119 5.94611 13.3403L4.60034 11.8608ZM10.5705 4.06305C10.0204 4.1118 9.61391 4.59729 9.66266 5.14741C9.71141 5.69754 10.1969 6.10399 10.747 6.05525L10.5705 4.06305ZM17.3393 10.3798C16.8567 10.1114 16.2478 10.285 15.9794 10.7677C15.711 11.2504 15.8847 11.8593 16.3673 12.1277L17.3393 10.3798ZM3.70711 2.29289C3.31658 1.90237 2.68342 1.90237 2.29289 2.29289C1.90237 2.68342 1.90237 3.31658 2.29289 3.70711L3.70711 2.29289ZM20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L20.2929 21.7071ZM12 6C15.5863 6 18.8556 7.34716 21.3331 9.5646L22.6669 8.07433C19.8369 5.54138 16.0972 4 12 4V6ZM12 21H12.01V19H12V21ZM12 16C13.0367 16 13.9793 16.3931 14.6905 17.04L16.0363 15.5605C14.9713 14.5918 13.5536 14 12 14V16ZM9.3095 17.04C10.0207 16.3931 10.9633 16 12 16V14C10.4464 14 9.02872 14.5918 7.96372 15.5605L9.3095 17.04ZM10.747 6.05525C11.1596 6.01869 11.5775 6 12 6V4C11.5185 4 11.0417 4.0213 10.5705 4.06305L10.747 6.05525ZM16.3673 12.1277C16.9757 12.466 17.5412 12.874 18.0539 13.3403L19.3997 11.8608C18.7751 11.2927 18.0844 10.7941 17.3393 10.3798L16.3673 12.1277ZM2.29289 3.70711L5.46648 6.8807L6.8807 5.46648L3.70711 2.29289L2.29289 3.70711ZM2.66691 9.5646C3.81213 8.53961 5.12648 7.70074 6.56232 7.09494L5.78486 5.25224C4.14251 5.94517 2.64069 6.904 1.33309 8.07433L2.66691 9.5646ZM5.46648 6.8807L9.46042 10.8746L10.8746 9.46042L6.8807 5.46648L5.46648 6.8807ZM9.46042 10.8746L20.2929 21.7071L21.7071 20.2929L10.8746 9.46042L9.46042 10.8746ZM5.94611 13.3403C7.15939 12.2367 8.67355 11.4612 10.3496 11.1508L9.98543 9.18424C7.93271 9.5644 6.08108 10.5139 4.60034 11.8608L5.94611 13.3403Z" fill="currentColor"/></svg>',
-  bluetooth: '<svg viewBox="0 0 24 24" fill="none"><path d="M7 17L12 12M17 17L12 22V12M3 3L12 12M21 21L12 12M14.8252 9.1748L17 7L12 2V6.34961" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  // The rune itself with a line struck through it, rather than a rune redrawn as half of itself:
+  // the broken-up version read as a different symbol altogether, which is the one thing an off face
+  // may not do — it has to be recognised as the same thing, switched off.
+  bluetooth: '<svg viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7L12 2V22L17 17L7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 3.5L20.5 20.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  mobile: '<svg viewBox="0 0 24 24"><path d="M4 16h3v4H4zm5-3h3v7H9zm5-4h3v11h-3zm5-5h3v16h-3z" opacity="0.55"/><path fill="none" d="M3.5 3.5L20.5 20.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   mic: '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.00004 7.91421V11C9.00004 12.6569 10.3432 14 12 14C12.8503 14 13.6179 13.6463 14.1638 13.078L12.7487 11.6629C12.5655 11.8697 12.298 12 12 12C11.4478 12 11 11.5523 11 11V9.91422L9.00004 7.91421ZM13 9.08579V5C13 4.44772 12.5523 4 12 4C11.4478 4 11 4.44772 11 5V7.08579L9.00004 5.08579V5C9.00004 3.34315 10.3432 2 12 2C13.6569 2 15 3.34315 15 5V11C15 11.0283 14.9997 11.0565 14.9989 11.0846L13 9.08579ZM15.5782 14.4924C15.4023 14.6727 15.2121 14.8402 15.0091 14.9932C14.1658 15.6286 13.143 15.9808 12.0873 15.9992C12.0594 15.9997 12.0315 16 12.0036 16C10.977 16.0007 9.97424 15.6854 9.13216 15.0958C8.26722 14.4901 7.61622 13.6262 7.27245 12.6278C7.09264 12.1056 6.52356 11.8281 6.00136 12.0079C5.47917 12.1877 5.20161 12.7568 5.38141 13.279C5.86269 14.6767 6.77409 15.8862 7.98501 16.7341C8.88694 17.3656 9.92054 17.7724 11 17.9282V20H9.00004C8.44776 20 8.00004 20.4477 8.00004 21C8.00004 21.5523 8.44776 22 9.00004 22H12H15C15.5523 22 16 21.5523 16 21C16 20.4477 15.5523 20 15 20H13V17.9282C14.1618 17.7605 15.2678 17.3025 16.2127 16.5904C16.4905 16.3812 16.7509 16.1525 16.9925 15.9067L15.5782 14.4924ZM18.1876 14.2733L16.6785 12.7642C16.716 12.6648 16.7504 12.5639 16.7816 12.4619C16.943 11.9337 17.5021 11.6365 18.0302 11.7979C18.5584 11.9594 18.8556 12.5184 18.6942 13.0466C18.5639 13.4729 18.3938 13.8834 18.1876 14.2733Z" fill="currentColor"/><path d="M5 5L19 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
@@ -125,26 +172,40 @@ const GLYPHS_OFF = {
 const glyphFor = (name, isOn) => (isOn ? GLYPHS[name] : GLYPHS_OFF[name] || GLYPHS[name]) || '';
 
 /**
- * The battery as it is drawn in the panel: four steps of charge plus the bolt, because a level
- * is read at a glance from how full the cell looks and never from counting bars. The percentage
- * stands under it for when the glance is not enough.
+ * The bolt, and only the bolt. The panel draws the cell itself now and the bar's announcement is
+ * the one place a whole battery is still drawn, so the four steps of charge went with the box:
+ * a picture of a level standing inside the level is the same reading twice.
  */
 const BATTERY_GLYPHS = {
   charging: '<svg viewBox="0 0 24 24"><path fill="none" d="M12.5 6L8.5 12H14.5L10.5 18M21 13V11M7.7 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.0799 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.0799 18 6.2 18H6.5M16.5 6H16.8C17.9201 6 18.4802 6 18.908 6.21799C19.2843 6.40973 19.5903 6.71569 19.782 7.09202C20 7.51984 20 8.0799 20 9.2V14.8C20 15.9201 20 16.4802 19.782 16.908C19.5903 17.2843 19.2843 17.5903 18.908 17.782C18.4802 18 17.9201 18 16.8 18H15.31" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  empty: '<svg viewBox="0 0 24 24"><path fill="none" d="M21 13V11M6.2 18H16.8C17.9201 18 18.4802 18 18.908 17.782C19.2843 17.5903 19.5903 17.2843 19.782 16.908C20 16.4802 20 15.9201 20 14.8V9.2C20 8.0799 20 7.51984 19.782 7.09202C19.5903 6.71569 19.2843 6.40973 18.908 6.21799C18.4802 6 17.9201 6 16.8 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.07989 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.07989 18 6.2 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  low: '<svg viewBox="0 0 24 24"><path fill="none" d="M7.5 10V14M21 13V11M6.2 18H16.8C17.9201 18 18.4802 18 18.908 17.782C19.2843 17.5903 19.5903 17.2843 19.782 16.908C20 16.4802 20 15.9201 20 14.8V9.2C20 8.0799 20 7.51984 19.782 7.09202C19.5903 6.71569 19.2843 6.40973 18.908 6.21799C18.4802 6 17.9201 6 16.8 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.07989 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.07989 18 6.2 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  mid: '<svg viewBox="0 0 24 24"><path fill="none" d="M7.5 10V14M11.5 10V14M21 13V11M6.2 18H16.8C17.9201 18 18.4802 18 18.908 17.782C19.2843 17.5903 19.5903 17.2843 19.782 16.908C20 16.4802 20 15.9201 20 14.8V9.2C20 8.0799 20 7.51984 19.782 7.09202C19.5903 6.71569 19.2843 6.40973 18.908 6.21799C18.4802 6 17.9201 6 16.8 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.07989 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.07989 18 6.2 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  full: '<svg viewBox="0 0 24 24"><path fill="none" d="M7.5 10V14M11.5 10V14M15.5 10V14M21 13V11M6.2 18H16.8C17.9201 18 18.4802 18 18.908 17.782C19.2843 17.5903 19.5903 17.2843 19.782 16.908C20 16.4802 20 15.9201 20 14.8V9.2C20 8.0799 20 7.51984 19.782 7.09202C19.5903 6.71569 19.2843 6.40973 18.908 6.21799C18.4802 6 17.9201 6 16.8 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.07989 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.07989 18 6.2 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
-/** Which of them a charge wears. Plugged in outranks the level: what it is doing is the news. */
-function batteryGlyph() {
-  if (isPlugged) return BATTERY_GLYPHS.charging;
-  if (charge < 15) return BATTERY_GLYPHS.empty;
-  if (charge < 40) return BATTERY_GLYPHS.low;
-  if (charge < 75) return BATTERY_GLYPHS.mid;
-  return BATTERY_GLYPHS.full;
-}
+/**
+ * What the announcement wears, one face per state, and all three are the same drawing: the cell
+ * with a gap top and bottom and something passing through it. The bolt is being charged; a bar
+ * standing alone in an otherwise empty cell is what is left; the bar with a dot under it is the
+ * same reading once there is too little of it to be a reading any more. Adapted rather than
+ * redrawn, because the three are one announcement in three moods and have to be recognised as
+ * each other at a glance on a bar nobody is looking at.
+ */
+const ANNOUNCE_CELL = 'M21 13V11M7.7 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.0799 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.0799 18 6.2 18H6.5M16.5 6H16.8C17.9201 6 18.4802 6 18.908 6.21799C19.2843 6.40973 19.5903 6.71569 19.782 7.09202C20 7.51984 20 8.0799 20 9.2V14.8C20 15.9201 20 16.4802 19.782 16.908C19.5903 17.2843 19.2843 17.5903 18.908 17.782C18.4802 18 17.9201 18 16.8 18H15.31';
+const announceGlyph = mark =>
+  '<svg viewBox="0 0 24 24"><path fill="none" d="' + mark + ANNOUNCE_CELL +
+  '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const ANNOUNCE_GLYPHS = {
+  charging: BATTERY_GLYPHS.charging,
+  low: announceGlyph('M12 9.2V14.8'),
+  critical: announceGlyph('M12 8.4V13M12 16.3V16.4'),
+};
+
+/** What each of them takes the bubble to. Once the shape has said "battery", the colour is the whole difference between running low and being nearly out. */
+const ANNOUNCE_COLOURS = {
+  charging: '#5bfd5b',
+  low: '#ffb300',
+  critical: '#ff3b30',
+};
+
 
 /**
  * A Modus is what is riding on top of the link — a paired device, a hotspot someone is using,
@@ -184,6 +245,13 @@ const MODUS_COLOUR = {
 };
 
 let attached = null;
+/**
+ * The file in flight, or null. It is this bubble's now: a transfer is a thing the phone is doing
+ * for something attached to it, and it used to stand in the clock beside a torch and a recording —
+ * which are things the *person* started. It is one slot and nothing else here yet: no reading, no
+ * timeline, no tap. What it says at this size is that a file is moving and which way.
+ */
+let transfer = null;
 let charge = -1;
 let isPlugged = false;
 let isBorn = false;
@@ -213,6 +281,12 @@ function hasModus(kind) {
 function wanted() {
   const shown = [];
   if (attached && attached.usb) shown.push({ name: 'usb', html: GLYPHS.usb });
+  if (transfer) {
+    shown.push({
+      name: 'transfer',
+      html: transfer.isDone ? GLYPHS.transferDone : GLYPHS[transfer.mod],
+    });
+  }
   const modus = MODUS_ORDER.find(kind => hasModus(kind));
   if (modus) shown.push({ name: 'modus', html: modus === 'zen' ? zenGlyph() : GLYPHS[modus] });
   if (attached && attached.link === 'wifi') {
@@ -232,8 +306,12 @@ function wanted() {
   const paired = attached && attached.bluetooth && attached.bluetooth.charge >= 0
     ? attached.bluetooth.charge
     : -1;
-  const reading = (paired >= 0 ? paired + '% · ' : '') + (charge >= 0 ? charge + '%' : '');
-  if (reading) shown.push({ name: 'battery', text: reading });
+  // The phone's own charge is wrapped rather than written flat, because it is the half that goes yellow and then red and the paired device's must not go with it — two readings in one slot, one of which has an alarm.
+  const own = charge >= 0
+    ? '<span class="own-charge" data-charge="' + chargeBand() + '">' + charge + '%</span>'
+    : '';
+  const reading = (paired >= 0 ? paired + '% · ' : '') + own;
+  if (reading) shown.push({ name: 'battery', html: reading, isText: true });
   return shown.sort((one, two) => SLOTS[one.name] - SLOTS[two.name]);
 }
 
@@ -258,6 +336,7 @@ function paintStatus() {
   root.style.setProperty('--status-accent', modus ? MODUS_COLOUR[modus] : 'transparent');
   statusPill.classList.toggle('plugged', isPlugged);
   paintBattery();
+  paintModeLabels();
 
   const shown = wanted();
   const names = shown.map(slot => slot.name);
@@ -282,9 +361,9 @@ function paintStatus() {
         other => SLOTS[other.dataset.slot] > SLOTS[want.name]
       );
       statusClosed.insertBefore(slot, after || null);
-      // Let go on the next frame, or the browser only ever computes the open state and there
-      // is nothing to animate from.
-      requestAnimationFrame(() => slot.classList.remove('arriving'));
+      // Read a layout property back before letting go, which is what forces the closed state to be *computed* rather than merely written — a rAF is not enough here and never was: its callback runs before the frame's style recalc, so the class going on and coming off collapse into one computation and the browser has nothing to animate from, which is why slots appeared on the spot instead of growing.
+      void slot.offsetWidth;
+      slot.classList.remove('arriving');
     }
     const inner = slot.firstElementChild;
     const drawn = want.text ? want.text : want.html;
@@ -293,7 +372,7 @@ function paintStatus() {
       if (want.text) inner.textContent = want.text;
       else inner.innerHTML = want.html;
     }
-    inner.classList.toggle('is-text', Boolean(want.text));
+    inner.classList.toggle('is-text', Boolean(want.text) || Boolean(want.isText));
     if (want.level >= 0) inner.dataset.level = want.level;
     else delete inner.dataset.level;
   });
@@ -304,6 +383,120 @@ function paintStatus() {
   }
   fitStatusProxy();
   stirLiquid(SLOT_MOVE + 200);
+}
+
+/* ── The charge announcement ───────────────────────────────────────────────────────────── */
+
+/**
+ * Being plugged in is announced *here*, by the bubble that already carries the charge, and it
+ * is a takeover rather than a second shape: for a few seconds the status bar stops reporting
+ * and says one thing instead.
+ *
+ * It used to be the Double's, at the bottom of the screen, and that was a bubble opening at the
+ * far end of the phone to say something about a reading standing at the top of it — the news and
+ * the thing it is news about were nowhere near each other. The Double keeps what has no home on
+ * the bar: a battery running out, a recording that ended.
+ *
+ * The order is the rule and it is [motion.md]'s glyph-as-cause read at bubble scale. **What is
+ * there leaves before what is arriving comes**: each reading shakes where it stands and is then
+ * pulled inwards — one after another, left to right, so it reads as the row being cleared rather
+ * than as everything blinking off together — and only once the bubble is empty does it open out
+ * around the bolt. The width is the consequence of the icon, as always.
+ */
+const CHARGE_POP_STAGGER = 34;
+const CHARGE_POP_SHAKE = 150;
+const CHARGE_POP_COLLAPSE = 190;
+
+/** Coming back is the opposite mood: each reading is thrown back in turned a little off true and swings straight, which is a shape landing rather than a shape being shown. The angle is random per slot so a row of them does not read as one rehearsed move. */
+const CHARGE_POP_IN_STAGGER = 42;
+const CHARGE_POP_IN = 460;
+const CHARGE_POP_IN_TILT = 14;
+
+/** How long the bolt stands there before the readings come back. */
+const CHARGE_DWELL = 2600;
+
+/** What the bubble opens out to while it is holding the bolt. Mirrors --status-charge-width. */
+const CHARGE_WIDTH = 86;
+root.style.setProperty('--status-charge-width', CHARGE_WIDTH + 'px');
+
+let chargeDwell = null;
+let isAnnouncing = false;
+/** Which of the three is currently standing, so a second one arriving under it can be seen to be a different one. */
+let announcingState = null;
+
+export function announceCharge(state = 'charging') {
+  // Not over an open panel: the panel owns the faces and the width while it is up, and news
+  // arriving under the thing the finger is working is news drawn where nobody is looking.
+  if (!isBorn || statusOpen) return;
+  clearTimeout(chargeDwell);
+  // Written even while one is already standing, since a charge falling from low to critical under
+  // its own announcement is the one thing that reading is there to say.
+  root.style.setProperty('--status-announce', ANNOUNCE_COLOURS[state] || ANNOUNCE_COLOURS.charging);
+  // Already standing: the dwell is pushed out rather than the whole run played again, exactly as
+  // an alert arriving on top of an alert does not announce itself twice.
+  if (!isAnnouncing) {
+    isAnnouncing = true;
+    announcingState = state;
+    const slots = [...statusClosed.children];
+    slots.forEach((slot, index) => {
+      slot.style.setProperty('--pop-at', index * CHARGE_POP_STAGGER + 'ms');
+      slot.classList.add('popping');
+    });
+    const emptyAt = slots.length * CHARGE_POP_STAGGER + CHARGE_POP_SHAKE;
+    setTimeout(() => {
+      if (!isAnnouncing) return;
+      // `announcingState` rather than this run's `state`: a second announcement can land while the
+      // row is still emptying, and the glyph owed is the latest one and not the one that started it.
+      statusFaces.charge.innerHTML =
+        ANNOUNCE_GLYPHS[announcingState] || ANNOUNCE_GLYPHS.charging;
+      statusPill.classList.add('announcing');
+      showStatusFace('charge');
+      bridge.triggerHaptic('notification');
+      fitStatusProxy();
+      stirLiquid(CHARGE_POP_COLLAPSE + 400);
+    }, emptyAt);
+    stirLiquid(emptyAt + CHARGE_POP_COLLAPSE + 400);
+    chargeDwell = setTimeout(retireCharge, emptyAt + CHARGE_DWELL);
+    return;
+  }
+  // The colour was being written and the glyph was not, so a charge falling past two marks in one
+  // dwell — which is every fall now that the marks are 30 and 10 and only twenty percent apart —
+  // stood there wearing the low battery's bar while the bubble had already gone red underneath it.
+  // The glyph is the reading, so it is swapped, and replacing the node is also what re-runs
+  // charge-land: the new shape rises into place the way the first one did, which is the icon being
+  // the cause of the change rather than a picture quietly edited under a colour.
+  if (state !== announcingState) {
+    announcingState = state;
+    statusFaces.charge.innerHTML = ANNOUNCE_GLYPHS[state] || ANNOUNCE_GLYPHS.charging;
+    bridge.triggerHaptic('notification');
+  }
+  chargeDwell = setTimeout(retireCharge, CHARGE_DWELL);
+}
+
+/**
+ * The readings come back the way any of them arrives: the slots are taken out of the DOM and
+ * `paintStatus` builds them again, so each one grows from nothing through the same `arriving`
+ * state a wifi icon uses. Leaving the popped slots standing and merely un-popping them would
+ * put the whole row back in one frame, which is the one thing this bubble never does.
+ */
+function retireCharge() {
+  if (!isAnnouncing) return;
+  isAnnouncing = false;
+  announcingState = null;
+  statusPill.classList.remove('announcing');
+  showStatusFace('closed');
+  statusClosed.replaceChildren();
+  paintStatus();
+  // The slots grow their own width back through `arriving`; what is written here is the mood on
+  // top of it, on the inner element so the two compose instead of one owning the other.
+  [...statusClosed.children].forEach((slot, index) => {
+    const tilt = (Math.random() * 0.6 + 0.4) * CHARGE_POP_IN_TILT * (Math.random() < 0.5 ? -1 : 1);
+    slot.style.setProperty('--pop-at', index * CHARGE_POP_IN_STAGGER + 'ms');
+    slot.style.setProperty('--pop-tilt', tilt + 'deg');
+    slot.classList.add('popping-in');
+    setTimeout(() => slot.classList.remove('popping-in'), index * CHARGE_POP_IN_STAGGER + CHARGE_POP_IN);
+  });
+  stirLiquid(statusClosed.children.length * CHARGE_POP_IN_STAGGER + CHARGE_POP_IN + 200);
 }
 
 /** The proxy is exactly the bubble — the panel's box when it is open, its own when it is not. */
@@ -324,6 +517,19 @@ export function fitStatusProxy() {
     );
     return;
   }
+  // On its way home, and therefore nobody's to touch. `getBoundingClientRect()` reads the box as it
+  // stands *this frame*, and the frame the collapse starts on is still the panel's full size — width
+  // and height are both transitioned — so "the proxy comes down with the panel" below was measuring
+  // the panel and handing the host a window most of the bar wide for the whole 420ms of the close.
+  // That is the window that ate the shade swipe, and a tap or a pull landing in it went to
+  // `statusTouch` with `statusOpen` already false, which is `openStatusPanel()` — the panel snapping
+  // back open out of a gesture that was asking for anything but. Nothing is owed a touch while it is
+  // travelling: the room is given straight back the moment the ask ends, and taken again at the
+  // settle. Measuring after the transition instead would be the same window held for the same 420ms.
+  if (statusPill.classList.contains('panel-closing')) {
+    bridge.setStatusProxy(0, 0, 0);
+    return;
+  }
   const box = statusPill.getBoundingClientRect();
   if (!box.width) {
     bridge.setStatusProxy(0, 0, 0);
@@ -342,7 +548,7 @@ function bornStatus() {
   if (isBorn) return;
   isBorn = true;
   const box = statusPill.getBoundingClientRect();
-  const home = window.innerWidth / 2 - (box.left + box.width / 2);
+  const home = screenWidth() / 2 - (box.left + box.width / 2);
   root.style.setProperty('--status-fly', Math.round(home) + 'px');
   root.style.setProperty('--status-pop', 0.5);
   requestAnimationFrame(() => {
@@ -360,6 +566,12 @@ function bornStatus() {
 /** Whether a point on the bar belongs to this bubble, asked the same way the light is. */
 export function statusHolds(x, y) {
   if (!isBorn) return false;
+  // The other half of the collapse. Zeroing this bubble's own proxy stops it hearing anything
+  // directly, but the row's window covers the bar too and `bridge.js` asks *this* whether a touch
+  // it heard belongs here — off a rect that is still the open panel's for the length of the close.
+  // So a swipe on the row near the top of the screen was claimed by a bubble that is not there any
+  // more and read as a tap, which reopens the panel. A bubble on its way to idle holds nothing.
+  if (statusPill.classList.contains('panel-closing')) return false;
   const box = statusPill.getBoundingClientRect();
   return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 }
@@ -376,16 +588,32 @@ function showStatusFace(name) {
 
 /** Where the open panel's left edge belongs: the middle of the screen, and nothing else. */
 function statusPanelLeft() {
-  return (window.innerWidth - STATUS_PANEL.width) / 2;
+  return (screenWidth() - STATUS_PANEL.width) / 2;
 }
+
+/** The tidy-up at the end of a collapse, held so a panel asked for again mid-close can call it off. */
+let panelSettle = null;
 
 export function openStatusPanel() {
   if (statusOpen) return;
+  // Opened again before the last close had finished. The settle was going to take `--liquid-tall`
+  // back off in a few hundred milliseconds — the room this function is about to ask for — and
+  // `panel-closing` is what makes the bubble hold and hear nothing, so a panel opening under it
+  // would stand there deaf until a stale timeout happened to free it.
+  clearTimeout(panelSettle);
+  statusPill.classList.remove('panel-closing');
+  // A finger outranks an announcement: the panel takes the bubble's faces and its width, so the
+  // charge is put away rather than left holding a class the panel is about to disagree with.
+  clearTimeout(chargeDwell);
+  retireCharge();
   // One bubble is extended at a time: two open panels are two answers to the same screen, and
   // the one that was already standing there is the one nobody is looking at any more. The rule
   // belongs to whichever bubble is arriving, which is why it is here and not in a watcher.
   if (shared.state === 'extended') toClosed();
   if (nowOpen) closeNowPanel();
+  // The screen is the box, so it is measured on the way open rather than at load: at load this
+  // bubble has not been born yet and there is nothing to measure the top off.
+  fitStatusPanel();
   statusOpen = true;
   // The panel opens on what it was last told and corrects itself when the shell answers: a
   // switch that is a frame behind is better than a panel that waits for a shell to open.
@@ -423,6 +651,11 @@ export function openStatusPanel() {
 export function closeStatusPanel() {
   if (!statusOpen) return;
   statusOpen = false;
+  // The clip has to outlive `open`, which is the class whose removal starts the collapse: the panel
+  // inside is its own fixed size rather than the bubble's, so without this it stands at full width
+  // over a bubble that is already most of the way home. Taken off with the rest of the tidying up
+  // at the end of the collapse, below.
+  statusPill.classList.add('panel-closing');
   showStatusFace('closed');
   // The same jump, put back the same way: taking `open` off moves the anchor back to the screen's
   // right edge, so the flight holds it where the panel was standing for one frame first.
@@ -435,13 +668,15 @@ export function closeStatusPanel() {
     root.style.setProperty('--status-fly-ms', STATUS_PANEL.ms + 'ms');
     root.style.setProperty('--status-fly', '0px');
   });
-  // The proxy comes down with the panel rather than after it. Left at the panel's size for the
-  // length of the close, it is an invisible window most of the bar wide that answers to this
-  // bubble — so a tap anywhere near the top of the screen in that half second opened the panel
-  // straight back up, which is most of what "the tap does not work consistently" was.
+  // The proxy comes off with the panel rather than after it: `panel-closing` is already on, so this
+  // hands the room straight back and the collapse happens under a bubble that answers to nothing.
   fitStatusProxy();
   stirLiquid(STATUS_PANEL.ms + 160);
-  setTimeout(() => {
+  panelSettle = setTimeout(() => {
+    // The class first and the fit second, and never the other way round: `panel-closing` is what
+    // makes `fitStatusProxy` answer nothing, so fitting under it would hand back zero and leave the
+    // settled bubble untouchable until the next reading happened to arrive.
+    statusPill.classList.remove('panel-closing');
     fitStatusProxy();
     // Back to the bar's own height once the panel has finished coming in, and not before: a
     // filter region that shrinks mid-collapse clips what is still moving.
@@ -479,9 +714,12 @@ const faceOf = control => control.querySelector('.quick-icon') || control;
  * What says they are on is that they are lit and wearing their on face.
  */
 function paintToggles(state) {
+  toggles = state;
   quickModes.forEach(button => {
     setControl(button, Boolean(state[button.dataset.toggle]), false);
   });
+  paintModeLabels();
+  paintLevels(state);
   quickKnobs.forEach(knob => {
     const name = knob.dataset.toggle;
     const value = name === 'recording' ? isRecordingLive() : state[name];
@@ -492,6 +730,46 @@ function paintToggles(state) {
   });
   // Saving is a state of the battery as much as it is a switch, and the panel says it in both places off the one reading.
   batteryBox.classList.toggle('saving', Boolean(state.saver));
+}
+
+/**
+ * The last reading the shell gave for the switches, kept because the labels under the three links
+ * are written from two sources at once — the shell says whether a radio is on, the connectivity
+ * payload says what it found — and the two arrive on their own clocks. Without it, whichever
+ * landed second wiped the half the other one knew.
+ */
+let toggles = {};
+
+/**
+ * What each link is attached to, under its glyph. A colour says a radio is on and nothing else,
+ * and "on" is the half of a link nobody has to be told — the network, the pair of headphones, the
+ * cable are the reading. Where there is no name to give, the state is said in words instead of a
+ * blank being left: an empty line under a lit glyph reads as a label that failed to load.
+ */
+function paintModeLabels() {
+  const paired = attached && attached.bluetooth;
+  const text = {
+    // A cable is not a switch: it is either in the phone or it is not, and what the switch under
+    // it does is decide what the cable is allowed to carry.
+    usb: !(attached && attached.usb) ? 'no cable' : toggles.usb ? 'file transfer' : 'charging only',
+    bluetooth: paired ? (paired.name || 'connected') : toggles.bluetooth ? 'nothing paired' : 'off',
+    wifi: attached && attached.link === 'wifi' && attached.ssid
+      ? attached.ssid
+      : toggles.wifi ? 'not connected' : 'off',
+    // The generation is the name of a mobile link the way an SSID is the name of a wifi one — it is
+    // what the phone will say about the network it is on, and it is already on the bar.
+    mobile: !toggles.mobile ? 'off'
+      : attached && attached.link === 'mobile' ? (attached.generation || 'connected')
+      : 'standby',
+  };
+  quickModes.forEach(button => {
+    const name = button.dataset.toggle;
+    button.querySelector('.quick-label').textContent = text[name] || '';
+    // The USB switch answers to a cable rather than to a setting: with nothing plugged in there
+    // is nothing for it to grant, and a live-looking button that silently does nothing is worse
+    // than one that says it has no subject.
+    if (name === 'usb') button.classList.toggle('unavailable', !(attached && attached.usb));
+  });
 }
 
 /** Whether the Now bubble is currently carrying a recording, which is where that truth lives. */
@@ -513,6 +791,10 @@ const batteryReading = document.getElementById('battery-reading');
  * five situations it is in. Mirrors the bands in the backlog: 100-86, 85-61, 60-36, 35-16, 15-0.
  */
 function chargeColour() {
+  // Plugged in outranks every band, the same way it outranks them on the bar: the level is no
+  // longer the news, what is being done to it is — and it is the announcement's own green, so the
+  // bubble saying "charging" and the panel showing it are one colour rather than two greens.
+  if (isPlugged) return ANNOUNCE_COLOURS.charging;
   if (charge >= 86) return '#5bfd5b';
   if (charge >= 61) return '#2fbf2f';
   if (charge >= 36) return '#ffd429';
@@ -520,14 +802,30 @@ function chargeColour() {
   return '#e5342b';
 }
 
+/**
+ * Which of the three the bar's own reading is in. Three and not the panel's five: the panel is
+ * being looked at and can afford a scale, the bar is being glanced past and only has room for
+ * the question "is this fine, is this getting on, is this a problem". The two boundaries are the
+ * bottom two of chargeColour()'s, so a charge crossing 36 or 16 changes in both places at once.
+ */
+function chargeBand() {
+  if (charge >= 36) return 'ok';
+  if (charge >= 16) return 'low';
+  return 'critical';
+}
+
 /** The charge, drawn where it can be read across the room rather than counted off a bar. */
 function paintBattery() {
-  batteryGlyphBox.innerHTML = batteryGlyph();
+  // The bolt and nothing else: the cell around the level is the battery glyph now, so the four
+  // steps of charge would be a drawing of the level standing inside the level itself.
+  batteryGlyphBox.innerHTML = isPlugged ? BATTERY_GLYPHS.charging : '';
   batteryReading.textContent = charge >= 0 ? charge + '%' : '--';
   batteryBox.style.setProperty('--charge-height', Math.max(0, charge) + '%');
   batteryBox.style.setProperty('--charge-color', chargeColour());
   // Low is the battery's own alarm and belongs to the reading, not to a slot beside it. Not while it is plugged in: a phone at 9% on a cable is a phone being fixed.
   batteryBox.classList.toggle('low', !isPlugged && charge >= 0 && charge < 15);
+  // Charging is a thing happening to the liquid rather than a colour written on it, so the class carries it: the bubbles only rise while this is on, and they are drawn from nothing rather than paused, because a paused animation still holds nine circles standing in the middle of a still surface.
+  batteryBox.classList.toggle('charging', isPlugged);
 }
 
 /** The control behind the battery's tap: one truth, worked from two places in the same panel. */
@@ -565,6 +863,96 @@ batteryBox.addEventListener('click', event => {
 });
 
 window.onTogglesChanged = paintToggles;
+
+/* ── The levels ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Brightness and volume, and they are the two readings in this panel that are neither a state nor
+ * something the phone decided: they are amounts a hand sets. So they are drawn as amounts — an
+ * upright column filled to its share, which is the same drawing the charge beside them is — and
+ * they answer a *drag* and never a tap. A bar that jumps to wherever it was touched changes the
+ * screen's brightness because a finger came down on its way to something else, and on a panel that
+ * closes when the background is hit, that is a change nobody saw and nobody asked for.
+ */
+const LEVEL_GLYPHS = {
+  brightness: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  volume: '<svg viewBox="0 0 24 24"><path d="M11 4.5 6.5 8.5H3.5v7h3l4.5 4zM15.4 8.6a4.8 4.8 0 0 1 0 6.8l1.4 1.4a6.8 6.8 0 0 0 0-9.6zM18.2 5.8a8.8 8.8 0 0 1 0 12.4l1.4 1.4a10.8 10.8 0 0 0 0-15.2z"/></svg>',
+};
+
+const levels = [...document.querySelectorAll('.level')];
+levels.forEach(level => {
+  level.querySelector('.level-icon').innerHTML = LEVEL_GLYPHS[level.dataset.level];
+});
+
+/** Below this a touch is a touch: the panel closes on its background and a bar is a big target. */
+const LEVEL_SLOP = 8;
+
+/** How coarse a step is worth sending. A finger crosses a 300px bar in a few dozen of these, and every one of them is a shell command — a percent per frame is a queue the hand outruns. */
+const LEVEL_STEP = 2;
+
+/**
+ * One bar drawn at a share. Written as a percentage rather than a pixel height so the fill means
+ * the same thing on any screen, and `lit` is the whole of what says a bar has something in it.
+ */
+function paintLevel(level, share) {
+  level.style.setProperty('--level', share + '%');
+  level.classList.toggle('lit', share > 0);
+}
+
+levels.forEach(level => {
+  const name = level.dataset.level;
+  let from = null;
+  let share = 0;
+  let sent = -1;
+
+  level.addEventListener('touchstart', event => {
+    event.stopPropagation();
+    from = event.touches[0].clientY;
+    share = parseFloat(level.style.getPropertyValue('--level')) || 0;
+    sent = share;
+  }, { passive: true });
+
+  level.addEventListener('touchmove', event => {
+    if (from === null) return;
+    event.stopPropagation();
+    const travelled = from - event.touches[0].clientY;
+    if (!level.classList.contains('dragging')) {
+      if (Math.abs(travelled) < LEVEL_SLOP) return;
+      level.classList.add('dragging');
+      bridge.triggerHaptic('tap');
+    }
+    // Off the bar's own height, so the whole of it is the whole of the range and the value is
+    // under the thumb rather than a distance away from where it started.
+    const next = Math.round(share + (travelled / level.getBoundingClientRect().height) * 100);
+    const clamped = Math.max(0, Math.min(100, next));
+    paintLevel(level, clamped);
+    if (Math.abs(clamped - sent) < LEVEL_STEP && clamped !== 0 && clamped !== 100) return;
+    sent = clamped;
+    bridge.setLevel(name, clamped);
+  }, { passive: true });
+
+  ['touchend', 'touchcancel'].forEach(type => {
+    level.addEventListener(type, () => {
+      from = null;
+      level.classList.remove('dragging');
+    }, { passive: true });
+  });
+
+  // A tap on a bar is a tap on the panel's background everywhere else, and here it has to be
+  // nothing at all: the panel closing under a finger that meant to set the volume is the one
+  // outcome a drag-only control exists to prevent.
+  level.addEventListener('click', event => event.stopPropagation());
+});
+
+/** Both bars from the same reading every other control here is painted from. */
+function paintLevels(state) {
+  levels.forEach(level => {
+    const value = state[level.dataset.level];
+    // A level the shell would not answer is left where it stands rather than dropped to the floor:
+    // an empty bar is a reading, and "we could not ask" is not one.
+    if (typeof value === 'number' && !level.classList.contains('dragging')) paintLevel(level, value);
+  });
+}
 
 /**
  * Mirrors the 460ms turn on .quick-knob.turning in pill.css. The glyph is swapped at the half
@@ -621,8 +1009,6 @@ let statusHeld = false;
 let statusDownAt = null;
 let statusHoldTimer = 0;
 let statusPulled = false;
-/** True once the upward dismiss has fired on the open panel: once per touch, never per frame. */
-let statusDismissed = false;
 /** The furthest the finger got downwards, kept so a confiscated gesture can still be read. */
 let statusDrop = 0;
 
@@ -635,11 +1021,46 @@ let statusDrop = 0;
  * currently reporting; a panel of ours that toggled the radios *and* named the networks would
  * be a second settings app rather than a status bubble.
  */
+/**
+ * The Push on the open panel: a flick upwards puts it away, which is the state every extended
+ * bubble owes and the one this bubble looked like it had. It used to live inside statusTouch,
+ * behind an `if (statusOpen)` — and statusTouch is only ever called while the panel is *closed*,
+ * because an open panel is full of switches whose touches have to reach the elements that know
+ * what to do with them. So the branch could never run and the flick did nothing at this end of
+ * the bar while meaning dismiss at every other. It is its own function now and bridge.js calls
+ * it alongside the ordinary routing rather than instead of it: a flick and a tap on a switch are
+ * told apart by how far the finger went, which is a thing both readings can agree on without
+ * either having to win the gesture outright.
+ *
+ * Latched, because a touchmove is a stream: unlatched, every frame the finger stayed above the
+ * line fired the dismiss again.
+ */
+let panelPushFrom = null;
+let panelPushed = false;
+
+export function statusPanelPush(action, x, y) {
+  if (action === 'down') {
+    // Not from a bar. The levels are worked with a long vertical drag and the push is a short
+    // one, so every brightness change made upwards was also a dismiss: the panel went away under
+    // the finger that was setting it. A gesture that starts on a control belongs to that control.
+    const on = document.elementFromPoint(x, y);
+    panelPushFrom = on && on.closest('.level') ? null : { x, y };
+    panelPushed = false;
+    return;
+  }
+  if (action !== 'move' || !panelPushFrom || panelPushed) return;
+  if (y - panelPushFrom.y < -24 && Math.abs(x - panelPushFrom.x) < 40) {
+    panelPushed = true;
+    panelPushFrom = null;
+    bridge.triggerHaptic('dismiss');
+    closeStatusPanel();
+  }
+}
+
 export function statusTouch(action, x, y) {
   if (action === 'down') {
     statusHeld = false;
     statusPulled = false;
-    statusDismissed = false;
     statusDrop = 0;
     statusDownAt = { x, y };
     statusPill.classList.add('pressing');
@@ -654,20 +1075,6 @@ export function statusTouch(action, x, y) {
   }
   if (action === 'move') {
     if (!statusDownAt) return;
-    // Upwards on an open panel puts it away, which is the Push every extended bubble owes — the
-    // main bubble has answered it all along and this one did not, so the same flick meant two
-    // different things depending on which end of the bar it was made at. Latched, because a
-    // touchmove is a stream: without it every frame the finger stayed above the line closed the
-    // panel again, which is the bug the main bubble had.
-    if (statusOpen) {
-      if (!statusDismissed && y - statusDownAt.y < -24 && Math.abs(x - statusDownAt.x) < 40) {
-        statusDismissed = true;
-        clearTimeout(statusHoldTimer);
-        bridge.triggerHaptic('dismiss');
-        closeStatusPanel();
-      }
-      return;
-    }
     if (statusPulled) return;
     const across = x - statusDownAt.x;
     const down = y - statusDownAt.y;
@@ -715,6 +1122,47 @@ export function statusTouch(action, x, y) {
   else openStatusPanel();
 }
 
+/** A finished transfer stands there wearing its tick for this long, then goes. Mirrors NOW_DONE_DWELL, which is what it was before the mod moved here. */
+const TRANSFER_DONE_DWELL = 1100;
+
+let transferTick = null;
+
+/**
+ * The file in flight, handed over by `now.js` — the host reads a recording and a transfer off the
+ * same shade in one pass, so one payload arrives and the two halves of it are shown in two bubbles.
+ *
+ * A transfer that reaches its total is not dropped on the spot: it stands there wearing a tick for
+ * a moment first, or the only thing ever seen of a finished download is an icon disappearing. Nor
+ * is one that simply left the shade — apps take a progress notification away the instant it
+ * completes, so anything that was nearly there when it went finished, and is owed the same tick.
+ */
+export function setTransfer(payload) {
+  if (payload) {
+    const isDone = payload.total > 0 && payload.done >= payload.total;
+    transfer = Object.assign({ isDone }, payload);
+    if (isDone) holdTheTick();
+    paintStatus();
+    return;
+  }
+  if (transfer && transfer.isDone) return;
+  if (transfer && transfer.total && transfer.done / transfer.total >= 0.95) {
+    transfer = Object.assign({}, transfer, { isDone: true });
+    holdTheTick();
+    paintStatus();
+    return;
+  }
+  transfer = null;
+  paintStatus();
+}
+
+function holdTheTick() {
+  clearTimeout(transferTick);
+  transferTick = setTimeout(() => {
+    transfer = null;
+    paintStatus();
+  }, TRANSFER_DONE_DWELL);
+}
+
 window.onConnectivity = state => {
   attached = state;
   bornStatus();
@@ -731,7 +1179,9 @@ window.onCharge = (level, plugged) => {
 // The bubble stands where the screen's right edge is, and the page is the side that knows
 // what a resize did to that.
 window.addEventListener('resize', () => {
-  if (isBorn) fitStatusProxy();
+  if (!isBorn) return;
+  fitStatusPanel();
+  fitStatusProxy();
 });
 
 root.style.setProperty('--status-right', STATUS_RIGHT + 'px');

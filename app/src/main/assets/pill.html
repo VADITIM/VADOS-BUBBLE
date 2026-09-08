@@ -125,7 +125,6 @@
 <div id="double">
   <div id="double-glyph">
     <div id="double-fill"></div>
-    <svg id="double-bolt" viewBox="0 0 8 12"><path d="M4.6 0 0.6 6.6h2.4L3.4 12l4-6.6H5L5.6 0z"/></svg>
   </div>
   <span id="double-reading"></span>
 </div>
@@ -136,10 +135,6 @@
   <div class="now-face" id="now-closed">
     <div id="now-glyph"></div>
     <span id="now-reading"></span>
-    <!-- A transfer's timeline, drawn along the bottom edge of the pill rather than inside
-         it: the bubble is bar-height and a bar inside a bar is two readings of the same
-         thing. Empty and hidden for every other mod. -->
-    <div id="now-line"><div id="now-line-done"></div></div>
   </div>
   <div class="now-face" id="now-panel">
     <span id="now-label">Flashlight</span>
@@ -169,29 +164,75 @@
      is a fixed list. -->
 <div id="status">
   <div class="status-face showing" id="status-closed"></div>
+  <!-- What the bubble wears for the few seconds it is announcing a charge instead of reporting:
+       the bolt alone, no percentage. The glyph is written from the script's own set rather than
+       inlined here, because it is the same one the panel's battery wears. -->
+  <div class="status-face" id="status-charge"></div>
   <div class="status-face" id="status-panel">
-    <!-- One column, read top to bottom in the order the readings matter: the charge first and across the whole width, because it is the one thing in here that is a level rather than a state; the three links under it; the six states under those. It used to be two side-by-side halves, which made the reading that matters most a narrow strip at the edge. -->
-    <!-- The charge, drawn large enough to be read rather than counted. Tapped it puts the phone into power saving, which is the one thing worth doing to a battery from a bar; held it opens the system's own battery screen, where the charging limit lives — the same meaning a hold has on every other bubble here. -->
+    <!-- One column, read top to bottom in the order the readings matter: the charge in the top right corner, the three links under it, the six states under those. The charge is a cell rather than a band across the panel now — a battery already has a shape everyone knows, and the level standing in that shape is read without a box being drawn round it or a glyph being put beside it. -->
+    <!-- The charge, drawn as the icon it is: the liquid is the cell's own inside. Tapped it puts the phone into power saving, which is the one thing worth doing to a battery from a bar; held it opens the system's own battery screen, where the charging limit lives — the same meaning a hold has on every other bubble here. -->
+    <div id="quick-head">
+    <!-- The four links, stacked at the top left beside the charge. Wide and short rather than square: what each of them is attached to is a *name*, and a name wants width — the icon and the reading stand side by side on one line the way a row of a list does. Mobile joined them because it is the same kind of fact as the other three, and because the bubble on the bar already reports it. -->
+    <div id="quick-modes">
+      <button class="quick-mode" data-toggle="usb"><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-mode" data-toggle="bluetooth"><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-mode" data-toggle="wifi"><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-mode" data-toggle="mobile"><span class="quick-icon"></span><span class="quick-label"></span></button>
+    </div>
     <div id="quick-battery">
+      <!-- The terminal, and its own strip above the cell rather than part of the outline: the cell clips everything in it so the liquid cannot climb out of it, and a nub inside that clip is a nub with its top cut off. -->
+      <span id="battery-pin"></span>
+      <div id="battery-cell">
       <!-- The charge drawn as a level rather than only as an icon: the liquid stands at the percentage and is coloured by the band it is in, so the reading is had before the number is read. Two crests, not one: the darker one rides a few units higher and behind, drifting the other way at a slower pace, so all that is ever seen of it is a shaded edge running along the top of the surface — which is what tells the eye it is looking at liquid with depth rather than at a line that was drawn. Each path spans six wavelengths against a viewBox four wide, and the drift is exactly one wavelength: the slack is what keeps a leading edge from walking into view, which is the whole of why the first version stuttered at the loop. -->
+      <!-- The bubbles a charge sends up through the liquid, and they belong to the *waves* rather
+           than to the box: each set rises to the surface it is under and is gone at it, which is
+           what makes them read as being in the liquid instead of drawn over it. The back set is
+           dimmer, smaller and slower, behind the crests the front set breaks through. They stand
+           beside the fill rather than inside it because the fill carries a group opacity that
+           cannot be given up — see the CSS — and each one is a strip the full height of the liquid
+           carrying its circle at the foot, so a rise is exactly that height whatever the charge is;
+           a percentage on the circle would be a percentage of the circle. -->
+      <div class="battery-bubbles back">
+        <span class="battery-bubble" style="--at: 18%; --size: 4px; --rise: 3.4s; --wait: 0.7s"></span>
+        <span class="battery-bubble" style="--at: 44%; --size: 3px; --rise: 4.1s; --wait: 2.2s"></span>
+        <span class="battery-bubble" style="--at: 67%; --size: 5px; --rise: 3.8s; --wait: 1.4s"></span>
+        <span class="battery-bubble" style="--at: 88%; --size: 3px; --rise: 4.6s; --wait: 3.1s"></span>
+      </div>
       <div id="battery-fill">
-        <svg id="battery-waves" viewBox="0 0 200 24" preserveAspectRatio="none">
-          <path class="battery-wave back" d="M0 12 q25 -9 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
-          <path class="battery-wave front" d="M0 12 q25 -9 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
+        <!-- Two wavelengths across the cell, not four: a 64px box showing four crests is a ripple pattern, and a ripple pattern is read as a texture rather than as a surface. Halving the viewBox's width is what widens them, and it costs the loop nothing — each path still runs six wavelengths of 50 against a window 100 wide, so a drift of one wavelength never brings an end into view. -->
+        <svg id="battery-waves" viewBox="0 0 100 24" preserveAspectRatio="none">
+          <path class="battery-wave back" d="M0 12 q25 -12 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
+          <path class="battery-wave front" d="M0 12 q25 -12 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
         </svg>
+      </div>
+      <div class="battery-bubbles front">
+        <span class="battery-bubble" style="--at: 9%;  --size: 6px; --rise: 2.6s; --wait: 0.2s"></span>
+        <span class="battery-bubble" style="--at: 31%; --size: 8px; --rise: 3.1s; --wait: 1.6s"></span>
+        <span class="battery-bubble" style="--at: 55%; --size: 5px; --rise: 2.3s; --wait: 0.9s"></span>
+        <span class="battery-bubble" style="--at: 76%; --size: 7px; --rise: 3.5s; --wait: 2.6s"></span>
+        <span class="battery-bubble" style="--at: 95%; --size: 4px; --rise: 2.9s; --wait: 1.1s"></span>
       </div>
       <span id="battery-glyph"></span>
       <span id="battery-reading"></span>
+      </div>
+    </div>
     </div>
 
-    <!-- The three that are links rather than states: they are buttons, not switches, and what says
-         they are on is that they are lit rather than a knob having travelled. Each carries its own
-         off glyph where one exists — a wifi with a slash through it says more than a dimmed wifi,
-         and the icon is the reading rather than the colour under it. -->
-    <div id="quick-modes">
-      <button class="quick-mode" data-toggle="usb"></button>
-      <button class="quick-mode" data-toggle="bluetooth"></button>
-      <button class="quick-mode" data-toggle="wifi"></button>
+    <!-- The two levels, standing against the right edge where the thumb already is: brightness and
+         then volume, because that is the order they are reached in from the hand holding the phone.
+         Upright, because both of them *are* an amount of something and a column filling from the
+         floor is that amount — the same reading the charge beside them is drawn as. They answer a
+         drag and never a tap: a bar that jumps to wherever it was touched is a bar that changes the
+         screen's brightness because a finger came down on the way to something else. -->
+    <div id="quick-levels">
+      <div class="level" data-level="brightness">
+        <div class="level-fill"></div>
+        <span class="level-icon"></span>
+      </div>
+      <div class="level" data-level="volume">
+        <div class="level-fill"></div>
+        <span class="level-icon"></span>
+      </div>
     </div>
 
     <!-- The six states, as buttons rather than as switches. A switch draws a track it does not need — these are on or off with nothing in between, exactly as the three above are — so what is left is the knob the icon was already riding in. Pressed, it turns a full circle and swaps its glyph halfway through: the turn is the cause and the new icon is the consequence, and a whole revolution is the one rotation that leaves nothing crooked behind it. -->

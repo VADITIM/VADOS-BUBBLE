@@ -61,8 +61,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          */
         private const val BLEED = 14
 
-        /** Room under the closed bubble that exists for one gesture: the swipe down. A pull starts on the bubble and immediately leaves it — the pill is 30dp tall and a thumb travels further than that before the threshold is anywhere near — so without this the finger was off the proxy a few frames in and the rest of the gesture went to whatever was underneath. It is taken below the bar rather than around it, which is the one direction that costs the shade swipe nothing. */
-        private const val PULL_GRAB = 40
+        /** Room under the closed bubble that exists for one gesture: the swipe down. A pull starts on the bubble and immediately leaves it — the pill is 30dp tall and a thumb travels further than that before the threshold is anywhere near — so without this the finger was off the proxy a few frames in and the rest of the gesture went to whatever was underneath. It is taken below the bar rather than around it, which is the one direction that costs the shade swipe nothing — but it is not free there either: it is a band of the app underneath that answers our bubble instead of itself, and at 40dp that band was deep enough that a tap genuinely aimed at the app's own top row expanded the bubble. It is PULL_TRIGGER in js/motion.js plus a hair now, which is the least that keeps the finger on this window until the pull has been recognised, and the two are mirrored: raising the trigger without raising this is a pull that stops being heard partway down. */
+        private const val PULL_GRAB = 24
 
         /** How tall the strip the shade swipe starts in is, in dp. One UI takes the gesture anywhere in the status bar and a little under it, and every pixel past that is a pixel taken from the app for nothing. */
         private const val SHADE_STRIP = 48
@@ -115,6 +115,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private var instance: BubbleService? = null
 
         val isRunning: Boolean get() = instance != null
+
+        /** Take every bubble off the screen without touching the app around it — the state a test leaves the overlay in that only a fresh service clears, which used to cost revoking accessibility by hand and granting it again. `disableSelf` takes this component out of `enabled_accessibility_services` on its way out, so the panel's Accessibility button is the way back and cannot end up adding a second copy of it. */
+        fun stopBubbles() {
+            instance?.disableSelf()
+        }
 
         /**
          * The last touch forwarded to the page, and what the page did with it. Read by
@@ -240,6 +245,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
      */
     private var shadeGuard: View? = null
 
+    /** Kept beside the view rather than left local to applyBarLock, because the strip has to be made untouchable and touchable again with everything else — see applyVisibility. */
+    private var shadeGuardParams: WindowManager.LayoutParams? = null
+
     /** Over the lock screen's notification bubbles, and only while they are standing there. */
     private lateinit var notesProxy: View
     private lateinit var notesProxyParams: WindowManager.LayoutParams
@@ -359,6 +367,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         super.onServiceConnected()
         if (instance != null) return
 
+        // The colour an unnamed app wears is read off its own icon, and that needs the package list.
+        AppStyles.learnFrom(this)
         preferences = Preferences.of(this)
         preferences.registerOnSharedPreferenceChangeListener(this)
         blurRadius = Preferences.get(preferences, Preferences.BLUR)
@@ -679,6 +689,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         if (!wanted) {
             runCatching { windowManager.removeView(shadeGuard) }
             shadeGuard = null
+            shadeGuardParams = null
             return
         }
         val guard = object : View(this) {
@@ -700,6 +711,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         runCatching { windowManager.addView(guard, guardParams) }
         shadeGuard = guard
+        shadeGuardParams = guardParams
+        // The strip has to agree with everything else about whether the interface is on screen at all: it went up once and then stood there in landscape and under a fullscreen app, full width across the top, swallowing every touch aimed at whatever was actually drawn up there. That is the "invisible bar at the top in landscape" — a window with nothing in it, doing the one job it has, at a moment when the bubble it is protecting is not being drawn.
+        applyVisibility()
         // Back on top of it, in the order they were added the first time: the strip is full width and would otherwise be standing over every bubble on the bar.
         listOf(
             touchProxy to proxyParams,
@@ -755,6 +769,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.updateViewLayout(notesProxy, notesProxyParams) }
         } else {
             push("window.refitProxies()")
+        }
+        // The shade lock is a window like any other and has to stop taking touches when there is nothing on screen to protect: hidden, it is a full-width invisible strip across the top eating every tap aimed at whatever the phone is actually showing.
+        shadeGuardParams?.let { guardParams ->
+            guardParams.flags =
+                if (isHidden) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                else BASE_FLAGS
+            runCatching { windowManager.updateViewLayout(shadeGuard, guardParams) }
         }
         runCatching { windowManager.updateViewLayout(stage, params) }
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
@@ -1396,13 +1417,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         /**
-         * The clock bubble's way out. `SHOW_ALARMS` rather than a package name: every phone has
-         * a clock and none of them agree on what it is called, and this is the intent the
-         * platform put there for exactly this question.
+         * The clock bubble's way out — the clock *app*, not one screen inside it. `SHOW_ALARMS` is still how the app is found, because every phone has a clock and none of them agree on what it is called and this is the intent the platform put there for exactly that question, but resolving it and then launching the resolved package's own entry point lands wherever the user last was in the clock instead of dropping them in Alarms every time; the raw intent stays as the fallback for a build where the resolve comes back empty or the package has no launcher activity of its own.
          */
         @JavascriptInterface
         fun openClock() {
-            val intent = Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
+            val alarms = Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
+            val clockPackage = packageManager.resolveActivity(alarms, 0)?.activityInfo?.packageName
+            val launch = clockPackage?.let { packageManager.getLaunchIntentForPackage(it) }
+            val intent = (launch ?: alarms)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             runCatching { startActivity(intent) }
                 .onFailure { android.util.Log.w("IslandBubble", "no clock app", it) }
@@ -1515,6 +1537,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 SystemToggles.set(name, isOn)
                 push("window.onTogglesChanged(${SystemToggles.read()})")
             }.start()
+        }
+
+        /** A level dragged to a new place. Nothing is pushed back: see [SystemToggles.setLevel]. */
+        @JavascriptInterface
+        fun setLevel(name: String, percent: Int) {
+            Thread { SystemToggles.setLevel(name, percent) }.start()
         }
 
         /**

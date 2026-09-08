@@ -20,11 +20,11 @@ Everything here binds every bubble, whichever kind it is. A rule that holds for 
 | **Now** | Bottom of the lock screen, where a thumb reaches. Replaces One UI's Now Bar, and the lock screen is the only place it exists. | built, partly | yes — stolen from the row |
 | **Status** | Right end of the bar, over the system's icons. | built | **no** — Modus instead |
 | **Clock** | Top-left, over the system clock and One UI's flashlight chip beside it. | built | yes, the Now mods |
-| **Double** | Beside the punch hole, alongside whatever Main is doing. | built | no |
+| **Double** | Bottom of the screen, centred, alongside whatever Main is doing at the cutout. | built | no |
 | **Lock** | Where the lock icon is. Opens, then merges into Main on unlock. | built | no |
 | **Notification** | Over the lock screen's own notification list, in its place. | built | no |
 
-Status carries no mod at all — it stands for something the system already draws — and it and the Clock both sit a few pixels shorter than the rest, which is how the eye tells a bubble that can be worked from one that only reports. Both are pressed, both are pulled and both are held: Status opens the quick settings panel it owns and holds out to the system's settings, and the Clock holds out to the clock app while nothing is standing in it.
+Status carries no mod at all — it stands for something the system already draws, and the one thing it *announces* is the charge — plugged in, running low, nearly out — which is news about the reading it is already holding — and it and the Clock both sit a few pixels shorter than the rest, which is how the eye tells a bubble that can be worked from one that only reports. Both are pressed, both are pulled and both are held: Status opens the quick settings panel it owns and holds out to the system's settings, and the Clock holds out to the clock app while nothing is standing in it.
 
 The Clock is the one that changed. There was a Now bubble on the bar as well, standing on One UI's flashlight chip a few pixels to its right, and the two wanted the same corner: the clock had to leave whenever a mod came out and the row had to stand aside for both of them, which is a lot of motion spent on two shapes getting out of each other's way. The mods are shown in the Clock now — the time when nothing is happening, the thing that is happening when something is — and the name Now belongs to the lock screen's bubble alone.
 
@@ -39,20 +39,22 @@ A mod is content injected into a bubble, and which bubbles may carry it is part 
 | Media | Main, Satellite, Now (lock screen) | built |
 | Clock / timer | Main, Satellite | built |
 | Call | Main, Satellite | built |
-| Battery | **Double only** — it is not a mod | built |
+| Battery | **Status only** — as its announcement rather than as a mod | built |
 | Torch | **Clock only** | built |
 | Recording / screen share | Clock only | built |
-| Download, Upload | Clock only | built |
+| Download, Upload | **Status only** — one slot, the way USB is | built |
 | Bluetooth, Hotspot, Do not disturb | **Status only**, as a Modus | built |
 | Quick settings | **Status only**, as its panel rather than as a mod | built |
 | Discord video | Main, Satellite | planned |
 | DB Navigator | Main, Satellite, **Now (lock screen)** | planned |
 
-The Now mods are what is *happening* — a torch burning, a recording running, a download in flight — and the Clock is where they are shown. Status carries what is *connected*. That is the line between the two, and it is why bluetooth is not a Now mod even though it would fit there.
+The Now mods are what is *happening* — a torch burning, a recording running — and the Clock is where they are shown. Status carries what is *connected*. That is the line between the two, and it is why bluetooth is not a Now mod even though it would fit there.
+
+A transfer used to be on the Clock's side of that line and it is on Status' now, because the line is about **who started it**. A torch and a recording are things the person did; a file in flight is something the phone is doing for whatever it is attached to, which is the same kind of fact as a cable being in or a device being paired. It stands beside USB as one slot and nothing more — an arrow pointing the way the file is moving, and the tick it wears for a moment when it lands. No reading, no timeline, no tap: what a bubble that is glanced past can say about a transfer is that there is one and which way it is going.
 
 The line has a second half worth naming, because it decides how the Status bubble is written: what is happening **starts and stops**, and what is connected is **true all the time**. So a Now mod is watched and announced — the time stands aside when the light comes on and comes back when it goes — while Status is read and drawn, born once and standing there for as long as the bar does. A Modus is not a mod arriving in it: the bubble is being true about something else, so the swap is a repaint and its own width carries the change. USB left the Modus family and became a slot of its own — a cable is not something riding on top of the link, it is a second thing attached — and do not disturb joined it, because a phone that has been put quiet is exactly a mode it is being kept in.
 
-The Clock carries one Now mod at a time and picks by the row's own rule: first come, first served. Nothing ranks a recording above a download — the phone cannot know which of two true things matters more, and guessing is how a bubble ends up flickering between two states that are both correct.
+The Clock carries one Now mod at a time and picks by the row's own rule: first come, first served. Nothing ranks a recording above a torch — the phone cannot know which of two true things matters more, and guessing is how a bubble ends up flickering between two states that are both correct.
 
 Torch is the one to read twice. It is not a mod the row is currently not showing — it is a mod the row may never show, because the bubble at the left end of the bar is the one standing over One UI's flashlight chip and a torch drawn anywhere else covers nothing. Eligibility is what stops a new Now mod from being written as a row mod that happens to start out there. It is also the one mod with no closed face: a light that is on is shown as its panel and nothing else.
 
@@ -62,11 +64,13 @@ The lock screen's Now bubble is the exception that proves the shape: it does not
 
 Nothing spawns where it will eventually live. The true middle of the screen is the middle of the hole and the middle of the Main bubble drawn around it, and every bubble comes out of there as a small drop, travels to its spot, and only then behaves like a bubble standing there. A bubble that appears at its own position is a box being shown; a bubble that arrives from the hole is the same body of liquid moving. The travel distance is the host's to supply — the page does not know how wide the screen is.
 
+**The rule underneath it is that a bubble arrives from somewhere**, and the hole is where a bubble that lives on the bar arrives from. A bubble that lives at the bottom of the screen does not: the lock screen's Now bubble and its notification list are placed rather than flown, and the Double joins them now that it stands down there too — it rises out of the bottom edge, which is the direction it will leave by, and sinks back through it. A drop crossing the whole height of the screen and back for a four-second announcement is a longer journey than the thing it is announcing. What is not negotiable is the half these three still obey: none of them appear at their own position, and none of them blink out.
+
 Departure is the same journey backwards, and it is a departure rather than a repaint: width first, then the shape goes. A mod that ends because its app was killed still leaves; it does not blink out. See [motion.md](motion.md#the-glyph-is-the-cause-width-is-the-consequence).
 
 ## Every bubble is a fluid
 
-This is the contract the whole window model exists to serve: **every bubble merges with every bubble it comes near, and none of them are exempt.** Not Main with its satellites only — the Clock with Main when the row stands aside for a mod standing in it, Now with Main on the unlock, Lock with Main too, Double with whatever it lands over, a dot with the bubble that takes it back in. Two of ours near each other and not necking is a bug, not a bubble that happens not to merge.
+This is the contract the whole window model exists to serve: **every bubble merges with every bubble it comes near, and none of them are exempt.** Not Main with its satellites only — the Clock with Main when the row stands aside for a mod standing in it, Now with Main on the unlock, Lock with Main too, Double with whatever it lands over at the bottom of the screen, a dot with the bubble that takes it back in. Two of ours near each other and not necking is a bug, not a bubble that happens not to merge.
 
 What follows, and none of it is negotiable:
 
@@ -110,6 +114,8 @@ A mod's glyph and its short reading inside the bubble are not subject to the fad
 Two things follow for anything new:
 
 - **A face with three runs has no corridor.** Wrap until it has two, rather than reaching for a width that happens to look right; a hardcoded `max-width` stops the reading short of the room it is allowed and still does not guarantee the middle.
+- **The fade is conditional, and only the layout can answer the condition.** A mask knows how wide the box is and nothing at all about how wide the text is, so a mask written flat into a label's rule dissolves the last quarter of every reading that fitted perfectly well — which is what "text labels fade out everywhere" was. `js/labels.js` measures every reading on the bar and puts `.runs-out` on the ones that overflowed; every mask in `pill.css` hangs off that class, and a label that fits is drawn whole. A new reading that may run out of room is a name added to that file's list and nothing else.
+- **A reading too long to fit travels.** Fading the end is honest and it is not readable, so after 0.7s standing where it landed the text moves far enough to show what the fade was hiding and comes back, on a loop. It moves by `text-indent` and never by a transform: the clip and the mask sit on the same box as the glyphs, so a transform carries the window along with what is inside it and nothing appears to move. Which way it travels is read off the text's own anchor — the same fact the fade's direction is read off, asked once.
 - **The fade covers the end that runs out, which is never the end that is pinned.** A reading set from its left overflows on the right and fades there; one anchored against a clock at the right grows leftwards and fades on the left. A mask copied from a face with the opposite anchor fades where there is nothing to hide and cuts square where there is.
 
 `--hole-gap` is over-reserved in exactly one state: while the Now bubble is out the row is pushed right until the bubble's left edge is at the hole, so the hole is no longer beneath the middle of the bubble. That costs the reading room it could have had; it never puts text under the camera, and it is not worth a second geometry to recover.

@@ -53,7 +53,15 @@ class MainActivity : Activity() {
         super.onResume()
         // Shizuku can have been started or granted while we were away.
         ShizukuShell.bind(this)
-        // Every grant happens in another app, so the panel is repainted on the way back.
+        // Samsung's own banner is not a setting anyone should have to find twice: the bubble is
+        // what replaces it, so the moment a shell UID exists it is taken away and never asked about.
+        if (ShizukuShell.isReady && HeadsUp.read() != HeadsUp.SUPPRESSED) HeadsUp.set(true)
+        // Every grant that could not be done from here happens in another app, so the panel is
+        // repainted on the way back.
+        repaint()
+    }
+
+    private fun repaint() {
         if (::webView.isInitialized) {
             webView.evaluateJavascript("window.onStateChanged(${state()})", null)
         }
@@ -74,7 +82,6 @@ class MainActivity : Activity() {
         .put("notificationAccess", hasNotificationAccess())
         .put("serviceRunning", BubbleService.isRunning)
         .put("shizuku", ShizukuShell.isRunning() && ShizukuShell.hasPermission())
-        .put("headsUp", HeadsUp.read())
         .put("statusBar", StatusBarPolicy.read())
         .put("preferences", Preferences.asJson(preferences))
         .put("defaults", JSONObject(Preferences.defaults as Map<*, *>))
@@ -149,13 +156,38 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun readState(): String = state().toString()
 
+        /**
+         * With a shell UID the whole grant is one write and nobody has to leave the panel; the
+         * settings deep link is only the fallback for the one run before Shizuku exists. The
+         * existing list is read and appended to rather than written over, because that key holds
+         * every accessibility service on the phone and stamping on it turns the others off.
+         */
         @JavascriptInterface
         fun requestAccessibility() = runOnUiThread {
+            if (ShizukuShell.isReady) {
+                val component = "$packageName/$packageName.BubbleService"
+                val enabled = ShizukuShell.run("settings get secure enabled_accessibility_services")
+                    ?.trim()
+                    ?.takeUnless { it == "null" || it.isEmpty() }
+                val list = if (enabled == null) component else "$enabled:$component"
+                ShizukuShell.run("settings put secure enabled_accessibility_services $list")
+                ShizukuShell.run("settings put secure accessibility_enabled 1")
+                repaint()
+                return@runOnUiThread
+            }
             openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS, withPackageUri = false)
         }
 
         @JavascriptInterface
         fun requestNotificationAccess() = runOnUiThread {
+            if (ShizukuShell.isReady) {
+                ShizukuShell.run(
+                    "cmd notification allow_listener " +
+                        "$packageName/$packageName.IslandNotificationListener"
+                )
+                repaint()
+                return@runOnUiThread
+            }
             openSettings(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, withPackageUri = false)
         }
 
@@ -164,6 +196,11 @@ class MainActivity : Activity() {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED
             ) return@runOnUiThread
+            if (ShizukuShell.isReady) {
+                ShizukuShell.run("pm grant $packageName ${Manifest.permission.POST_NOTIFICATIONS}")
+                repaint()
+                return@runOnUiThread
+            }
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
 
@@ -177,13 +214,6 @@ class MainActivity : Activity() {
             ShizukuShell.requestPermission()
         }
 
-        /** Hands SystemUI's pop-up off to the bubble, or gives it back. */
-        @JavascriptInterface
-        fun toggleHeadsUp() = runOnUiThread {
-            HeadsUp.set(HeadsUp.read() != HeadsUp.SUPPRESSED)
-            webView.evaluateJavascript("window.onStateChanged(${state()})", null)
-        }
-
         /**
          * Hides the real status bar, or gives it back. One button for both, because it is one
          * state — and it reads the setting back rather than assuming the write took, since
@@ -192,7 +222,20 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun toggleStatusBar() = runOnUiThread {
             StatusBarPolicy.set(StatusBarPolicy.read() != StatusBarPolicy.HIDDEN)
-            webView.evaluateJavascript("window.onStateChanged(${state()})", null)
+            repaint()
+        }
+
+        /**
+         * Stop the bubbles, not the app. Testing can leave the overlay in a state no repaint gets
+         * out of, and the only fix was revoking accessibility in the system settings and granting
+         * it again — this is that, from here, in one press. The service is what draws every window,
+         * so disabling it is the whole stop; the Accessibility button above brings it back.
+         */
+        @JavascriptInterface
+        fun stopBubbles() = runOnUiThread {
+            BubbleService.stopBubbles()
+            // The service dies asynchronously, so a repaint on this frame still reads it as running.
+            webView.postDelayed({ repaint() }, 400)
         }
 
         /** The one route to the "Allow restricted settings" menu a sideloaded app needs. */

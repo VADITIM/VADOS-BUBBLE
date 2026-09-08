@@ -150,6 +150,11 @@ function mirrorFrame() {
       // not fit inside its own outline.
       corner: style.cornerShape,
       colour: style.borderTopColor,
+      // A tint the bubble asked for, or nothing. Read from the element rather than from its
+      // background, because html.liquid blanks every bubble's own background the moment the skin
+      // takes over painting it — so a bubble that wants its own colour has to say so in a property
+      // that survives that. Transparent is the initial value and means the layer's own fill.
+      fill: style.getPropertyValue('--blob-fill').trim(),
       // Glass cannot fade, so it shrinks instead: a circle on its way out is a
       // smaller pane every frame, and by the time it is invisible there is no pane
       // left hanging over the wallpaper.
@@ -174,6 +179,9 @@ function mirrorFrame() {
     write(blob.edge, seen.box, 0, seen);
     write(blob.fill, seen.box, -1, seen);
     blob.edge.style.background = seen.colour;
+    // Cleared rather than written black when there is no tint, so the stylesheet's own fill is
+    // what paints and there is one place the resting colour lives.
+    blob.fill.style.background = isTinted(seen.fill) ? seen.fill : '';
   });
 
   paintWalls(measured);
@@ -382,6 +390,9 @@ function nearestTo(side, measured) {
   }
   return found;
 }
+
+/** Whether a bubble asked for a colour of its own. Nothing at all and fully transparent are the same answer, and a computed `<color>` says the second of the two. */
+const isTinted = fill => Boolean(fill) && !fill.startsWith('rgba(0, 0, 0, 0)');
 
 function write(shape, box, grow, seen) {
   shape.style.width = (box.width + grow * 2) + 'px';
