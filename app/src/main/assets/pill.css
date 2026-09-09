@@ -2976,10 +2976,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-:root { --pill-status-shift: 24px; }
+:root { --pill-status-shift: 74px; }
 #pill.corner-grow {
   top: calc(var(--grab, 0px) - var(--edge-over));
   height: calc(var(--pill-height) + var(--edge-over));
+  padding-top: var(--edge-over);
   translate: calc(var(--shift, 0px) + var(--pill-status-shift)) 0;
   padding-right: var(--pill-status-grow, 0px);
 }
@@ -3071,7 +3072,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     margin-left var(--grow-ms) var(--ease-grow);
 }
 #clock.corner-grow #clock-date {
-  margin-left: 0.5rem;
+  margin-left: 0.65rem;
   max-width: 70px;
   opacity: 0.75;
   translate: 0 0;

@@ -35,7 +35,7 @@ const STATUS_RIGHT = 14;
 const EDGE_OVER = 20;
 
 
-const PILL_STATUS_SHIFT = 24;
+const PILL_STATUS_SHIFT = 74;
 
 
 

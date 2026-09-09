@@ -102,7 +102,7 @@ window.onProxyTouch = (action, x, y, source) => {
   
   
   if (action === 'down') {
-    statusOwnsTouch = !statusOpen && (source === 'status' || statusHolds(x, y));
+    statusOwnsTouch = !statusOpen && !statusPill.classList.contains('panel-closing') && (source === 'status' || statusHolds(x, y));
   }
   
   
