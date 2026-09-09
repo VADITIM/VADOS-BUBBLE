@@ -2820,10 +2820,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    read as the module arriving at a surface rather than as it inflating on the way. Rotation and
    scale are separate properties here rather than one `transform`, so the tilt's own curve and the
    pop's are allowed to disagree — which is the whole of why the correction reads as a settle. */
-/* Three hundred rather than the hundred and fifty it was, and the number is the whole of whether the launch exists: the top row has seven hundred pixels to cover and the shot spends most of them in the first third of its time, so at 150ms that row cleared the bottom edge inside two frames at 60Hz and one on a 30fps capture — the panel's modules were never seen coming off the screen, only seen already up. Mirrors QUICK_POP in js/status.js, which is what keeps the liquid mirror running for the length of the flight. */
+/* The clock the Extended states take, which is `--grow-ms: 460ms` on `#pill.player, #pill.timer, #pill.history, #pill.expanded, #pill.picture` — "the states a tap opens: slower" — and this panel is the largest thing a tap opens here, so it is the same state change and takes the same time rather than a number of its own. It was 150, then 300, and both were read off the screen as too fast for one reason the numbers do not show: the modules cross most of the display, so at any duration the pill's collapse also runs they are travelling several times faster than it, and the arrival to match the collapse against is the collapse's *pace* and not its clock. Mirrors QUICK_POP in js/status.js, which is what keeps the liquid mirror running for the length of the flight. */
 #quick-panel.showing .quick-bubble {
   opacity: 1;
-  animation: bubble-pop 300ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
+  animation: bubble-pop 460ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
 }
 /* Fired up from under the bottom edge of the screen at full size and full strength, and caught by a
    magnet at the top of the flight: the module overshoots the place it belongs, hangs there for a
@@ -2831,7 +2831,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    — a shot that simply decelerated into place is a box being flown to a coordinate, and what makes
    it read as *pulled* is that it went past and had to come back. */
 /* Nothing fades in and nothing grows on the way up, and both of those were the launch being hidden rather than dressed. The module sets off from *under the screen*, so every frame a fade spends reaching full strength and a scale spends reaching full size is a frame spent on a box nobody can see — and with the old curve those frames were most of the journey: opacity was full at 24% of the animation and the box was already nine tenths of the way up, so what the eye caught was a module appearing near its own place. A box scaled to nothing at the bottom edge is not a box overflowing the bottom edge either; it is a point, and a point has nothing to overflow with. The punch is the distance now — hundreds of pixels of it — which is what motion.md means by a punch being a distance rather than a curve, and the scale is left with the one job it can be seen doing: the overshoot at the landing. */
-/* The shot's curve has to leave the edge at a speed a frame can hold. It was `cubic-bezier(0.05, 0.86, 0.2, 1)`, whose slope off the line is seventeen — a projectile that is a third of the way up before the first frame is drawn, at any duration. This one leaves at two and a half and still spends most of its travel early, which is what a thing that was fired does. */
+/* The shot's curve has to leave the edge at a speed a frame can hold. It was `cubic-bezier(0.05, 0.86, 0.2, 1)`, whose slope off the line is seventeen — a projectile that is a third of the way up before the first frame is drawn, at any duration. This one leaves at two and a half, which over the 285ms the rise now takes puts the top row a seventh of the way up on its first frame and keeps it in the bottom of the screen for two or three, and still spends most of its travel early, which is what a thing that was fired does. */
 /* `--quick-throw` is **per module and measured**, not one number for the set, and that is the whole
    of the difference between a set that comes off the screen and a set that comes off nothing. It
    was thirty percent of the display height written once on the root — which is a *relative* start,
@@ -2883,7 +2883,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* A level is a column that fills from the floor, so what arrives inside it is the liquid: the
    bubble itself has already popped in, and the fill runs up out of its own foot after it. */
 #quick-panel.showing .level-fill {
-  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 130ms) backwards;
+  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
 }
 @keyframes liquid-pour {
   from { translate: 0 100%; }

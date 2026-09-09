@@ -650,8 +650,8 @@ const QUICK_STAGGER = 5;
 /** The same on the way out, where it is tighter. Mirrors the `* 4ms` in `#quick-panel.leaving .quick-bubble`. */
 const QUICK_DROP_STAGGER = 4;
 
-/** How long one module is in the air. Mirrors the `300ms` on `#quick-panel.showing .quick-bubble` in pill.css, and it is named on this side because the liquid mirror has to be stirred for exactly as long as the last module is still moving — a flight that outlives the stir is a flight whose glass stops being sent part-way through it. */
-const QUICK_POP = 300;
+/** How long one module is in the air, which is the clock the Extended states take (`--grow-ms: 460ms`) because the panel is the largest thing a tap opens here. Mirrors the `460ms` on `#quick-panel.showing .quick-bubble` in pill.css, and it is named on this side because the liquid mirror has to be stirred for exactly as long as the last module is still moving — a flight that outlives the stir is a flight whose glass stops being sent part-way through it. */
+const QUICK_POP = 460;
 
 /**
  * How long the frost behind the panel takes to reach nothing. Mirrors the `--scrim-frost` transition
