@@ -6,7 +6,7 @@
 
 
 <div id="assembly">
-<!-- Behind everything, and first, so the skin is under the content it belongs to. -->
+
 <div id="liquid" aria-hidden="true">
   <div id="liquid-edge"></div>
   <div id="liquid-fill"></div>
@@ -34,11 +34,11 @@
   </div>
 
   <div class="face" id="media-face">
-    <!-- The art rides in a slot because it owns two motions at once: the rise when
-         the bubble hands over, and the sideways fade when the song changes.
-         It leads, because every mod's glyph is at the left and the satellite's is
-         too: that is what lets the same picture be in both places at once and
-         travel between them without moving a pixel at the hand-over. -->
+    
+
+
+
+
     <div id="media-art-slot" class="glyph"><img id="media-art" data-morph="art" data-morph-scale alt=""></div>
     <div id="equalizer"><span></span><span></span><span></span></div>
   </div>
@@ -48,11 +48,11 @@
     <span id="timer-remaining" data-morph="reading"></span>
   </div>
 
-  <!-- The name and the clock are one run, not two children of the face. Flat, they were
-       three items under space-between and the name landed midway between the avatar and
-       the clock — which is the middle of the bubble, which is the camera. Wrapped, this
-       face is the same two-part shape every other resting face has: glyph on the left,
-       reading on the right, and the corridor between them belongs to neither. -->
+  
+
+
+
+
   <div class="face" id="call-face">
     <div id="call-avatar" class="avatar glyph"></div>
     <div id="call-reading">
@@ -88,8 +88,8 @@
         <div class="transport" id="player-next">
           <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg>
         </div>
-        <!-- Only drawn for the players whose "songs" are people talking. It is a word rather
-             than a glyph because the rate is the reading. -->
+        
+
         <div class="transport" id="player-speed">1×</div>
       </div>
 
@@ -109,19 +109,19 @@
     <div id="history-list"></div>
   </div>
 
-  <!-- The quick settings face used to stand here. It is the Status bubble's panel now: every
-       switch in it is something the phone is attached to or doing, which is that bubble's
-       subject and not this one's, and a panel belongs to the bubble it grows out of. -->
+  
+
+
 
   <div id="indicators">
     <div id="microphone-dot" class="indicator"></div>
     <div id="camera-dot" class="indicator"></div>
   </div>
 </div>
-<!-- The Double: a second bubble beside the punch hole, standing where the bubble stands
-     rather than inside it. It carries the system's own short-lived announcements — a charge
-     level, a low battery — which are news about the phone itself and have no business taking
-     the bubble away from a song. Nothing about it is interactive, so it costs no window. -->
+
+
+
+
 <div id="double">
   <div id="double-glyph">
     <div id="double-fill"></div>
@@ -129,9 +129,9 @@
   <span id="double-reading"></span>
 </div>
 
-<!-- The clock bubble, and the Now mods with it. There is no second bubble out on the bar any more: a torch, a recording or a transfer is shown *here*, because the time is the one thing this bubble carries that anything else is allowed to interrupt — the digits stand aside, the box grows to the mod, and the bar keeps the one shape it had. -->
+
 <div id="clock">
-  <div id="clock-time"><span id="clock-face"></span><span id="clock-seconds"></span></div>
+  <div id="clock-time"><span id="clock-face"></span><span id="clock-seconds"></span><span id="clock-date"></span></div>
   <div class="now-face" id="now-closed">
     <div id="now-glyph"></div>
     <span id="now-reading"></span>
@@ -142,9 +142,9 @@
       <div id="now-rail"></div>
       <div id="now-flow"></div>
     </div>
-    <!-- The recording's own panel: how long it has been running, and the one button that
-         ends it. It shares the panel box rather than opening a second one, because it is
-         the same bubble held down. -->
+    
+
+
     <div id="now-record">
       <span id="now-elapsed">0:00</span>
       <button id="now-stop">Stop</button>
@@ -152,81 +152,72 @@
   </div>
 </div>
 
-<!-- The bar's other end, standing on the system's own connectivity icons. It carries no mod
-     and announces nothing: what the phone is attached to is true all the time, so this bubble
-     is read rather than watched. A Modus — a paired device, a cable, a hotspot — colours the
-     whole of it and takes the left slot, the way a mod's glyph does in every other bubble. -->
-<!-- Two faces, the way the Now bubble has two: the row of icons it rests as, and the panel it
-     opens into. The quick settings live here rather than on the main bubble because they are
-     this bubble's own subject — every switch in them is something the phone is attached to or
-     doing — and because a panel belongs to the bubble it grows out of. The closed face is empty
-     in the markup: its slots are built from what is true, in slot order, and nothing about them
-     is a fixed list. -->
+
+
+
+
+
+
+
+
+
+
 <div id="status">
   <div class="status-face showing" id="status-closed"></div>
-  <!-- What the bubble wears for the few seconds it is announcing a charge instead of reporting:
-       the bolt alone, no percentage. The glyph is written from the script's own set rather than
-       inlined here, because it is the same one the panel's battery wears. -->
+  
+
+
   <div class="status-face" id="status-charge"></div>
-  <!-- Open, this face is the battery and nothing else. Every other reading the panel used to hold
-       is a bubble of its own now, standing in #quick-panel below — the charge stays with the
-       Status bubble because it is the one reading that *is* this bubble: it is the first thing to
-       arrive when the panel opens and the first to go home when it closes, so it can never be a
-       module that happens to be in the same room as the others. -->
-  <div class="status-face" id="status-panel">
-    <div id="quick-battery">
-      <!-- The terminal, and its own strip above the cell rather than part of the outline: the cell clips everything in it so the liquid cannot climb out of it, and a nub inside that clip is a nub with its top cut off. -->
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+<div id="quick-panel">
+  
+
+
+
+  <div id="quick-scrim"></div>
+  
+
+
+
+
+
+
+  <div id="quick-row-top">
+    <div id="quick-row-links">
+      <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-name">Hotspot</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-name">Flight</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="gps"><span class="quick-name">Location</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="mobile"><span class="quick-name">Mobile</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="wifi"><span class="quick-name">Wi-Fi</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="bluetooth"><span class="quick-name">Bluetooth</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+    </div>
+    <div class="quick-bubble" id="quick-battery">
       <span id="battery-pin"></span>
       <div id="battery-cell">
-      <!-- The charge drawn as a level rather than only as an icon: the liquid stands at the percentage and is coloured by the band it is in, so the reading is had before the number is read. Flat, with no surface on it and nothing rising through it — a level that is never still is a level being watched rather than read, and the crests cost the fill a group opacity and seventeen pixels of reserved headroom that the reading was paying for. -->
       <div id="battery-fill"></div>
       <span id="battery-glyph"></span>
       <span id="battery-reading"></span>
       </div>
     </div>
   </div>
-</div>
 
-<!-- The quick settings, and every one of them is its own bubble now.
-     They used to be four groups inside one big box, which made the panel a card with a list in
-     it: the box was the thing that arrived and the controls were its contents. A module standing
-     on its own can be thrown in and slung back one at a time, which is the whole of why they were
-     split. What they are not is liquid: they were blobs in the goo layer for a while, and fifteen
-     shapes standing a hair apart in a grid pinned the layer's one melt number at its ceiling and
-     welded the panel — and the row that shares the layer — into a single sheet. They are in no
-     pane list on either side and they paint their own background; see js/liquid.js's BLUR_PANES.
-     This container itself is never seen and never touched: it is the frame the modules are laid
-     out in, so the arithmetic for where each of them stands is a flexbox rather than eight sets
-     of coordinates that have to agree with each other. -->
-<div id="quick-panel">
-  <!-- The scrim. It is not a bubble — it has no liquid and no press — it is the region the host
-       frosts the whole screen through, mirrored the same way every other pane is: the page owns
-       where it is and the host owns what it does there. The faint ground over it is ours, drawn
-       above the glass, because a blur alone leaves white wallpaper too bright to read a panel on. -->
-  <div id="quick-scrim"></div>
-  <!-- The connectors, and every one of them is its own bubble in a five-column grid. They were four
-       rows inside one box titled "Connections", which made the set a list with a heading over it —
-       and a heading is a label on a bubble, which this panel no longer has: a bubble says what it is
-       with its own glyph. The grid is the one the design asks for. The six two-column links carry a
-       glyph and the name of what they are attached to; USB takes the narrow fifth column down all
-       three rows, glyph alone, because what it reports is a cable rather than a network and a cable
-       has no name to give.
-       The charge is not a cell in this grid. It is the Status bubble itself, hung at the top right
-       by #status.open, so the room for it is subtracted from the row rather than held for it. -->
-  <div id="quick-row-links">
-    <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-name">Hotspot</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-name">Flight</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="gps"><span class="quick-name">Location</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="mobile"><span class="quick-name">Mobile</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="wifi"><span class="quick-name">Wi-Fi</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="bluetooth"><span class="quick-name">Bluetooth</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-  </div>
+  
 
-  <!-- The six states, each its own bubble. They were two boxes titled "Display" and "System", which
-       is a shelf with a heading on it: what the split buys is that one switch can be thrown in and
-       slung home on its own, and what the heading cost was a word explaining a glyph that had
-       already said it. The grouping survives in the order — the three the screen answers to, then
-       the three the phone does — because an order is a grouping nobody has to read. -->
+
+
+
   <div id="quick-row-body">
     <div id="quick-row-knobs">
       <button class="quick-bubble quick-knob" data-toggle="modus"><span class="quick-icon"></span></button>
@@ -237,8 +228,14 @@
       <button class="quick-bubble quick-knob" data-toggle="mic"><span class="quick-icon"></span></button>
     </div>
 
-    <!-- Two bubbles and not one module with two columns in it: the slider that is being held has
-         to be able to leave the panel on its own, which a column inside a shared box cannot do. -->
+    
+
+
+
+
+
+
+
     <div id="quick-row-levels">
       <div class="quick-bubble level" data-level="brightness">
         <div class="level-fill"></div>
@@ -251,27 +248,27 @@
     </div>
   </div>
 
-  <!-- The one module at the foot that is not a switch: it reports. Its base mod is **media** and
-       not the transfer it used to be, because a file in flight is a rare thing and a song is not —
-       a bubble whose resting state is a reading nobody ever sees is a bubble spending the panel's
-       best row on nothing. A transfer takes it over while one is running, exactly the way a mod
-       takes a bubble over anywhere else here, and hands it back when the file lands.
-       It is the bottom-most bubble, so it runs into the bottom screen edge rather than standing the
-       panel's margin off it: an edge a bubble touches is an edge the panel is attached to.
-       With a song playing it grows its height by half again as much again, and the room comes out
-       of the switches and the levels alone — the connector grid above them is `flex: none` and does
-       not give, because a connector shrinking to make room for a song is the panel rearranging
-       itself around the wrong subject. -->
+  
+
+
+
+
+
+
+
+
+
+
   <div class="quick-bubble" id="quick-media">
-    <!-- What it says with nothing playing and nothing in flight, and what a transfer takes over:
-         one line and a track under it, which is the shape both readings share. -->
+    
+
     <div id="quick-media-head">
       <span id="quick-media-kind">Nothing playing</span>
       <span id="quick-media-reading"></span>
     </div>
     <div id="quick-media-track"><div id="quick-media-fill"></div></div>
-    <!-- The song, and it is drawn rather than hidden behind the head above: the two are different
-         heights and different shapes, so the module carries both and wears the one that is true. -->
+    
+
     <div id="quick-media-now">
       <img id="quick-media-art" alt="">
       <div id="quick-media-lines">
@@ -290,19 +287,19 @@
         </div>
       </div>
     </div>
-    <!-- The cable, and it lives here rather than in the connector grid above because a cable is not a
-         radio: it is a thing physically attached to the bottom of the phone, and the module at the
-         bottom of the panel is the one that already reaches that edge. It is drawn only while
-         something is plugged in — an "off" cable is no cable, and a permanently dimmed row saying so
-         is a row spending height on nothing. A tap grants the machine on the other end the run of
-         the phone, which is the whole of what the switch behind it does. -->
+    
+
+
+
+
+
     <button class="quick-mode" id="quick-media-usb" data-toggle="usb"><span class="quick-icon"></span><span class="quick-label"></span></button>
   </div>
 </div>
 
-<!-- The padlock, standing where One UI draws its own lock icon. It says one thing and answers
-     no touch, so it costs no window. On unlock it opens and then leaves: the shackle lifting is
-     the cause and the flight home is the consequence. -->
+
+
+
 <div id="padlock">
   <svg id="padlock-body" viewBox="0 0 24 24">
     <path id="padlock-shackle" d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -310,22 +307,22 @@
   </svg>
 </div>
 
-<!-- The lock screen's own two bubbles, one container: both stand where a thumb reaches, and the
-     Now bubble growing open is the notifications' business as much as it is its own — see
-     motion.md. Roughly 60% of the screen height, bottom-anchored: Now is the last child, so it
-     stays glued to the bottom edge and grows upward into the room the notifications give up. -->
+
+
+
+
 <div id="lock-stack">
-  <!-- The lock screen's notifications, as bubbles standing where the system's own list is. The
-       container is overflow-visible because these are bubbles and a bubble's overshoot may not
-       be clipped; the scroller inside it is what clips instead. -->
+  
+
+
   <div id="lock-notes">
     <div id="lock-notes-list"></div>
   </div>
 
-  <!-- The lock screen's own bubble, down where a thumb reaches. It is not a second copy
-       of the main bubble and it is not the Now bubble moved: it is the bubble the row's
-       mods belong to while the phone is locked. Its glyph is at the left like every other
-       bubble's, so a mod arriving here arrives the same way it arrives anywhere. -->
+  
+
+
+
   <div id="lock-now">
     <div id="lock-head">
       <div id="lock-art-slot" class="glyph"><img id="lock-art" alt=""></div>
@@ -345,9 +342,9 @@
         <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg>
       </div>
     </div>
-    <!-- Flush against the bottom edge, not inset from it: the bubble clips its own
-         corners, so the ends of the line are cut by the squircle and it reads as part of
-         the shape rather than as a bar sitting inside it. -->
+    
+
+
     <div id="lock-timeline">
       <div id="lock-clock"><span id="lock-position">0:00</span><span id="lock-duration">0:00</span></div>
       <div id="lock-track"><div id="lock-elapsed"><div id="lock-dot"></div></div></div>
@@ -357,24 +354,24 @@
 
 </div>
 
-<!-- Blur the layer, then push the alpha back to a hard edge: shapes whose blurs
-     overlap come back as one outline, and shapes that do not keep their own. That
-     is the whole of the liquid — there is no second element bridging them. -->
+
+
+
 <svg id="filters" aria-hidden="true">
-  <!-- The bubbles merge into one another exactly the way the torch's steps do: they
-       are one body of water that happens to be in several places. The deviation is
-       not written here because it is not a constant — meltBy() reads it off the gap
-       between the shapes every frame, so they fuse as they come together and let go
-       as they part. Shapes bridge at roughly twice whatever it currently is. -->
+  
+
+
+
+
   <filter id="bubble-goo" x="-15%" y="-40%" width="130%" height="180%">
     <feGaussianBlur id="bubble-melt" in="SourceGraphic" stdDeviation="2" result="blurred"/>
     <feColorMatrix in="blurred" type="matrix"
       values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -14"/>
   </filter>
-  <!-- The switches get a fixed deviation, unlike the row above: their two shapes are
-       either apart or wholly on top of each other and never rest a hair's breadth
-       apart, which is the one case a constant is right for. Same numbers as the
-       torch's step slider, because it is the same liquid. -->
+  
+
+
+
   <filter id="switch-goo" x="-30%" y="-60%" width="160%" height="220%">
     <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blurred"/>
     <feColorMatrix in="blurred" type="matrix"

@@ -1,4 +1,5 @@
 import { PROXY_TAP_SLOP } from './bridge.js';
+import { clockPill } from './clock.js';
 import { stirLiquid } from './liquid.js';
 import { rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
@@ -67,7 +68,7 @@ const STATUS_LAND = 0.42;
 
 const STATUS_MARGIN = 10;
 const STATUS_MARGIN_FOOT = STATUS_MARGIN;
-const STATUS_PANEL = { width: 0, height: 0, ms: 220 };
+const STATUS_PANEL = { width: 0, height: 0, ms: 340 };
 
 
 
@@ -742,7 +743,9 @@ export function openStatusPanel() {
   
   
   statusPill.classList.add('open');
-  
+  pill.classList.add('corner-grow');
+  clockPill.classList.add('corner-grow');
+
   quickPanel.classList.remove('leaving');
   
   
@@ -774,8 +777,9 @@ export function closeStatusPanel() {
   
   
   statusPill.classList.remove('open');
-  
-  
+  pill.classList.remove('corner-grow');
+  clockPill.classList.remove('corner-grow');
+
   fitStatusProxy();
   
   const dropped = quickBubbles.length * QUICK_DROP_STAGGER + 180;

@@ -3,33 +3,33 @@ import { HOLD_BLOCK } from './motion.js';
 import { swipeToDismiss } from './swipeDismiss.js';
 import { bridge, HOLD_MILLIS } from './state.js';
 
-/**
- * The lock screen's notifications, as bubbles, standing where the system draws its own list.
- *
- * Every other bubble here is one shape holding one true thing. This is a column of them: one
- * per conversation, newest at the bottom — beside the Now bubble it shares its container with,
- * which is where a thumb already is — scrolling upward into the past as a chat thread does.
- *
- * The container is `overflow: visible` and the scroller inside it is not, which is the rule
- * from bubbles.md doing exactly what it is for: the bubbles overshoot when they arrive and a
- * container sized to them would cut the overshoot off, so what clips is an inner element.
- */
+
+
+
+
+
+
+
+
+
+
+
 const notesPill = document.getElementById('lock-notes');
 const notesList = document.getElementById('lock-notes-list');
 
-/**
- * How many stand there. Past this the rest are a count, the way the row's dots are. Mirrors
- * the run of 'note0'…'note4' liquid.js reserves in BLUR_PANES and BubbleService's own count of
- * them: a sixth note bubble would draw with no glass behind it.
- */
+
+
+
+
+
 const NOTES_LIMIT = 5;
 
 let showing = false;
 
-/** Whether the keyguard is up, kept apart from `showing` so the setting below can be answered without it. */
+
 let locked = false;
 
-/** The settings panel's own switch. Off, the lock screen is left exactly as One UI drew it. */
+
 let allowed = true;
 
 window.setNotesShown = wanted => {
@@ -43,15 +43,15 @@ export function isNotesShowing() {
   return showing;
 }
 
-/** The note standing at this position, or null — what liquid.js mirrors a glass pane off. */
+
 export function noteAt(index) {
   return (showing && notesList.children[index]) || null;
 }
 
-/**
- * Grouped by conversation the same way the notification tab groups them: a messenger rewrites
- * one notification as each line lands, so one bubble is one conversation and never one message.
- */
+
+
+
+
 function grouped(entries) {
   const byWho = new Map();
   for (const entry of entries) {
@@ -62,18 +62,18 @@ function grouped(entries) {
   return [...byWho.values()];
 }
 
-/** Every line a conversation is holding, oldest first — mirrors the notification tab's own read of `lines`. */
+
 function linesOf(entry) {
   return (entry.lines && entry.lines.length) ? entry.lines.map(line => line.text) : [entry.text || ''];
 }
 
-/** One letter of the app's name, for a notification whose icon the platform did not give us. */
+
 function initialOf(entry) {
   const name = entry.appName || entry.app || '?';
   return name.trim().charAt(0).toUpperCase() || '?';
 }
 
-/** Held down, it means what a hold means on every bubble here: out to the app behind it. */
+
 function armHold(note, entry) {
   let start = null;
   let holdTimer = null;
@@ -98,31 +98,31 @@ function armHold(note, entry) {
   note.addEventListener('touchcancel', release, { passive: true });
 }
 
-/**
- * Tapped, a conversation opens in place: the rest of what it is holding grows in beneath the
- * newest line, and the note beside it makes room the same way a Now mod's arrival does — the
- * box that is changing size grows on `grid-template-rows`, a native transition from nothing to
- * its own content's height, so every neighbour above it reflows on the same frames rather than
- * jumping to a size this element decided on its own.
- */
+
+
+
+
+
+
+
 function armExpand(note) {
   note.addEventListener('click', () => {
     if (note.dataset.swiped === 'true' || note.dataset.scrolled === 'true') return;
     if (note.dataset.held === 'true') return;
     const already = note.classList.contains('expanded');
-    // One open at a time: two conversations read at once is two answers to one glance.
+    
     notesList.querySelectorAll('.lock-note.expanded').forEach(other => {
       if (other !== note) other.classList.remove('expanded');
     });
     note.classList.toggle('expanded', !already);
     bridge.triggerHaptic('tap');
-    // Past the 260ms grid-template-rows transition (see .lock-note-more in pill.css), with the
-    // same margin every other transition-covering stir here gives itself.
+    
+    
     stirLiquid(420);
   });
 }
 
-/** The hole a dismissed conversation leaves, closed by moving rather than by disappearing. */
+
 function closeGap(below, gap) {
   if (!below.length) return;
   for (const other of below) {
@@ -138,11 +138,11 @@ function closeGap(below, gap) {
   fitNotesProxy();
 }
 
-/**
- * Redrawn whole rather than reconciled. A lock screen is looked at, not worked: the list only
- * changes when something arrives or is taken away, and a diff of five rows costs more to be
- * wrong about than to redo.
- */
+
+
+
+
+
 export function paintNotes(isLocked) {
   locked = isLocked;
   showing = isLocked && allowed;
@@ -197,8 +197,8 @@ export function paintNotes(isLocked) {
     said.textContent = lines[lines.length - 1];
     copy.appendChild(said);
 
-    // Every earlier line, held in a box with no height until the conversation is expanded —
-    // see armExpand() for why this grows on grid-template-rows rather than on its own height.
+    
+    
     if (lines.length > 1) {
       const more = document.createElement('div');
       more.className = 'lock-note-more';
@@ -238,11 +238,11 @@ export function paintNotes(isLocked) {
   stirLiquid(420);
 }
 
-/**
- * The proxy is the list and nothing else. It is a large touchable window and it is the one
- * place that is affordable: it is on the lock screen, where the only gesture underneath is
- * the shade swipe from the very top of the screen, and this stands well below it.
- */
+
+
+
+
+
 export function fitNotesProxy() {
   if (!showing || !notesList.children.length) {
     bridge.setNotesProxy(0, 0, 0, 0);
@@ -254,7 +254,7 @@ export function fitNotesProxy() {
   );
 }
 
-/** Redrawn when the shade changes underneath it, which is the only thing that moves it. */
+
 window.onNotesChanged = () => {
   if (showing) paintNotes(true);
 };

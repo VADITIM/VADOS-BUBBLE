@@ -136,7 +136,7 @@ html, body {
 
     border-radius var(--grow-ms) ease-out,
     top var(--grow-ms) var(--ease-grow),
-    
+    padding-right var(--grow-ms) var(--ease-grow),
 
     translate var(--carry-ms, var(--shift-ms, var(--grow-ms))) var(--ease-split) var(--shift-delay, 0ms),
     scale 350ms linear,
@@ -1959,11 +1959,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   inset: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms ease;
 }
 .status-face.showing { opacity: 1; pointer-events: auto; }
+#status.open .status-face { align-items: flex-start; justify-content: flex-end; }
 
 
 
@@ -2133,8 +2135,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #status.open {
   right: calc(-1 * var(--edge-over));
   top: calc(-1 * var(--edge-over));
-  justify-content: flex-end;
-  align-items: flex-end;
   padding-right: calc(0.55rem + var(--status-right, 14px) + var(--edge-over));
   padding-top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
   height: calc(var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
@@ -2569,8 +2569,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   display: flex;
   flex-direction: column;
   gap: var(--quick-gap);
-  
-
+  transition:
+    left var(--grow-ms) var(--ease-grow),
+    top var(--grow-ms) var(--ease-grow),
+    width var(--grow-ms) var(--ease-grow),
+    height var(--grow-ms) var(--ease-grow);
   pointer-events: none;
   z-index: 29;
 }
@@ -2937,7 +2940,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 :root { --edge-over: 20px; }
-html:has(#quick-panel.showing) #clock {
+#clock.corner-grow {
   left: calc(-1 * var(--edge-over));
   top: calc(-1 * var(--edge-over));
   
@@ -2974,11 +2977,9 @@ html:has(#quick-panel.showing) #clock {
 
 
 :root { --pill-status-shift: 24px; }
-html:has(#quick-panel.showing) #pill {
-  
-
-
-  transition: var(--pill-transition), padding var(--grow-ms) var(--ease-grow);
+#pill.corner-grow {
+  top: calc(var(--grab, 0px) - var(--edge-over));
+  height: calc(var(--pill-height) + var(--edge-over));
   translate: calc(var(--shift, 0px) + var(--pill-status-shift)) 0;
   padding-right: var(--pill-status-grow, 0px);
 }
@@ -3052,21 +3053,28 @@ html:has(#quick-panel.showing) #pill {
 
 
 #clock-date {
-  display: none;
-  margin-left: 0.5rem;
+  display: inline-flex;
+  align-items: baseline;
+  overflow: hidden;
+  margin-left: 0;
+  max-width: 0;
   font-size: 0.62rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  opacity: 0;
+  translate: -6px 0;
+  transition:
+    opacity 220ms var(--ease-split),
+    translate 220ms var(--ease-split),
+    max-width var(--grow-ms) var(--ease-grow),
+    margin-left var(--grow-ms) var(--ease-grow);
+}
+#clock.corner-grow #clock-date {
+  margin-left: 0.5rem;
+  max-width: 70px;
   opacity: 0.75;
-}
-@keyframes clock-date-in {
-  from { opacity: 0; translate: -6px 0; }
-  to { opacity: 0.75; translate: 0 0; }
-}
-html:has(#quick-panel.showing) #clock-date {
-  display: inline-flex;
-  animation: clock-date-in 260ms var(--ease-split) both;
+  translate: 0 0;
 }
 
 

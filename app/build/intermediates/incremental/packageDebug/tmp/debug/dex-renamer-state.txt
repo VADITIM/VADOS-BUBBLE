@@ -1,4 +1,4 @@
-#Wed Sep 09 12:15:21 CEST 2026
+#Wed Sep 09 14:35:19 CEST 2026
 base.0=C\:\\Users\\vn\\source\\VADOS-BUBBLE\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes.dex
 base.1=C\:\\Users\\vn\\source\\VADOS-BUBBLE\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex
 base.2=C\:\\Users\\vn\\source\\VADOS-BUBBLE\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\14\\classes.dex

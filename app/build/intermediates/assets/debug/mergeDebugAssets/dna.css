@@ -1,11 +1,11 @@
-/* Style DNA — VADITIM. Ported from PORTFOLIO25/.claude/style-dna, modules 01-06.
-   Loaded once by every WebView surface in the app; no surface declares its own faces or tokens. */
+
+
 
 @font-face { font-family: "Wosker";    src: url('fonts/Wosker.otf')            format('opentype'); }
 @font-face { font-family: "Striker";   src: url('fonts/Striker.otf')           format('opentype'); }
 @font-face { font-family: "Audiowide"; src: url('fonts/Audiowide-Regular.ttf') format('truetype'); }
 @font-face { font-family: "Mono";      src: url('fonts/SpaceMono-Regular.ttf') format('truetype'); }
-/* Semibold only — VADOS DNA's newest face, and this app has no use yet for any weight but the one the quick panel's connector names wear. */
+
 @font-face { font-family: "Clash";     src: url('fonts/ClashDisplay-Semibold.otf') format('opentype'); font-weight: 600; }
 
 :root {
@@ -31,8 +31,8 @@
   --danger: #ff6b6b;
   --danger-hard: #dc143c;
 
-  /* One accent for the whole app, inherited by every component. Terminal green
-     is the identity colour, and this overlay is the sandbox of the system. */
+  
+
   --section-color: #5bfd5b;
 
   --squircle: 0.75rem;
@@ -48,8 +48,8 @@
   border-radius: var(--squircle);
 }
 
-/* Boxes want the radius; text never does — a rounded label is the tell of a
-   design that applied a radius blindly. */
+
+
 p, span, h1, h2, h3, h4, h5, h6, label, li, strong, em, small,
 .module-label, .module-caption, .status-line, .reveal-text {
   border-radius: 0;
@@ -73,8 +73,8 @@ html, body {
 html { scrollbar-width: none; }
 html::-webkit-scrollbar { display: none; }
 
-/* The panel primitive: translucent near-black, one hairline, one radius, a
-   micro-label in the corner. Depth comes from the border, never from a shadow. */
+
+
 .module {
   --accent: var(--section-color);
   position: relative;
@@ -106,9 +106,9 @@ html::-webkit-scrollbar { display: none; }
   font-size: 0.75rem;
 }
 
-/* The bar-sweep reveal, module 05 §6.1: text is wiped into existence by an
-   accent bar that was already there, never faded in. The per-element delay is
-   written to --reveal-delay by the positional stagger. */
+
+
+
 .reveal {
   position: relative;
   display: inline-block;
@@ -136,8 +136,8 @@ html::-webkit-scrollbar { display: none; }
   100%  { transform: scaleX(0); transform-origin: right center; opacity: 0; }
 }
 
-/* The device axis collapses on a handheld — everything here is coarse pointer,
-   so hover affordances are absent rather than gated. */
+
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
