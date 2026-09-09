@@ -2376,6 +2376,14 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    of the cell, and **nothing about its background**: the whole of the cell going bright is the one
    reading this panel may not use, because the glyph here is drawn at the size of the cell and
    anything lighting it lights the entire bubble. That is the same rule the glow fell to. */
+/* The cell used to be wider than it is tall — the row stretches every button to fill both its
+   share of --quick-links-tall and its share of the row's own width, and on this screen those are
+   two different numbers. Squared to a literal 1:1 by sizing off the one number here that is fixed
+   rather than derived from the screen's own width: the row's height. Un-stretched from the track
+   (justify-self/align-self default to stretch on a grid item) and centred in it, at eighty percent
+   of that height — a smaller control standing in the same grid, not the grid itself shrinking,
+   which would also shrink the charge cell beside it since --quick-links-tall is the two of them's
+   shared number. */
 #quick-row-links .quick-mode {
   position: relative;
   overflow: hidden;
@@ -2383,6 +2391,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   padding: 0.42rem 0.5rem;
   gap: 0;
   border: none;
+  aspect-ratio: 1;
+  height: 80%;
+  align-self: center;
+  justify-self: center;
 }
 /* The ring and the wash both, and the background is written back to the resting one rather than left
    out: `.quick-mode.on` tints the box a sixth of the way to the accent, which never painted while the
@@ -2395,14 +2407,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   box-shadow: none;
   background: var(--pill-background);
 }
-/* Audiowide and not the panel's Mono: this is the one word on the cell that this interface *chose*,
-   and everything else in the panel is a reading that came from somewhere else. A name in the display
-   face and a router's name in mono is the difference said in the type rather than in a rule about
-   which line means what. */
+/* Clash Display Semibold and not the panel's Mono: this is the one word on the cell that this
+   interface *chose*, and everything else in the panel is a reading that came from somewhere else. A
+   name in the display face and a router's name in mono is the difference said in the type rather
+   than in a rule about which line means what. Was Audiowide; VADOS DNA's labels moved to Clash. */
 .quick-name {
   width: 100%;
   text-align: center;
-  font-family: "Audiowide", sans-serif;
+  font-family: "Clash", sans-serif;
+  font-weight: 600;
   font-size: 0.62rem;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -2424,8 +2437,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #quick-row-links .quick-mode svg {
   width: auto;
   height: 108%;
-  /* The glyph is drawn to a square box and the cell is wider than it is tall, so filling the
-     height is what fills the cell — filling the width would leave it standing in a letterbox. */
+  /* The glyph and the cell are both square now, so filling either axis fills the whole cell — the
+     108 is a deliberate slight bleed past the cell's own edge, kept from when the cell was wider
+     than tall and filling by height was what filled it. */
 }
 /* A lit connector says so by the watermark coming up out of the cell and by the name over it taking
    the accent, and by nothing else. It used to give off light as well — two `drop-shadow`s on the
