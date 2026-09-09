@@ -3,7 +3,7 @@ import { stirLiquid } from './liquid.js';
 import { rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
 import { toClosed } from './row.js';
-import { GROWN_PAD, HOLD_MILLIS, bridge, root, shared } from './state.js';
+import { GROWN_PAD, HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 
 /**
  * The bubble at the right end of the bar, standing on the system's own icons.
@@ -30,6 +30,26 @@ const statusFaces = {
 
 /** Mirrors --status-right in pill.css: how far its right edge stands off the screen edge. Where the bubble stands, and not something to give up for reaching the edge — see CLOCK_LEFT, which was zeroed once and slid its digits along with the box. */
 const STATUS_RIGHT = 14;
+
+/** Mirrors --edge-over in pill.css: how far past the screen edge a corner-merged bubble reaches. */
+const EDGE_OVER = 20;
+
+/** Mirrors --pill-status-shift in pill.css: the small rightward move Main-Status-Idle makes before it grows, read back so the grow amount below is measured from where the bubble will actually be standing. */
+const PILL_STATUS_SHIFT = 24;
+
+/**
+ * How far past its resting right edge the main bubble has to grow to reach the same corner the
+ * Status bubble idles in, so the two read as one shape rather than as two bubbles that happen to
+ * be near each other. Measured rather than written down, because the punch hole's horizontal
+ * position is a per-phone calibration (`horizontalOffsetDp`) and not a number this file owns.
+ * Written once on open — `--pill-status-shift` is a constant so the "few pixels" move is not
+ * re-measured, only what is left after it.
+ */
+function fitPillStatusGrow() {
+  const box = pill.getBoundingClientRect();
+  const grow = screenWidth() + EDGE_OVER - box.right - PILL_STATUS_SHIFT;
+  root.style.setProperty('--pill-status-grow', Math.max(0, Math.round(grow)) + 'px');
+}
 
 /** Its flight out of the punch hole, matching the Now bubble's at the other end. */
 const STATUS_TRAVEL = 420;
@@ -702,6 +722,9 @@ export function openStatusPanel() {
   // The screen is the box, so it is measured on the way open rather than at load: at load this
   // bubble has not been born yet and there is nothing to measure the top off.
   fitStatusPanel();
+  // Before anything about #pill has changed, or this measures the corner it is already reaching
+  // for instead of the resting box it is reaching from.
+  fitPillStatusGrow();
   statusOpen = true;
   // The panel opens on what it was last told and corrects itself when the shell answers: a
   // switch that is a frame behind is better than a panel that waits for a shell to open.

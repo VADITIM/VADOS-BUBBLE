@@ -2981,11 +2981,23 @@ html:has(#quick-panel.showing) #clock {
   width: calc(var(--clock-width, auto) + var(--clock-left, 14px) + var(--edge-over));
   height: calc(var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
 }
-/* The main bubble takes the same growth upwards and no more: the punch hole is not near a side, so
-   the only edge it has to reach is the one above it. It is the one box here that is `content-box`,
-   which is why the height is left alone — padding on a content-box element grows the border box on
-   its own, and every state that gives this bubble a height (`.alerting` and the rest) goes on
-   owning that number rather than fighting a rule with an id and a `:has()` in front of it. */
+/* The main bubble takes the same growth upwards it always did, plus a reach towards the corner the
+   Status bubble now idles in beside it (Main-Status-Idle — see states.md#status). It is the one box
+   here that is `content-box`, which is why height and width are never touched directly — padding on
+   a content-box element grows the border box on its own, so every state that gives this bubble a
+   size (`.alerting` and the rest) goes on owning that number rather than fighting a rule with an id
+   and a `:has()` in front of it.
+
+   The reach right is two separate things, same as the prose asking for it: a small *move*
+   (`--pill-status-shift`, a constant — "a few pixels", not a growth) done on `translate`, which is
+   this bubble's own place and already eases; and a *grow* past that (`--pill-status-grow`), done on
+   `padding-right`, which is the content-box trick above read sideways instead of upwards. The grow
+   amount is measured rather than guessed — the punch hole's horizontal position is a per-phone
+   calibration (`horizontalOffsetDp`), not a constant this stylesheet has — so `status.js` reads the
+   bubble's own resting box and writes exactly what is left between its right edge and the screen's,
+   mirroring how far past it `--edge-over` is meant to go. Set once on open and left alone the rest of
+   the time; the rule above is what turns it on and off, not the number itself. */
+:root { --pill-status-shift: 24px; }
 html:has(#quick-panel.showing) #pill {
   /* The list put back with one property added to it, never replaced: `top` is already in there and
      the padding that pays the growth back has to ease on the same clock, or the box opens upwards
@@ -2993,6 +3005,8 @@ html:has(#quick-panel.showing) #pill {
   transition: var(--pill-transition), padding var(--grow-ms) var(--ease-grow);
   top: calc(-1 * var(--edge-over));
   padding-top: calc(var(--grab, 0px) + var(--edge-over));
+  translate: calc(var(--shift, 0px) + var(--pill-status-shift)) 0;
+  padding-right: var(--pill-status-grow, 0px);
 }
 /* 1.03, the one press response every bubble here shares. */
 #clock.pressing { scale: 1.03; }
@@ -3057,6 +3071,28 @@ html:has(#quick-panel.showing) #pill {
   line-height: 0.95;
   margin-left: 2px;
   opacity: 0.6;
+}
+
+/* Clock-Status-Idle only — see html:has(#quick-panel.showing) #clock below, which is what
+   actually shows it. Hidden rather than merely transparent, because `width: auto` on the closed
+   clock must shrink-wrap the two runs it has today and not reserve room for a third that is not
+   showing. `display` cannot transition, so the reveal is a small animation instead of a fade. */
+#clock-date {
+  display: none;
+  margin-left: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+@keyframes clock-date-in {
+  from { opacity: 0; translate: -6px 0; }
+  to { opacity: 0.75; translate: 0 0; }
+}
+html:has(#quick-panel.showing) #clock-date {
+  display: inline-flex;
+  animation: clock-date-in 260ms var(--ease-split) both;
 }
 
 

@@ -21,6 +21,10 @@ import { HOLD_MILLIS, bridge, root } from './state.js';
 const clockPill = document.getElementById('clock');
 const clockFace = document.getElementById('clock-face');
 const clockSeconds = document.getElementById('clock-seconds');
+const clockDate = document.getElementById('clock-date');
+
+/** German weekday abbreviations, same reasoning as the 24-hour digits: the phone is German. Read off `getDay()`, which is Sunday-first regardless of locale. */
+const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
 /** Mirrors --clock-left in pill.css: how far its left edge stands off the screen edge. It is where the bubble *stands* and it is not to be traded for reaching an edge: moved to zero once, the box went to the edge and took the digits with it, and what the eye read was the time having slid sideways rather than the bubble having grown. Reaching an edge is a growth and belongs to `html.status-open` further down pill.css, which extends the box past the edge and pays the extra room back as padding so nothing inside it moves. */
 const CLOCK_LEFT = 14;
@@ -54,6 +58,10 @@ function paintClock() {
   }
   clockSeconds.children[0].textContent = digits[0];
   clockSeconds.children[1].textContent = digits[1];
+  // Only read while Clock-Status-Idle actually shows it, but painted every tick anyway — it is
+  // cheap, and a date that changes at midnight while the corner happens to be idle must not wait
+  // for the next unrelated repaint to catch up.
+  clockDate.textContent = WEEKDAYS[now.getDay()] + ', ' + now.getDate() + '.' + (now.getMonth() + 1) + '.';
 }
 
 /**
