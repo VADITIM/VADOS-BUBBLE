@@ -2154,17 +2154,16 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #quick-battery {
-  
-
-
   --battery-well: rgba(10, 9, 13, 0.85);
-  flex: 1;
-  min-width: 0;
+  background: none;
+  border: none;
+  flex: none;
+  width: 64px;
+  height: var(--quick-links-tall);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0.5rem 0.5rem 0.6rem;
-  
+  padding: 0;
 
   color: #fff;
   transition: scale 200ms var(--ease-split);
@@ -2638,9 +2637,16 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
+#quick-row-top {
+  display: flex;
+  gap: var(--quick-gap);
+  flex: none;
+}
+
 #quick-row-links {
   height: var(--quick-links-tall);
-  flex: none;
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));

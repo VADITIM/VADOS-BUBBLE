@@ -194,13 +194,23 @@
 
 
 
-  <div id="quick-row-links">
-    <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-name">Hotspot</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-name">Flight</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="gps"><span class="quick-name">Location</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="mobile"><span class="quick-name">Mobile</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="wifi"><span class="quick-name">Wi-Fi</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    <button class="quick-bubble quick-mode" data-toggle="bluetooth"><span class="quick-name">Bluetooth</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+  <div id="quick-row-top">
+    <div id="quick-row-links">
+      <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-name">Hotspot</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-name">Flight</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="gps"><span class="quick-name">Location</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="mobile"><span class="quick-name">Mobile</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="wifi"><span class="quick-name">Wi-Fi</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+      <button class="quick-bubble quick-mode" data-toggle="bluetooth"><span class="quick-name">Bluetooth</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+    </div>
+    <div class="quick-bubble" id="quick-battery">
+      <span id="battery-pin"></span>
+      <div id="battery-cell">
+      <div id="battery-fill"></div>
+      <span id="battery-glyph"></span>
+      <span id="battery-reading"></span>
+      </div>
+    </div>
   </div>
 
   
@@ -234,16 +244,6 @@
       <div class="quick-bubble level" data-level="volume">
         <div class="level-fill"></div>
         <span class="level-icon"></span>
-      </div>
-      <div class="quick-bubble" id="quick-battery">
-        
-        <span id="battery-pin"></span>
-        <div id="battery-cell">
-        
-        <div id="battery-fill"></div>
-        <span id="battery-glyph"></span>
-        <span id="battery-reading"></span>
-        </div>
       </div>
     </div>
   </div>
