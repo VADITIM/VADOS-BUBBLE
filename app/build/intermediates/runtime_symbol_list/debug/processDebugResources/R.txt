@@ -1,1 +1,0 @@
-int xml bubble_service 0x7f010000
