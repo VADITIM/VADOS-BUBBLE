@@ -122,6 +122,36 @@ class IslandNotificationListener : NotificationListenerService() {
             BubbleService.deliverTimer(timer()?.let { TimerWatch.describe(it) })
         }
 
+
+        /** The recording that is running, or null when nothing is being recorded. */
+        fun recording(): StatusBarNotification? =
+            instance?.activeNotifications?.firstOrNull { NowWatch.isRecording(it) }
+
+        /** The transfer in flight, or null. The oldest wins, so a second one waits its turn. */
+        fun transfer(): StatusBarNotification? =
+            instance?.activeNotifications
+                ?.filter { NowWatch.isTransfer(it) }
+                ?.minByOrNull { it.postTime }
+
+        /** The recorder's own buttons — pause, resume, stop — fired from the bubble. */
+        fun recordingAction(index: Int) {
+            recording()?.let { NowWatch.act(it, index) }
+        }
+
+        /**
+         * Both of the Now bubble's notification-borne mods in one push, because the bubble
+         * shows one thing at a time and deciding which is the page's job: it is the side that
+         * knows what it is already carrying and what that would cost to swap.
+         */
+        fun publishNowMods() {
+            if (instance == null) return
+            BubbleService.deliverNowMods(
+                JSONObject()
+                    .put("recording", recording()?.let { NowWatch.describeRecording(it) } ?: JSONObject.NULL)
+                    .put("transfer", transfer()?.let { NowWatch.describeTransfer(it) } ?: JSONObject.NULL)
+            )
+        }
+
         /** The Discord call that is connected, or null when none is. */
         fun call(): StatusBarNotification? =
             instance?.activeNotifications?.firstOrNull { CallWatch.isCall(it) }
@@ -131,12 +161,38 @@ class IslandNotificationListener : NotificationListenerService() {
             val service = instance ?: return
             BubbleService.deliverCall(call()?.let { CallWatch.describe(service, it) })
         }
+
+        /** A notification carrying a media session is a player's, whoever posted it. */
+        fun isPlayer(statusBarNotification: StatusBarNotification): Boolean =
+            statusBarNotification.notification.extras
+                .containsKey(Notification.EXTRA_MEDIA_SESSION)
+
+        /**
+         * Whether this player is one the phone is actually offering right now, or a
+         * session left lying around by an app that is gone. Null means the shade could
+         * not be read at all, which is a different answer from "no" and must not be
+         * treated as one.
+         *
+         * A media session is not proof that a player exists. Spotify keeps a paused one
+         * alive long after it has been closed and swiped away, so closing YouTube handed
+         * the bubble a song nobody had touched since that morning — the session list
+         * simply fell back to whatever else was in it. The notification is the proof: a
+         * player the phone is really offering has a row in the shade and a card in the
+         * media panel, and one that has been closed has neither.
+         */
+        fun isOfferingPlayer(packageName: String): Boolean? {
+            val service = instance ?: return null
+            return runCatching {
+                service.activeNotifications.any { it.packageName == packageName && isPlayer(it) }
+            }.getOrNull()
+        }
     }
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
     /** Media sessions become readable only once this binding exists. */
     override fun onListenerConnected() {
+        AppStyles.learnFrom(this)
         instance = this
         MediaControl.refresh()
         publishTimer()
@@ -160,6 +216,16 @@ class IslandNotificationListener : NotificationListenerService() {
             publishCall()
             return
         }
+        // A ringing alarm is left alone entirely — no bubble, no alert, nothing. The phone is already ringing, the clock app already owns the screen while it does, and anything of ours arriving on top of that is a second thing to dismiss at six in the morning. It is asked before the recording, because the clock app posts an ongoing notification for a ringing alarm as well and that one would otherwise be read as a state worth carrying.
+        if (AlarmWatch.isAlarm(statusBarNotification)) return
+        // A recording and a transfer are states in the same sense, and they belong to the
+        // bubble out at the clock rather than to the row: what is happening, not what is
+        // connected. A progress notification re-posts on every tick, so this is also how the
+        // timeline moves.
+        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
+            publishNowMods()
+            return
+        }
         // Same for a player: its notification is the song, and the song is a closed
         // mod. Ask the session again first — it is the richer source and it carries
         // the transport — and hand over the notification only if it cannot answer.
@@ -172,8 +238,8 @@ class IslandNotificationListener : NotificationListenerService() {
         if (!isWorthShowing(statusBarNotification)) return
 
         val notification = statusBarNotification.notification
+        // describe() already puts iconBase64; this adds only what the alert needs on top of it.
         val payload = describe(statusBarNotification)
-            .put("iconBase64", encodeIcon(notification))
             .put("imageBase64", encodePicture(notification))
             .put("mediaState", JSONObject.NULL)
 
@@ -201,6 +267,9 @@ class IslandNotificationListener : NotificationListenerService() {
         BubbleService.deliverGone(statusBarNotification.key)
         if (TimerWatch.isTimer(statusBarNotification)) publishTimer()
         if (CallWatch.isCall(statusBarNotification)) publishCall()
+        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
+            publishNowMods()
+        }
         // The song may have ended with its notification, or only changed players.
         if (isPlayer(statusBarNotification)) MediaControl.refresh()
         // The badge is the shade, so it moves whenever the shade does — including
@@ -208,9 +277,6 @@ class IslandNotificationListener : NotificationListenerService() {
         BubbleService.deliverCount(count())
     }
 
-    /** A notification carrying a media session is a player's, whoever posted it. */
-    private fun isPlayer(statusBarNotification: StatusBarNotification): Boolean =
-        statusBarNotification.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
 
     /**
      * The player's notification wearing the shape [MediaControl] publishes, so the
@@ -234,7 +300,12 @@ class IslandNotificationListener : NotificationListenerService() {
             .put("canAdd", false)
     }
 
-    /** Who sent it, what it says and which colour it wears — no images. */
+    /**
+     * Who sent it, what it says and which colour it wears. `iconBase64` is the large icon when
+     * the app supplied one — which for a messaging app *is* the sender's own avatar, exactly
+     * the picture its native notification wears — falling back to the app's small monochrome
+     * icon for everything else. See encodeIcon().
+     */
     private fun describe(statusBarNotification: StatusBarNotification): JSONObject {
         val extras = statusBarNotification.notification.extras
         val style = AppStyles.of(statusBarNotification.packageName)
@@ -243,10 +314,18 @@ class IslandNotificationListener : NotificationListenerService() {
             .put("app", style.key)
             .put("appName", labelOf(statusBarNotification.packageName))
             .put("accent", style.accent)
+            // Absent for every app whose identity is one colour, which is all but Google's.
+            .put("gradient", style.gradient ?: JSONObject.NULL)
             .put("package", statusBarNotification.packageName)
             .put("title", extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty())
             .put("text", extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty())
             .put("lines", messages(statusBarNotification.notification))
+            .put("iconBase64", encodeIcon(statusBarNotification.notification))
+            // When it arrived, so the list can say how long ago rather than only what. The
+            // notification's own postTime, not the moment this ran: a conversation is rewritten
+            // in place as each line lands, so re-reading it must not make an hour-old thread
+            // look new. Epoch milliseconds, and the page turns it into an age when it draws.
+            .put("postedAt", statusBarNotification.postTime)
     }
 
     /**

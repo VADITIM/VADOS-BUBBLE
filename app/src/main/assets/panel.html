@@ -18,7 +18,7 @@
     position: absolute;
     inset: 0;
     padding: 1.5rem 1.25rem var(--nav-reserve-bottom);
-    padding-top: calc(1.5rem + env(safe-area-inset-top));
+    padding-top: calc(1.5rem + 10px + env(safe-area-inset-top));
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: none;
@@ -88,23 +88,35 @@
     margin-bottom: 1.5rem;
   }
 
-  /* A grid, not a flex row: the three columns must line up across rows even when
+  /* A grid, not a flex row: the two columns must line up across rows even when
      one name wraps to two lines, which space-between cannot promise. */
   .row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.7rem 0;
-    border-bottom: 1px solid var(--border);
+    padding: 0.55rem 0;
   }
-  .row:last-of-type { border-bottom: 0; }
 
   .row-name {
     font-size: 0.8rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-body);
+  }
+  /* The star is the whole footnote: this row is not a permission of ours to give, it is a
+     system setting that only exists once a shell UID does. Without the mark the row reads as
+     broken on a phone where Shizuku is simply not running. */
+  .row.depends .row-name::before {
+    content: "*";
+    color: var(--section-color);
+    margin-right: 0.45rem;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.85rem 0;
   }
 
   .status {
@@ -165,44 +177,218 @@
   button.quiet:active { color: var(--section-color); border-color: transparent; }
   button.step { font-size: 0.8rem; padding: 0.1rem 0.4rem; letter-spacing: 0; }
 
+  /* The state and the control are one thing on the System screen: a row that says "blocked"
+     beside a button that says "Grant" is two words for one fact, and the button is the half
+     that gets pressed. So the button wears the state and the press is what changes it. */
+  .grant {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 8.5rem;
+    justify-content: flex-end;
+    font-family: "Mono", monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0.19rem;
+    color: var(--text-muted);
+    position: relative;
+    overflow: hidden;
+    transition: color 0.24s ease, border-color 0.24s ease, transform 0.12s var(--ease-leave);
+  }
+  .grant::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--text-faint);
+    transition: background 0.24s ease, box-shadow 0.24s ease;
+  }
+  .grant.granted {
+    color: var(--section-color);
+    border-color: color-mix(in srgb, var(--section-color) 35%, var(--border-control));
+  }
+  .grant.granted::before {
+    background: var(--section-color);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--section-color) 18%, transparent);
+  }
+  .grant.blocked { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--border-control)); }
+  .grant.blocked::before { background: var(--danger); }
+  /* A grant is the one thing on this screen that happens *to* you rather than at your finger —
+     with Shizuku it lands a second after a different app was on screen — so it is announced by
+     the same accent bar that writes every heading here, swept across the button it changed. */
+  .grant::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--section-color);
+    transform: scaleX(0);
+    transform-origin: left center;
+    pointer-events: none;
+  }
+  .grant.landing::after { animation: reveal-bar 0.52s var(--ease-sweep) forwards; }
+  .grant.landing { animation: grant-land 0.42s var(--ease-enter) 0.18s; }
+  @keyframes grant-land {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+
+  /* The way out to the system's own page for this app, which is not a setting of ours and is
+     the only thing here that leaves. Filled rather than outlined, so it never reads as the
+     sixth row of a list of five. */
+  button.pronounced {
+    width: 100%;
+    margin-top: 0.2rem;
+    padding: 0.8rem;
+    color: var(--ground);
+    background: var(--section-color);
+    border-color: var(--section-color);
+    letter-spacing: 0.19rem;
+    font-size: 0.66rem;
+  }
+  button.pronounced:active { color: var(--ground); transform: scale(0.98); }
+
+  /* A choice with a handful of named answers is buttons, never a slider: a slider makes the
+     reader translate a position back into a word, and half of these have exactly two answers
+     where a position means nothing at all. The marker is one element sliding between them, so
+     the change is a move rather than two independent fades. */
+  .choices {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    padding: 3px;
+    background: var(--sunken-deep);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    corner-shape: squircle;
+  }
+  .choice-marker {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    background: color-mix(in srgb, var(--section-color) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--section-color) 45%, transparent);
+    border-radius: 11px;
+    corner-shape: squircle;
+    transition: transform 0.3s var(--ease-enter);
+  }
+  .choices button {
+    position: relative;
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-icon);
+    padding: 0.42rem 0.3rem;
+    font-size: 0.66rem;
+    transition: color 0.22s ease;
+  }
+  .choices button[aria-pressed="true"] { color: var(--section-color); }
+  .choices button:active { transform: none; }
+
   .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; margin-top: 0.9rem; }
   .actions .wide { grid-column: 1 / -1; }
 
-  .field { padding: 0.5rem 0 0.7rem; }
+  /* One card per setting, so the list reads as separate things rather than as a column of
+     controls: the name, its value, and the three buttons on one line, and the slider under
+     them with room of its own. Two settings running into each other is most of why the wrong
+     one was touched. */
+  .field {
+    padding: 0.75rem 0.85rem 0.85rem;
+    margin-bottom: 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    corner-shape: squircle;
+    background: var(--sunken);
+  }
   .field-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.5rem;
     font-size: 0.63rem;
     letter-spacing: 0.19rem;
     text-transform: uppercase;
-    color: var(--text-label);
-    margin-bottom: 0.4rem;
+    /* The name in the screen's own colour and the value in plain bright: at a glance the card
+       says which setting it is before it says what it is set to. */
+    color: var(--section-color);
+    margin-bottom: 0.55rem;
   }
-  .field-head .value { color: var(--text-bright); letter-spacing: 0.1rem; }
+  .field-head .value {
+    color: var(--text-bright);
+    letter-spacing: 0.1rem;
+    font-variant-numeric: tabular-nums;
+  }
+  /* The three buttons on one line, each the same size and the same shape as everything else
+     that is pressed here. Aligned right, because the value they change is above them. */
+  .field-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+  }
+  /* The swatch is the control: a native colour input draws its own box, and stretched across the
+     card it reads as the colour rather than as a button that opens one. */
+  #accent-picker {
+    flex: 1;
+    height: 2.2rem;
+    padding: 0;
+    border: 1px solid var(--border-control);
+    border-radius: 14px;
+    corner-shape: squircle;
+    background: transparent;
+  }
+  .field-buttons button {
+    min-width: 3rem;
+    padding: 0.42rem 0.7rem;
+    border-radius: 14px;
+    corner-shape: squircle;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+  }
 
-  /* A slider is a wide horizontal target on a screen that scrolls vertically, and a
-     drag down the settings list used to land on one and move it. pan-y hands the
-     vertical gesture back to the page; only a sideways drag is a value change, and
-     the step buttons cover the case where the value wanted is one away. */
-  input[type="range"] {
-    -webkit-appearance: none;
+  /* A slider that cannot be pressed by accident, because it is never pressed at all: it only
+     answers a *drag*. A native range jumps to wherever it was touched, so a finger that meant
+     to scroll the list past it moved the value it landed on — and on a settings screen that is
+     a change nobody asked for and nobody saw. This one takes the value from how far the finger
+     has travelled since it went down, so a tap does nothing, a vertical scroll does nothing,
+     and only sideways movement past a slop is a change. pan-y keeps the scroll the page's. */
+  .slider {
     touch-action: pan-y;
-    width: 100%;
-    height: 2px;
-    background: var(--border-strong);
-    border-radius: 999px;
-    margin: 0.4rem 0;
+    padding: 0.55rem 0;
+    cursor: ew-resize;
   }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+  .slider-track {
+    position: relative;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-strong);
+  }
+  .slider-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--section-color) 55%, transparent);
+  }
+  .slider-thumb {
+    position: absolute;
+    top: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
     border-radius: 999px;
     background: var(--ground);
     border: 1px solid var(--section-color);
   }
+  /* Only while a finger is actually driving it: written per frame during a drag, so it must not
+     be eased then, and it is what makes a step button read as a move rather than a jump. */
+  .slider:not(.dragging) .slider-fill,
+  .slider:not(.dragging) .slider-thumb {
+    transition: width 0.18s var(--ease-leave), left 0.18s var(--ease-leave);
+  }
+  .slider.dragging .slider-thumb { scale: 1.15; }
 
   .note {
     font-size: 0.7rem;
@@ -210,7 +396,6 @@
     color: var(--text-muted);
     margin-top: 0.9rem;
   }
-  .note b { color: var(--text-body); font-weight: 500; }
 
   /* The nav is the one piece of global chrome, so every screen reserves the same
      token for it and none of them has to know its shape. */
@@ -258,20 +443,62 @@
   }
 </style>
 
-<section class="screen" data-screen="settings" data-accent="#5bfd5b" data-side="left">
+<section class="screen" data-screen="system" data-accent="#0040ff" data-side="left">
+  <div class="slice"></div>
+  <div class="slice front"></div>
+
+  <h1 class="stagger"><span class="reveal"><span class="reveal-text">System</span><span class="reveal-bar"></span></span></h1>
+  <span class="kicker stagger">Access and service</span>
+
+  <section class="module stagger">
+    <span class="module-label">Access</span>
+    <div class="row">
+      <span class="row-name">Shizuku</span>
+      <button class="grant" id="status-shizuku" onclick="Panel.requestShizuku()">checking</button>
+    </div>
+    <div class="row">
+      <span class="row-name">Accessibility</span>
+      <button class="grant" id="status-accessibility" onclick="Panel.requestAccessibility()">checking</button>
+    </div>
+    <div class="row">
+      <span class="row-name">Notifications</span>
+      <button class="grant" id="status-post" onclick="Panel.requestPostNotifications()">checking</button>
+    </div>
+    <div class="row">
+      <span class="row-name">Notification access</span>
+      <button class="grant" id="status-listener" onclick="Panel.requestNotificationAccess()">checking</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="row depends">
+      <span class="row-name">Status bar</span>
+      <button class="grant" id="status-statusbar" onclick="Panel.toggleStatusBar()">checking</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Stops the bubbles, not the app: the accessibility service is what draws every window, so
+         turning it off is the whole stop — and the Accessibility button above is the way back. It
+         is here rather than beside a debug state because it is the same fix as revoking that
+         permission by hand, which is what it replaces. -->
+    <button class="pronounced" onclick="Panel.stopBubbles()">Force stop the bubbles</button>
+    <button class="pronounced" onclick="Panel.openApplicationInfo()">Open app info</button>
+    <p class="note">* Shizuku's shell UID, so it reads "no access" until Shizuku is connected. Everything above it grants itself from here once Shizuku is; without it a press opens the system page instead.</p>
+  </section>
+</section>
+
+<section class="screen" data-screen="settings" data-accent="#5bfd5b" data-side="right">
   <div class="slice"></div>
   <div class="slice front"></div>
 
   <h1 class="stagger"><span class="reveal"><span class="reveal-text">Dynamic Bubble</span><span class="reveal-bar"></span></span></h1>
   <span class="kicker stagger">Appearance</span>
 
-  <section class="module stagger">
-    <span class="module-label">Pill</span>
-    <div id="fields"></div>
-    <p class="note">Transparency applies to the pill background only. Icons and text stay fully opaque.</p>
-  </section>
-
-  <span class="module-caption stagger">Every change applies to the live overlay immediately.</span>
+  <!-- One module per thing being changed rather than one module called "Pill": twenty cards under
+       one heading is a list nobody reads twice, and the group a setting sits in is most of what
+       says which of them is the one to touch. -->
+  <div id="fields"></div>
 </section>
 
 <section class="screen" data-screen="debug" data-accent="#ffb020" data-side="right">
@@ -287,141 +514,119 @@
       <span class="row-name">Service</span>
       <span class="status" id="status-service">checking</span>
     </div>
-    <p class="note">
-      The bubble runs as an accessibility service: that is the only window an ordinary app can
-      put <b>above</b> the status bar, which is what makes the whole bubble tappable. Android
-      starts and stops it with the toggle — there is nothing to start from here.
-    </p>
     <div class="actions">
       <button class="wide" onclick="Panel.testNotification()">Send test notification</button>
     </div>
   </section>
 
   <section class="module stagger">
-    <span class="module-label">States</span>
-    <p class="note">
-      Every state the bubble can be in, without waiting for a real song, a real timer or a real
-      call. Each button sets up what that state needs and then shows it. <b>Walk every state</b>
-      runs the whole list in a fixed order, slowly enough to record — two recordings, before and
-      after a change, are what a regression shows up in.
-    </p>
+    <span class="module-label">Every state</span>
     <div class="actions">
       <button class="wide" onclick="Panel.stageSequence()">Walk every state</button>
-      <button onclick="Panel.stage('idle')">Idle</button>
-      <button onclick="Panel.stage('clear')">Clear</button>
-      <button onclick="Panel.stage('media')">Media</button>
-      <button onclick="Panel.stage('media-paused')">Media paused</button>
-      <button onclick="Panel.stage('timer')">Timer</button>
-      <button onclick="Panel.stage('timer-paused')">Timer paused</button>
-      <button onclick="Panel.stage('call')">Call</button>
-      <button onclick="Panel.stage('call-phone')">Call, phone</button>
-      <button onclick="Panel.stage('media-timer')">Two mods</button>
-      <button onclick="Panel.stage('media-timer-call')">Three mods</button>
-      <button onclick="Panel.stage('alert')">Alert</button>
-      <button onclick="Panel.stage('alert-image')">Alert, photo</button>
-      <button class="wide" onclick="Panel.stage('alert-over-mod')">Alert over a mod</button>
-      <button onclick="Panel.stage('torch')">Torch on</button>
-      <button onclick="Panel.stage('torch-off')">Torch off</button>
-      <button onclick="Panel.stage('battery-charging')">Charging</button>
-      <button onclick="Panel.stage('battery-low')">Battery low</button>
-      <button class="wide" onclick="Panel.stage('battery-critical')">Battery critical</button>
     </div>
   </section>
 
+  <!-- One module per kind of state, because a wall of thirty buttons is a wall whatever order it
+       is in and the group a state belongs to is how it is looked for. -->
+  <div id="states"></div>
+
   <section class="module stagger">
     <span class="module-label">Touch</span>
-    <p class="note">
-      Where the last finger landed, and what the bubble made of it. Touch the bar, then come back
-      here and read it — there is no adb on this phone, so this is the only way a question about a
-      coordinate gets an answer instead of a guess.
-    </p>
     <pre class="note" id="trace">—</pre>
   </section>
 
   <section class="module stagger">
     <span class="module-label">Replay</span>
-    <p class="note">
-      Each button replays that app's most recent real notification, image and all. If nothing has
-      arrived from it yet, a stand-in with its colours is sent instead.
-    </p>
     <div class="actions" id="replays"></div>
   </section>
 </section>
 
-<section class="screen" data-screen="system" data-accent="#0040ff" data-side="right">
-  <div class="slice"></div>
-  <div class="slice front"></div>
-
-  <h1 class="stagger"><span class="reveal"><span class="reveal-text">System</span><span class="reveal-bar"></span></span></h1>
-  <span class="kicker stagger">Access and service</span>
-
-  <section class="module stagger">
-    <span class="module-label">Access</span>
-    <div class="row">
-      <span class="row-name">Accessibility</span>
-      <span class="status" id="status-accessibility">checking</span>
-      <button onclick="Panel.requestAccessibility()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">Notifications</span>
-      <span class="status" id="status-post">checking</span>
-      <button onclick="Panel.requestPostNotifications()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">Notification access</span>
-      <span class="status" id="status-listener">checking</span>
-      <button onclick="Panel.requestNotificationAccess()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">Shizuku</span>
-      <span class="status" id="status-shizuku">checking</span>
-      <button onclick="Panel.requestShizuku()">Grant</button>
-    </div>
-    <div class="row">
-      <span class="row-name">System pop-ups</span>
-      <span class="status" id="status-headsup">checking</span>
-      <button onclick="Panel.toggleHeadsUp()">Toggle</button>
-    </div>
-    <p class="note">
-      With system pop-ups suppressed the bubble is the only thing that announces a notification —
-      it still lands in the shade, nothing is dropped. Needs Shizuku: the switch is a global
-      setting no sideloaded app may write.
-    </p>
-    <p class="note">
-      Shizuku powers the microphone-access toggle on the pill. It has to be started after every
-      reboot, from the Shizuku app.
-    </p>
-    <p class="note">
-      A toggle greyed out as <b>Restricted setting</b> means Android is blocking a sideloaded app.
-      Open <b>App info</b>, use the three-dot menu, choose <b>Allow restricted settings</b>, then grant it again.
-    </p>
-    <div class="actions">
-      <button class="wide" onclick="Panel.openApplicationInfo()">Open app info</button>
-    </div>
-  </section>
-
-  <span class="module-caption stagger">Access is granted once; the accessibility toggle brings the bubble up.</span>
-</section>
-
 <nav>
+  <button data-goto="system">System</button>
   <button data-goto="settings">Settings</button>
   <button data-goto="debug">Debug</button>
-  <button data-goto="system">System</button>
 </nav>
 
 <script>
+  /* Grouped by what the setting *is*, and the group order is the order the modules appear in. A
+     field carrying `labels` has named answers and is built as buttons rather than as a slider. */
   const FIELDS = [
-    { key: 'widthDp',            name: 'Width',             min: 60,   max: 400 },
-    { key: 'heightDp',           name: 'Height',            min: 20,   max: 120 },
-    { key: 'horizontalOffsetDp', name: 'Horizontal offset', min: -200, max: 200 },
-    { key: 'verticalOffsetDp',   name: 'Vertical offset',   min: 0,    max: 200 },
-    { key: 'red',                name: 'Red',               min: 0,    max: 255 },
-    { key: 'green',              name: 'Green',             min: 0,    max: 255 },
-    { key: 'blue',               name: 'Blue',              min: 0,    max: 255 },
-    { key: 'backgroundAlpha',    name: 'Background alpha',  min: 0,    max: 100 },
-    { key: 'blurRadius',         name: 'Backdrop blur',     min: 0,    max: 60 },
-    { key: 'notificationIdentity', name: 'App identity',    min: 0,    max: 2,
+    { group: 'Position', key: 'horizontalOffsetDp', name: 'Horizontal', min: -200, max: 200 },
+    { group: 'Position', key: 'verticalOffsetDp',   name: 'Vertical',   min: 0,    max: 200 },
+
+    { group: 'Size', key: 'widthDp',    name: 'Width',     min: 60, max: 400 },
+    { group: 'Size', key: 'heightDp',   name: 'Height',    min: 20, max: 120 },
+    { group: 'Size', key: 'modWidthDp', name: 'Mod width', min: 20, max: 160 },
+
+    // The one lit colour, picked as a colour. A native colour input is the platform's own wheel
+    // on this WebView, which is a better picker than anything this page would grow and is the
+    // only control here that does not need a slider's drag rules.
+    { group: 'Colour', key: 'accentColor',     name: 'Accent',           color: true },
+    { group: 'Colour', key: 'red',             name: 'Red',              min: 0, max: 255 },
+    { group: 'Colour', key: 'green',           name: 'Green',            min: 0, max: 255 },
+    { group: 'Colour', key: 'blue',            name: 'Blue',             min: 0, max: 255 },
+    { group: 'Colour', key: 'backgroundAlpha', name: 'Background alpha', min: 0, max: 100 },
+
+    { group: 'Glass', key: 'blurRadius',  name: 'Backdrop blur', min: 0, max: 60 },
+    // Its own range as well as its own number: the screen behind an open panel is meant to stop
+    // being readable, which is further than any bubble's glass ever goes.
+    { group: 'Glass', key: 'scrimBlurRadius', name: 'Panel blur', min: 0, max: 150 },
+    { group: 'Glass', key: 'gooStrength', name: 'Goo strength',  min: 0, max: 200 },
+    { group: 'Glass', key: 'edgeMerge',   name: 'Wet the screen edges', min: 0, max: 1,
+      labels: ['No', 'Yes'] },
+
+    { group: 'Alerts', key: 'notificationIdentity', name: 'App identity', min: 0, max: 2,
       labels: ['Icon', 'Name', 'Both'] },
+    // Tenths of a second, because the store holds ints — read as seconds, stepped by half
+    // a second, since a tenth is under what anyone can tell an alert apart by.
+    { group: 'Alerts', key: 'alertDwellTenths', name: 'Alert stands for', min: 10, max: 200, step: 5,
+      read: tenths => (tenths / 10).toFixed(1) + 's' },
+
+    { group: 'Lock screen', key: 'lockOffsetDp',    name: 'Bubble X', min: -150, max: 150 },
+    { group: 'Lock screen', key: 'padlockOffsetDp', name: 'Lock icon Y', min: -150, max: 150 },
+    { group: 'Lock screen', key: 'notesShown',   name: 'Notes',     min: 0, max: 1, labels: ['No', 'Yes'] },
+    { group: 'Lock screen', key: 'padlockShown', name: 'Lock icon', min: 0, max: 1, labels: ['No', 'Yes'] },
+
+    { group: 'Behaviour', key: 'nowPushesRow', name: 'Now pushes the row', min: 0, max: 1,
+      labels: ['No', 'Yes'] },
+    // On, nothing can pull the shade down: a touchable strip stands on the top of the screen and
+    // swallows the gesture before SystemUI sees it. It is the one place this project spends the
+    // shade swipe on purpose, which is why it is a switch rather than how the bar behaves.
+    { group: 'Behaviour', key: 'barLocked', name: 'Lock the shade out', min: 0, max: 1,
+      labels: ['No', 'Yes'] },
+  ];
+
+  /* The debug states, grouped the way the bubble's own vocabulary groups them, so walking a
+     kind means walking one block rather than hunting a name down a wall of buttons. */
+  const STATES = [
+    { group: 'Base', states: [['idle', 'Idle'], ['clear', 'Clear'], ['locked', 'Lock screen']] },
+    { group: 'Mods', states: [
+      ['media', 'Media'], ['media-paused', 'Media paused'],
+      ['timer', 'Timer'], ['timer-paused', 'Timer paused'],
+      ['call', 'Call'], ['call-phone', 'Call, phone'],
+      ['recording', 'Recording'], ['download', 'Download'], ['upload', 'Upload'],
+      ['media-timer', 'Two mods'], ['media-timer-call', 'Three mods'],
+    ] },
+    { group: 'Alerts', states: [
+      ['alert', 'Alert'], ['alert-image', 'Alert, photo'],
+      ['alert-over-mod', 'Alert over a mod', true],
+      ['alert-stacking', 'Two from one sender', true],
+      ['alert-marked', 'Alert with date and money', true],
+    ] },
+    { group: 'Satellites', states: [
+      ['torch', 'Torch on'], ['torch-off', 'Torch off'],
+      ['battery-charging', 'Charging'], ['battery-low', 'Battery low'],
+      ['battery-critical', 'Battery critical', true],
+      ['connectivity', 'Wifi'],
+      ['connectivity-bluetooth', 'Bluetooth, with charge', true],
+      ['connectivity-hotspot', 'Hotspot on mobile', true],
+    ] },
+    { group: 'Transitions', states: [
+      ['mod-closing', 'A mod closing, one left', true],
+      ['satellite-closing', 'A satellite closing', true],
+      ['mod-to-idle', 'Last mod to idle', true],
+      ['now-flight', 'Now, out and home', true],
+    ] },
   ];
 
   const LEAVE_DURATION = 170;
@@ -431,9 +636,32 @@
 
   // #region ── appearance fields ──────────────────────────────────────────────
 
+  /** One module per group, in the order the table lists them. */
   function buildFields(preferences, defaults) {
-    const container = document.getElementById('fields');
+    const root = document.getElementById('fields');
+    const modules = new Map();
     for (const field of FIELDS) {
+      let container = modules.get(field.group);
+      if (!container) {
+        const module = document.createElement('section');
+        module.className = 'module stagger';
+        const label = document.createElement('span');
+        label.className = 'module-label';
+        label.textContent = field.group;
+        container = document.createElement('div');
+        module.append(label, container);
+        root.appendChild(module);
+        modules.set(field.group, container);
+      }
+      if (field.color) {
+        buildAccent(container, field, preferences, defaults);
+        continue;
+      }
+      if (field.labels) {
+        buildChoice(container, field, preferences, defaults);
+        continue;
+      }
+
       const wrapper = document.createElement('div');
       wrapper.className = 'field';
 
@@ -443,43 +671,173 @@
       name.textContent = field.name;
       const value = document.createElement('span');
       value.className = 'value';
+      head.append(name, value);
+
+      const slider = document.createElement('div');
+      slider.className = 'slider';
+      const track = document.createElement('div');
+      track.className = 'slider-track';
+      const fill = document.createElement('div');
+      fill.className = 'slider-fill';
+      const thumb = document.createElement('div');
+      thumb.className = 'slider-thumb';
+      track.append(fill, thumb);
+      slider.append(track);
+
+      const buttons = document.createElement('div');
+      buttons.className = 'field-buttons';
       const down = document.createElement('button');
-      down.className = 'quiet step';
-      down.textContent = '\u2212';
+      down.textContent = '−';
       const up = document.createElement('button');
-      up.className = 'quiet step';
       up.textContent = '+';
       const reset = document.createElement('button');
-      reset.className = 'quiet';
       reset.textContent = 'Reset';
-      head.append(name, value, down, up, reset);
+      buttons.append(down, up, reset);
 
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = field.min;
-      slider.max = field.max;
-
+      let current = field.min;
+      const clamp = to => Math.min(field.max, Math.max(field.min, Math.round(to)));
       const apply = written => {
-        slider.value = written;
-        value.textContent = field.labels ? field.labels[Number(written)] : written;
-        Panel.setPreference(field.key, Number(written));
+        current = clamp(Number(written));
+        const share = (current - field.min) / (field.max - field.min);
+        fill.style.width = (share * 100) + '%';
+        thumb.style.left = (share * 100) + '%';
+        value.textContent = field.read ? field.read(current) : current;
+        Panel.setPreference(field.key, current);
       };
 
       apply(preferences[field.key]);
-      // One step at a time, clamped, for the value that is next to the one showing —
-      // the case a finger on a 2px track is worst at.
-      const step = by => apply(
-        Math.min(field.max, Math.max(field.min, Number(slider.value) + by))
-      );
+      const step = by => apply(current + by);
 
-      slider.addEventListener('input', () => apply(slider.value));
-      down.addEventListener('click', () => step(-1));
-      up.addEventListener('click', () => step(1));
+      // The value comes from how far the finger has travelled since it went down, never from
+      // where it landed: a tap changes nothing, a scroll past a slider changes nothing, and a
+      // whole track's width of movement is the whole range whatever the screen is.
+      let from = null;
+      slider.addEventListener('pointerdown', event => {
+        from = { x: event.clientX, value: current, armed: false };
+      });
+      slider.addEventListener('pointermove', event => {
+        if (!from) return;
+        const travelled = event.clientX - from.x;
+        // Under the slop this is not a drag yet, so a finger on its way down the list is free
+        // to pass over a slider without moving it.
+        if (!from.armed) {
+          if (Math.abs(travelled) < 8) return;
+          from.armed = true;
+          slider.classList.add('dragging');
+          slider.setPointerCapture(event.pointerId);
+        }
+        apply(from.value + travelled / track.clientWidth * (field.max - field.min));
+      });
+      const release = () => {
+        from = null;
+        slider.classList.remove('dragging');
+      };
+      slider.addEventListener('pointerup', release);
+      slider.addEventListener('pointercancel', release);
+
+      down.addEventListener('click', () => step(-(field.step || 1)));
+      up.addEventListener('click', () => step(field.step || 1));
       reset.addEventListener('click', () => apply(defaults[field.key]));
 
-      wrapper.append(head, slider);
+      wrapper.append(head, slider, buttons);
       container.appendChild(wrapper);
     }
+  }
+
+  /**
+   * A setting with named answers, built as one button per answer. The marker is moved by
+   * transform across a grid of equal columns, so its travel needs no measuring and stays right
+   * when a label is wider than its neighbours.
+   */
+  function buildChoice(container, field, preferences, defaults) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+
+    // No value beside the name: the lit button is already the answer, and printing it a second
+    // time in the corner is the same fact said twice.
+    const head = document.createElement('div');
+    head.className = 'field-head';
+    const name = document.createElement('span');
+    name.textContent = field.name;
+    head.append(name);
+
+    const choices = document.createElement('div');
+    choices.className = 'choices';
+    const marker = document.createElement('div');
+    marker.className = 'choice-marker';
+    marker.style.width = `calc((100% - 6px) / ${field.labels.length})`;
+    choices.appendChild(marker);
+
+    const buttons = field.labels.map((label, index) => {
+      const button = document.createElement('button');
+      button.textContent = label;
+      button.addEventListener('click', () => {
+        apply(index);
+        Panel.triggerHaptic();
+      });
+      choices.appendChild(button);
+      return button;
+    });
+
+    const apply = chosen => {
+      const current = Math.min(field.max, Math.max(field.min, Math.round(chosen)));
+      marker.style.transform = `translateX(${current * 100}%)`;
+      buttons.forEach((button, index) =>
+        button.setAttribute('aria-pressed', String(index === current)));
+      Panel.setPreference(field.key, current);
+    };
+
+    apply(preferences[field.key]);
+    // A double-tap on the name is the reset, because a third button beside two answers would be
+    // read as a third answer.
+    name.addEventListener('dblclick', () => apply(defaults[field.key]));
+
+    wrapper.append(head, choices);
+    container.appendChild(wrapper);
+  }
+
+  /**
+   * The accent, which is a colour rather than three numbers and so is not a slider. It is stored
+   * as one 0xRRGGBB int because the store holds ints, and the settings screen wears it live: the
+   * screen that owns the setting is the one place a colour can be judged before it is committed.
+   */
+  function buildAccent(container, field, preferences, defaults) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+
+    const head = document.createElement('div');
+    head.className = 'field-head';
+    const name = document.createElement('span');
+    name.textContent = field.name;
+    const value = document.createElement('span');
+    value.className = 'value';
+    head.append(name, value);
+
+    const buttons = document.createElement('div');
+    buttons.className = 'field-buttons';
+    const picker = document.createElement('input');
+    picker.type = 'color';
+    picker.id = 'accent-picker';
+    const reset = document.createElement('button');
+    reset.textContent = 'Reset';
+    buttons.append(picker, reset);
+    wrapper.append(head, buttons);
+    container.appendChild(wrapper);
+
+    const screen = document.querySelector('.screen[data-screen="settings"]');
+    const apply = number => {
+      const hex = '#' + (number & 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
+      picker.value = hex;
+      value.textContent = hex;
+      screen.dataset.accent = hex;
+      if (screen.classList.contains('active')) {
+        document.documentElement.style.setProperty('--section-color', hex);
+      }
+      Panel.setPreference('accentColor', number & 0xFFFFFF);
+    };
+    apply(preferences[field.key]);
+    picker.addEventListener('input', () => apply(parseInt(picker.value.slice(1), 16)));
+    reset.addEventListener('click', () => apply(defaults[field.key]));
   }
 
   // #endregion ────────────────────────────────────────────────────────────────
@@ -491,14 +849,53 @@
     element.className = 'status ' + (isGranted ? 'granted' : 'blocked');
   }
 
+  /* Painted every time the panel is resumed and after every grant, so the sweep is fired off the
+     word actually changing rather than off the press — a press that opened the system's own page
+     and came back with nothing granted has nothing to announce. */
+  function paintGrant(id, isGranted, grantedWord, missingWord) {
+    const element = document.getElementById(id);
+    const word = isGranted ? grantedWord : missingWord;
+    const hasChanged = element.textContent !== word && element.textContent !== 'checking';
+    element.textContent = word;
+    element.className = 'grant ' + (isGranted ? 'granted' : 'blocked');
+    if (!hasChanged) return;
+    // Removed and re-added on a later frame, or the same class going off and back on is one
+    // computation and the animation never restarts.
+    element.classList.remove('landing');
+    requestAnimationFrame(() => element.classList.add('landing'));
+  }
+
   window.onStateChanged = state => {
-    paintStatus('status-accessibility', state.accessibility, 'granted', 'blocked');
-    paintStatus('status-post', state.postNotifications, 'granted', 'blocked');
-    paintStatus('status-listener', state.notificationAccess, 'granted', 'blocked');
-    paintStatus('status-shizuku', state.shizuku, 'connected', 'off');
-    paintStatus('status-headsup', state.headsUp === 'suppressed', 'suppressed', state.headsUp === 'unavailable' ? 'no access' : 'showing');
+    paintGrant('status-shizuku', state.shizuku, 'connected', 'off');
+    paintGrant('status-accessibility', state.accessibility, 'granted', 'blocked');
+    paintGrant('status-post', state.postNotifications, 'granted', 'blocked');
+    paintGrant('status-listener', state.notificationAccess, 'granted', 'blocked');
+    paintGrant('status-statusbar', state.statusBar === 'hidden', 'hidden', state.statusBar === 'unavailable' ? 'no access' : 'showing');
     paintStatus('status-service', state.serviceRunning, 'running', 'stopped');
   };
+
+  /** One module per group of debug states, in the order the table lists them. */
+  function buildStates() {
+    const root = document.getElementById('states');
+    for (const { group, states } of STATES) {
+      const module = document.createElement('section');
+      module.className = 'module stagger';
+      const label = document.createElement('span');
+      label.className = 'module-label';
+      label.textContent = group;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      for (const [name, text, isWide] of states) {
+        const button = document.createElement('button');
+        button.textContent = text;
+        if (isWide) button.className = 'wide';
+        button.addEventListener('click', () => Panel.stage(name));
+        actions.appendChild(button);
+      }
+      module.append(label, actions);
+      root.appendChild(module);
+    }
+  }
 
 
   /**
@@ -593,6 +990,7 @@
 
   const initialState = JSON.parse(Panel.readState());
   buildFields(initialState.preferences, initialState.defaults);
+  buildStates();
   buildReplays();
   window.onStateChanged(initialState);
   document.documentElement.style.setProperty('--section-color', screens[0].dataset.accent);

@@ -29,7 +29,9 @@ Four rule files in `.claude/rules/`, and each one owns a different question. A c
 - `adb install -r app/build/outputs/apk/debug/app-debug.apk` — reinstalling keeps the accessibility and notification-listener grants, so `grant.ps1` is only needed on a first install or after an uninstall.
 - `adb logcat -s IslandBubble` — every WebView console line from every page lands here, tagged with which page it came from.
 
-`adb` is not on PATH; it lives under the Android SDK's `platform-tools`. The phone is normally on wifi rather than USB — `adb connect 192.168.0.83:5555`. The port `adb mdns services` announces refuses the connection; 5555 works without pairing.
+`adb` is not on PATH; it lives under the Android SDK's `platform-tools`. The phone is normally on wifi rather than USB — `adb connect <phone>:5555`. The port `adb mdns services` announces refuses the connection; 5555 works without pairing.
+
+**The address is DHCP and does change**, so a hardcoded one here is a trap rather than a shortcut: it was `192.168.0.83` and is `192.168.0.192` today, and a failed `connect` on the old one reads as the phone being off rather than as the note being stale. With the cable in, `adb shell ip -f inet addr show wlan0` says what it is; `adb tcpip 5555` then opens the port and `adb connect` takes it over wifi, after which the cable can come out. `adb tcpip` restarts the daemon on the phone, so the USB entry leaves the device list — that is the mode switching, not the phone going away.
 
 The JDK and the SDK exist only on the machine the phone is flashed from. A checkout on any other machine can read and edit but cannot build or install, and must say so rather than reporting a phase done.
 

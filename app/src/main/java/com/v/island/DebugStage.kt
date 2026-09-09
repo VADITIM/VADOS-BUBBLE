@@ -29,10 +29,53 @@ object DebugStage {
 
     /** What the sequence walks, in the order it walks them. */
     private val SEQUENCE = listOf(
-        "idle", "media", "media-timer", "media-timer-call", "alert-over-mod",
-        "clear", "alert", "alert-image", "timer-paused", "call-phone",
-        "torch", "battery-charging", "battery-low", "clear"
+        "idle", "media", "media-timer", "media-timer-call", "satellite-closing",
+        "mod-closing", "mod-to-idle", "alert-over-mod",
+        "clear", "alert", "alert-marked", "alert-stacking", "alert-image",
+        "timer-paused", "call-phone",
+        "now-flight", "torch", "recording", "download", "upload",
+        "connectivity", "connectivity-bluetooth", "connectivity-hotspot",
+        "battery-charging", "battery-low", "locked", "clear"
     )
+
+    /** A transfer at a share of the way through, wearing the line the app's own text would. */
+    private fun transfer(kind: String, name: String, done: Int) {
+        BubbleService.deliverNowMods(
+            JSONObject()
+                .put("recording", JSONObject.NULL)
+                .put(
+                    "transfer",
+                    JSONObject()
+                        .put("mod", kind)
+                        .put("key", "stage-transfer")
+                        .put("label", name)
+                        .put("accent", "#4285f4")
+                        .put("since", System.currentTimeMillis() - 30_000)
+                        .put("done", done)
+                        .put("total", 100)
+                        .put("detail", "$done,4 von 118 MB · 12,1 MB/s")
+                        .put("actions", JSONArray())
+                )
+        )
+    }
+
+    /** What the phone is attached to, in the shape ConnectivityWatch publishes. */
+    private fun attached(
+        link: String,
+        level: Int,
+        bluetooth: JSONObject? = null,
+        hotspot: Boolean = false,
+        usb: Boolean = false
+    ) {
+        BubbleService.deliverConnectivity(
+            JSONObject()
+                .put("link", link)
+                .put("level", level)
+                .put("usb", usb)
+                .put("hotspot", hotspot)
+                .put("bluetooth", bluetooth ?: JSONObject.NULL)
+        )
+    }
 
     /** How long each staged state is left standing before the next one replaces it. */
     private const val STEP_MILLIS = 3500L
@@ -102,6 +145,120 @@ object DebugStage {
             "battery-critical" -> BubbleService.deliverBattery(battery("critical", 4))
 
             "clear" -> { clear(); BubbleService.deliverTorch(null) }
+
+            // A mod ending while another is still standing: the one that went closes, the
+            // one left over is a circle out at the side, and it runs back in and makes the
+            // bubble a mod bubble again. The merge, in other words — the transition with
+            // the most moving parts and the one nothing else here reaches.
+            "mod-closing" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                BubbleService.deliverTimer(timer(isPaused = false))
+                handler.postDelayed({ BubbleService.deliverTimer(null) }, 1400L)
+            }
+
+            // Three mods down to two, so a dot has to become a circle. The row's widths, its
+            // satellites and its dots are all worked out from the same list, and this is the
+            // only stage where that list shortens with something still past the circles.
+            "satellite-closing" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                BubbleService.deliverTimer(timer(isPaused = false))
+                BubbleService.deliverCall(call(phone = false))
+                handler.postDelayed({ BubbleService.deliverCall(null) }, 1400L)
+            }
+
+            // The last mod ending, which is a departure and not a repaint: the width comes
+            // back first and the glyph leaves down into the hole. Staged because an app being
+            // killed is the real cause and that is not something to arrange on purpose.
+            "mod-to-idle" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                handler.postDelayed({ BubbleService.deliverMedia(null) }, 1600L)
+            }
+
+            // The light out and back: born at the hole, flying to its spot by the clock, and
+            // the whole row standing aside for it — then the same in reverse.
+            // The Now bubble's other mods, each carrying the shape the real payload has. The
+            // recorder's buttons are staged with their real titles, because what a tap does is
+            // decided by matching those titles and a stage with different words would test
+            // nothing that ships.
+            "recording" -> BubbleService.deliverNowMods(
+                JSONObject()
+                    .put(
+                        "recording",
+                        JSONObject()
+                            .put("mod", "recording")
+                            .put("key", "stage-recording")
+                            .put("label", "Screen recorder")
+                            .put("since", System.currentTimeMillis() - 74_000L)
+                            .put("isPaused", false)
+                            .put(
+                                "actions",
+                                JSONArray()
+                                    .put(JSONObject().put("index", 0).put("title", "Pause"))
+                                    .put(JSONObject().put("index", 1).put("title", "Stop"))
+                            )
+                    )
+                    .put("transfer", JSONObject.NULL)
+            )
+
+            "download" -> transfer("download", "Kaufvertrag.pdf", 62)
+            "upload" -> transfer("upload", "IMG_4471.heic", 88)
+
+            // What the bubble at the right end of the bar wears, with and without a Modus.
+            "connectivity" -> attached(link = "wifi", level = 3)
+            "connectivity-bluetooth" -> attached(
+                link = "wifi",
+                level = 4,
+                bluetooth = JSONObject().put("name", "Buds3 Pro").put("charge", 64)
+            )
+            "connectivity-hotspot" -> attached(link = "mobile", level = -1, hotspot = true)
+
+            // The lock screen without locking the phone: the padlock, the notification bubbles
+            // and the bottom Now bubble all stand up, and the unlock is the merge home.
+            "locked" -> {
+                BubbleService.deliverMedia(media(isPlaying = true))
+                BubbleService.stageLock(true)
+                handler.postDelayed({ BubbleService.stageLock(false) }, 2600L)
+            }
+
+            "now-flight" -> {
+                BubbleService.deliverTorch(torch())
+                handler.postDelayed({ BubbleService.deliverTorch(null) }, 2200L)
+            }
+
+            // Three from the same sender inside one dwell, arriving the way a messenger really
+            // posts them: one notification rewritten, carrying every message so far. The first
+            // is an alert; the two after it append beneath it without the bubble announcing
+            // itself again, and by the third the oldest is being pushed off the top.
+            "alert-stacking" -> {
+                clear()
+                BubbleService.deliver(conversation("Are you around this evening?"))
+                handler.postDelayed({
+                    BubbleService.deliver(
+                        conversation(
+                            "Are you around this evening?",
+                            "I found the place we were talking about last week"
+                        )
+                    )
+                }, 900L)
+                handler.postDelayed({
+                    BubbleService.deliver(
+                        conversation(
+                            "Are you around this evening?",
+                            "I found the place we were talking about last week",
+                            "It is a five minute walk from you, we could go at eight"
+                        )
+                    )
+                }, 1800L)
+            }
+
+            // The marks in running text, on a message written the way this phone writes them:
+            // a German date, a clock time and an amount with the symbol after it.
+            "alert-marked" -> BubbleService.deliver(
+                notification().put("text", "Termin 27.08.2026 um 14:30, Anzahlung 7,80€ fällig")
+            )
         }
     }
 
@@ -181,6 +338,19 @@ object DebugStage {
             .put("imageBase64", JSONObject.NULL)
             .put("mediaState", JSONObject.NULL)
     }
+
+    /**
+     * One conversation as a messenger posts it: the same key rewritten each time, carrying
+     * every message so far in `lines` with the newest also standing as `text`. That array
+     * growing is the whole of what the alert stacks on.
+     */
+    private fun conversation(vararg messages: String): JSONObject = notification()
+        .put("key", "stage:conversation")
+        .put("title", "Mara")
+        .put("text", messages.last())
+        .put("lines", JSONArray().apply {
+            messages.forEach { put(JSONObject().put("text", it)) }
+        })
 
     private fun battery(state: String, percent: Int) =
         JSONObject().put("state", state).put("level", percent)

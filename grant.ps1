@@ -13,6 +13,12 @@ $bubble = "$package/$package.BubbleService"
 # are the grants themselves, which Settings would have done.
 & $adb shell appops set $package ACCESS_RESTRICTED_SETTINGS allow
 & $adb shell pm grant $package android.permission.POST_NOTIFICATIONS
+# The mobile link's generation (4G / 5G / E) for the Status bubble. Nothing else reads it.
+& $adb shell pm grant $package android.permission.READ_PHONE_STATE
+# What is paired and what it is called, for the Status bubble's Bluetooth connector. Without it the
+# device name reads back null and a profile proxy reports nothing connected — a silent empty answer
+# rather than a refusal, which is exactly what "Bluetooth is not recognised" looked like.
+& $adb shell pm grant $package android.permission.BLUETOOTH_CONNECT
 & $adb shell cmd notification allow_listener $listener
 
 # The accessibility list is written directly: it is a colon-separated string, and

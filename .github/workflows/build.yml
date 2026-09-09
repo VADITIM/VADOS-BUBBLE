@@ -1,0 +1,47 @@
+name: Build debug APK
+
+# The JDK and the Android SDK exist only on the machine the phone is flashed from, so a checkout
+# anywhere else can read and edit but cannot build; this workflow is that missing check, and the
+# rolling latest-debug release is how the APK reaches the phone without a cable or a GitHub login.
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Sideloading is the only way this app is installed, and a workflow artifact needs a signed-in
+      # browser to download; a prerelease asset does not, so the phone can fetch it directly.
+      - name: Publish to the rolling latest-debug release
+        if: github.ref == 'refs/heads/claude/ios-dev-plan-progress-xnyhqr' || github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-debug
+          name: Latest debug build
+          prerelease: true
+          body: "Debug APK from ${{ github.sha }} on ${{ github.ref_name }}. Sideload it; installing over an existing copy keeps the accessibility and notification-listener grants."
+          files: app/build/outputs/apk/debug/app-debug.apk

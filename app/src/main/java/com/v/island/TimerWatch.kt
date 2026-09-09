@@ -54,7 +54,8 @@ object TimerWatch {
             .put("remaining", remaining(summary) ?: JSONObject.NULL)
             .put(
                 "endsAt",
-                endsAt(summary, statusBarNotification.postTime) ?: JSONObject.NULL
+                (endsAt(summary, statusBarNotification.postTime) ?: endsAtByChronometer(notification))
+                    ?: JSONObject.NULL
             )
             // A paused timer is exactly the one that kept its remaining half and lost
             // its target: there is no wall clock to count down to any more, which is
@@ -86,7 +87,8 @@ object TimerWatch {
      * paused timer is left with, and the bubble reads its own clock off it so a
      * pause changes nothing but the counting.
      */
-    private val remainingPattern = Regex("""(\d+)\s*(std|h|min|s)\b""", RegexOption.IGNORE_CASE)
+    private val remainingPattern =
+        Regex("""(\d+)\s*(std|h|min|sek|s)\b""", RegexOption.IGNORE_CASE)
 
     /**
      * When the timer ends, as epoch millis.
@@ -113,9 +115,25 @@ object TimerWatch {
             value * when (part.groupValues[2].lowercase()) {
                 "std", "h" -> 3_600_000L
                 "min" -> 60_000L
+                // "Sek" and "s" are the same unit written two ways — One UI abbreviates German seconds either way depending on how much room the shade line has.
                 else -> 1_000L
             }
         }
+    }
+
+    /**
+     * The target the notification's own chronometer is counting down to, which is where the reading comes from when the summary is missing or written in words this parser does not know — the summary is a localised sentence and the only thing keeping the bubble's digits alive, so a build or a locale that phrases it differently leaves the bubble blank, and this is the machine-readable half of the same fact that One UI has to set for its own shade chronometer to run at all.
+     */
+    private fun endsAtByChronometer(notification: Notification): Long? {
+        val extras = notification.extras
+        // The key by its own name rather than by the constant: EXTRA_SHOWS_CHRONOMETER is @hide on
+        // this platform and does not compile, while the string it holds is what is actually in the
+        // bundle and has been stable since the field existed.
+        if (!extras.getBoolean("android.showChronometer", false) &&
+            !extras.containsKey(CHRONOMETER)
+        ) return null
+        if (!extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN, false)) return null
+        return notification.`when`.takeIf { it > System.currentTimeMillis() }
     }
 
     /**

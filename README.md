@@ -53,7 +53,7 @@ Every surface is a WebView so the identity is one implementation, not several:
 
 - `assets/dna.css` — the token layer: faces, palette, panel primitive, micro-label, bar-sweep reveal.
 - `assets/panel.html` — the control panel.
-- `assets/pill.html` — every bubble: the one at the cutout, its satellites, and the Now bubble out at the clock.
+- `assets/pill.html` — every bubble: the one at the cutout, its satellites, the clock at the left end of the bar and the Now mods it carries, and the lock screen's own.
 
 The four identity fonts live in `assets/fonts/` and are registered once, in `dna.css`.
 
@@ -219,38 +219,55 @@ left open.
 Every ongoing Discord notification counts as a call. Discord posts no other kind for any length of
 time, and the alternative is matching on channel names in whatever language the phone is set to.
 
-## The Now bubble
+## The Now mods, and the bubble that carries them
 
 Some states do not belong at the punch hole. The flashlight is one: One UI draws its own blue chip
-for it at the far left of the status bar, next to the clock, and a bubble that says the light is on
-has to stand exactly there or Samsung's chip shows through beside it. So there is a second bubble out
-by the clock, and it is named for the place rather than for the light — anything that belongs out
-there in future stands in the same spot.
+for it at the far left of the status bar, right beside the clock, and a bubble that says the light is
+on has to stand exactly there or Samsung's chip shows through next to it. A recording is the same kind
+of thing — something that is *happening*, as against the row's mods, which are something that is
+*playing* or *running*.
 
-It is still born at the punch hole. The pill leaves the bubble as a drop, travels the width of the
-bar, and only then stands there as a pill; on the way out it goes home the same way. The travel
-distance comes from the host, because the page does not know how wide the screen is.
+A download and an upload were here too, and they are the Status bubble's now. The line between the
+two ends of the bar turns out to be **who started it**: a torch and a recording are things the person
+did, and a file in flight is the phone working for whatever it is attached to, which is the same kind
+of fact as a cable being in. It stands over there as one slot beside USB — an arrow pointing the way
+the file is moving, and a tick for a moment when it lands — and it gave up the reading and the
+timeline it had here, because a slot is not a bubble and the shape it can take is not the same shape.
 
-It never retreats. One UI's chip is directly underneath it, so a pill that moved aside to make room
-would uncover the exact thing it exists to cover — that was built once and Samsung's blue chip
-appeared every time. The row is the side that yields instead, and it yields by
-moving rather than by shrinking: while the Now bubble is out, everything is pushed right until the
-main bubble's left edge stands at the punch hole, the Now bubble takes the bar that was given up,
-and the two rest a few pixels apart so the skin necks between them. The row is allowed one satellite
-while this is true; a second is run into the bubble, which takes the knock, and comes back as a dot.
-A state grown wide enough simply passes in front.
+There was a second bubble out there for them, standing on the chip a few pixels right of the clock.
+There is not any more, and the reason is that the two wanted the same corner: the clock had to leave
+whenever a mod came out, the row had to stand aside for both of them, and most of the motion at that
+end of the bar was two shapes getting out of each other's way. The clock carries the mods instead —
+the time when nothing is happening, the thing that is happening when something is. The name Now
+belongs to the lock screen's bubble now, which is the only place a Now bubble still stands.
 
-Tapping it opens the flashlight's own panel: five steps on a rail, the dot running between them as
-one body of liquid. Holding it is reserved for the states that will want it. The torch is read from
-`CameraManager.registerTorchCallback` rather than from this app's own taps, so the pill is right
-whoever lit the light — Samsung's tile, the quick settings panel, or the switch in the bubble's own
-Haptic panel.
+The hand-over is two beats and the order is the whole of it: the time gives way first, fading and
+walking left, and the box grows to the mod afterwards. The reading is the cause and the width is the
+consequence, which is the same rule a mod's glyph obeys when it arrives at the main bubble. Going
+back is that backwards — the width first, the time after it.
 
-It merges with the rest of the row like any other bubble, and that is why it is drawn in `pill.html`
-rather than in a page of its own. A shared blur filter reaches exactly as far as the surface it is
-drawn on, so for as long as this was a second window the drop could only ever *appear* out by the
-clock. On one canvas it genuinely separates from the bubble on the way out and is genuinely taken
-back into it on the way home.
+It never retreats. One UI's clock and its chip are directly underneath, so a bubble that moved aside
+to make room would uncover the exact thing it exists to cover — that was built once and Samsung's
+chip appeared every time. The row is the side that yields instead, and it yields by moving rather
+than by shrinking: while a mod is standing in the clock, everything is pushed right until the main
+bubble's left edge is at the punch hole, the clock takes the bar that was given up, and the two rest
+a few pixels apart so the skin necks between them. The row is allowed one satellite while this is
+true; a second is run into the bubble, which takes the knock, and comes back as a dot. A state grown
+wide enough simply passes in front.
+
+The torch has no closed face at all: a light that is on is shown as its panel — five steps on a rail,
+the dot running between them as one body of liquid — at the width the media player opens to, and it
+goes away by the light going out rather than by being tapped shut. The torch is read from
+`CameraManager.registerTorchCallback` rather than from this app's own taps, so the reading is right
+whoever lit it: Samsung's tile, the quick settings panel, or the switch in the bubble's own panel.
+The other three keep a resting face — a glyph, a short reading, and for a transfer a timeline along
+the bottom edge — and a tap on each means what that mod's one obvious act is: pause a recording,
+open the app carrying a file.
+
+All of it merges with the rest of the row like any other bubble, and that is why it is drawn in
+`pill.html` rather than in a page of its own. A shared blur filter reaches exactly as far as the
+surface it is drawn on, so for as long as any of this lived in a second window it could only ever
+*appear* to be part of the bar.
 
 ## Replacing the system pop-up
 
@@ -261,8 +278,13 @@ exactly what "the pop-ups are not suppressed" looked like:
 - Samsung's own **brief** pop-up, drawn by `com.samsung.systemui.notilus` off its own notification
   listener, off with `cmd notification disallow_listener`.
 
-Both need the shell UID, so the **System pop-ups** row does both through Shizuku and `grant.ps1`
-sets both directly. The notification still lands in the shade and still reaches the listener.
+Both need the shell UID, so both go through Shizuku, and `grant.ps1` sets them directly. The
+notification still lands in the shade and still reaches the listener.
+
+It is **not a switch any more**. It was a row in the panel, and a row is a question — and there is
+no answer to it but yes: the bubble exists to be the pop-up, so a phone showing both is a phone
+half set up. It is applied on every resume the moment a shell UID exists, and there is nothing to
+find and nothing to press.
 
 `NotificationAssistantService` would be the per-notification way to do this, but it is a `@SystemApi`
 and cannot be compiled against from a normal app.
@@ -294,10 +316,19 @@ are edge-triggered and remembered, so a slow drain announces once rather than on
 charging clears them for the next time down. The first, sticky broadcast only primes the state --
 without that a low battery would pop up on every install.
 
-Charging is drawn as the charge arriving: the fill runs from where the battery actually is up to
-full, holds, fades and starts again from the real level, so the animation never lies about how full
-the thing is. Low is the same fill at rest, breathing. Both can be exercised without waiting for a
-real battery:
+**The three do not all land in the same place.** Being plugged in is announced by the **Status
+bubble**, which is the one already carrying the charge — the news and the reading it is news about
+belong to one shape, and a bubble opening at the bottom of the screen to say something about a
+number standing at the top of it is two places for one fact. It is a takeover rather than a second
+shape: the readings in there shake where they stand and are pulled inwards one after another, left
+to right, and only once the bubble is empty does it open out around the bolt, which is the
+glyph-as-cause order read at bubble scale. No percentage — the number was on the bar a second ago
+and the news is that it is going up. After a few seconds the readings grow back one by one the same
+way any of them arrives.
+
+Running low stays on the **Double** at the bottom of the screen, which is where an announcement with
+no home on the bar belongs. It is drawn as the fill at rest, breathing. Both can be exercised
+without waiting for a real battery:
 
 ```
 adb shell cmd battery unplug; adb shell cmd battery set level 14
@@ -358,7 +389,7 @@ Next, in order — each of these is a phase, and each is why the one after it is
    Animations API with `composite: 'add'`, so an interaction layers onto what is already running
    instead of replacing it.
 
-After that: the Double bubble, the lock-screen bubbles, the alarm state, the Discord video tab and
+After that: the Double bubble, the lock-screen bubbles, the Discord video tab and
 the recording Now state — each one ordinary feature work standing on the contract in
 `.claude/rules/`.
 
