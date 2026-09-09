@@ -35,25 +35,24 @@ const liquidLayers = {
  * same shape the two satellites already are. Mirrors NOTES_LIMIT in notes.js.
  */
 /**
- * The quick settings' modules are in here because they are bubbles: they are in the same body of
- * liquid the row is, they neck into each other and into the charge standing beside them, and they
- * are slung home into the Status bubble rather than being switched off. A module left out of this
- * list would be the one shape in the panel painting its own background — see bubbles.md.
+ * The quick settings' modules are **not** in here, and that is the one entry in this list worth
+ * arguing about. They were — fifteen blobs, on the reading that a module standing on its own is a
+ * bubble in every sense bubbles.md means one — and what that bought was a panel made of glue. The
+ * melt is one number for the whole layer, read off the smallest gap between any two shapes in it
+ * (`meltBy`), and these fifteen stand in a grid whose gap is a hair: with them measured the layer
+ * sat pinned at its ceiling for as long as the panel was up, so every module welded to its
+ * neighbours into one sheet with dents in it — and the row at the cutout, which shares the layer,
+ * welded along with them. Necking is what two shapes do when they come near each other; it is not
+ * what a grid of controls does, and a grid is what this is.
  *
- * There are fifteen of them rather than six because the four groups were broken up: every connector
- * and every state is its own bubble now, which is what lets one of them be thrown in and slung home
- * on its own. The names are the control's own `data-toggle`, so a switch added to the panel is a
- * name here and a `quick-` line in QUICK_MODULES and nothing else.
- *
- * The cable is the one control in the panel that is **not** here: it stands inside the foot module
- * rather than beside it, and a pane over pixels another pane already covers frosts them twice.
+ * So they paint themselves — `.quick-bubble` in pill.css keeps its own background and border, and
+ * html.liquid leaves it alone — and they are no panes either, which they already were not: they
+ * stand on the screen the scrim has frosted, and a pane under each of them frosts the same
+ * wallpaper twice. Nothing about them rides this bridge any more.
  */
 const BLUR_PANES = [
   'main', 'left', 'right', 'lock', 'status', 'clock', 'double', 'padlock',
   'note0', 'note1', 'note2', 'note3', 'note4',
-  'quickHotspot', 'quickPlane', 'quickGps', 'quickMobile', 'quickWifi', 'quickBluetooth',
-  'quickModus', 'quickDim', 'quickRotate', 'quickSaver', 'quickRecording', 'quickMic',
-  'quickBright', 'quickVolume', 'quickMedia',
 ];
 
 /**
@@ -87,26 +86,8 @@ function sourceOf(name) {
   if (name === 'padlock') return padlockPill;
   if (name === 'lock') return lockPill;
   if (name.startsWith('note')) return noteAt(Number(name.slice(4)));
-  if (name.startsWith('quick')) return quickModule(name);
   return satellites[name];
 }
-
-/** Which box each quick-settings module is. Resolved once — the markup is static, and a query per module per frame is fifteen of them for elements that cannot change. The twelve switches are looked up off the same `data-toggle` their pane is named after, so the two cannot drift apart by a typo the way a hand-written list of ids could. The cable is excluded by id: it is a `.quick-mode` like the rest and would be picked up by the same query, but it has no pane of its own — see BLUR_PANES. */
-const QUICK_MODULES = Object.assign(
-  {
-    quickBright: document.querySelector('.level[data-level="brightness"]'),
-    quickVolume: document.querySelector('.level[data-level="volume"]'),
-    quickMedia: document.getElementById('quick-media'),
-  },
-  Object.fromEntries([...document.querySelectorAll('.quick-mode:not(#quick-media-usb), .quick-knob')].map(control => [
-    'quick' + control.dataset.toggle[0].toUpperCase() + control.dataset.toggle.slice(1),
-    control,
-  ])),
-);
-const quickModule = name => QUICK_MODULES[name];
-
-/** The frame the modules stand in, which is also what says whether any of them are standing. */
-const quickPanel = document.getElementById('quick-panel');
 
 /**
  * A satellite that is not dressed has no skin: it is not merely invisible, it is
@@ -137,12 +118,6 @@ function isSkinned(name) {
   // Only as many as are actually standing there. A repaint can shrink the list from five notes
   // to two without this frame knowing in advance, which is exactly what noteAt() answers.
   if (name.startsWith('note')) return Boolean(noteAt(Number(name.slice(4))));
-  // Only while the panel is up, and through the sling as well as the stand: `leaving` is what holds
-  // the modules on screen while they fly home, and a skin dropped at the start of that flight is
-  // six bubbles that stop being liquid exactly as they run into the one taking them in.
-  if (name.startsWith('quick')) {
-    return quickPanel.classList.contains('showing') || quickPanel.classList.contains('leaving');
-  }
   // Only while the row is a row. A grown bubble is one shape with nothing beside it,
   // and a satellite still holding a mod behind it is not standing on the bar — it
   // would be a frosted circle out at the side of an open panel.
@@ -227,10 +202,10 @@ function mirrorFrame() {
     // A shape at zero opacity has no skin, and until now only the *pane* knew that: `sendBlurFrame`
     // has always dropped a region under `alpha < 0.01` and the blob went on being drawn from the box
     // alone. Everything that fades here used to fade while its class was still on and be dropped a
-    // moment later when the class went, so the two frames nobody saw hid it — and a module leaving
-    // the quick panel is the case where that stops being true, because the class it is dropped by
-    // comes off on a timer and the mirror can stop before it. A blob left drawn is a lump of liquid
-    // standing over the wallpaper for as long as nothing else stirs the mirror.
+    // moment later when the class went, so the two frames nobody saw hid it — and any shape whose
+    // class comes off on a *timer* is the case where that stops being true, because the mirror can
+    // stop before the timer does. A blob left drawn is a lump of liquid standing over the wallpaper
+    // for as long as nothing else stirs the mirror.
     if (!seen || !seen.box.width || (!isNaN(seen.alpha) && seen.alpha < 0.01)) {
       blob.edge.style.display = 'none';
       blob.fill.style.display = 'none';
@@ -383,22 +358,9 @@ function scrimRegion() {
   ].join(',');
 }
 
-/**
- * Whether a shape gets glass of its own, which is not the same question as whether it is liquid.
- * The quick settings' modules are the one set that answers no: they stand on the frosted screen the
- * panel already puts up, so a pane under each of them is the same wallpaper blurred twice — darker
- * and duller under every module than between them, which reads as six grey cards rather than as
- * glass. They keep their blob, so they go on necking into each other and into the charge; what they
- * give up is only the second frost. Their panes stay in the list and are simply sent empty, because
- * the host's panes are a fixed `View` list and a pane's index is its position in this one.
- */
-function isGlazed(name) {
-  return !name.startsWith('quick');
-}
-
 function sendBlurFrame(measured) {
-  const spec = [scrimRegion()].concat(measured.map((seen, index) => {
-    if (!seen || !seen.box.width || !isGlazed(blobs[index].name)) return '';
+  const spec = [scrimRegion()].concat(measured.map(seen => {
+    if (!seen || !seen.box.width) return '';
     // A shape mid-fade keeps its box, so the pane is shrunk on the fade instead and
     // stays centred on the shape while it closes to nothing.
     const alpha = isNaN(seen.alpha) ? 1 : seen.alpha;

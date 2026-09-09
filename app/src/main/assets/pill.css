@@ -538,9 +538,9 @@ html.grown #liquid { height: 100%; }
    painting its own opaque edge on top of the skin, which is why the one bubble whose
    background came from the same custom property as everyone else's still read as a
    different alpha — the rim was solid where the others were glass. */
+/* The quick settings' modules are deliberately not in this rule: they are not in the goo layer at all, so nothing else is painting them and blanking them here would leave fifteen invisible boxes on a frosted screen. See the note on BLUR_PANES in js/liquid.js for why they left it. */
 html.liquid #pill, html.liquid .satellite, html.liquid #lock-now, html.liquid .lock-note,
-html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #padlock,
-html.liquid .quick-bubble {
+html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #padlock {
   background: transparent;
   border-color: transparent;
 }
@@ -2135,10 +2135,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    while the box was a bubble with glass on it and the growth was the thing being watched. It is
    neither now: the skin comes off for the whole of `open` (see `isSkinned`), so the box draws
    nothing and there is no growth to hide anything behind, and the one thing left inside it is the
-   charge, which is fired up from a third of a screen below and would spend most of that flight
-   outside a clip the size of the cell — arriving out of its own bottom edge instead of off the
-   screen. A closed slot arriving overshoots its own size too, which is why this was never allowed
-   in any other state. */
+   charge, which does not fly at all any more — the growth *is* its arrival, so what a clip the size
+   of the cell would still cut is the overshoot on the box's own landing. A closed slot arriving
+   overshoots its own size too, which is why this was never allowed in any other state. */
 
 /* The cell, and nothing else. Sized in advance from the same two numbers `#status.open` is given
    rather than with `inset: 0`, for the reason that has not changed: the bubble's width and height
@@ -2373,8 +2372,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    repeating that leaves nowhere for the half that is news. Only what is attached is written.
    No outline on these, lit or unlit. The cell is already a shape — a squircle of lighter glass on
    a dark panel — and an outline around a glyph that fills it is a second edge drawn just inside the
-   first. What says a connector is on is its own colour and the light coming off the glyph, which is
-   a thing the eye reads before it reads a border anyway. */
+   first. What says a connector is on is its name taking the accent and its watermark coming up out
+   of the cell, and **nothing about its background**: the whole of the cell going bright is the one
+   reading this panel may not use, because the glyph here is drawn at the size of the cell and
+   anything lighting it lights the entire bubble. That is the same rule the glow fell to. */
 #quick-row-links .quick-mode {
   position: relative;
   overflow: hidden;
@@ -2383,7 +2384,17 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   gap: 0;
   border: none;
 }
-#quick-row-links .quick-mode.on { box-shadow: none; }
+/* The ring and the wash both, and the background is written back to the resting one rather than left
+   out: `.quick-mode.on` tints the box a sixth of the way to the accent, which never painted while the
+   modules were blanked for the skin to draw them — the skin read a `--blob-fill` nobody set here and
+   drew the resting colour. Out of the goo layer the box paints itself, so that tint would have come
+   back from the dead as a lit-up cell in the same breath as the glow was taken off it. It stays a
+   dead letter here on purpose; it is live on the cable, which is a `.quick-mode` and not one of the
+   bubbles, and that is the one place in the panel where a background may say on. */
+#quick-row-links .quick-mode.on {
+  box-shadow: none;
+  background: var(--pill-background);
+}
 /* Audiowide and not the panel's Mono: this is the one word on the cell that this interface *chose*,
    and everything else in the panel is a reading that came from somewhere else. A name in the display
    face and a router's name in mono is the difference said in the type rather than in a rule about
@@ -2408,7 +2419,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   inset: 0;
   pointer-events: none;
   opacity: 0.16;
-  transition: opacity 200ms ease, filter 200ms ease;
+  transition: opacity 200ms ease;
 }
 #quick-row-links .quick-mode svg {
   width: auto;
@@ -2416,15 +2427,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   /* The glyph is drawn to a square box and the cell is wider than it is tall, so filling the
      height is what fills the cell — filling the width would leave it standing in a letterbox. */
 }
-/* The light a lit connector gives off, and it is the glyph that gives it: `drop-shadow` follows the
-   alpha of what is drawn, so an aeroplane glows aeroplane-shaped where a `box-shadow` would glow
-   cell-shaped — which is the border this rule just took away, coming back as a halo. Two of them,
-   near and far, because one radius is a rim and the light wants a core and a bloom. Only on the
-   glyph: the name over it stays a flat colour, since a word wearing the same halo is a word out of
-   focus. Transitioned with the opacity so switching a radio on is one movement of light. */
+/* A lit connector says so by the watermark coming up out of the cell and by the name over it taking
+   the accent, and by nothing else. It used to give off light as well — two `drop-shadow`s on the
+   glyph, near and far, a core and a bloom — and at the size this watermark is drawn, a glyph filling
+   the whole cell, the bloom is not a halo round a mark but a wash across the entire bubble: the cell
+   read as lit from behind rather than as a shape that had been switched on, which is a background
+   where the drawing wanted a glyph. Brightness is the wrong axis for this reading anyway — what says
+   a radio is on is the name underneath it naming what it is attached to. */
 #quick-row-links .quick-mode.on .quick-icon {
   opacity: 0.42;
-  filter: drop-shadow(0 0 6px var(--section-color)) drop-shadow(0 0 18px var(--section-color));
 }
 
 /* A drag and never a tap, exactly as the settings panel's sliders are and for the same reason: a
@@ -2503,9 +2514,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease, scale 200ms var(--ease-split);
 }
 .quick-knob:active { scale: 0.94; }
+/* The ring and the glyph, and no wash behind them: being lit is the inset shadow, which is what a
+   switch's own knob already was. The tint that used to be written here painted nothing — the modules
+   were blanked for the skin to draw them and the skin drew the resting colour — so it is taken out
+   rather than allowed back in by the box now painting itself, which would have lit six circles
+   nobody asked to change. */
 .quick-knob.on {
   color: var(--section-color);
-  background: color-mix(in srgb, var(--section-color) 16%, transparent);
   box-shadow: inset 0 0 0 2px var(--section-color);
 }
 .quick-knob.unavailable { opacity: 0.4; }
@@ -2603,8 +2618,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* The dark ground alone. The frost behind it is on its own 450ms clock and is still the last thing on the screen to go — it is what the panel was standing on, so it outlives the panel rather than leaving with it — but it no longer outlives it by three quarters of a second. */
 #quick-panel.leaving #quick-scrim { opacity: 0; transition-duration: 140ms, 450ms; }
 
-/* What every module is made of. The skin is the liquid's — html.liquid blanks the background and
-   the mirror paints it — so what is written here is the shape, and the shape is what is measured. */
+/* What every module is made of, and it paints all of it. These are the one set of shapes in the
+   project that draw like bubbles and are deliberately not in the goo layer — a grid of controls a
+   hair apart pinned the layer's one melt number at its ceiling and welded the panel, and the row
+   sharing the layer, into a single sheet. So html.liquid does not blank this rule the way it blanks
+   every bubble on the bar, and the background and the border below are what is actually seen. */
 .quick-bubble {
   position: relative;
   box-sizing: border-box;
@@ -2814,18 +2832,26 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   opacity: 1;
   animation: bubble-pop 150ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
 }
-/* Fired up from a third of a screen below, out of nothing, and caught by a magnet at the top of the
-   flight: the module overshoots the place it belongs, hangs there for a frame, and is dragged the
-   last few pixels back down onto it. That drag is the whole of the effect — a shot that simply
-   decelerated into place is a box being flown to a coordinate, and what makes it read as *pulled*
-   is that it went past and had to come back.
+/* Fired up from below the bottom edge of the screen, out of nothing, and caught by a magnet at the
+   top of the flight: the module overshoots the place it belongs, hangs there for a frame, and is
+   dragged the last few pixels back down onto it. That drag is the whole of the effect — a shot that
+   simply decelerated into place is a box being flown to a coordinate, and what makes it read as
+   *pulled* is that it went past and had to come back.
    It was a 12px rise from a fifth of its size, which is a nudge: at that distance there is nothing
    to accelerate out of and nothing to be caught from, and the launch and the catch collapse into
-   one small wobble. The distance is what makes the two phases separable, so the throw is written
-   from the screen rather than in pixels — `--quick-throw`, thirty percent of the real display
-   height, mirrored out of `fitStatusPanel` because the page cannot ask `vh` for it: the layout
-   viewport this WebView hands out is 877 tall inside a 780-tall surface, so `30vh` is a third of a
-   screen that does not exist. */
+   one small wobble.
+   `--quick-throw` is **per module and measured**, not one number for the set, and that is the whole
+   of the difference between a set that comes off the screen and a set that comes off nothing. It
+   was thirty percent of the display height written once on the root — which is a *relative* start,
+   the same distance below each module's own place rather than the same place — so what every module
+   had in common was its journey and not where it began: the top row set off from a third of the way
+   down the screen, the foot module from below the bottom edge, and fifteen shapes launched from
+   fifteen heights read as the panel assembling out of its own middle. Written per module as the
+   distance from that module's own top down to the screen's bottom edge (`shuffleQuickRanks`), every
+   one of them starts underneath the screen and the row nearest the foot simply has least to travel.
+   It is measured in the script rather than left as a `vh` here for the reason `screenHeight()`
+   exists at all: the layout viewport this WebView hands out is 877 tall inside a 780-tall surface,
+   so every viewport unit in this page is a share of a screen that is not there. */
 @keyframes bubble-pop {
   0% {
     opacity: 0;
@@ -2895,14 +2921,19 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    own base while the level runs up from the floor behind the glass. The rise is a `translate` on
    the fill rather than its height, so it costs no layout and rides over the height transition the
    charge itself already owns. */
-/* `bubble-pop` itself, and it takes a rank like every other module does. It had a copy of that keyframe under its own name and a delay of `--panel-at` with nothing added to it, which is two faults in one rule: a duplicated animation is one that will be tuned in one place and not the other, and no rank made the charge unconditionally the first thing on the screen — a head start nothing earned, since the charge is not the subject of the panel but one reading in it. Being in `shuffleQuickRanks`'s list is the whole of what it gets instead, so where it falls in the queue is drawn fresh on every open, and the tilt comes with it: a set where fifteen things were thrown and one was placed reads as one thing being placed. */
-#status-panel.showing #quick-battery {
-  transform-origin: bottom;
-  animation: bubble-pop 150ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
-}
-/* Behind its own cell by the same rank, or the well fills before there is a well to fill: the pour used to start with the panel because the cell did too, and the two have to stay tied now that the cell can be last in the queue. */
+/* The charge has no arrival of its own, and that is the rule rather than an omission. It is not a
+   module standing in the panel — it is the face of the Status bubble, and the Status bubble opening
+   out into it *is* its animation: the box grows down out of the closed pill and the cell is what the
+   box now is. Thrown in on `bubble-pop` as well, as it was, the one shape on the screen with a
+   genuine growth behind it was the one shape also flying: the cell came up from a third of a screen
+   below, crooked on its own tilt, while the bubble it is the inside of was opening out around it —
+   two answers to one arrival, and the reason it read as the battery sliding in from the side of a
+   bubble that was expanding anyway. Nothing here moves the cell; the growth is the whole of it. */
+/* The pour is the exception and belongs to the cell rather than to its arrival: it is the liquid
+   running up out of the well's own floor once there is a well, so it keeps the panel's clock and no
+   longer waits on a rank the charge does not have. */
 #status-panel.showing #battery-fill {
-  animation: liquid-pour 320ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
+  animation: liquid-pour 320ms var(--ease-enter) var(--panel-at, 0ms) backwards;
 }
 
 /* The states used to have an arrival of their own — thrown in small and off true, after the module
