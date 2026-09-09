@@ -137,6 +137,7 @@ html, body {
     border-radius var(--grow-ms) ease-out,
     top var(--grow-ms) var(--ease-grow),
     padding-right var(--grow-ms) var(--ease-grow),
+    padding-bottom var(--grow-ms) var(--ease-grow),
 
     translate var(--carry-ms, var(--shift-ms, var(--grow-ms))) var(--ease-split) var(--shift-delay, 0ms),
     scale 350ms linear,
@@ -2289,21 +2290,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #quick-media-usb {
   flex-direction: row;
   justify-content: flex-start;
+  align-items: center;
   gap: 0.55rem;
-  height: var(--quick-media-cable);
+  height: 44px;
   flex: none;
-  
-
-
-  margin-top: auto;
-  padding: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-  background: none;
-  
-
-
-  box-shadow: none;
+  padding: 0 0.85rem;
 }
 
 
@@ -2613,12 +2604,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   
 
   --quick-links-tall: 300px;
-  
-  --quick-media-tall: 54px;
-  
+
   --quick-pop: 460ms;
-  
-  --quick-media-cable: 30px;
 }
 
 #quick-panel {
@@ -2723,30 +2710,32 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   gap: var(--quick-gap);
   flex: 1;
   min-height: 0;
+  transition: flex-basis 320ms var(--ease-split);
 }
 
 
 #quick-row-knobs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(2, auto);
-  align-content: space-between;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
   gap: var(--quick-gap);
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 #quick-row-levels {
   display: flex;
   gap: var(--quick-gap);
-  
 
 
 
-
-
+  min-width: 130px;
   width: 179px;
-  flex: none;
+  flex: 0 1 179px;
+  min-height: 0;
 }
+/* Main's dock takes its height from #quick-row-body's own flex-basis (fitPillDock() in status.js, mirroring --pill-dock-tall), so the knobs and levels flex-scale down with it instead of clipping. */
 
 
 
@@ -2754,115 +2743,27 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-#quick-media {
-  height: var(--quick-media-tall);
-  margin-bottom: calc(-1 * var(--quick-margin));
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0 0.85rem;
-  transition: height 320ms var(--ease-split);
-}
-
-
-
-#quick-media.sounding { height: calc(var(--quick-media-tall) * 2.5); }
-
-
-
-#quick-media.cabled { height: calc(var(--quick-media-tall) + var(--quick-media-cable)); }
-#quick-media.sounding.cabled { height: calc(var(--quick-media-tall) * 2.5 + var(--quick-media-cable)); }
-
-
-
-#quick-media.sounding #quick-media-head,
-#quick-media.sounding #quick-media-track { display: none; }
-#quick-media:not(.sounding) #quick-media-now { display: none; }
-#quick-media-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.6rem;
-}
-#quick-media-kind {
-  font-size: 0.6rem;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-#quick-media.running #quick-media-kind { color: var(--section-color); }
-#quick-media-reading {
+/* Main-Status-Idle's own dock: #pill.panel-dock (below, near --pill-dock-* vars) is the box. */
+/* #player-face is reused verbatim inside it — .face is already inset:0, so it fills whatever */
+/* height fitPillDock() gives the box with no dock-specific override needed. #dock-transfer is */
+/* the one piece of markup this state adds, since Main carries no transfer face anywhere else; */
+/* it is pinned under #player-face, always at the very bottom, never the reverse (states.md). */
+#dock-transfer {
+  display: none;
+  position: absolute;
+  left: 1.1rem;
+  right: 1.1rem;
+  bottom: 0.85rem;
+  align-items: center;
+  gap: 0.5rem;
   font-family: "Mono", monospace;
   font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
   color: var(--text-body);
 }
-
-
-#quick-media-track {
-  height: 2px;
-  border-radius: 999px;
-  background: var(--border);
-  overflow: hidden;
-  transition: height 220ms var(--ease-split);
-}
-#quick-media.running #quick-media-track { height: 8px; }
-#quick-media-fill {
-  height: 100%;
-  width: var(--transfer-share, 0%);
-  border-radius: 999px;
-  background: var(--section-color);
-  transition: width 220ms var(--ease-split);
-}
-
-
-
-
-#quick-media-now {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-width: 0;
-}
-#quick-media-art {
-  width: 56px;
-  height: 56px;
-  flex: none;
-  border-radius: 14px;
-  corner-shape: squircle;
-  object-fit: cover;
-  background: var(--sunken);
-}
-#quick-media-lines {
-  flex: 1;
-  min-width: 0;
-}
-#quick-media-title {
-  font-size: 0.82rem;
-  color: var(--text-bright);
-  white-space: nowrap;
-  overflow: hidden;
-  
-  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
-}
-#quick-media-artist {
-  font-family: "Mono", monospace;
-  font-size: 0.68rem;
-  color: var(--text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
-}
-#quick-media-transport {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  flex: none;
-}
-#quick-media-transport .transport { width: 40px; height: 40px; }
-#quick-media-transport svg { width: 22px; height: 22px; fill: currentColor; }
+#pill.panel-dock #dock-transfer.showing { display: flex; }
+#pill.dock-transfer #player-face { padding-bottom: 2.6rem; }
+#dock-transfer-glyph svg { width: 18px; height: 18px; fill: currentColor; }
+#dock-transfer-reading { font-variant-numeric: tabular-nums; }
 
 
 
@@ -3039,13 +2940,17 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-:root { --pill-status-shift: 74px; }
-#pill.corner-grow {
-  top: calc(var(--grab, 0px) - var(--edge-over));
-  height: calc(var(--pill-height) + var(--edge-over));
-  padding-top: var(--edge-over);
-  translate: calc(var(--shift, 0px) + var(--pill-status-shift)) 0;
-  padding-right: var(--pill-status-grow, 0px);
+/* Main-Status-Idle no longer reaches the top-right corner (see states.md). It docks at the */
+/* bottom of the quick-settings panel instead, growing width/height/top to a box status.js's */
+/* fitPillDock() measures off #quick-panel and the screen (mirrors STATUS_PANEL geometry, never */
+/* a hand-picked constant). --pill-dock-* are written before .panel-dock is added, so the box */
+/* is ready the instant the class starts easing width/height/top on the ordinary --pill-transition. */
+#pill.panel-dock {
+  width: var(--pill-dock-width, var(--pill-width));
+  top: var(--pill-dock-top, var(--grab, 0px));
+  height: var(--pill-dock-height, var(--pill-height));
+  padding-bottom: var(--edge-over);
+  border-radius: 26px;
 }
 
 #clock.pressing { scale: 1.03; }

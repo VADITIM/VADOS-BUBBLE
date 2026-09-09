@@ -3,7 +3,7 @@ import { clockPill } from './clock.js';
 import { stirLiquid } from './liquid.js';
 import { rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
-import { toClosed } from './row.js';
+import { applyClosedWindow, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 
 
@@ -35,20 +35,52 @@ const STATUS_RIGHT = 14;
 const EDGE_OVER = 20;
 
 
-const PILL_STATUS_SHIFT = 74;
+const PILL_DOCK_TALL = 130;
+const PILL_DOCK_TRANSFER_TALL = 46;
 
 
 
 
+function dockShows() {
+  return Boolean(shared.media) || Boolean(transfer);
+}
 
+function fitPillDock() {
+  const hasMedia = Boolean(shared.media);
+  const hasTransfer = Boolean(transfer);
+  const tall = (hasMedia ? PILL_DOCK_TALL : 0) + (hasTransfer ? PILL_DOCK_TRANSFER_TALL : 0);
+  const width = STATUS_PANEL.width + EDGE_OVER * 2;
+  const bottom = screenHeight() - STATUS_MARGIN_FOOT;
+  const top = bottom - tall;
+  root.style.setProperty('--pill-dock-width', Math.round(width) + 'px');
+  root.style.setProperty('--pill-dock-top', Math.round(top) + 'px');
+  root.style.setProperty('--pill-dock-height', Math.round(tall + EDGE_OVER) + 'px');
+  bridge.setWindowBounds(Math.round(width), Math.round(bottom), 0, 0);
+}
 
+export function refreshDock() {
+  if (statusOpen) paintDock();
+}
 
-
-
-function fitPillStatusGrow() {
-  const box = pill.getBoundingClientRect();
-  const grow = screenWidth() + EDGE_OVER - box.right - PILL_STATUS_SHIFT;
-  root.style.setProperty('--pill-status-grow', Math.max(0, Math.round(grow)) + 'px');
+function paintDock() {
+  const showing = dockShows();
+  pill.classList.toggle('panel-dock', showing);
+  pill.classList.toggle('dock-transfer', showing && Boolean(transfer));
+  dockTransfer.classList.toggle('showing', showing && Boolean(transfer));
+  if (!showing) {
+    showFace('idle');
+    applyClosedWindow();
+    return;
+  }
+  fitPillDock();
+  if (shared.media) showFace('player');
+  else showFace('idle');
+  if (transfer) {
+    dockTransferGlyph.innerHTML = transfer.isDone ? GLYPHS.transferDone : GLYPHS[transfer.mod];
+    const share = transfer.isDone || !transfer.total ? 100 : Math.round((transfer.done / transfer.total) * 100);
+    dockTransferReading.textContent = transfer.isDone ? 'Done' : share + '%';
+  }
+  stirLiquid(320);
 }
 
 
@@ -383,7 +415,7 @@ function paintStatus() {
   statusPill.classList.toggle('plugged', isPlugged);
   paintBattery();
   paintModeLabels();
-  paintQuickMedia();
+  if (statusOpen) paintDock();
 
   const shown = wanted();
   const names = shown.map(slot => slot.name);
@@ -720,30 +752,29 @@ export function openStatusPanel() {
   
   
   fitStatusPanel();
-  
-  
-  fitPillStatusGrow();
+
+
   statusOpen = true;
-  
-  
+  paintDock();
+
+
   bridge.requestToggles();
-  
-  
-  
-  root.style.setProperty('--liquid-tall', (STATUS_PANEL.height + GROWN_PAD + 24) + 'px');
-  
-  
-  
-  
-  
-  
-  
+
+
+
+  root.style.setProperty('--liquid-tall', (STATUS_PANEL.height + GROWN_PAD + 24 + PILL_DOCK_TALL + PILL_DOCK_TRANSFER_TALL) + 'px');
+
+
+
+
+
+
+
   if (!statusDownAt) fitStatusProxy();
-  
-  
-  
+
+
+
   statusPill.classList.add('open');
-  pill.classList.add('corner-grow');
   clockPill.classList.add('corner-grow');
 
   quickPanel.classList.remove('leaving');
@@ -777,8 +808,11 @@ export function closeStatusPanel() {
   
   
   statusPill.classList.remove('open');
-  pill.classList.remove('corner-grow');
   clockPill.classList.remove('corner-grow');
+  pill.classList.remove('panel-dock', 'dock-transfer');
+  dockTransfer.classList.remove('showing');
+  showFace('idle');
+  applyClosedWindow();
 
   fitStatusProxy();
   
@@ -946,14 +980,7 @@ function paintModeLabels() {
     
     
     if (name === 'usb') {
-      const cabled = Boolean(attached && attached.usb);
-      button.classList.toggle('attached', cabled);
-      
-      
-      if (cabled !== quickMedia.classList.contains('cabled')) {
-        quickMedia.classList.toggle('cabled', cabled);
-        stirLiquid(QUICK_MEDIA_GROW + 120);
-      }
+      button.classList.toggle('attached', Boolean(attached && attached.usb));
     }
   });
   
@@ -1356,88 +1383,9 @@ export function setTransfer(payload) {
   paintStatus();
 }
 
-
-
-
-const QUICK_MEDIA_GROW = 320;
-
-const quickMedia = document.getElementById('quick-media');
-const quickMediaKind = document.getElementById('quick-media-kind');
-const quickMediaReading = document.getElementById('quick-media-reading');
-const quickMediaArt = document.getElementById('quick-media-art');
-const quickMediaTitle = document.getElementById('quick-media-title');
-const quickMediaArtist = document.getElementById('quick-media-artist');
-const quickMediaPlayPath = document.getElementById('quick-media-play-path');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-export function paintQuickMedia() {
-  const running = Boolean(transfer);
-  const song = !running && shared.media ? shared.media : null;
-  quickMedia.classList.toggle('running', running);
-  
-  
-  if (Boolean(song) !== quickMedia.classList.contains('sounding')) {
-    quickMedia.classList.toggle('sounding', Boolean(song));
-    stirLiquid(QUICK_MEDIA_GROW + 120);
-  }
-  if (song) {
-    quickMediaTitle.textContent = song.title || '';
-    quickMediaArtist.textContent = song.artist || '';
-    
-    
-    if (song.artBase64) quickMediaArt.src = song.artBase64;
-    else quickMediaArt.removeAttribute('src');
-    quickMediaPlayPath.setAttribute('d', song.isPlaying ? 'M6 5h4v14H6zm8 0h4v14h-4z' : 'M8 5v14l11-7z');
-    return;
-  }
-  if (!running) {
-    quickMediaKind.textContent = 'Nothing playing';
-    quickMediaReading.textContent = '';
-    quickMedia.style.setProperty('--transfer-share', '0%');
-    return;
-  }
-  quickMediaKind.textContent = transfer.mod === 'upload' ? 'Upload' : 'Download';
-  
-  
-  const share = transfer.isDone || !transfer.total
-    ? 100
-    : Math.round((transfer.done / transfer.total) * 100);
-  quickMediaReading.textContent = transfer.isDone ? 'Done' : share + '%';
-  quickMedia.style.setProperty('--transfer-share', share + '%');
-}
-
-
-
-
-[
-  ['quick-media-previous', () => 'previous'],
-  
-  
-  
-  ['quick-media-play', () => (shared.media && shared.media.isPlaying ? 'pause' : 'play')],
-  ['quick-media-next', () => 'next'],
-].forEach(([id, command]) => {
-  document.getElementById(id).addEventListener('click', event => {
-    event.stopPropagation();
-    bridge.triggerHaptic('tap');
-    bridge.mediaControl(command());
-  });
-});
+const dockTransfer = document.getElementById('dock-transfer');
+const dockTransferGlyph = document.getElementById('dock-transfer-glyph');
+const dockTransferReading = document.getElementById('dock-transfer-reading');
 
 function holdTheTick() {
   clearTimeout(transferTick);

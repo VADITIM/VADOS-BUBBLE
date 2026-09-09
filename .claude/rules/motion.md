@@ -183,6 +183,10 @@ Legibility beats speed. A merge the user cannot follow is wrong even when every 
 
 Never leave the state that is being animated out of a phase in the middle: an element retired in the same frame its retreat begins vanishes on the spot, and the growth it was supposed to explain then happens for no visible reason.
 
+## A dock is a measured travel, not a grown corner
+
+Main-Status-Idle (see [states.md](states.md#clock-status-idle-and-main-status-idle)) is the one state that relocates a bubble's resting box rather than growing it past an edge in place. It still obeys every rule above: `width`/`height`/`top`/`padding-bottom` are ordinary entries in `--pill-transition`, never a replaced list; the box is measured off `#quick-panel`'s own geometry before the travel starts, the same way every edge-reach here is measured rather than hand-picked; and the touch proxy is resized to the new box before the CSS starts easing into it, never mid-flight. What makes it a *dock* rather than another corner-reach is only that the box it grows into is not the box it rests in — everything else about how it gets there is the same additive motion the rest of this bubble already runs on.
+
 ## Room and the hole
 
 Two rules live in [bubbles.md](bubbles.md) because they are properties of being a bubble, and are named here because every motion change runs into them:

@@ -1,6 +1,6 @@
 import { lockArt, lockPill, paintLock, paintLockProgress } from '../lock.js';
 import { becomeExtended, closedTarget, setSize, showFace, toClosed } from '../row.js';
-import { paintQuickMedia } from '../status.js';
+import { refreshDock } from '../status.js';
 import { bridge, mods, pill, shared } from '../state.js';
 
 const playerElapsed = document.getElementById('player-elapsed');
@@ -262,7 +262,7 @@ window.onMediaUpdate = payload => {
   
   
   
-  paintQuickMedia();
+  refreshDock();
   if (!shared.media) {
     mods.delete('media');
     clearInterval(shared.mediaTicker);
