@@ -2,10 +2,10 @@
 
 The VADITIM Style DNA is global. It lives in the `vados-dna` skill, in the global config repo:
 
-- `.claude/skills/vados-dna/` — vendored into this repository, so it is here whether or
+- `agent-config/skills/vados-dna/` — vendored into this repository, so it is here whether or
   not the global config has been fetched. Upstream is
   <https://github.com/VADITIM/claude-config>, branch `global`, which is the root of
-  `~/.claude`. The repository was called `.claude` until a leading dot turned out to be
+  `~/agent-config`. The repository was called `.claude` until a leading dot turned out to be
   unattachable on Claude Code on the web; that old URL is dead.
 - `dna/` holds the modules (palette, typography, motion, …).
 - `map/` indexes every project; `platforms/` holds the per-engine pitfalls.
