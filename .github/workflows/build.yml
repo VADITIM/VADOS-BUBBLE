@@ -37,7 +37,7 @@ jobs:
       # Sideloading is the only way this app is installed, and a workflow artifact needs a signed-in
       # browser to download; a prerelease asset does not, so the phone can fetch it directly.
       - name: Publish to the rolling latest-debug release
-        if: github.ref == 'refs/heads/claude/ios-dev-plan-progress-xnyhqr' || github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-debug
