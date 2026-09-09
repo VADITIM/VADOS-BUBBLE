@@ -2248,7 +2248,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-  border-radius: 0 0 12px 12px;
+  border-radius: 12px;
   position: absolute;
   left: 4px;
   right: 4px;
@@ -2371,13 +2371,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   position: relative;
   overflow: visible;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   grid-template-rows: auto auto;
   grid-template-areas:
-    "name bubble"
-    "name label";
+    "bubble"
+    "label";
   align-items: center;
-  column-gap: 0.5rem;
+  justify-items: center;
   row-gap: 0.3rem;
   padding: 0;
   gap: 0;
@@ -2417,17 +2417,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .quick-mode.on .quick-name { color: var(--section-color); }
 
 #quick-row-links .quick-name {
-  grid-area: name;
-  width: auto;
-  height: 100%;
-  align-self: stretch;
-  justify-self: start;
-  display: flex;
-  align-items: center;
-  writing-mode: vertical-lr;
-  text-orientation: upright;
-  text-align: start;
-  line-height: 0.4;
+  display: none;
 }
 
 #quick-row-links .quick-icon {
@@ -2462,6 +2452,47 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #quick-row-links .quick-mode.on .quick-icon {
   color: var(--section-color);
   box-shadow: inset 0 0 0 2px var(--section-color);
+}
+
+#quick-row-links .quick-label.waiting {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  height: 0.66rem;
+  text-shadow: none;
+}
+#quick-row-links .quick-label.waiting .quick-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  will-change: transform, filter;
+}
+#quick-row-links .quick-label.waiting .quick-dot:nth-child(1) { animation: quick-dot-wave-1 1.8s ease-in-out infinite; }
+#quick-row-links .quick-label.waiting .quick-dot:nth-child(2) { animation: quick-dot-wave-2 1.8s ease-in-out infinite; }
+#quick-row-links .quick-label.waiting .quick-dot:nth-child(3) { animation: quick-dot-wave-3 1.8s ease-in-out infinite; }
+
+@keyframes quick-dot-wave-1 {
+  0%, 100%  { transform: translateY(0); filter: blur(0); }
+  10%       { transform: translateY(-60%); filter: blur(0.6px); }
+  22%       { transform: translateY(0); filter: blur(0); }
+  66%       { transform: translateY(-60%); filter: blur(0.6px); }
+  78%       { transform: translateY(0); filter: blur(0); }
+}
+@keyframes quick-dot-wave-2 {
+  0%, 100%  { transform: translateY(0); filter: blur(0); }
+  22%       { transform: translateY(-60%); filter: blur(0.6px); }
+  34%       { transform: translateY(0); filter: blur(0); }
+  66%       { transform: translateY(-60%); filter: blur(0.6px); }
+  78%       { transform: translateY(0); filter: blur(0); }
+}
+@keyframes quick-dot-wave-3 {
+  0%, 100%  { transform: translateY(0); filter: blur(0); }
+  34%       { transform: translateY(-60%); filter: blur(0.6px); }
+  46%       { transform: translateY(0); filter: blur(0); }
+  66%       { transform: translateY(-60%); filter: blur(0.6px); }
+  78%       { transform: translateY(0); filter: blur(0); }
 }
 
 

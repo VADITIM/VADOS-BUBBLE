@@ -912,12 +912,35 @@ function paintModeLabels() {
     
     gps: '',
   };
+  const waiting = {
+    bluetooth: 'nothing paired',
+    wifi: 'not connected',
+    hotspot: 'nobody joined',
+    mobile: 'standby',
+  };
   quickModes.forEach(button => {
     const name = button.dataset.toggle;
-    
-    
+
+
     const label = button.querySelector('.quick-label');
-    if (label) label.textContent = text[name] || '';
+    if (label) {
+      const reading = text[name] || '';
+      const isWaiting = reading && reading === waiting[name];
+      const wasWaiting = label.classList.contains('waiting');
+      label.classList.toggle('waiting', isWaiting);
+      if (isWaiting) {
+        if (!wasWaiting) {
+          label.textContent = '';
+          for (let dot = 0; dot < 3; dot += 1) {
+            const span = document.createElement('span');
+            span.className = 'quick-dot';
+            label.appendChild(span);
+          }
+        }
+      } else {
+        label.textContent = reading;
+      }
+    }
     
     
     
