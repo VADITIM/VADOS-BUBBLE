@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.v.island"
+    android:versionCode="1"
+    android:versionName="0.1" >
+
+    <uses-sdk
+        android:minSdkVersion="31"
+        android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <!--
+         The mobile link's generation, which is the reading the Status bubble stands on. Granted
+         over adb by grant.ps1: One UI greys the toggle out for a sideloaded app anyway.
+    -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!--
+         What the phone is attached to at all. Both are granted at install and neither is asked
+         for, and the Status bubble had no link icon for as long as they were missing: without
+         ACCESS_NETWORK_STATE registerDefaultNetworkCallback throws a SecurityException, and the
+         runCatching around it turned that into a bubble that quietly never knew about wifi.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!--
+         What is paired, and what it is called. This was simply missing, which is why the Bluetooth
+         connector never recognised anything: from Android 12 both `BluetoothDevice.getName()` and
+         asking a profile proxy what is connected are behind it, and undeclared they do not throw
+         loudly — the name comes back null and the connected list comes back empty, which reads as
+         a phone with nothing on it rather than as a permission that was never asked for. It is a
+         runtime permission and this app has no dialog to ask with, so grant.ps1 grants it.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!--
+         The Clock bubble's hold. SHOW_ALARMS lands on the clock app whatever it is called, and
+         the platform gates that intent behind this — it is granted at install, not asked for.
+    -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
+    <!--
+        Without this, `getLaunchIntentForPackage` returns null for every other app on
+        the phone — package visibility hides them since Android 11 — and holding an
+        open mod to leave for Spotify did nothing at all. Only launchable apps are
+        asked for; nothing here reads what is installed beyond that.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:debuggable="true"
+        android:extractNativeLibs="false"
+        android:hardwareAccelerated="true"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:label="VADOS BUBBLE" >
+        <activity
+            android:name="com.v.island.MainActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            The panel as an app, so that a gesture can open it: One UI's diagonal swipe from the
+            right belongs to SystemUI's own quick settings and cannot be pointed at ours, but every
+            gesture host on this phone can "open an app". It carries LAUNCHER because that category
+            is exactly what those pickers enumerate — the second home-screen icon is the cost of
+            being pickable, not an oversight.
+
+            Translucent so the app behind is never stopped, no history and out of recents so it
+            leaves nothing to swipe away, and a task affinity of its own so opening it never brings
+            the control panel's task forward with it.
+        -->
+        <activity
+            android:name="com.v.island.StatusPanelActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="VADOS Panel"
+            android:noHistory="true"
+            android:taskAffinity=".panel"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name="com.v.island.BubbleService"
+            android:exported="true"
+            android:label="VADOS BUBBLE"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" >
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/bubble_service" />
+        </service>
+        <service
+            android:name="com.v.island.IslandNotificationAssistant"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_ASSISTANT_SERVICE" >
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationAssistantService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="com.v.island.IslandNotificationListener"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="com.v.island.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <meta-data
+            android:name="moe.shizuku.client.V3_SUPPORT"
+            android:value="true" />
+    </application>
+
+</manifest>

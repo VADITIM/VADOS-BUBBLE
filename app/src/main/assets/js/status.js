@@ -741,33 +741,17 @@ export function openStatusPanel() {
   // *mid-drag*, so doing it here killed the very gesture that asked for it. It is done on the
   // release instead, which is late by one finger-lift and correct.
   if (!statusDownAt) fitStatusProxy();
-  // The anchor changes from the screen's right edge to its middle, and a changed anchor is a
-  // relayout, which no transition eases. So it is allowed to jump and then put back: the flight
-  // holds the bubble at the pixel it was already standing on for one frame, and letting go of
-  // that on the next frame is what the eye reads as the move.
-  const was = statusPill.getBoundingClientRect().left;
-  root.style.setProperty('--status-fly-ms', '0ms');
+  // `top`, `right`, `width`, `height` and `padding` are all in `--status-transition` now, so growing
+  // into the corner is an ordinary eased value change on properties this box already owns — the same
+  // way Clock-Status-Idle grows, and no anchor jump is needed to fake it.
   statusPill.classList.add('open');
-  // **The bubble's own new left, measured after the class lands** — not `statusPanelLeft()`, which is
-  // where the *frame* of modules begins. The two are different boxes: the frame starts at the middle
-  // of the screen and the charge is right-anchored ten pixels off the edge, so the offset this was
-  // handed was a hundred and fifty pixels of a journey the bubble was never making. It jumped left,
-  // then flew back right across most of the screen to a place it had already been standing next to.
-  // The close has always measured it this way; the open is what disagreed.
-  root.style.setProperty('--status-fly', Math.round(was - statusPill.getBoundingClientRect().left) + 'px');
-  // Read back, so the browser has actually computed the frame we are about to move away from.
-  void statusPill.offsetWidth;
   // `bubble-collapse` is filled `both`, so a panel asked for again inside the close's own quarter second finds every module still holding the last frame of it, shrunk to a fifth and invisible. The class comes off here rather than being left to the settle timer that this open has already cancelled.
   quickPanel.classList.remove('leaving');
   // A fresh order for the modules, and it is chosen before the frame they start on rather than
   // during it: the delay is a custom property the animation reads once when it begins.
   shuffleQuickRanks();
-  requestAnimationFrame(() => {
-    root.style.setProperty('--status-fly-ms', STATUS_PANEL.ms + 'ms');
-    root.style.setProperty('--status-fly', '0px');
-    showStatusFace('panel');
-    quickPanel.classList.add('showing');
-  });
+  showStatusFace('panel');
+  quickPanel.classList.add('showing');
   // Long enough to cover the last module landing as well as the charge growing: the modules are
   // bubbles in the same body of liquid, so the skin has to go on being mirrored until the slowest
   // of them has stopped moving. Fifteen ranks of stagger plus the growth itself, on top of the
@@ -789,17 +773,9 @@ export function closeStatusPanel() {
   // came in leaning one way and went out leaning another is two different sets of things.
   quickPanel.classList.remove('showing');
   quickPanel.classList.add('leaving');
-  // The same jump, put back the same way: taking `open` off moves the anchor back to the screen's
-  // right edge, so the flight holds it where the panel was standing for one frame first.
-  const was = statusPill.getBoundingClientRect().left;
-  root.style.setProperty('--status-fly-ms', '0ms');
+  // Taking `open` off eases `top`/`right`/`width`/`height` back the same way putting it on grew
+  // them — see `openStatusPanel` — so there is nothing here left to jump and put back by hand.
   statusPill.classList.remove('open');
-  root.style.setProperty('--status-fly', Math.round(was - statusPill.getBoundingClientRect().left) + 'px');
-  void statusPill.offsetWidth;
-  requestAnimationFrame(() => {
-    root.style.setProperty('--status-fly-ms', STATUS_PANEL.ms + 'ms');
-    root.style.setProperty('--status-fly', '0px');
-  });
   // The proxy comes off with the panel rather than after it: `panel-closing` is already on, so this
   // hands the room straight back and the collapse happens under a bubble that answers to nothing.
   fitStatusProxy();

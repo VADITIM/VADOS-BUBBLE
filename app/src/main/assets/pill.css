@@ -1927,6 +1927,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
        its mark and settles back, which is what every other bubble on this bar does. */
     width var(--grow-ms) var(--ease-split),
     height var(--grow-ms) var(--ease-split),
+    /* The reach into the corner (see the comment above `#status.open`) is a value change on an
+       anchor that was always `right`, not a swap of which property positions the box — so it eases
+       here exactly as width and height do, on the bubble family's own clock, rather than needing a
+       `--status-fly` translate to fake what these two could animate on their own. */
+    top var(--grow-ms) var(--ease-split),
+    right var(--grow-ms) var(--ease-split),
+    padding var(--grow-ms) var(--ease-split),
     --blob-fill 280ms ease,
     border-radius var(--grow-ms) ease-out,
     border-color 220ms ease,
@@ -2113,21 +2120,30 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    right end of the bar and the cell hangs directly under it, so the growth is almost entirely
    downwards and there is no sweep across the screen to put back. */
 /* Anchored to the right edge and not to the middle, which means the anchor no longer changes at
-   all between closed and open: both are `right`. The flight that used to hold the bubble still for
-   a frame while the anchor swapped is therefore not needed for the horizontal any more — it is
-   kept because the *margin* differs (the bar's own inset against the panel's) and a few pixels of
-   jump is still a jump. */
+   all between closed and open: both are `right`, and `top`/`right`/`width`/`height` are ordinary
+   entries in `--status-transition` now rather than a jump `status.js` had to hold and put back by
+   hand — the anchor's *value* changes but the property never does, and a value change on a property
+   already in the list is exactly what a transition is for.
+
+   It also reaches the same corner Clock-Status-Idle reaches, so the two idle bubbles read as one
+   shape closing on the panel between them rather than as a battery cell that happens to stand near
+   a grown pill: this box is `border-box`, same as Clock, so the reach is the explicit width/height
+   trick Clock uses rather than the padding-only one `#pill` gets — `right` and `top` step out by
+   `--edge-over`, width and height take the same amount back so the edge *away* from the screen
+   corner (left, bottom) does not move, and `padding-top` gives the vertical room straight back so
+   the charge cell inside does not drift with the box that grew around it. No `padding-right` is
+   needed to match: the panel inside is pinned to this box's left edge, which the sum above already
+   holds still, so there is nothing on the right for padding to be paid back to. */
 #status.open {
   /* The panel's own top line, which is the line a grown main bubble rests on: --grown-pad is the same number the main bubble drops by, so the two sit on one line rather than each on its own. */
-  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--grown-pad) + var(--quick-clearance));
+  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--grown-pad) + var(--quick-clearance) - var(--edge-over));
   left: auto;
-  right: var(--quick-margin);
+  right: calc(var(--quick-margin) - var(--edge-over));
   margin-left: 0;
-  width: var(--quick-cell);
-  height: var(--quick-links-tall);
+  width: calc(var(--quick-cell) + var(--edge-over));
+  height: calc(var(--quick-links-tall) + var(--edge-over));
   border-radius: 26px;
-  --grow-ms: 220ms;
-  padding: 0;
+  padding: var(--edge-over) 0 0 0;
   z-index: 30;
 }
 /* Nothing here clips, in any state. The box used to hide the part of the panel it had not opened
@@ -2981,30 +2997,29 @@ html:has(#quick-panel.showing) #clock {
   width: calc(var(--clock-width, auto) + var(--clock-left, 14px) + var(--edge-over));
   height: calc(var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
 }
-/* The main bubble takes the same growth upwards it always did, plus a reach towards the corner the
-   Status bubble now idles in beside it (Main-Status-Idle — see states.md#status). It is the one box
-   here that is `content-box`, which is why height and width are never touched directly — padding on
-   a content-box element grows the border box on its own, so every state that gives this bubble a
-   size (`.alerting` and the rest) goes on owning that number rather than fighting a rule with an id
-   and a `:has()` in front of it.
+/* The main bubble reaches towards the corner the Status bubble now idles in beside it
+   (Main-Status-Idle — see states.md#status) — sideways only, never upwards: it is prohibited from
+   climbing off the bar the way an alert does, because nothing about becoming idle beside the panel
+   is the row leaving its line. It is the one box here that is `content-box`, which is why width is
+   never touched directly — padding on a content-box element grows the border box on its own, so
+   every state that gives this bubble a size (`.alerting` and the rest) goes on owning that number
+   rather than fighting a rule with an id and a `:has()` in front of it.
 
-   The reach right is two separate things, same as the prose asking for it: a small *move*
+   The reach is two separate things, same as the prose asking for it: a small *move*
    (`--pill-status-shift`, a constant — "a few pixels", not a growth) done on `translate`, which is
    this bubble's own place and already eases; and a *grow* past that (`--pill-status-grow`), done on
-   `padding-right`, which is the content-box trick above read sideways instead of upwards. The grow
-   amount is measured rather than guessed — the punch hole's horizontal position is a per-phone
-   calibration (`horizontalOffsetDp`), not a constant this stylesheet has — so `status.js` reads the
-   bubble's own resting box and writes exactly what is left between its right edge and the screen's,
-   mirroring how far past it `--edge-over` is meant to go. Set once on open and left alone the rest of
-   the time; the rule above is what turns it on and off, not the number itself. */
+   `padding-right`, which is the content-box trick read sideways. The grow amount is measured rather
+   than guessed — the punch hole's horizontal position is a per-phone calibration
+   (`horizontalOffsetDp`), not a constant this stylesheet has — so `status.js` reads the bubble's own
+   resting box and writes exactly what is left between its right edge and the screen's, mirroring how
+   far past it `--edge-over` is meant to go. Set once on open and left alone the rest of the time; the
+   rule above is what turns it on and off, not the number itself. */
 :root { --pill-status-shift: 24px; }
 html:has(#quick-panel.showing) #pill {
-  /* The list put back with one property added to it, never replaced: `top` is already in there and
-     the padding that pays the growth back has to ease on the same clock, or the box opens upwards
-     while the contents step. */
+  /* The list put back with one property added to it, never replaced: padding is what pays the
+     rightward growth back, and it has to ease on the same clock or the box opens while the contents
+     step. */
   transition: var(--pill-transition), padding var(--grow-ms) var(--ease-grow);
-  top: calc(-1 * var(--edge-over));
-  padding-top: calc(var(--grab, 0px) + var(--edge-over));
   translate: calc(var(--shift, 0px) + var(--pill-status-shift)) 0;
   padding-right: var(--pill-status-grow, 0px);
 }

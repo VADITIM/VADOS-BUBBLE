@@ -1,0 +1,227 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.v.island"
+4    android:versionCode="1"
+5    android:versionName="0.1" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="31"
+9        android:targetSdkVersion="36" />
+10
+11    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+11-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:4:5-77
+11-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:4:22-74
+12    <uses-permission android:name="android.permission.VIBRATE" />
+12-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:5:5-66
+12-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:5:22-63
+13    <uses-permission android:name="android.permission.WAKE_LOCK" />
+13-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:6:5-68
+13-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:6:22-65
+14    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+14-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:7:5-78
+14-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:7:22-75
+15    <!--
+16         The mobile link's generation, which is the reading the Status bubble stands on. Granted
+17         over adb by grant.ps1: One UI greys the toggle out for a sideloaded app anyway.
+18    -->
+19    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+19-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:10:5-75
+19-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:10:22-72
+20    <!--
+21         What the phone is attached to at all. Both are granted at install and neither is asked
+22         for, and the Status bubble had no link icon for as long as they were missing: without
+23         ACCESS_NETWORK_STATE registerDefaultNetworkCallback throws a SecurityException, and the
+24         runCatching around it turned that into a bubble that quietly never knew about wifi.
+25    -->
+26    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+26-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:15:5-79
+26-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:15:22-76
+27    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+27-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:16:5-76
+27-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:16:22-73
+28    <!--
+29         What is paired, and what it is called. This was simply missing, which is why the Bluetooth
+30         connector never recognised anything: from Android 12 both `BluetoothDevice.getName()` and
+31         asking a profile proxy what is connected are behind it, and undeclared they do not throw
+32         loudly — the name comes back null and the connected list comes back empty, which reads as
+33         a phone with nothing on it rather than as a permission that was never asked for. It is a
+34         runtime permission and this app has no dialog to ask with, so grant.ps1 grants it.
+35    -->
+36    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+36-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:23:5-76
+36-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:23:22-73
+37    <!--
+38         The Clock bubble's hold. SHOW_ALARMS lands on the clock app whatever it is called, and
+39         the platform gates that intent behind this — it is granted at install, not asked for.
+40    -->
+41    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+41-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:26:5-78
+41-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:26:22-75
+42
+43    <!--
+44        Without this, `getLaunchIntentForPackage` returns null for every other app on
+45        the phone — package visibility hides them since Android 11 — and holding an
+46        open mod to leave for Spotify did nothing at all. Only launchable apps are
+47        asked for; nothing here reads what is installed beyond that.
+48    -->
+49    <queries>
+49-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:34:5-39:15
+50        <intent>
+50-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:35:9-38:18
+51            <action android:name="android.intent.action.MAIN" />
+51-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:36:13-65
+51-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:36:21-62
+52
+53            <category android:name="android.intent.category.LAUNCHER" />
+53-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:37:13-73
+53-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:37:23-70
+54        </intent>
+55    </queries>
+56
+57    <application
+57-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:41:5-116:19
+58        android:debuggable="true"
+59        android:extractNativeLibs="false"
+60        android:hardwareAccelerated="true"
+60-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:44:9-43
+61        android:icon="@android:drawable/ic_dialog_info"
+61-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:43:9-56
+62        android:label="VADOS BUBBLE" >
+62-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:42:9-37
+63        <activity
+63-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:46:9-54:20
+64            android:name="com.v.island.MainActivity"
+64-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:47:13-41
+65            android:exported="true"
+65-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:48:13-36
+66            android:theme="@android:style/Theme.Material.NoActionBar" >
+66-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:49:13-70
+67            <intent-filter>
+67-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:50:13-53:29
+68                <action android:name="android.intent.action.MAIN" />
+68-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:36:13-65
+68-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:36:21-62
+69
+70                <category android:name="android.intent.category.LAUNCHER" />
+70-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:37:13-73
+70-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:37:23-70
+71            </intent-filter>
+72        </activity>
+73
+74        <!--
+75            The panel as an app, so that a gesture can open it: One UI's diagonal swipe from the
+76            right belongs to SystemUI's own quick settings and cannot be pointed at ours, but every
+77            gesture host on this phone can "open an app". It carries LAUNCHER because that category
+78            is exactly what those pickers enumerate — the second home-screen icon is the cost of
+79            being pickable, not an oversight.
+80
+81            Translucent so the app behind is never stopped, no history and out of recents so it
+82            leaves nothing to swipe away, and a task affinity of its own so opening it never brings
+83            the control panel's task forward with it.
+84        -->
+85        <activity
+85-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:67:9-79:20
+86            android:name="com.v.island.StatusPanelActivity"
+86-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:68:13-48
+87            android:excludeFromRecents="true"
+87-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:71:13-46
+88            android:exported="true"
+88-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:70:13-36
+89            android:label="VADOS Panel"
+89-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:69:13-40
+90            android:noHistory="true"
+90-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:72:13-37
+91            android:taskAffinity=".panel"
+91-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:73:13-42
+92            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+92-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:74:13-72
+93            <intent-filter>
+93-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:50:13-53:29
+94                <action android:name="android.intent.action.MAIN" />
+94-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:36:13-65
+94-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:36:21-62
+95
+96                <category android:name="android.intent.category.LAUNCHER" />
+96-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:37:13-73
+96-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:37:23-70
+97            </intent-filter>
+98        </activity>
+99
+100        <service
+100-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:81:9-92:19
+101            android:name="com.v.island.BubbleService"
+101-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:82:13-42
+102            android:exported="true"
+102-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:84:13-36
+103            android:label="VADOS BUBBLE"
+103-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:83:13-41
+104            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" >
+104-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:85:13-79
+105            <intent-filter>
+105-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:86:13-88:29
+106                <action android:name="android.accessibilityservice.AccessibilityService" />
+106-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:87:17-92
+106-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:87:25-89
+107            </intent-filter>
+108
+109            <meta-data
+109-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:89:13-91:58
+110                android:name="android.accessibilityservice"
+110-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:90:17-60
+111                android:resource="@xml/bubble_service" />
+111-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:91:17-55
+112        </service>
+113        <service
+113-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:93:9-100:19
+114            android:name="com.v.island.IslandNotificationAssistant"
+114-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:94:13-56
+115            android:exported="true"
+115-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:95:13-36
+116            android:permission="android.permission.BIND_NOTIFICATION_ASSISTANT_SERVICE" >
+116-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:96:13-88
+117            <intent-filter>
+117-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:97:13-99:29
+118                <action android:name="android.service.notification.NotificationAssistantService" />
+118-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:98:17-100
+118-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:98:25-97
+119            </intent-filter>
+120        </service>
+121        <service
+121-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:101:9-108:19
+122            android:name="com.v.island.IslandNotificationListener"
+122-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:102:13-55
+123            android:exported="false"
+123-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:103:13-37
+124            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+124-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:104:13-87
+125            <intent-filter>
+125-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:105:13-107:29
+126                <action android:name="android.service.notification.NotificationListenerService" />
+126-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:106:17-99
+126-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:106:25-96
+127            </intent-filter>
+128        </service>
+129
+130        <provider
+131            android:name="rikka.shizuku.ShizukuProvider"
+131-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:110:13-57
+132            android:authorities="com.v.island.shizuku"
+132-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:111:13-59
+133            android:enabled="true"
+133-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:113:13-35
+134            android:exported="true"
+134-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:114:13-36
+135            android:multiprocess="false"
+135-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:112:13-41
+136            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+136-->C:\Users\vn\source\VADOS-BUBBLE\app\src\main\AndroidManifest.xml:115:13-79
+137
+138        <meta-data
+138-->[dev.rikka.shizuku:provider:13.1.5] C:\Users\vn\.gradle\caches\8.11.1\transforms\9d6937cd7646e927822a81da3c8fbf1c\transformed\provider-13.1.5\AndroidManifest.xml:11:9-13:36
+139            android:name="moe.shizuku.client.V3_SUPPORT"
+139-->[dev.rikka.shizuku:provider:13.1.5] C:\Users\vn\.gradle\caches\8.11.1\transforms\9d6937cd7646e927822a81da3c8fbf1c\transformed\provider-13.1.5\AndroidManifest.xml:12:13-57
+140            android:value="true" />
+140-->[dev.rikka.shizuku:provider:13.1.5] C:\Users\vn\.gradle\caches\8.11.1\transforms\9d6937cd7646e927822a81da3c8fbf1c\transformed\provider-13.1.5\AndroidManifest.xml:13:13-33
+141    </application>
+142
+143</manifest>
