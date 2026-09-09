@@ -156,35 +156,18 @@
      and announces nothing: what the phone is attached to is true all the time, so this bubble
      is read rather than watched. A Modus — a paired device, a cable, a hotspot — colours the
      whole of it and takes the left slot, the way a mod's glyph does in every other bubble. -->
-<!-- Two faces, the way the Now bubble has two: the row of icons it rests as, and the panel it
-     opens into. The quick settings live here rather than on the main bubble because they are
-     this bubble's own subject — every switch in them is something the phone is attached to or
-     doing — and because a panel belongs to the bubble it grows out of. The closed face is empty
+<!-- Two faces, the way the Now bubble has two: the row of icons it rests as, and the announcement
+     it wears for a moment when the phone is plugged in or running low. The closed face is empty
      in the markup: its slots are built from what is true, in slot order, and nothing about them
-     is a fixed list. -->
+     is a fixed list. It carries no third face for the settings panel any more — the panel is
+     `#quick-panel`, a sibling, and this bubble stays exactly what it is while it is open, idling
+     in the corner it shares with Main-Status-Idle the same way Clock idles in its own. -->
 <div id="status">
   <div class="status-face showing" id="status-closed"></div>
   <!-- What the bubble wears for the few seconds it is announcing a charge instead of reporting:
        the bolt alone, no percentage. The glyph is written from the script's own set rather than
-       inlined here, because it is the same one the panel's battery wears. -->
+       inlined here, because it is the same one the battery module in the panel wears. -->
   <div class="status-face" id="status-charge"></div>
-  <!-- Open, this face is the battery and nothing else. Every other reading the panel used to hold
-       is a bubble of its own now, standing in #quick-panel below — the charge stays with the
-       Status bubble because it is the one reading that *is* this bubble: it is the first thing to
-       arrive when the panel opens and the first to go home when it closes, so it can never be a
-       module that happens to be in the same room as the others. -->
-  <div class="status-face" id="status-panel">
-    <div id="quick-battery">
-      <!-- The terminal, and its own strip above the cell rather than part of the outline: the cell clips everything in it so the liquid cannot climb out of it, and a nub inside that clip is a nub with its top cut off. -->
-      <span id="battery-pin"></span>
-      <div id="battery-cell">
-      <!-- The charge drawn as a level rather than only as an icon: the liquid stands at the percentage and is coloured by the band it is in, so the reading is had before the number is read. Flat, with no surface on it and nothing rising through it — a level that is never still is a level being watched rather than read, and the crests cost the fill a group opacity and seventeen pixels of reserved headroom that the reading was paying for. -->
-      <div id="battery-fill"></div>
-      <span id="battery-glyph"></span>
-      <span id="battery-reading"></span>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- The quick settings, and every one of them is its own bubble now.
@@ -210,9 +193,7 @@
        with its own glyph. The grid is the one the design asks for. The six two-column links carry a
        glyph and the name of what they are attached to; USB takes the narrow fifth column down all
        three rows, glyph alone, because what it reports is a cable rather than a network and a cable
-       has no name to give.
-       The charge is not a cell in this grid. It is the Status bubble itself, hung at the top right
-       by #status.open, so the room for it is subtracted from the row rather than held for it. -->
+       has no name to give. -->
   <div id="quick-row-links">
     <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-name">Hotspot</span><span class="quick-icon"></span><span class="quick-label"></span></button>
     <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-name">Flight</span><span class="quick-icon"></span><span class="quick-label"></span></button>
@@ -237,8 +218,14 @@
       <button class="quick-bubble quick-knob" data-toggle="mic"><span class="quick-icon"></span></button>
     </div>
 
-    <!-- Two bubbles and not one module with two columns in it: the slider that is being held has
-         to be able to leave the panel on its own, which a column inside a shared box cannot do. -->
+    <!-- Three bubbles and not one module with columns in it: the slider that is being held has
+         to be able to leave the panel on its own, which a column inside a shared box cannot do —
+         and the same is true of the charge now that it is a bubble here rather than the Status
+         bubble's own face. It used to be the shape the Status bubble opened into, thrown in with
+         a growth of its own while the bubble around it was also growing: two answers to one
+         arrival, and what that read as was the battery sliding in from the side of a bubble that
+         was already expanding. It is `.quick-bubble` now like the sixteen beside it — the arrival,
+         the stagger, the press, all of it shared rather than a bespoke copy. -->
     <div id="quick-row-levels">
       <div class="quick-bubble level" data-level="brightness">
         <div class="level-fill"></div>
@@ -247,6 +234,16 @@
       <div class="quick-bubble level" data-level="volume">
         <div class="level-fill"></div>
         <span class="level-icon"></span>
+      </div>
+      <div class="quick-bubble" id="quick-battery">
+        <!-- The terminal, and its own strip above the cell rather than part of the outline: the cell clips everything in it so the liquid cannot climb out of it, and a nub inside that clip is a nub with its top cut off. -->
+        <span id="battery-pin"></span>
+        <div id="battery-cell">
+        <!-- The charge drawn as a level rather than only as an icon: the liquid stands at the percentage and is coloured by the band it is in, so the reading is had before the number is read. Flat, with no surface on it and nothing rising through it — a level that is never still is a level being watched rather than read, and the crests cost the fill a group opacity and seventeen pixels of reserved headroom that the reading was paying for. -->
+        <div id="battery-fill"></div>
+        <span id="battery-glyph"></span>
+        <span id="battery-reading"></span>
+        </div>
       </div>
     </div>
   </div>

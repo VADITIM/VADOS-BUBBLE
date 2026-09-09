@@ -1954,8 +1954,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    that would be the bubble reacting to itself. */
 #status.settling { scale: 0.94; }
 
-/* The two faces, stacked and cross-faded, exactly as the Now bubble's are: the row of icons
-   it rests as, and the quick settings it opens into. */
+/* The two faces, stacked and cross-faded, the way the Now bubble's are: the row of icons it rests
+   as, and the bolt-only announcement it wears for a moment when the phone is plugged in or running
+   low. There is no third face for the settings panel — the panel is `#quick-panel`, a sibling, and
+   this bubble stays the row of icons the whole time it is open, idling in its grown corner. */
 .status-face {
   position: absolute;
   inset: 0;
@@ -1967,9 +1969,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 .status-face.showing { opacity: 1; pointer-events: auto; }
 /* The closed face is the one face in the flow, because it is what gives this bubble its width:
-   the bubble is sized by what is true right now and both faces taken out of the flow would
-   leave it as wide as its own padding. The panel has a width of its own and does not need to
-   be in the layout to get one. */
+   the bubble is sized by what is true right now and a face taken out of the flow would leave it
+   as wide as its own padding. */
 #status-closed {
   position: relative;
   inset: auto;
@@ -2112,64 +2113,36 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .own-charge[data-charge="critical"] { color: #b8544c; }
 /* Plugged in outranks the band: a phone at 9% on a cable is a phone being fixed, not a warning. */
 #status.plugged .own-charge { color: inherit; }
-/* Open, this bubble is the *battery* — a tall narrow cell standing at the top right of the panel,
-   with every other reading beside it as a bubble of its own. It used to grow into the whole panel
-   and hold all four groups; splitting them out is what makes each of them able to arrive and leave
-   on its own, and what is left for this bubble to become is the one reading that was always its
-   own: the charge. It is also the shortest flight on the screen — the closed bubble stands at the
-   right end of the bar and the cell hangs directly under it, so the growth is almost entirely
-   downwards and there is no sweep across the screen to put back. */
-/* Anchored to the right edge and not to the middle, which means the anchor no longer changes at
-   all between closed and open: both are `right`, and `top`/`right`/`width`/`height` are ordinary
-   entries in `--status-transition` now rather than a jump `status.js` had to hold and put back by
-   hand — the anchor's *value* changes but the property never does, and a value change on a property
-   already in the list is exactly what a transition is for.
+/* Open, this bubble stays exactly what it is: the row of icons it always shows, idling in the
+   top-right corner beside Main-Status-Idle (see states.md#status). It used to become the battery
+   itself here — the box growing down into a tall narrow cell that held the one reading it never
+   let go of — and that is exactly the bug this replaced: a shape that changes what it *is* to open
+   a panel reads as vanishing and being replaced, not as a bubble growing, however smoothly the box
+   itself eased. The charge is a `.quick-bubble` now, standing in `#quick-row-levels` beside
+   brightness and volume, and it arrives and leaves the same way every one of the sixteen around it
+   does.
 
-   It also reaches the same corner Clock-Status-Idle reaches, so the two idle bubbles read as one
-   shape closing on the panel between them rather than as a battery cell that happens to stand near
-   a grown pill: this box is `border-box`, same as Clock, so the reach is the explicit width/height
-   trick Clock uses rather than the padding-only one `#pill` gets — `right` and `top` step out by
-   `--edge-over`, width and height take the same amount back so the edge *away* from the screen
-   corner (left, bottom) does not move, and `padding-top` gives the vertical room straight back so
-   the charge cell inside does not drift with the box that grew around it. No `padding-right` is
-   needed to match: the panel inside is pinned to this box's left edge, which the sum above already
-   holds still, so there is nothing on the right for padding to be paid back to. */
+   What is left for the Status bubble itself is the same idle reach Clock makes — mirrored, since
+   this one is anchored by `right` where Clock is anchored by `left`: `right` and `top` reset to the
+   same absolute overhang Clock's `left`/`top` reset to, and the padding on the side facing the
+   corner grows by exactly the distance that reset moved the anchor, so the *far* edges (left,
+   bottom) land back where they already were — the same proof Clock's own comment makes, run in the
+   mirror. It differs from Clock in one way rather than being a copy: this row of icons is centred
+   both ways at rest (`align-items: center; justify-content: center` in the base rule) rather than
+   pinned to one corner of its box the way Clock's digits are, so growing the box would otherwise
+   recentre the icons into the new, bigger box and read as a small sideways/downward creep. Pinning
+   them to the far corner instead — `justify-content: flex-end; align-items: flex-end` — is what
+   keeps them exactly where they were: the padding growth lands entirely on the side away from them,
+   so a corner-pinned row sees none of it. */
 #status.open {
-  /* The panel's own top line, which is the line a grown main bubble rests on: --grown-pad is the same number the main bubble drops by, so the two sit on one line rather than each on its own. */
-  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--grown-pad) + var(--quick-clearance) - var(--edge-over));
-  left: auto;
-  right: calc(var(--quick-margin) - var(--edge-over));
-  margin-left: 0;
-  width: calc(var(--quick-cell) + var(--edge-over));
-  height: calc(var(--quick-links-tall) + var(--edge-over));
-  border-radius: 26px;
-  padding: var(--edge-over) 0 0 0;
+  right: calc(-1 * var(--edge-over));
+  top: calc(-1 * var(--edge-over));
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding-right: calc(0.55rem + var(--status-right, 14px) + var(--edge-over));
+  padding-top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
+  height: calc(var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
   z-index: 30;
-}
-/* Nothing here clips, in any state. The box used to hide the part of the panel it had not opened
-   out to yet — the face inside is its own fixed size before the box is — and that was worth having
-   while the box was a bubble with glass on it and the growth was the thing being watched. It is
-   neither now: the skin comes off for the whole of `open` (see `isSkinned`), so the box draws
-   nothing and there is no growth to hide anything behind, and the one thing left inside it is the
-   charge, which does not fly at all any more — the growth *is* its arrival, so what a clip the size
-   of the cell would still cut is the overshoot on the box's own landing. A closed slot arriving
-   overshoots its own size too, which is why this was never allowed in any other state. */
-
-/* The cell, and nothing else. Sized in advance from the same two numbers `#status.open` is given
-   rather than with `inset: 0`, for the reason that has not changed: the bubble's width and height
-   are animated for 420ms on the way open, and a face stretched to the box re-solves its whole
-   layout on every one of those frames while the liquid mirror is reading boxes off the same
-   document. Sized in advance the layout is computed once and the growth is a clip over a picture
-   that no longer moves. Less the bubble's own border, both sides, because `inset` measures against
-   the padding box and the two numbers are the border box. */
-#status-panel {
-  width: calc(var(--quick-cell) - 2px);
-  height: calc(var(--quick-links-tall) - 2px);
-  right: auto;
-  bottom: auto;
-  flex-direction: column;
-  align-items: stretch;
-  padding: 0.5rem 0.5rem 0.6rem;
 }
 
 /* The charge, and it is the battery rather than a box with a battery in it: a terminal above a
@@ -2180,19 +2153,21 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    The drawing is Claude Design's: the outline is *not* a border round the cell any more. Three
    pixels of accent round a filled cell read as a slab with a frame, and the frame was competing
    with the liquid inside it for what the eye was meant to look at — so the cell is an unlit well
-   with the charge poured into it, and the only edge in the whole shape is the terminal on top. */
+   with the charge poured into it, and the only edge in the whole shape is the terminal on top.
+   It is a `.quick-bubble` in `#quick-row-levels` now, the same flex row brightness and volume
+   stand in, so the sizing below is written against `flex: 1` and the row's own height rather than
+   against a fixed 96×300 cell — the drawing survives the move, the box it stands in does not. */
 #quick-battery {
   /* The one ground both halves of the drawing stand on. Named rather than written twice: the terminal
      and the well are one shape with a step in it, and two literals that have to match are two literals
      that eventually will not. */
   --battery-well: rgba(10, 9, 13, 0.85);
-  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* The whole of the bubble it is the face of. The cell inside takes what the terminal leaves with a `flex: 1` of its own, and a flex child's floor is its content — without a height to divide, the cell resolved to the height of the number in it and the charge stood as a stub at the top of a column of glass. */
-  flex: 1;
-  min-height: 0;
+  padding: 0.5rem 0.5rem 0.6rem;
   /* White rather than the accent or the band: the level behind it is already the colour, and a
      reading that changed colour with it is the same thing said twice in the same cell. */
   color: #fff;
@@ -2202,10 +2177,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* The terminal, and the whole of why the shape reads as a battery from the corner of an eye. It is
    the same drawing the cell is rather than a grey tab above it: the cell's own ground with the cell's
    own edge round it, open at the bottom so the two are one outline with a step in it. A solid bar in
-   a different colour read as a part bolted on, which is what it looked like against a cell that had
-   grown to 96 wide and gained a border of its own. */
+   a different colour read as a part bolted on. */
 #battery-pin {
-  /* Grown with the cell under it. A terminal that stayed 26 wide on a 96 wide cell stops reading as the nub on top of a battery and starts reading as a tab stuck to it. */
   width: 38px;
   height: 11px;
   border-radius: 5px 5px 0 0;
@@ -2397,9 +2370,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    two different numbers. Squared to a literal 1:1 by sizing off the one number here that is fixed
    rather than derived from the screen's own width: the row's height. Un-stretched from the track
    (justify-self/align-self default to stretch on a grid item) and centred in it, at eighty percent
-   of that height — a smaller control standing in the same grid, not the grid itself shrinking,
-   which would also shrink the charge cell beside it since --quick-links-tall is the two of them's
-   shared number. */
+   of that height — a smaller control standing in the same grid, not the grid itself shrinking. */
 #quick-row-links .quick-mode {
   position: relative;
   overflow: hidden;
@@ -2577,17 +2548,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    than eight sets of coordinates that have to be kept in agreement, and so that the whole set
    can be told to arrive or to leave in one class.
 
-   Sizes the script also has to know are named here and mirrored in js/status.js — the margin the
-   panel keeps off the screen and the cell the charge stands in are both read there, because the
-   Status bubble's open box is written from them. */
+   The margin the panel keeps off the screen is named here and mirrored in js/status.js, since the
+   script has to know it too. */
 :root {
   /* Mirrors STATUS_MARGIN in js/status.js. */
   --quick-margin: 10px;
   --quick-gap: 8px;
-  /* The three rows of the connector grid, and with them the height of the charge standing beside it. It is written rather than measured because the charge is a *sibling* of the frame, not a child — the two have to agree on one height without either being able to read the other. */
+  /* The three rows of the connector grid. It is written rather than measured because nothing else
+     in this stylesheet can derive it from the screen alone. */
   --quick-links-tall: 300px;
-  /* The width the charge's own bubble opens to, and it is what `#status.open` is sized from. Half again as wide as the 64 it was: at that width the cell was a stripe, and a level read off a stripe is a level being measured rather than seen. */
-  --quick-cell: 96px;
   /* The foot module at rest, which is what it is with nothing playing and nothing in flight. Half again as much again on top of it while a song is playing — see `#quick-media.sounding`. */
   --quick-media-tall: 54px;
   /* How long a module takes to grow, and it is `--grow-ms` for the states a tap opens rather than a number of this panel's own: the arrival *is* the bubble's Extended growth, so it takes the bubble's clock. Mirrors QUICK_POP in js/status.js, which keeps the liquid mirror running for the length of it. */
@@ -2672,14 +2641,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    every one of them exactly where a hand-written `grid-area` would have — and a list of seven areas
    kept in step with a list of six buttons is a second copy of the markup. It was five columns of
    two-column cells for as long as the cable took the fifth on its own; the width per connector is
-   the same, because two of five and one of two are the same half.
-   The right-hand column of the drawing is the charge, which is not a cell here — the Status bubble
-   hangs there and is not in this flow, so the room is subtracted with a padding rather than held by
-   a placeholder that would have to be kept the same size as a bubble it cannot see. */
+   the same, because two of five and one of two are the same half. */
 #quick-row-links {
   height: var(--quick-links-tall);
   flex: none;
-  padding-right: calc(var(--quick-cell) + var(--quick-gap));
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
@@ -2705,12 +2670,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #quick-row-levels {
   display: flex;
   gap: var(--quick-gap);
-  /* A tenth narrower than the 156 they were: the panel gained thirteen bubbles and the room had to
-     come from the one pair of shapes here that is wider than it needs a thumb to be. Still wide
-     enough to drag up — a level is held rather than tapped, and a thumb travelling up a 48px column
-     is a thumb mostly off it. The knobs beside them are `flex: 1` and take the room back without a
-     second number to keep in step. */
-  width: 140px;
+  /* Sized for three now rather than two — the charge joined brightness and volume here rather than
+     hanging off the Status bubble, and each keeps roughly the width it had (140px was two at about
+     66 apiece; 210 is three at the same). Still wide enough to drag a level up — held rather than
+     tapped, and a thumb travelling up a column much narrower than this reads as a thumb mostly off
+     it — though the charge itself is tapped, not dragged, and only borrows the row's own width. The
+     knobs beside them are `flex: 1` and take the room back without a second number to keep in step. */
+  width: 210px;
   flex: none;
 }
 
@@ -2879,24 +2845,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   to   { translate: 0 0; }
 }
 
-/* The cell arrives as the object it is, and the liquid pours into it: the box swells up off its
-   own base while the level runs up from the floor behind the glass. The rise is a `translate` on
-   the fill rather than its height, so it costs no layout and rides over the height transition the
-   charge itself already owns. */
-/* The charge has no arrival of its own, and that is the rule rather than an omission. It is not a
-   module standing in the panel — it is the face of the Status bubble, and the Status bubble opening
-   out into it *is* its animation: the box grows down out of the closed pill and the cell is what the
-   box now is. Thrown in with the modules as it was, back when their arrival was a
-   flight, the one shape on the screen with a genuine growth behind it was the one shape also flying:
-   the cell came up from a third of a screen below, crooked on its own tilt, while the bubble it is
-   the inside of was opening out around it — two answers to one arrival, and the reason it read as
-   the battery sliding in from the side of a bubble that was expanding anyway. Nothing here moves the
-   cell; the growth is the whole of it, and it is now the growth every module beside it is doing. */
-/* The pour is the exception and belongs to the cell rather than to its arrival: it is the liquid
-   running up out of the well's own floor once there is a well, so it keeps the panel's clock and no
-   longer waits on a rank the charge does not have. */
-#status-panel.showing #battery-fill {
-  animation: liquid-pour 320ms var(--ease-enter) var(--panel-at, 0ms) backwards;
+/* The cell arrives as the object it is, and the liquid pours into it: the box grows into its rank
+   in the row exactly as every other module does, and the level runs up from the floor behind the
+   glass on the same clock a `.level-fill` pours on. It used to be the exception rather than an
+   instance of the rule — the face of the Status bubble, thrown in with a growth of its own while
+   the bubble around it was also growing, which read as the battery sliding in from the side of a
+   bubble that was already expanding: two answers to one arrival. It is a rank in the row now, so
+   it takes the row's own stagger rather than skipping it. */
+#quick-panel.showing #battery-fill {
+  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
 }
 
 /* The states used to have an arrival of their own — thrown in small and off true, after the module

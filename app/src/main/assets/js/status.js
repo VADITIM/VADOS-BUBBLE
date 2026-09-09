@@ -25,7 +25,6 @@ const statusClosed = document.getElementById('status-closed');
 const statusFaces = {
   closed: statusClosed,
   charge: document.getElementById('status-charge'),
-  panel: document.getElementById('status-panel'),
 };
 
 /** Mirrors --status-right in pill.css: how far its right edge stands off the screen edge. Where the bubble stands, and not something to give up for reaching the edge — see CLOCK_LEFT, which was zeroed once and slid its digits along with the box. */
@@ -104,8 +103,6 @@ function fitStatusPanel() {
   const top = statusPill.getBoundingClientRect().top + GROWN_PAD + QUICK_CLEARANCE;
   STATUS_PANEL.width = Math.round(screenWidth() - STATUS_MARGIN * 2);
   STATUS_PANEL.height = Math.round(screenHeight() - top - STATUS_MARGIN_FOOT);
-  root.style.setProperty('--status-panel-width', STATUS_PANEL.width + 'px');
-  root.style.setProperty('--status-panel-height', STATUS_PANEL.height + 'px');
   // The same box, handed to the frame the modules are laid out in. It is written here rather than
   // in the stylesheet because the top of it is read off the bubble, and the bubble does not exist
   // at load — this is the one function that runs when it does.
@@ -750,7 +747,8 @@ export function openStatusPanel() {
   // A fresh order for the modules, and it is chosen before the frame they start on rather than
   // during it: the delay is a custom property the animation reads once when it begins.
   shuffleQuickRanks();
-  showStatusFace('panel');
+  // No face change: the bubble stays the row of icons it always is, idling in its grown corner —
+  // see the comment over `#status.open`. There is nothing here for `showStatusFace` to switch to.
   quickPanel.classList.add('showing');
   // Long enough to cover the last module landing as well as the charge growing: the modules are
   // bubbles in the same body of liquid, so the skin has to go on being mirrored until the slowest

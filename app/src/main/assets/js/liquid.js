@@ -105,13 +105,13 @@ function isSkinned(name) {
   // Only once it has been born. Before the first connectivity payload it is a zero-opacity
   // box at the right end of the bar, and a blob mirrored off it would be a lump of liquid
   // standing over the system's icons from the moment the service starts.
-  // Open, this bubble is not a bubble: the panel it grows into is the battery and only the battery,
-  // so the glass that would stand behind the cell is dropped for as long as it is open. A pane there
-  // was a rounded slab of liquid the exact size of the cell, drawn a pixel behind it and reading as a
-  // frame round a shape that is already its own outline.
-  if (name === 'status') {
-    return statusPill.classList.contains('lit') && !statusPill.classList.contains('open');
-  }
+  // Kept for the whole of `open` now, where it used to be dropped: the panel used to be the
+  // battery and this bubble briefly stopped being a bubble to become it, so the glass behind
+  // the cell was a frame round a shape that was already its own outline. It stays a bubble now —
+  // the charge moved into the panel as a module of its own — so it goes on merging with whatever
+  // stands near it exactly the way it does at rest, including the Main bubble grown into the same
+  // corner (Main-Status-Idle, see states.md#status) — that merge is the whole point of the reach.
+  if (name === 'status') return statusPill.classList.contains('lit');
   if (name === 'clock') return isClockLit();
   if (name === 'double') return isDoubleOut();
   if (name === 'padlock') return isPadlockShowing();
