@@ -1919,17 +1919,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   interpolate-size: allow-keywords;
   --status-transition:
     opacity 200ms ease,
-    
-
-    width var(--grow-ms) var(--ease-split),
-    height var(--grow-ms) var(--ease-split),
-    
 
 
-
-    top var(--grow-ms) var(--ease-split),
-    right var(--grow-ms) var(--ease-split),
-    padding var(--grow-ms) var(--ease-split),
+    width var(--status-width-ms, 300ms) var(--ease-split),
+    height var(--grow-ms) var(--ease-grow),
+    top var(--grow-ms) var(--ease-grow),
+    right var(--status-width-ms, 300ms) var(--ease-split),
+    padding var(--status-width-ms, 300ms) var(--ease-split),
     --blob-fill 280ms ease,
     border-radius var(--grow-ms) ease-out,
     border-color 220ms ease,
