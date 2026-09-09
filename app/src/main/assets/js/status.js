@@ -650,6 +650,9 @@ const QUICK_STAGGER = 5;
 /** The same on the way out, where it is tighter. Mirrors the `* 4ms` in `#quick-panel.leaving .quick-bubble`. */
 const QUICK_DROP_STAGGER = 4;
 
+/** How long one module is in the air. Mirrors the `300ms` on `#quick-panel.showing .quick-bubble` in pill.css, and it is named on this side because the liquid mirror has to be stirred for exactly as long as the last module is still moving — a flight that outlives the stir is a flight whose glass stops being sent part-way through it. */
+const QUICK_POP = 300;
+
 /**
  * How long the frost behind the panel takes to reach nothing. Mirrors the `--scrim-frost` transition
  * on `#quick-scrim` in pill.css, and it is here for one reason: the ramp is only *sent* to the host
@@ -758,10 +761,11 @@ export function openStatusPanel() {
   root.style.setProperty('--status-fly', Math.round(was - statusPill.getBoundingClientRect().left) + 'px');
   // Read back, so the browser has actually computed the frame we are about to move away from.
   void statusPill.offsetWidth;
+  // The class comes off *before* the measuring, and that order is the whole of whether the throw is a number or a nonsense: `bubble-drop` is filled `both`, so a panel asked for again inside the close's own quarter second finds every module still holding the last frame of it — sitting a throw's worth below where it belongs — and `getBoundingClientRect` reports what a transform did rather than where the layout put it. Measured through that, every module reads as already standing on the bottom edge and is handed a throw of nothing at all, which is the relative spawn this whole arrival exists to stop.
+  quickPanel.classList.remove('leaving');
   // A fresh order for the modules, and it is chosen before the frame they start on rather than
   // during it: the delay is a custom property the animation reads once when it begins.
   shuffleQuickRanks();
-  quickPanel.classList.remove('leaving');
   requestAnimationFrame(() => {
     root.style.setProperty('--status-fly-ms', STATUS_PANEL.ms + 'ms');
     root.style.setProperty('--status-fly', '0px');
@@ -770,9 +774,10 @@ export function openStatusPanel() {
   });
   // Long enough to cover the last module landing as well as the charge growing: the modules are
   // bubbles in the same body of liquid, so the skin has to go on being mirrored until the slowest
-  // of them has stopped moving. Six ranks of stagger plus the pop itself, plus the arrivals inside.
-  // It covers the frost's own 600ms ramp several times over, which is why that is not a term here.
-  stirLiquid(STATUS_PANEL.ms + quickBubbles.length * QUICK_STAGGER + 260);
+  // of them has stopped moving. Fifteen ranks of stagger plus the flight itself, on top of the
+  // bubble's own growth. It covers the frost's own ramp several times over, which is why that is
+  // not a term here.
+  stirLiquid(STATUS_PANEL.ms + quickBubbles.length * QUICK_STAGGER + QUICK_POP);
 }
 
 export function closeStatusPanel() {

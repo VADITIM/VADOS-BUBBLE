@@ -2528,7 +2528,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .quick-icon svg { width: 26px; height: 26px; fill: currentColor; }
 /* A whole revolution, because a whole revolution is the one rotation that leaves nothing crooked behind it: the button ends where it started and only the glyph in it has changed. The swap lands at the half turn, where the icon is upside down and hardest to read, which is exactly why the turn is what carries it — the state changing is the cause and the new glyph is the consequence. */
 /* Carries the panel's own id because the arrival rule further down — `#quick-panel.showing .quick-knob` — outranks a bare two-class selector and never stops applying: the panel keeps `.showing` for as long as it is open, so that `animation` declaration sat on top of every press for the whole life of the panel and the turn was never the animation that ran. */
-/* The *glyph* turns and not the button, which the states now share with the links — and it is no longer only about labels. A state is a `.quick-bubble` since the split, so the arrival rule further down (`#quick-panel.showing .quick-bubble`) matches it with the same specificity and wins on source order: a turn written on the button itself would be outranked by the pop for the whole life of the panel, which is exactly the bug this file already records once. Written on the glyph it is three classes deep and outranks the contents rule above it. */
+/* The *glyph* turns and not the button, which the states now share with the links — and it is no longer only about labels. A state is a `.quick-bubble` since the split, so the arrival rule further down (`#quick-panel.showing .quick-bubble`) matches it with the same specificity and wins on source order: a turn written on the button itself would be outranked by the pop for the whole life of the panel, which is exactly the bug this file already records once. Written on the glyph it stands on an element the pop never touches, which is also what the contents rule — three classes deep, animating every child of a module — used to have to be outranked for; that rule has gone with the growth it was waiting out. */
 #quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
 /* The four links turn too, and they always did — the rebuild moved them from a knob to a wide button with a label beside the glyph and left the turn behind on the class they no longer wear, so `.turning` was still being written by the script onto buttons no rule matched. It is the *glyph* that turns here and not the button: the whole box revolving would take its label round with it, and a word upside down at the half turn is unreadable in a way an icon is not — the icon is what changed, so the icon is what answers. */
 #quick-panel.showing .quick-mode.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
@@ -2631,8 +2631,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: var(--pill-background);
   border: 1px solid var(--border);
   pointer-events: auto;
-  /* Centred, because the note is that they arrive *into* their final position rather than out of
-     an edge: a module growing from its own middle is a drop landing where it belongs. */
+  /* Centred, because what turns and what pops here are both corrections at the end of a flight rather than a growth out of an edge: the tilt swings through true about the module's own middle and the landing's 1.03 is read off the same point. */
   transform-origin: center;
   opacity: 0;
 }
@@ -2801,46 +2800,39 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 /* ── The panel arriving and leaving ────────────────────────────────────────────────────
-   The modules are thrown in one at a time in a shuffled order, sixty milliseconds apart, and
-   each of them lands before the controls inside it start. The order is shuffled on every open
-   because a fixed one is a sequence that gets learnt, and a learnt sequence is a loading bar.
-
-   Each module's own contents are keyed off that module's rank rather than off the last module in
-   the set. Waiting for all six would put the first button nearly a second after the panel was
-   asked for; keyed per module, the buttons still arrive after the bubble that carries them, which
-   is the whole of what "the buttons animate in afterwards" means. */
+   The modules are fired in one at a time in a shuffled order, five milliseconds apart, off the one
+   edge of the screen. The order is shuffled on every open because a fixed one is a sequence that
+   gets learnt, and a learnt sequence is a loading bar. */
 /* Each module arrives where it belongs rather than out of the Status bubble. The sling it replaces
    was the right idea said too loudly: six drops crossing the screen from one corner is six flights
    to watch before anything can be read, and the bubble they came out of was never the point — the
    panel is, and the panel is already where it is going to be.
 
-   So it is PORTFOLIO's enter, which is opacity plus a short rise from below and nothing clever:
-   `{ opacity: 0, y: 18 }` to `{ opacity: 1, y: 0 }`. What is added to it here is the tilt and the
-   pop. The tilt is a few degrees either way, written per module by the script and reshuffled on
-   every open, and it is what stops six identical rises reading as one sheet being slid up: each
-   module is a thing that was *thrown* and each of them lands crooked by a different amount in a
-   different direction. Coming back to true is the realignment — it is a different correction every
-   time because the throw was, and it is the last thing to finish, which is what makes the set look
-   settled rather than placed.
+   What is on it is the throw, the tilt and the pop. The tilt is a few degrees either way, written
+   per module by the script and reshuffled on every open, and it is what stops fifteen identical
+   rises reading as one sheet being slid up: each module is a thing that was *thrown* and each of
+   them lands crooked by a different amount in a different direction. Coming back to true is the
+   realignment — it is a different correction every time because the throw was, and it is the last
+   thing to finish, which is what makes the set look settled rather than placed.
 
    The pop is the landing and belongs at the end, not the start: the box overshoots its own size by
    a few percent once it has stopped rising, on the family's own overshoot curve, so the bounce is
    read as the module arriving at a surface rather than as it inflating on the way. Rotation and
    scale are separate properties here rather than one `transform`, so the tilt's own curve and the
    pop's are allowed to disagree — which is the whole of why the correction reads as a settle. */
+/* Three hundred rather than the hundred and fifty it was, and the number is the whole of whether the launch exists: the top row has seven hundred pixels to cover and the shot spends most of them in the first third of its time, so at 150ms that row cleared the bottom edge inside two frames at 60Hz and one on a 30fps capture — the panel's modules were never seen coming off the screen, only seen already up. Mirrors QUICK_POP in js/status.js, which is what keeps the liquid mirror running for the length of the flight. */
 #quick-panel.showing .quick-bubble {
   opacity: 1;
-  animation: bubble-pop 150ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
+  animation: bubble-pop 300ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
 }
-/* Fired up from below the bottom edge of the screen, out of nothing, and caught by a magnet at the
-   top of the flight: the module overshoots the place it belongs, hangs there for a frame, and is
-   dragged the last few pixels back down onto it. That drag is the whole of the effect — a shot that
-   simply decelerated into place is a box being flown to a coordinate, and what makes it read as
-   *pulled* is that it went past and had to come back.
-   It was a 12px rise from a fifth of its size, which is a nudge: at that distance there is nothing
-   to accelerate out of and nothing to be caught from, and the launch and the catch collapse into
-   one small wobble.
-   `--quick-throw` is **per module and measured**, not one number for the set, and that is the whole
+/* Fired up from under the bottom edge of the screen at full size and full strength, and caught by a
+   magnet at the top of the flight: the module overshoots the place it belongs, hangs there for a
+   frame, and is dragged the last few pixels back down onto it. That drag is the whole of the effect
+   — a shot that simply decelerated into place is a box being flown to a coordinate, and what makes
+   it read as *pulled* is that it went past and had to come back. */
+/* Nothing fades in and nothing grows on the way up, and both of those were the launch being hidden rather than dressed. The module sets off from *under the screen*, so every frame a fade spends reaching full strength and a scale spends reaching full size is a frame spent on a box nobody can see — and with the old curve those frames were most of the journey: opacity was full at 24% of the animation and the box was already nine tenths of the way up, so what the eye caught was a module appearing near its own place. A box scaled to nothing at the bottom edge is not a box overflowing the bottom edge either; it is a point, and a point has nothing to overflow with. The punch is the distance now — hundreds of pixels of it — which is what motion.md means by a punch being a distance rather than a curve, and the scale is left with the one job it can be seen doing: the overshoot at the landing. */
+/* The shot's curve has to leave the edge at a speed a frame can hold. It was `cubic-bezier(0.05, 0.86, 0.2, 1)`, whose slope off the line is seventeen — a projectile that is a third of the way up before the first frame is drawn, at any duration. This one leaves at two and a half and still spends most of its travel early, which is what a thing that was fired does. */
+/* `--quick-throw` is **per module and measured**, not one number for the set, and that is the whole
    of the difference between a set that comes off the screen and a set that comes off nothing. It
    was thirty percent of the display height written once on the root — which is a *relative* start,
    the same distance below each module's own place rather than the same place — so what every module
@@ -2854,63 +2846,44 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    so every viewport unit in this page is a share of a screen that is not there. */
 @keyframes bubble-pop {
   0% {
-    opacity: 0;
     translate: 0 var(--quick-throw, 234px);
-    scale: 0;
+    scale: 1;
     rotate: var(--tilt, 6deg);
-    /* The shot: almost the whole distance is spent in the first third of the time, so what is
-       watched is the arrival rather than the journey. */
-    animation-timing-function: cubic-bezier(0.05, 0.86, 0.2, 1);
+    /* The shot: most of the distance is spent in the first third of the time, so what is watched is
+       the arrival rather than the journey — but it leaves the edge rather than teleporting off it. */
+    animation-timing-function: cubic-bezier(0.3, 0.76, 0.36, 1);
   }
-  /* Solid well before it has finished rising: a box still fading while it lands is a box that
-     arrives twice. */
-  24% { opacity: 1; }
   /* Past the mark, and this is the pushover rather than a landing — the box is above where it
      belongs and larger than it will be, with the tilt swung through true. */
   62% {
-    opacity: 1;
     translate: 0 -5px;
     scale: 1.03;
     rotate: calc(var(--tilt, 6deg) * -0.18);
     animation-timing-function: var(--ease-grow);
   }
-  100% { opacity: 1; translate: 0 0; scale: 1; rotate: 0deg; }
+  100% { translate: 0 0; scale: 1; rotate: 0deg; }
 }
-/* A short beat behind the box rather than the half second the drop needed: at 0.92 of its size the
-   module is already the module, so what the contents are waiting for is the rise to be underway,
-   not a circle to become a rectangle. */
-#quick-panel.showing .quick-bubble > * {
-  animation: quick-contents-in 60ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 46ms) backwards;
-}
-@keyframes quick-contents-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+/* The contents used to arrive a beat behind the box, and the beat was there to wait out a growth that no longer happens: a module that is full size on the frame it sets off has nothing for its face to wait for, and a fade over the first fifth of the flight is a full-size empty rectangle coming up off the bottom edge. A module is a module when it is fired. The same goes on the way out — a box emptied a touch ahead of itself is a second move for one fact. */
 
 /* The enter run backwards, and quicker: this is one state change rather than two, so what a module
-   leaves by is the way it came — back down to the fifth of its size it was thrown in at, back onto
-   the tilt it landed off, and out. It keeps the module's own throw so the set does not suddenly
-   agree with itself on the way out. The overshoot is not reversed with it: an anticipation before a
-   leave is a thing bracing, and nothing here is bracing. */
+   leaves by is the way it came — back under the bottom edge it was fired from, back onto the tilt it
+   landed off, and out. It keeps the module's own throw so the set does not suddenly agree with
+   itself on the way out. The overshoot is not reversed with it: an anticipation before a leave is a
+   thing bracing, and nothing here is bracing. */
+/* There is no scale on it any more either, for the same reason the enter has none: it shrank to nothing across a drop that already took it off the screen, which is a second move saying what the drop had already said. */
 #quick-panel.leaving .quick-bubble {
   opacity: 1;
   animation: bubble-drop 110ms var(--ease-leave) calc(var(--pop-rank, 0) * 4ms) both;
 }
 @keyframes bubble-drop {
-  0%   { opacity: 1; translate: 0 0; scale: 1; rotate: 0deg; }
-  100% { opacity: 0; translate: 0 var(--quick-throw, 234px); scale: 0; rotate: var(--tilt, 6deg); }
-}
-/* Emptied a touch ahead of the box, so what fades is a module and not a module with four buttons
-   still at full strength inside it. */
-#quick-panel.leaving .quick-bubble > * {
-  opacity: 0;
-  transition: opacity 80ms linear;
+  0%   { opacity: 1; translate: 0 0; rotate: 0deg; }
+  100% { opacity: 0; translate: 0 var(--quick-throw, 234px); rotate: var(--tilt, 6deg); }
 }
 
 /* A level is a column that fills from the floor, so what arrives inside it is the liquid: the
    bubble itself has already popped in, and the fill runs up out of its own foot after it. */
 #quick-panel.showing .level-fill {
-  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 64ms) backwards;
+  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 130ms) backwards;
 }
 @keyframes liquid-pour {
   from { translate: 0 100%; }
