@@ -79,13 +79,17 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * the two, so a bubble added on one side and not the other is a bubble that draws without glass or a pane
          * blurring nothing.
          *
-         * Twenty-eight of them are bubbles — the eight above, the five notes, and the quick settings'
-         * fifteen modules, which are bubbles in every sense this project means one. The twenty-ninth is
-         * the scrim, and it is not a bubble at all: it is the whole screen frosted behind an open
-         * panel, which is why it is pane 0 rather than the last of them — panes are added to the
-         * frame in index order, so index 0 is the one underneath everything else.
+         * Thirteen of them are bubbles — the eight above and the five notes. The fourteenth is the scrim,
+         * and it is not a bubble at all: it is the whole screen frosted behind an open panel, which is why
+         * it is pane 0 rather than the last of them — panes are added to the frame in index order, so
+         * index 0 is the one underneath everything else.
+         *
+         * It was twenty-nine: the quick settings' fifteen modules held a pane each, sent empty, because a
+         * pane's index is its place in that list and they were still blobs in the goo layer. They are
+         * neither now — a grid of controls a hair apart pinned the whole layer's melt and welded the panel
+         * into one sheet — so the panes went with the blobs. See the note on BLUR_PANES in js/liquid.js.
          */
-        private const val BLUR_PANES = 29
+        private const val BLUR_PANES = 14
 
         /**
          * Which pane the frosted screen is. It is the one pane with a radius of its own

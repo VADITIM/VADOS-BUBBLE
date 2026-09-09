@@ -93,12 +93,6 @@ function fitStatusPanel() {
   root.style.setProperty('--quick-top', Math.round(top) + 'px');
   root.style.setProperty('--quick-width', STATUS_PANEL.width + 'px');
   root.style.setProperty('--quick-height', STATUS_PANEL.height + 'px');
-  // How far below where it belongs a module is fired from: thirty percent of the display. It is
-  // written here rather than left as `30vh` in the stylesheet for the reason screenHeight() exists
-  // at all — the layout viewport this WebView reports is 877 tall inside a 780-tall surface, so
-  // every viewport unit in this page is a percentage of a screen that is not there. Mirrors
-  // `--quick-throw` in pill.css, which is read by bubble-pop and bubble-drop.
-  root.style.setProperty('--quick-throw', Math.round(screenHeight() * 0.3) + 'px');
 }
 fitStatusPanel();
 
@@ -634,8 +628,8 @@ function statusPanelLeft() {
  */
 const quickPanel = document.getElementById('quick-panel');
 const quickScrim = document.getElementById('quick-scrim');
-// The charge is in the list and is not in the frame: it is the Status bubble's own face, hung at the top right rather than laid out with the modules, and it is a `.quick-bubble` nowhere in the markup because it is not one — it is the bubble the panel grew out of. What it shares with them is the arrival, which is the whole of what this list decides, so it is appended by hand. Left out, it had a rank of nothing and so a delay of nothing, and was the first thing on the screen on every single open.
-const quickBubbles = [...quickPanel.querySelectorAll('.quick-bubble'), document.getElementById('quick-battery')];
+// The charge is deliberately not in this list. It was, on the argument that a set where fifteen things are thrown and one is placed reads as one thing being placed — but it is not one of the fifteen: it is the Status bubble's own face, and the bubble opening out into it is already its arrival. In the list it took a rank, a tilt and a throw on top of that growth, so the one shape with a real animation behind it was also the one flying in from somewhere, which is what the charge sliding in from the side of an expanding bubble was. What is placed here is nothing; what grows is the bubble.
+const quickBubbles = [...quickPanel.querySelectorAll('.quick-bubble')];
 
 /**
  * Five milliseconds between one module arriving and the next. Mirrors the `* 5ms` the arrival
@@ -673,9 +667,21 @@ function shuffleQuickRanks() {
     const swap = Math.floor(Math.random() * (at + 1));
     [ranks[at], ranks[swap]] = [ranks[swap], ranks[at]];
   }
+  // Every module starts underneath the screen, which is a place rather than a distance — so the
+  // distance is its own: from this module's top edge down to the bottom of the display, so the box
+  // is entirely below the edge on the frame it sets off and the foot of the panel simply has less
+  // ground to cover than the top of it. It was one number on the root for the whole set (thirty
+  // percent of the display), which is the same *journey* for everybody and therefore fifteen
+  // different starting heights — the top row began a third of the way down the screen, in full
+  // view, which is what "the bubbles at the top start further up" was. Read here, one pass over
+  // the set, because the frame has just been measured by fitStatusPanel() and this runs before the
+  // class that starts the animation goes on; the keyframes read it once when they begin.
+  const floor = screenHeight();
+  const throws = quickBubbles.map(bubble => Math.round(floor - bubble.getBoundingClientRect().top));
   quickBubbles.forEach((bubble, index) => {
     bubble.style.setProperty('--pop-rank', ranks[index]);
     bubble.style.setProperty('--tilt', quickTilt() + 'deg');
+    bubble.style.setProperty('--quick-throw', throws[index] + 'px');
   });
 }
 

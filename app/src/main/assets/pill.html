@@ -190,10 +190,11 @@
 <!-- The quick settings, and every one of them is its own bubble now.
      They used to be four groups inside one big box, which made the panel a card with a list in
      it: the box was the thing that arrived and the controls were its contents. A module standing
-     on its own is a *bubble* — it is in the same body of liquid the row is, it necks into
-     whatever it passes on the way home, and it can be thrown in and slung back one at a time.
-     That is the whole of why they were split, and it is why each of them owes a pane in
-     liquid.js's BLUR_PANES and a blob to mirror it.
+     on its own can be thrown in and slung back one at a time, which is the whole of why they were
+     split. What they are not is liquid: they were blobs in the goo layer for a while, and fifteen
+     shapes standing a hair apart in a grid pinned the layer's one melt number at its ceiling and
+     welded the panel — and the row that shares the layer — into a single sheet. They are in no
+     pane list on either side and they paint their own background; see js/liquid.js's BLUR_PANES.
      This container itself is never seen and never touched: it is the frame the modules are laid
      out in, so the arithmetic for where each of them stands is a flexbox rather than eight sets
      of coordinates that have to agree with each other. -->
