@@ -78,8 +78,23 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
          * BLUR_PANES, which sends exactly this many regions in exactly this order — there is no build step joining
          * the two, so a bubble added on one side and not the other is a bubble that draws without glass or a pane
          * blurring nothing.
+         *
+         * Twenty-eight of them are bubbles — the eight above, the five notes, and the quick settings'
+         * fifteen modules, which are bubbles in every sense this project means one. The twenty-ninth is
+         * the scrim, and it is not a bubble at all: it is the whole screen frosted behind an open
+         * panel, which is why it is pane 0 rather than the last of them — panes are added to the
+         * frame in index order, so index 0 is the one underneath everything else.
          */
-        private const val BLUR_PANES = 13
+        private const val BLUR_PANES = 29
+
+        /**
+         * Which pane the frosted screen is. It is the one pane with a radius of its own
+         * (`Preferences.SCRIM_BLUR`), because how hard the screen behind a panel is frosted is a
+         * different question from how hard the glass under a bubble is — One UI frosts its own
+         * quick settings far harder than it frosts a pop-up. Mirrors the region liquid.js prepends
+         * to every blur frame it sends.
+         */
+        private const val SCRIM_PANE = 0
 
         /** How long a touch on a bubble holds the screen on for. */
         private const val LOCK_AWAKE = 15_000L
@@ -119,6 +134,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         /** Take every bubble off the screen without touching the app around it — the state a test leaves the overlay in that only a fresh service clears, which used to cost revoking accessibility by hand and granting it again. `disableSelf` takes this component out of `enabled_accessibility_services` on its way out, so the panel's Accessibility button is the way back and cannot end up adding a second copy of it. */
         fun stopBubbles() {
             instance?.disableSelf()
+        }
+
+        /** The Status bubble's panel, opened or put away from outside the page — the one thing StatusPanelActivity exists to say, so that a gesture bound to "open an app" can say it. */
+        fun toggleStatusPanel() {
+            instance?.push("window.onToggleStatusPanel()")
         }
 
         /**
@@ -283,8 +303,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private val paneBlurRadius = IntArray(BLUR_PANES) { -1 }
     private val paneBlurCorner = FloatArray(BLUR_PANES) { -1f }
 
+    /** The share of its radius each pane is currently to wear, from the sixth number of its region. One everywhere but the scrim, which ramps it. */
+    private val paneShares = FloatArray(BLUR_PANES) { 1f }
+
     /** Mirrors `Preferences.BLUR`, re-read only when it changes — it was a `SharedPreferences` read per pane per frame. */
     private var blurRadius = 0
+
+    /** The same, for the one pane that is the whole screen behind an open panel. */
+    private var scrimBlurRadius = 0
     private lateinit var params: WindowManager.LayoutParams
     private lateinit var preferences: SharedPreferences
     private var pageReady = false
@@ -372,6 +398,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         preferences = Preferences.of(this)
         preferences.registerOnSharedPreferenceChangeListener(this)
         blurRadius = Preferences.get(preferences, Preferences.BLUR)
+        scrimBlurRadius = Preferences.get(preferences, Preferences.SCRIM_BLUR)
         windowManager = getSystemService(WindowManager::class.java)
 
         webView = WebView(this).apply {
@@ -812,6 +839,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         proxyParams.x = params.x
         proxyParams.y = 0
         blurRadius = Preferences.get(preferences, Preferences.BLUR)
+        scrimBlurRadius = Preferences.get(preferences, Preferences.SCRIM_BLUR)
         repaintBlur()
         runCatching { windowManager.updateViewLayout(stage, params) }
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
@@ -837,7 +865,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             clearBlur(index, view)
             return
         }
-        val radius = blurRadius
+        // The scrim is frosted on its own number: the screen behind an open panel and the glass
+        // under a bubble on the bar are two different asks, and One UI itself frosts its quick
+        // settings far harder than it frosts a pop-up.
+        // The share is what makes the frost behind an open panel ramp: it is 1 for every bubble's glass and is the
+        // page's own `--scrim-frost` for pane 0. Rounded, so a strength that lands under half a dp is off rather than
+        // a blur nobody can see costing a reflective apply every frame of the ramp's tail.
+        val radius = Math.round((if (index == SCRIM_PANE) scrimBlurRadius else blurRadius) * paneShares[index])
         if (radius == 0) {
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
             params.blurBehindRadius = 0
@@ -849,14 +883,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // while the bubble is growing or closing. Keyed on radius and corner alone the whole animation was one apply
         // on the first frame and skips after it, so the glass stayed the width the bubble started at.
         if (!resized && paneBlurRadius[index] == radius && paneBlurCorner[index] == corner) return
-        // Temporary: every apply on the main pane, to see what the last frames of a close actually do — the bubble
-        // was reported losing its glass for a frame exactly as it lands. Pull this back out once diagnosed.
-        if (index == 0) {
-            android.util.Log.i(
-                "IslandBubble",
-                "blur apply pane0 radius=$radius corner=$corner resized=$resized size=${view.width}x${view.height}"
-            )
-        }
         if (SamsungBlur.apply(view, dp(radius), corner)) {
             paneBlurRadius[index] = radius
             paneBlurCorner[index] = corner
@@ -878,8 +904,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // against, and a cleared pane has to be placed again whatever it was or was not wearing.
         paneSpec[index] = null
         if (paneBlurRadius[index] == -1) return
-        // Temporary, with the apply log above: a clear landing mid-close is the shape of the reported flash.
-        if (index == 0) android.util.Log.i("IslandBubble", "blur clear pane0")
         SamsungBlur.clear(view)
         paneBlurRadius[index] = -1
         paneSpec[index] = null
@@ -1073,6 +1097,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             // The bubble's own radius moves with its width, so the glass is re-rounded whenever it changes: glass that
             // kept a rounding of its own spilled past the corners.
             paneCorners[index] = numbers[4] * density
+            // How much of its radius this pane is to wear, and it is the only way a blur here can fade: a compositor
+            // blur is a fixed number on a View, so the strength has to be re-applied per frame to move at all. Only
+            // the scrim sends it — the ramp up and down behind an open panel — and anything without a sixth number
+            // gets the whole radius, which is every bubble's glass and was the only behaviour before it existed.
+            paneShares[index] = numbers.getOrNull(5) ?: 1f
             applyBlur(index, pane, paneCorners[index], resized)
         }
     }

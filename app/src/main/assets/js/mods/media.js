@@ -1,5 +1,6 @@
 import { lockArt, lockPill, paintLock, paintLockProgress } from '../lock.js';
 import { becomeExtended, closedTarget, setSize, showFace, toClosed } from '../row.js';
+import { paintQuickMedia } from '../status.js';
 import { bridge, mods, pill, shared } from '../state.js';
 
 const playerElapsed = document.getElementById('player-elapsed');
@@ -258,6 +259,10 @@ window.onMediaUpdate = payload => {
     payload.artBase64 = shared.media.artBase64;
   }
   shared.media = payload;
+  // The quick panel's foot module carries the song as its base mod, and this is the only place a
+  // song's arrival and departure are written down — so it is told here rather than the status
+  // bubble growing a watcher of its own for a truth that already has one.
+  paintQuickMedia();
   if (!shared.media) {
     mods.delete('media');
     clearInterval(shared.mediaTicker);

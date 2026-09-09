@@ -16,7 +16,7 @@ import org.json.JSONObject
  */
 object BatteryWatch {
 
-    /** Yellow: worth knowing. */
+    /** Yellow: worth knowing. Mirrored by `chargeColour` and `chargeBand` in `status.js`, which break their yellow band one above it — the announcement and the colour are one reading about one phone, and for a while they were half a band apart. */
     private const val LOW = 30
 
     /** Red: do something about it. */

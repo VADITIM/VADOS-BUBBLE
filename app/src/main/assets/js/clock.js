@@ -22,7 +22,7 @@ const clockPill = document.getElementById('clock');
 const clockFace = document.getElementById('clock-face');
 const clockSeconds = document.getElementById('clock-seconds');
 
-/** Mirrors --clock-left in pill.css: how far its left edge stands off the screen edge. */
+/** Mirrors --clock-left in pill.css: how far its left edge stands off the screen edge. It is where the bubble *stands* and it is not to be traded for reaching an edge: moved to zero once, the box went to the edge and took the digits with it, and what the eye read was the time having slid sideways rather than the bubble having grown. Reaching an edge is a growth and belongs to `html.status-open` further down pill.css, which extends the box past the edge and pays the extra room back as padding so nothing inside it moves. */
 const CLOCK_LEFT = 14;
 
 /** How far down the finger has to pull before the pull counts, matching the Status bubble's. */

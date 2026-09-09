@@ -3,7 +3,7 @@ import { mediaWindow } from './mods/media.js';
 import { show } from './mods/notification.js';
 import { timerWindow } from './mods/timer.js';
 import { nowOpen, nowOwnsClock, nowTouch } from './now.js';
-import { statusHolds, statusOpen, statusPanelPush, statusPill, statusTouch } from './status.js';
+import { closeStatusPanel, openStatusPanel, statusHolds, statusOpen, statusPanelPush, statusPill, statusTouch } from './status.js';
 import { clockHolds, clockPill, clockTouch } from './clock.js';
 import { lockHolds, lockPill } from './lock.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize } from './row.js';
@@ -234,3 +234,14 @@ window.setMicrophoneActive = isActive =>
   document.getElementById('microphone-dot').classList.toggle('active', isActive);
 window.setCameraActive = isActive =>
   document.getElementById('camera-dot').classList.toggle('active', isActive);
+
+/**
+ * The Status panel, asked for by something that is not a finger on this bar: a gesture bound to
+ * StatusPanelActivity. It is the tap's own meaning and not a second one — open if closed, closed if
+ * open — so what it must not become is an `open` the host calls twice, which would be a panel that
+ * cannot be put away by the gesture that brought it.
+ */
+window.onToggleStatusPanel = () => {
+  if (statusOpen) closeStatusPanel();
+  else openStatusPanel();
+};

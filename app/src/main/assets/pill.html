@@ -168,82 +168,134 @@
        the bolt alone, no percentage. The glyph is written from the script's own set rather than
        inlined here, because it is the same one the panel's battery wears. -->
   <div class="status-face" id="status-charge"></div>
+  <!-- Open, this face is the battery and nothing else. Every other reading the panel used to hold
+       is a bubble of its own now, standing in #quick-panel below — the charge stays with the
+       Status bubble because it is the one reading that *is* this bubble: it is the first thing to
+       arrive when the panel opens and the first to go home when it closes, so it can never be a
+       module that happens to be in the same room as the others. -->
   <div class="status-face" id="status-panel">
-    <!-- One column, read top to bottom in the order the readings matter: the charge in the top right corner, the three links under it, the six states under those. The charge is a cell rather than a band across the panel now — a battery already has a shape everyone knows, and the level standing in that shape is read without a box being drawn round it or a glyph being put beside it. -->
-    <!-- The charge, drawn as the icon it is: the liquid is the cell's own inside. Tapped it puts the phone into power saving, which is the one thing worth doing to a battery from a bar; held it opens the system's own battery screen, where the charging limit lives — the same meaning a hold has on every other bubble here. -->
-    <div id="quick-head">
-    <!-- The four links, stacked at the top left beside the charge. Wide and short rather than square: what each of them is attached to is a *name*, and a name wants width — the icon and the reading stand side by side on one line the way a row of a list does. Mobile joined them because it is the same kind of fact as the other three, and because the bubble on the bar already reports it. -->
-    <div id="quick-modes">
-      <button class="quick-mode" data-toggle="usb"><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-mode" data-toggle="bluetooth"><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-mode" data-toggle="wifi"><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-mode" data-toggle="mobile"><span class="quick-icon"></span><span class="quick-label"></span></button>
-    </div>
     <div id="quick-battery">
       <!-- The terminal, and its own strip above the cell rather than part of the outline: the cell clips everything in it so the liquid cannot climb out of it, and a nub inside that clip is a nub with its top cut off. -->
       <span id="battery-pin"></span>
       <div id="battery-cell">
-      <!-- The charge drawn as a level rather than only as an icon: the liquid stands at the percentage and is coloured by the band it is in, so the reading is had before the number is read. Two crests, not one: the darker one rides a few units higher and behind, drifting the other way at a slower pace, so all that is ever seen of it is a shaded edge running along the top of the surface — which is what tells the eye it is looking at liquid with depth rather than at a line that was drawn. Each path spans six wavelengths against a viewBox four wide, and the drift is exactly one wavelength: the slack is what keeps a leading edge from walking into view, which is the whole of why the first version stuttered at the loop. -->
-      <!-- The bubbles a charge sends up through the liquid, and they belong to the *waves* rather
-           than to the box: each set rises to the surface it is under and is gone at it, which is
-           what makes them read as being in the liquid instead of drawn over it. The back set is
-           dimmer, smaller and slower, behind the crests the front set breaks through. They stand
-           beside the fill rather than inside it because the fill carries a group opacity that
-           cannot be given up — see the CSS — and each one is a strip the full height of the liquid
-           carrying its circle at the foot, so a rise is exactly that height whatever the charge is;
-           a percentage on the circle would be a percentage of the circle. -->
-      <div class="battery-bubbles back">
-        <span class="battery-bubble" style="--at: 18%; --size: 4px; --rise: 3.4s; --wait: 0.7s"></span>
-        <span class="battery-bubble" style="--at: 44%; --size: 3px; --rise: 4.1s; --wait: 2.2s"></span>
-        <span class="battery-bubble" style="--at: 67%; --size: 5px; --rise: 3.8s; --wait: 1.4s"></span>
-        <span class="battery-bubble" style="--at: 88%; --size: 3px; --rise: 4.6s; --wait: 3.1s"></span>
-      </div>
-      <div id="battery-fill">
-        <!-- Two wavelengths across the cell, not four: a 64px box showing four crests is a ripple pattern, and a ripple pattern is read as a texture rather than as a surface. Halving the viewBox's width is what widens them, and it costs the loop nothing — each path still runs six wavelengths of 50 against a window 100 wide, so a drift of one wavelength never brings an end into view. -->
-        <svg id="battery-waves" viewBox="0 0 100 24" preserveAspectRatio="none">
-          <path class="battery-wave back" d="M0 12 q25 -12 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
-          <path class="battery-wave front" d="M0 12 q25 -12 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 V24 H0Z"/>
-        </svg>
-      </div>
-      <div class="battery-bubbles front">
-        <span class="battery-bubble" style="--at: 9%;  --size: 6px; --rise: 2.6s; --wait: 0.2s"></span>
-        <span class="battery-bubble" style="--at: 31%; --size: 8px; --rise: 3.1s; --wait: 1.6s"></span>
-        <span class="battery-bubble" style="--at: 55%; --size: 5px; --rise: 2.3s; --wait: 0.9s"></span>
-        <span class="battery-bubble" style="--at: 76%; --size: 7px; --rise: 3.5s; --wait: 2.6s"></span>
-        <span class="battery-bubble" style="--at: 95%; --size: 4px; --rise: 2.9s; --wait: 1.1s"></span>
-      </div>
+      <!-- The charge drawn as a level rather than only as an icon: the liquid stands at the percentage and is coloured by the band it is in, so the reading is had before the number is read. Flat, with no surface on it and nothing rising through it — a level that is never still is a level being watched rather than read, and the crests cost the fill a group opacity and seventeen pixels of reserved headroom that the reading was paying for. -->
+      <div id="battery-fill"></div>
       <span id="battery-glyph"></span>
       <span id="battery-reading"></span>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- The quick settings, and every one of them is its own bubble now.
+     They used to be four groups inside one big box, which made the panel a card with a list in
+     it: the box was the thing that arrived and the controls were its contents. A module standing
+     on its own is a *bubble* — it is in the same body of liquid the row is, it necks into
+     whatever it passes on the way home, and it can be thrown in and slung back one at a time.
+     That is the whole of why they were split, and it is why each of them owes a pane in
+     liquid.js's BLUR_PANES and a blob to mirror it.
+     This container itself is never seen and never touched: it is the frame the modules are laid
+     out in, so the arithmetic for where each of them stands is a flexbox rather than eight sets
+     of coordinates that have to agree with each other. -->
+<div id="quick-panel">
+  <!-- The scrim. It is not a bubble — it has no liquid and no press — it is the region the host
+       frosts the whole screen through, mirrored the same way every other pane is: the page owns
+       where it is and the host owns what it does there. The faint ground over it is ours, drawn
+       above the glass, because a blur alone leaves white wallpaper too bright to read a panel on. -->
+  <div id="quick-scrim"></div>
+  <!-- The connectors, and every one of them is its own bubble in a five-column grid. They were four
+       rows inside one box titled "Connections", which made the set a list with a heading over it —
+       and a heading is a label on a bubble, which this panel no longer has: a bubble says what it is
+       with its own glyph. The grid is the one the design asks for. The six two-column links carry a
+       glyph and the name of what they are attached to; USB takes the narrow fifth column down all
+       three rows, glyph alone, because what it reports is a cable rather than a network and a cable
+       has no name to give.
+       The charge is not a cell in this grid. It is the Status bubble itself, hung at the top right
+       by #status.open, so the room for it is subtracted from the row rather than held for it. -->
+  <div id="quick-row-links">
+    <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-name">Hotspot</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+    <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-name">Flight</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+    <button class="quick-bubble quick-mode" data-toggle="gps"><span class="quick-name">Location</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+    <button class="quick-bubble quick-mode" data-toggle="mobile"><span class="quick-name">Mobile</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+    <button class="quick-bubble quick-mode" data-toggle="wifi"><span class="quick-name">Wi-Fi</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+    <button class="quick-bubble quick-mode" data-toggle="bluetooth"><span class="quick-name">Bluetooth</span><span class="quick-icon"></span><span class="quick-label"></span></button>
+  </div>
+
+  <!-- The six states, each its own bubble. They were two boxes titled "Display" and "System", which
+       is a shelf with a heading on it: what the split buys is that one switch can be thrown in and
+       slung home on its own, and what the heading cost was a word explaining a glyph that had
+       already said it. The grouping survives in the order — the three the screen answers to, then
+       the three the phone does — because an order is a grouping nobody has to read. -->
+  <div id="quick-row-body">
+    <div id="quick-row-knobs">
+      <button class="quick-bubble quick-knob" data-toggle="modus"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="dim"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="rotate"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="saver"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="recording"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="mic"><span class="quick-icon"></span></button>
     </div>
 
-    <!-- The two levels, standing against the right edge where the thumb already is: brightness and
-         then volume, because that is the order they are reached in from the hand holding the phone.
-         Upright, because both of them *are* an amount of something and a column filling from the
-         floor is that amount — the same reading the charge beside them is drawn as. They answer a
-         drag and never a tap: a bar that jumps to wherever it was touched is a bar that changes the
-         screen's brightness because a finger came down on the way to something else. -->
-    <div id="quick-levels">
-      <div class="level" data-level="brightness">
+    <!-- Two bubbles and not one module with two columns in it: the slider that is being held has
+         to be able to leave the panel on its own, which a column inside a shared box cannot do. -->
+    <div id="quick-row-levels">
+      <div class="quick-bubble level" data-level="brightness">
         <div class="level-fill"></div>
         <span class="level-icon"></span>
       </div>
-      <div class="level" data-level="volume">
+      <div class="quick-bubble level" data-level="volume">
         <div class="level-fill"></div>
         <span class="level-icon"></span>
       </div>
     </div>
+  </div>
 
-    <!-- The six states, as buttons rather than as switches. A switch draws a track it does not need — these are on or off with nothing in between, exactly as the three above are — so what is left is the knob the icon was already riding in. Pressed, it turns a full circle and swaps its glyph halfway through: the turn is the cause and the new icon is the consequence, and a whole revolution is the one rotation that leaves nothing crooked behind it. -->
-    <div id="quick-grid">
-      <button class="quick-knob" data-toggle="modus"><span class="quick-icon"></span></button>
-      <button class="quick-knob" data-toggle="dim"><span class="quick-icon"></span></button>
-      <button class="quick-knob" data-toggle="rotate"><span class="quick-icon"></span></button>
-      <button class="quick-knob" data-toggle="saver"><span class="quick-icon"></span></button>
-      <button class="quick-knob" data-toggle="recording"><span class="quick-icon"></span></button>
-      <button class="quick-knob" data-toggle="mic"><span class="quick-icon"></span></button>
+  <!-- The one module at the foot that is not a switch: it reports. Its base mod is **media** and
+       not the transfer it used to be, because a file in flight is a rare thing and a song is not —
+       a bubble whose resting state is a reading nobody ever sees is a bubble spending the panel's
+       best row on nothing. A transfer takes it over while one is running, exactly the way a mod
+       takes a bubble over anywhere else here, and hands it back when the file lands.
+       It is the bottom-most bubble, so it runs into the bottom screen edge rather than standing the
+       panel's margin off it: an edge a bubble touches is an edge the panel is attached to.
+       With a song playing it grows its height by half again as much again, and the room comes out
+       of the switches and the levels alone — the connector grid above them is `flex: none` and does
+       not give, because a connector shrinking to make room for a song is the panel rearranging
+       itself around the wrong subject. -->
+  <div class="quick-bubble" id="quick-media">
+    <!-- What it says with nothing playing and nothing in flight, and what a transfer takes over:
+         one line and a track under it, which is the shape both readings share. -->
+    <div id="quick-media-head">
+      <span id="quick-media-kind">Nothing playing</span>
+      <span id="quick-media-reading"></span>
     </div>
+    <div id="quick-media-track"><div id="quick-media-fill"></div></div>
+    <!-- The song, and it is drawn rather than hidden behind the head above: the two are different
+         heights and different shapes, so the module carries both and wears the one that is true. -->
+    <div id="quick-media-now">
+      <img id="quick-media-art" alt="">
+      <div id="quick-media-lines">
+        <div id="quick-media-title"></div>
+        <div id="quick-media-artist"></div>
+      </div>
+      <div id="quick-media-transport">
+        <div class="transport" id="quick-media-previous">
+          <svg viewBox="0 0 24 24"><path d="M7 6h2v12H7zm3 6 8-6v12z"/></svg>
+        </div>
+        <div class="transport" id="quick-media-play">
+          <svg viewBox="0 0 24 24"><path id="quick-media-play-path" d="M8 5v14l11-7z"/></svg>
+        </div>
+        <div class="transport" id="quick-media-next">
+          <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zm-1 6L6 18V6z"/></svg>
+        </div>
+      </div>
+    </div>
+    <!-- The cable, and it lives here rather than in the connector grid above because a cable is not a
+         radio: it is a thing physically attached to the bottom of the phone, and the module at the
+         bottom of the panel is the one that already reaches that edge. It is drawn only while
+         something is plugged in — an "off" cable is no cable, and a permanently dimmed row saying so
+         is a row spending height on nothing. A tap grants the machine on the other end the run of
+         the phone, which is the whole of what the switch behind it does. -->
+    <button class="quick-mode" id="quick-media-usb" data-toggle="usb"><span class="quick-icon"></span><span class="quick-label"></span></button>
   </div>
 </div>
 

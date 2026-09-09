@@ -34,10 +34,38 @@ const liquidLayers = {
  * showing, because the host's panes are a fixed `View` list stood up once at start — the
  * same shape the two satellites already are. Mirrors NOTES_LIMIT in notes.js.
  */
+/**
+ * The quick settings' modules are in here because they are bubbles: they are in the same body of
+ * liquid the row is, they neck into each other and into the charge standing beside them, and they
+ * are slung home into the Status bubble rather than being switched off. A module left out of this
+ * list would be the one shape in the panel painting its own background — see bubbles.md.
+ *
+ * There are fifteen of them rather than six because the four groups were broken up: every connector
+ * and every state is its own bubble now, which is what lets one of them be thrown in and slung home
+ * on its own. The names are the control's own `data-toggle`, so a switch added to the panel is a
+ * name here and a `quick-` line in QUICK_MODULES and nothing else.
+ *
+ * The cable is the one control in the panel that is **not** here: it stands inside the foot module
+ * rather than beside it, and a pane over pixels another pane already covers frosts them twice.
+ */
 const BLUR_PANES = [
   'main', 'left', 'right', 'lock', 'status', 'clock', 'double', 'padlock',
   'note0', 'note1', 'note2', 'note3', 'note4',
+  'quickHotspot', 'quickPlane', 'quickGps', 'quickMobile', 'quickWifi', 'quickBluetooth',
+  'quickModus', 'quickDim', 'quickRotate', 'quickSaver', 'quickRecording', 'quickMic',
+  'quickBright', 'quickVolume', 'quickMedia',
 ];
+
+/**
+ * The frosted screen behind the open quick settings, and it is a pane without being a blob: it is
+ * flat glass rather than liquid, and a full-screen shape in the goo layer would weld every bubble
+ * on the canvas into it. So it rides the blur bridge alone — prepended to the spec `sendBlurFrame`
+ * sends, which makes it **pane 0** and every blob's pane its own index plus one.
+ *
+ * Mirrored in BubbleService: SCRIM_PANE is that 0, BLUR_PANES over there is this list plus it, and
+ * the host gives that one pane its own radius so the screen can be frosted harder than a bubble is.
+ */
+const scrim = document.getElementById('quick-scrim');
 
 const blobs = BLUR_PANES.map(name => ({
   name,
@@ -59,8 +87,26 @@ function sourceOf(name) {
   if (name === 'padlock') return padlockPill;
   if (name === 'lock') return lockPill;
   if (name.startsWith('note')) return noteAt(Number(name.slice(4)));
+  if (name.startsWith('quick')) return quickModule(name);
   return satellites[name];
 }
+
+/** Which box each quick-settings module is. Resolved once — the markup is static, and a query per module per frame is fifteen of them for elements that cannot change. The twelve switches are looked up off the same `data-toggle` their pane is named after, so the two cannot drift apart by a typo the way a hand-written list of ids could. The cable is excluded by id: it is a `.quick-mode` like the rest and would be picked up by the same query, but it has no pane of its own — see BLUR_PANES. */
+const QUICK_MODULES = Object.assign(
+  {
+    quickBright: document.querySelector('.level[data-level="brightness"]'),
+    quickVolume: document.querySelector('.level[data-level="volume"]'),
+    quickMedia: document.getElementById('quick-media'),
+  },
+  Object.fromEntries([...document.querySelectorAll('.quick-mode:not(#quick-media-usb), .quick-knob')].map(control => [
+    'quick' + control.dataset.toggle[0].toUpperCase() + control.dataset.toggle.slice(1),
+    control,
+  ])),
+);
+const quickModule = name => QUICK_MODULES[name];
+
+/** The frame the modules stand in, which is also what says whether any of them are standing. */
+const quickPanel = document.getElementById('quick-panel');
 
 /**
  * A satellite that is not dressed has no skin: it is not merely invisible, it is
@@ -78,13 +124,25 @@ function isSkinned(name) {
   // Only once it has been born. Before the first connectivity payload it is a zero-opacity
   // box at the right end of the bar, and a blob mirrored off it would be a lump of liquid
   // standing over the system's icons from the moment the service starts.
-  if (name === 'status') return statusPill.classList.contains('lit');
+  // Open, this bubble is not a bubble: the panel it grows into is the battery and only the battery,
+  // so the glass that would stand behind the cell is dropped for as long as it is open. A pane there
+  // was a rounded slab of liquid the exact size of the cell, drawn a pixel behind it and reading as a
+  // frame round a shape that is already its own outline.
+  if (name === 'status') {
+    return statusPill.classList.contains('lit') && !statusPill.classList.contains('open');
+  }
   if (name === 'clock') return isClockLit();
   if (name === 'double') return isDoubleOut();
   if (name === 'padlock') return isPadlockShowing();
   // Only as many as are actually standing there. A repaint can shrink the list from five notes
   // to two without this frame knowing in advance, which is exactly what noteAt() answers.
   if (name.startsWith('note')) return Boolean(noteAt(Number(name.slice(4))));
+  // Only while the panel is up, and through the sling as well as the stand: `leaving` is what holds
+  // the modules on screen while they fly home, and a skin dropped at the start of that flight is
+  // six bubbles that stop being liquid exactly as they run into the one taking them in.
+  if (name.startsWith('quick')) {
+    return quickPanel.classList.contains('showing') || quickPanel.classList.contains('leaving');
+  }
   // Only while the row is a row. A grown bubble is one shape with nothing beside it,
   // and a satellite still holding a mod behind it is not standing on the bar — it
   // would be a frosted circle out at the side of an open panel.
@@ -166,7 +224,14 @@ function mirrorFrame() {
 
   blobs.forEach((blob, index) => {
     const seen = measured[index];
-    if (!seen || !seen.box.width) {
+    // A shape at zero opacity has no skin, and until now only the *pane* knew that: `sendBlurFrame`
+    // has always dropped a region under `alpha < 0.01` and the blob went on being drawn from the box
+    // alone. Everything that fades here used to fade while its class was still on and be dropped a
+    // moment later when the class went, so the two frames nobody saw hid it — and a module leaving
+    // the quick panel is the case where that stops being true, because the class it is dropped by
+    // comes off on a timer and the mirror can stop before it. A blob left drawn is a lump of liquid
+    // standing over the wallpaper for as long as nothing else stirs the mirror.
+    if (!seen || !seen.box.width || (!isNaN(seen.alpha) && seen.alpha < 0.01)) {
       blob.edge.style.display = 'none';
       blob.fill.style.display = 'none';
       return;
@@ -277,9 +342,63 @@ export function resendBlur() {
   stirLiquid(240);
 }
 
+/**
+ * The frosted screen, as the one region that is not a bubble's — and the one region that fades by
+ * changing its *strength* rather than its size. Every other pane here shrinks on its own opacity,
+ * because a bubble's glass is the bubble and a shape closing to its middle is what a bubble leaving
+ * looks like. A screen has no middle to close to: shrunk, the frost read as a rectangle of blur
+ * collapsing towards the centre of the wallpaper, which is the one thing it must not look like. So
+ * this pane keeps the whole screen for as long as it is there at all and sends `--scrim-frost` as a
+ * sixth number — the share of SCRIM_BLUR the host is to actually apply — and the ramp up over 0.6s
+ * and home over 1.1s is that number transitioning in the stylesheet.
+ *
+ * Read off the custom property rather than off `opacity`, because the two are no longer the same
+ * fade: the dark ground over the frost still leaves in 140ms and the frost behind it takes eight
+ * times as long, which is the whole point of the change.
+ */
+/** How many steps the frost ramp is allowed — see the comment on the value it rounds. */
+const FROST_STEPS = 12;
+
+function scrimRegion() {
+  const frost = parseFloat(getComputedStyle(scrim).getPropertyValue('--scrim-frost'));
+  if (!frost || frost < 0.01) return '';
+  const box = scrim.getBoundingClientRect();
+  return [
+    Math.round(box.left),
+    Math.round(box.top),
+    Math.round(box.width),
+    Math.round(box.height),
+    0,
+    // **Quantised hard, and this is the single most expensive number in the project.** It is compared
+    // against the last frame's string as text on both sides of the bridge, and the host re-applies a
+    // pane's blur whenever its region changes — so every distinct value here is one more full-screen
+    // Samsung blur of a 1080×2340 surface. Two decimals were nearly free-running: a 450ms ramp at
+    // 120Hz is fifty-odd frames and a hundred available values, so essentially every frame of every
+    // open and every close re-blurred the whole screen. Measured on the phone, the scrim's ramp was
+    // about 4ms of the 90th-percentile frame and most of the GPU tail (15ms down to 9ms with the
+    // panes off entirely). At a twelfth the ramp is twelve re-blurs instead of fifty and the step is
+    // not visible, because the blur is not what the eye is reading during the ramp — the scrim's dark
+    // ground is, and that is a plain CSS opacity transition that costs nothing and stays smooth.
+    (Math.round(frost * FROST_STEPS) / FROST_STEPS).toFixed(2),
+  ].join(',');
+}
+
+/**
+ * Whether a shape gets glass of its own, which is not the same question as whether it is liquid.
+ * The quick settings' modules are the one set that answers no: they stand on the frosted screen the
+ * panel already puts up, so a pane under each of them is the same wallpaper blurred twice — darker
+ * and duller under every module than between them, which reads as six grey cards rather than as
+ * glass. They keep their blob, so they go on necking into each other and into the charge; what they
+ * give up is only the second frost. Their panes stay in the list and are simply sent empty, because
+ * the host's panes are a fixed `View` list and a pane's index is its position in this one.
+ */
+function isGlazed(name) {
+  return !name.startsWith('quick');
+}
+
 function sendBlurFrame(measured) {
-  const spec = measured.map(seen => {
-    if (!seen || !seen.box.width) return '';
+  const spec = [scrimRegion()].concat(measured.map((seen, index) => {
+    if (!seen || !seen.box.width || !isGlazed(blobs[index].name)) return '';
     // A shape mid-fade keeps its box, so the pane is shrunk on the fade instead and
     // stays centred on the shape while it closes to nothing.
     const alpha = isNaN(seen.alpha) ? 1 : seen.alpha;
@@ -295,7 +414,7 @@ function sendBlurFrame(measured) {
       // is wearing, capped at half its shortest side the way a border-radius is.
       Math.round(Math.min(parseFloat(seen.radius) || 0, Math.min(width, height) / 2)),
     ].join(',');
-  }).join(';');
+  })).join(';');
   if (spec === blurSent) return;
   blurSent = spec;
   bridge.setBlurFrame(spec);

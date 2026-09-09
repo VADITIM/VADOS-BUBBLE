@@ -13,6 +13,13 @@
      content is drawn behind the camera and behind the bar bubbles standing there. Below them it has the whole width to
      read across, which is why the alert can be taller and say more rather than merely sitting lower. */
   --grown-pad: 26px;
+  /* And how far *below that again* the quick settings panel starts. The pad above is measured from the
+     line the closed row rests on, and the row's bubbles are 34 tall — so a panel at pad alone begins
+     eight pixels above their own bottoms, which is not merely tight but inside the goo's reach: the
+     connectors on the panel's top row grew necks up into the clock and the main bubble and the three
+     of them drew as one body of liquid. Clear of the row, not merely below its baseline. Mirrored by
+     QUICK_CLEARANCE in status.js, which is what actually places the frame. */
+  --quick-clearance: 22px;
   /* Repointed per notification by the app style table in Kotlin; the bubble never
      names an app colour itself. Plain white when nothing has repointed it: the
      section colour underneath is the phone's own accent, and a notification from an
@@ -97,8 +104,7 @@ html, body {
    window relayout into a visible slide. */
 #pill {
   position: absolute;
-  /* The window carries an invisible grab margin all round, so the bubble sits one
-     margin in from its top edge — otherwise it would ride that much too high. */
+  /* Not a margin of the window's any more, whatever the name says: the canvas is the whole display and `--grab` is the user's own `verticalOffsetDp`, sent down by `setGrab` — a calibration against this phone's cutout, and so where the row stands rather than a gap to be taken back. A state that wants the bubble against the top edge grows it up past the edge instead; see `html.status-open` further down. */
   top: var(--grab, 0px);
   left: 0;
   right: 0;
@@ -533,7 +539,8 @@ html.grown #liquid { height: 100%; }
    background came from the same custom property as everyone else's still read as a
    different alpha — the rim was solid where the others were glass. */
 html.liquid #pill, html.liquid .satellite, html.liquid #lock-now, html.liquid .lock-note,
-html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #padlock {
+html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #padlock,
+html.liquid .quick-bubble {
   background: transparent;
   border-color: transparent;
 }
@@ -2098,131 +2105,132 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .own-charge[data-charge="critical"] { color: #b8544c; }
 /* Plugged in outranks the band: a phone at 9% on a cable is a phone being fixed, not a warning. */
 #status.plugged .own-charge { color: inherit; }
-
-/* Open, it stands in the middle of the screen and in front of everything else on the bar: it
-   is the thing being interacted with, and nothing on the row outranks that. The same shape the
-   Now bubble's panel takes at the other end, because it is the same move. */
-/* Centred by the *layout* and not by arithmetic. It used to keep the closed bubble's `right`
-   anchor and be pushed to the middle with the flight offset, which meant the panel was only
-   ever centred if that offset survived — and it also meant the right edge stayed pinned to the
-   screen edge while the left edge swept across, which is what "its origin is the top right"
-   was. Anchored to the middle it cannot be anywhere else, whatever any transform is doing, and
-   the jump that switching anchors causes is put back by the flight for one frame the way
-   motion.md says a relayout is handled. */
+/* Open, this bubble is the *battery* — a tall narrow cell standing at the top right of the panel,
+   with every other reading beside it as a bubble of its own. It used to grow into the whole panel
+   and hold all four groups; splitting them out is what makes each of them able to arrive and leave
+   on its own, and what is left for this bubble to become is the one reading that was always its
+   own: the charge. It is also the shortest flight on the screen — the closed bubble stands at the
+   right end of the bar and the cell hangs directly under it, so the growth is almost entirely
+   downwards and there is no sweep across the screen to put back. */
+/* Anchored to the right edge and not to the middle, which means the anchor no longer changes at
+   all between closed and open: both are `right`. The flight that used to hold the bubble still for
+   a frame while the anchor swapped is therefore not needed for the horizontal any more — it is
+   kept because the *margin* differs (the bar's own inset against the panel's) and a few pixels of
+   jump is still a jump. */
 #status.open {
-  /* Beneath the punch hole, the way a grown main bubble stands: on the row its first line is drawn behind the camera and behind whatever else is standing up there, and --grown-pad is the same number the main bubble drops by, so the two panels sit on one line rather than each on its own. The proxy is given the pad as well, or the bottom of the panel is drawn where nothing can be touched. */
-  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--grown-pad));
-  left: 50%;
-  right: auto;
-  margin-left: calc(var(--status-panel-width) / -2);
-  width: var(--status-panel-width);
-  height: var(--status-panel-height);
-  border-radius: 30px;
-  --grow-ms: 420ms;
+  /* The panel's own top line, which is the line a grown main bubble rests on: --grown-pad is the same number the main bubble drops by, so the two sit on one line rather than each on its own. */
+  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--grown-pad) + var(--quick-clearance));
+  left: auto;
+  right: var(--quick-margin);
+  margin-left: 0;
+  width: var(--quick-cell);
+  height: var(--quick-links-tall);
+  border-radius: 26px;
+  --grow-ms: 220ms;
   padding: 0;
   z-index: 30;
 }
-/* The panel inside is already its full size before the box is, so the box has to be what hides the
-   part of it that has not been opened out to yet. It costs the skin nothing — the liquid is
-   mirrored into a layer of its own outside this element and is not clipped by it. It has to outlive
-   `open` by the length of the collapse: taking `open` off is what *starts* the shrink, and a panel
-   that no longer stretches to the bubble would otherwise stand at full size over a bubble a fifth
-   its width for the whole of the fade. Nothing else on this bubble may be clipped — a closed slot
-   arriving overshoots its own size — so it is these two states and no others. */
-#status.open, #status.panel-closing { overflow: hidden; }
+/* Nothing here clips, in any state. The box used to hide the part of the panel it had not opened
+   out to yet — the face inside is its own fixed size before the box is — and that was worth having
+   while the box was a bubble with glass on it and the growth was the thing being watched. It is
+   neither now: the skin comes off for the whole of `open` (see `isSkinned`), so the box draws
+   nothing and there is no growth to hide anything behind, and the one thing left inside it is the
+   charge, which is fired up from a third of a screen below and would spend most of that flight
+   outside a clip the size of the cell — arriving out of its own bottom edge instead of off the
+   screen. A closed slot arriving overshoots its own size too, which is why this was never allowed
+   in any other state. */
 
-/* One column now, read top to bottom: the charge across the whole width, the three links under
-   it, the six states under those. It used to be two side-by-side halves, and that made the one
-   reading in here that is a level rather than a state into a narrow strip at the edge. */
+/* The cell, and nothing else. Sized in advance from the same two numbers `#status.open` is given
+   rather than with `inset: 0`, for the reason that has not changed: the bubble's width and height
+   are animated for 420ms on the way open, and a face stretched to the box re-solves its whole
+   layout on every one of those frames while the liquid mirror is reading boxes off the same
+   document. Sized in advance the layout is computed once and the growth is a clip over a picture
+   that no longer moves. Less the bubble's own border, both sides, because `inset` measures against
+   the padding box and the two numbers are the border box. */
 #status-panel {
-  /* Its own size, written from the same two numbers `#status.open` is given, rather than
-     stretched to whatever the bubble is this frame. The bubble's width and height are *animated*
-     for 420ms on the way open, and a face laid out with `inset: 0` re-solved this whole panel —
-     four links, two levels, six knobs, the cell and its waves — on every one of those frames,
-     while the liquid mirror was reading boxes off the same document. That was the lag. Sized in
-     advance the layout is computed once and the growth is a clip over a picture that no longer
-     moves. `#status.open` is what does the clipping. */
-  /* Less the bubble's own border, both sides: `inset: 0` measures against the padding box, and
-     the two numbers are the border box. Two pixels, and they are the difference between the
-     panel it was and the panel it is. */
-  width: calc(var(--status-panel-width) - 2px);
-  height: calc(var(--status-panel-height) - 2px);
+  width: calc(var(--quick-cell) - 2px);
+  height: calc(var(--quick-links-tall) - 2px);
   right: auto;
   bottom: auto;
   flex-direction: column;
   align-items: stretch;
-  /* Spread, not stacked: with the meter capped there is room left over, and pooled at the foot it
-     reads as a panel that ran out of content. The three groups take the height between them — the
-     level at the top, the links in the middle, the states against the bottom where the thumb is. */
-  justify-content: space-between;
-  gap: 0.7rem;
-  padding: 0.9rem 1rem 1.4rem;
+  padding: 0.5rem 0.5rem 0.6rem;
 }
 
-/* The charge, and the top of the panel. Laid out across rather than down: a level fills sideways,
-   and the glyph and the number stand at the two ends of the room it is filling. Its height is a
-   ratio of the width it used to have as a column (104px), which is what keeps it a band rather
-   than a second panel. */
-/* The charge takes every pixel the controls do not, which on a full-screen panel is most of them.
-   It is the one reading in here that is a *level*, and a level is the one thing in this project
-   that genuinely wants height — the liquid, its surface and the bubbles rising through it are all
-   drawn in the room this gives them. The controls keep their own heights at the foot of it, where
-   the thumb already is. `min-height: 0` because a flex child's floor is its content and the glyph
-   in here would otherwise stop it shrinking on a short screen. */
-/* The corner the charge stands in. A row of its own so the cell can be pushed to the right edge
-   without being taken out of the column — absolutely positioned it would be outside the flow the
-   panel spreads its three groups along, and the links underneath would rise into its room. */
-#quick-head {
-  display: flex;
-  align-items: stretch;
-  gap: 0.6rem;
-}
-
-/* The charge, and it is the battery rather than a box with a battery in it: the outline is the
-   icon everybody already reads, and what is inside it is the level. Nothing is drawn beside it —
-   the glyph that used to stand next to the number was the shape saying "battery" a second time,
-   and the shape is now doing the saying. The bolt is the one thing still put over it, because
-   being plugged in is not a level and cannot be shown by one. */
+/* The charge, and it is the battery rather than a box with a battery in it: a terminal above a
+   sunken well, and the level standing in the well. Nothing is drawn beside it — the glyph that
+   used to stand next to the number was the shape saying "battery" a second time, and the shape is
+   now doing the saying. The bolt is the one thing still put over it, because being plugged in is
+   not a level and cannot be shown by one.
+   The drawing is Claude Design's: the outline is *not* a border round the cell any more. Three
+   pixels of accent round a filled cell read as a slab with a frame, and the frame was competing
+   with the liquid inside it for what the eye was meant to look at — so the cell is an unlit well
+   with the charge poured into it, and the only edge in the whole shape is the terminal on top. */
 #quick-battery {
+  /* The one ground both halves of the drawing stand on. Named rather than written twice: the terminal
+     and the well are one shape with a step in it, and two literals that have to match are two literals
+     that eventually will not. */
+  --battery-well: rgba(10, 9, 13, 0.85);
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* The whole of the bubble it is the face of. The cell inside takes what the terminal leaves with a `flex: 1` of its own, and a flex child's floor is its content — without a height to divide, the cell resolved to the height of the number in it and the charge stood as a stub at the top of a column of glass. */
+  flex: 1;
+  min-height: 0;
   /* White rather than the accent or the band: the level behind it is already the colour, and a
      reading that changed colour with it is the same thing said twice in the same cell. */
   color: #fff;
   transition: scale 200ms var(--ease-split);
 }
 #quick-battery.pressing { scale: 0.97; }
-/* The terminal, and the whole of why the shape reads as a battery from the corner of an eye. */
+/* The terminal, and the whole of why the shape reads as a battery from the corner of an eye. It is
+   the same drawing the cell is rather than a grey tab above it: the cell's own ground with the cell's
+   own edge round it, open at the bottom so the two are one outline with a step in it. A solid bar in
+   a different colour read as a part bolted on, which is what it looked like against a cell that had
+   grown to 96 wide and gained a border of its own. */
 #battery-pin {
-  width: 26px;
-  height: 7px;
-  border-radius: 3px 3px 0 0;
-  background: var(--battery-edge, rgba(255, 255, 255, 0.82));
-  transition: background 200ms ease;
+  /* Grown with the cell under it. A terminal that stayed 26 wide on a 96 wide cell stops reading as the nub on top of a battery and starts reading as a tab stuck to it. */
+  width: 38px;
+  height: 11px;
+  border-radius: 5px 5px 0 0;
+  background: var(--battery-well);
+  /* `--battery-edge` first so saving and low still tint the one edge in the shape, and the charge's
+     own band under it so the terminal and the cell are the same colour the rest of the time. */
+  border: 2px solid var(--battery-edge, var(--charge-color, var(--text-faint)));
+  border-bottom: none;
+  /* The two borders laid over each other rather than stacked: at 2px each, edge to edge, the join
+     draws as a 4px bar across the outline where it is supposed to be one continuous line. */
+  margin-bottom: -2px;
+  transition: border-color 500ms ease;
 }
-/* The outline is the drawing, so it is a real outline: three pixels of it, and the level held off
-   it by the padding — an absolutely positioned child is placed against the padding box, which is
-   what insets the liquid without a second element to inset it. Filled to the edge with a hairline
-   round it, the cell read as a green slab rather than as a battery. */
+/* The well the charge stands in, and it wears the band as an edge: the level says the charge by how
+   high it stands and the edge says it a second way, which is the one repetition worth having here —
+   a cell nearly full and a cell nearly empty differ by a colour at the top of the shape either way,
+   but only the edge is visible when the phone is glanced at from an angle. Two pixels rather than
+   three, which is what the frame that used to be here was: at three it read as a slab in a frame and
+   competed with the liquid inside it. The colour is `--charge-color` itself and not a second reading
+   of the same charge, so the border can never disagree with the level it surrounds. */
 #battery-cell {
   position: relative;
   overflow: hidden;
+  border: 2px solid var(--charge-color, var(--text-faint));
+  transition: border-color 500ms ease;
   flex: 1;
-  width: 64px;
-  padding: 4px;
+  /* The bubble's own width less its padding, rather than the number the bubble is written from: the two are the same only until one of them is changed, and the cell overhanging its bubble is not a thing the clip can hide — the skin is mirrored off the bubble, so the overhang is drawn outside the glass. */
+  width: 100%;
+  /* Flush against the terminal above it. There were eight pixels here while the terminal was a solid
+     bar floating over the cell; now that it is the same ground inside the same edge, a gap would be
+     the one outline broken in the middle. */
+  margin: 0;
   display: grid;
   place-items: center;
-  border-radius: 18px;
+  border-radius: 16px;
   corner-shape: squircle;
-  background: var(--sunken);
-  border: 3px solid var(--battery-edge, rgba(255, 255, 255, 0.82));
-  transition: border-color 200ms ease;
+  background: var(--battery-well);
 }
-/* Saving is a state of the battery rather than a switch beside it, so the whole cell wears it,
-   terminal included — a nub left in the plain border while the cell went accent read as a piece
-   of a different drawing. */
+/* Saving is a state of the battery rather than a switch beside it, so the terminal wears it — it
+   is the only edge left in the drawing, and the level below it is already saying the band. */
 #quick-battery.saving { --battery-edge: var(--section-color); }
 #quick-battery.low { --battery-edge: #e5342b; }
 /* Over the level rather than beside it, and only while there is a bolt to draw: see paintBattery. */
@@ -2237,7 +2245,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #battery-reading {
   z-index: 3;
   position: relative;
-  font-size: 1.5rem;
+  font-size: 1.875rem;
   line-height: 1;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -2246,183 +2254,80 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* The level. Its height is the charge and its colour is the band that charge falls in, both
    written by paintBattery — the bands are a reading rather than a gradient, so a phone at 62%
    and one at 38% are not the same yellow. It sits under the glyph and the number, which are the
-   only two things in this box that do not move. */
+   only two things in this box that do not move.
+   Flat and at full strength, with no surface on it. The crests and the rising bubbles were the
+   one part of this cell that moved on their own clock forever, and a level that is never still is
+   a level being watched rather than read; without them the fill needs no group opacity to keep
+   its overlaps from compositing twice, and no room reserved at the top for crests to break into,
+   so the liquid finally stands at exactly the percentage it is. */
 #battery-fill {
+  /* Square, and it has to be said: dna.css gives *every* element a default radius, so this one was
+     wearing a squircle it never asked for and the level stood in the well with rounded bottom corners
+     that did not follow the well's. The rounding belongs to the cell — it clips — and a shape being
+     clipped must not round itself as well. */
+  border-radius: 0;
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  /* The charge, with the surface's own room taken off the top of it. The waves stand *above* this
-     box and the cell clips everything in it, so a phone near full charge put its crests outside
-     the cell and had them cut off flat — the "the wave has a slice missing along the top" that
-     only ever showed up at a high reading, because only a high reading pushed the surface up into
-     the border. `min` rather than a factor, so every charge that has the room is still drawn at
-     exactly its own height and only the last few percent are held back for the liquid to move in. */
-  height: min(var(--charge-height, 0%), 100% - 17px);
+  height: var(--charge-height, 0%);
   z-index: 1;
   background: var(--charge-color, var(--text-faint));
-  /* A group opacity, and it has to stay one: the crests overlap the body and each other, and given
-     to each of them separately the overlaps composite twice and every overlap becomes an edge. It
-     is also why the bubbles are not in here — see .battery-bubbles. */
-  opacity: 0.55;
   transition: height 700ms var(--ease-enter), background 500ms ease;
 }
-/* The surface, standing above the fill's own top edge so the crests break out of it rather than
-   being cut off by it. The box is exactly the fill's width and the paths overhang it: the
-   viewport is what crops them, which is what gives the drift room to run without an end walking
-   into view. */
-/* The surface stands above the fill's own top edge so the crests break out of it rather than being
-   cut off by it, and it *overlaps* the fill by two pixels rather than meeting it. Meeting it was
-   the hairline running across the middle of the reading — a line that moved with the level, because
-   it was the level: two boxes edge to edge, each antialiasing its own edge against the other, with
-   a fractional `height: <charge>%` guaranteeing the join lands mid-pixel. There is no clip on this
-   box either. It never needed one — each path runs six wavelengths against a viewBox four wide
-   precisely so no end can walk into view — and the clip was the second edge doing the same thing at
-   the top. Two boxes that overlap and do not clip cannot produce a seam at all. */
-#battery-waves {
-  position: absolute;
-  left: 0;
-  bottom: 100%;
-  width: 100%;
-  height: 16px;
-  margin-bottom: -2px;
-}
-/* One wavelength is 50 units of the viewBox, so a drift of exactly 50 loops with nothing to see
-   at the seam. `translate` rather than `transform`, and nothing promoted: `will-change: transform`
-   on a path *inside* an SVG asks Chromium for a layer it cannot give a bare SVG child, and under
-   the goo filter this whole page is drawn through what came back was a still raster of the first
-   frame — the wave was animating and only the picture of it was not. The rule that put it there was
-   about the compositor's attention, which is exactly the thing this is not allowed to ask for. */
-.battery-wave {
-  animation: battery-drift 6.4s linear infinite;
-}
-/* `fill` eased on the same clock as the body's `background`, or the surface snapped to the new colour while the liquid under it took half a second to follow — the one moment the two are meant to be read as one liquid is the moment a cable goes in, and that was exactly the moment they disagreed. */
-.battery-wave { transition: fill 500ms ease; }
-.battery-wave.front { fill: var(--charge-color, var(--text-faint)); }
-/* Behind and higher, and the only part of it that is ever seen is the shaded edge it leaves
-   above the front crest. The other direction and a slower pace, so the two never sit still
-   against each other — two waves travelling together read as one wave drawn twice. */
-.battery-wave.back {
-  fill: color-mix(in srgb, var(--charge-color, var(--text-faint)) 55%, #000);
-  animation: battery-drift-back 10.5s linear infinite;
-}
-/* A sideways drift alone is a shape being slid, and that is what read as stiff: the crests kept
-   their exact heights the whole way across, so the eye followed one crest instead of watching a
-   surface. The heave is what fixes it — the whole sheet rises and falls by two units over the
-   length of the drift, and because the two paths heave on different clocks and in opposite
-   directions the crest one of them shows at any moment is never the crest it showed last time
-   round. It is written into the same keyframes rather than as a second animation because a path
-   has one `translate` and a second animation on it would simply win. The y at 0% and 100% must
-   match, or the loop the wavelength was chosen to hide comes back as a jolt. */
-@keyframes battery-drift {
-  0%   { translate: 0 0; }
-  25%  { translate: -12.5px -1.6px; }
-  50%  { translate: -25px 0; }
-  75%  { translate: -37.5px 1.6px; }
-  100% { translate: -50px 0; }
-}
-@keyframes battery-drift-back {
-  0%   { translate: -50px -5px; }
-  25%  { translate: -37.5px -3.6px; }
-  50%  { translate: -25px -5px; }
-  75%  { translate: -12.5px -6.4px; }
-  100% { translate: 0 -5px; }
-}
 
-/* ── Charging ──────────────────────────────────────────────────────────────────────────
-   Plugged in, the liquid is the announcement's own green — one colour for one truth, so the
-   bubble on the bar saying "charging" and the panel showing it are the same green rather than two
-   — and it is written by the script into --charge-color like every band, because the bands and
-   this are one reading and not a colour with an override on top of it.
-
-   What is added here is only the bubbles. They belong to the *waves* rather than to the box: each
-   set rises to the surface it is under and is gone at it, which is what makes them read as being
-   in the liquid rather than drawn over it. A strip the full height of the fill carrying a circle at
-   its foot, so the rise is `translateY(-100%)` and is the height of the liquid whatever the charge
-   is — a percentage on the circle would be a percentage of the circle. */
-/* Beside the liquid rather than inside it, and standing exactly as tall: the fill carries a group
-   opacity it cannot give up, and anything in there is dimmed by it — these are meant to be the
-   brightest thing in the box. Same height, so a rise is still the height of the liquid. */
-.battery-bubbles {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* Mirrors #battery-fill, cap included, plus the 6px the surface itself stands above the fill's flat top edge — #battery-waves sits at `bottom: 100%` with a 16px box pulled down 2px, so its path baseline runs 6px clear of the box the bubbles were measured against and every rise went out that far under the crest, in the middle of the liquid rather than at its surface. */
-  height: calc(min(var(--charge-height, 0%), 100% - 17px) + 6px);
-  transition: height 700ms var(--ease-enter);
-  pointer-events: none;
-}
-/* The back set is under the crests, the front set over them, which is the whole of what makes the
-   two sets read as two depths rather than as one set in two colours. */
-.battery-bubbles.back { z-index: 0; }
-.battery-bubbles.front { z-index: 2; }
-.battery-bubble {
-  position: absolute;
-  left: var(--at);
-  bottom: 0;
-  width: var(--size);
-  height: 100%;
-  /* Drawn from nothing rather than paused: a paused rise is nine circles standing still in the
-     middle of a still surface, which is worse than no bubbles at all. */
-  opacity: 0;
-}
-.battery-bubble::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 999px;
-  background: var(--bubble-colour, #eaffe8);
-}
-/* The back set is what is under the shaded crest: dimmer, and it never gets as white as the front
-   one, so the two read as two depths of one liquid. */
-.battery-bubbles.back .battery-bubble { --bubble-colour: #a8e6b0; }
-/* The surface is the one part of the liquid that goes bright while it is charging, and it has to be told to: the whole fill carries a 0.55 group opacity, so the crests were the announcement's green served at just over half strength and read as the same dull green the bands do. Mixed towards white rather than given a green of its own — it is still --charge-color and still one colour for one truth, lifted only where the light would actually catch a surface. */
-#quick-battery.charging .battery-wave.front { fill: color-mix(in srgb, var(--charge-color) 72%, #fff); }
-#quick-battery.charging .battery-bubble {
-  animation: bubble-rise var(--rise) linear var(--wait) infinite;
-}
-/* It wanders as it climbs, because a circle travelling in a straight line up a moving surface
-   reads as a dot being animated. The sway is a fraction of the bubble's own width — enough to be
-   noticed and never enough to be a path. It goes out just under the crest rather than at it: a
-   bubble that reached the surface and stopped being drawn there pops on a hard edge. */
-@keyframes bubble-rise {
-  0%   { opacity: 0; translate: 0 0; scale: 0.6; }
-  12%  { opacity: 0.85; translate: 1px -12%; scale: 1; }
-  50%  { translate: 3px -50%; }
-  85%  { opacity: 0.7; translate: -2px -85%; }
-  100% { opacity: 0; translate: 0 -100%; scale: 0.85; }
-}
-
-/* The three links. They are buttons rather than switches because a link has no middle: it is up
-   or it is down, and a knob travelling along a track promises a range that is not there. They
-   take the whole width in three equal shares, because the row under them does too and two rows
-   that agree on their margins read as one panel rather than as two lists. */
-#quick-modes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  flex: 1;
-  min-width: 0;
-}
+/* A connector. They are buttons rather than switches because a link has no middle: it is up or it
+   is down, and a knob travelling along a track promises a range that is not there. Each of them is
+   a bubble of its own now and takes the size of the grid cell it stands in, so nothing here writes
+   a height — the row's three tracks are what decide it, and a number written twice is a number the
+   two halves can disagree about.
+   Being on is a *filled* edge: two pixels of accent laid over the hairline as an inset shadow
+   rather than as a width, because a border that thickens moves everything inside it by a pixel. */
 .quick-mode {
-  /* A finger, not a cursor: this panel is worked at arm's length on a bar at the top of a 6.2 inch screen, and 42px was under what a thumb reliably hits — a miss landed on the panel's own background, which closes it, so an imprecise tap read as the panel refusing to work. Short and wide rather than square, because what it carries beside the glyph is a name and a name wants width, not height. */
-  height: 56px;
-  gap: 0.7rem;
-  padding: 0 0.85rem;
-  /* The border is the whole of the design here: a hairline outline all the way round said "pressable" and nothing else, so a lit one and a dark one were the same shape in two colours. It is a squircle with a soft ground instead, and being on is a *filled* edge — two pixels of accent laid over the hairline as an inset shadow rather than as a width, because a border that thickens is a border that moves everything inside it by a pixel. */
-  border-radius: 20px;
-  corner-shape: squircle;
-  background: var(--sunken);
-  border: 1px solid var(--border);
+  /* The name is *under* the glyph rather than beside it, which is the one thing the grid changed
+     about these buttons that could not simply be kept. Side by side they were a wide row and the
+     name had the width; two columns of five is 89 pixels, and after the glyph and the padding that
+     left about twenty for a network's name — every reading in the panel came out as "Vod", "sta",
+     "not". Stacked, the whole cell width is the name's and the cell is tall enough for both. */
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0 0.5rem;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease, scale 200ms var(--ease-split);
 }
+/* The cable, at the foot of the media module rather than in the grid above. It is the one connector
+   laid out along its width instead of down it: it is a strip the width of the panel, so the glyph
+   and what the cable is carrying stand side by side the way they do in a line of text — a name
+   centred under a glyph in a 30px strip is a name on top of it. Not a `.quick-bubble`: it is inside
+   one, and a bubble inside a bubble is two blur panes over the same pixels — see BLUR_PANES. */
+#quick-media-usb {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  height: var(--quick-media-cable);
+  flex: none;
+  /* The very bottom of the module and not the middle of it: the module centres its contents, and a
+     strip that floated between the transport and the screen edge would read as a third line of the
+     song rather than as the thing plugged into the bottom of the phone. */
+  margin-top: auto;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  /* The lit edge every other connector wears is an inset shadow, and at `border-radius: 0` inside a
+     rounded module it draws as a rectangle across the glass. Being on is the colour and the word
+     here; the shape is already the module's. */
+  box-shadow: none;
+}
+/* No cable is not a cable that is off: the row is gone rather than dimmed, and the module gives the
+   height back. `paintModeLabels` is what writes the class, off the same reading the glyph is drawn
+   from. */
+#quick-media-usb:not(.attached) { display: none; }
+#quick-media-usb svg { width: 20px; height: 20px; }
+#quick-media-usb .quick-label { width: auto; text-align: left; }
 .quick-mode svg { width: 28px; height: 28px; fill: currentColor; }
 .quick-mode:active { scale: 0.96; }
 /* What the link is actually attached to, which is the half of a link that a colour cannot say: a
@@ -2431,11 +2336,14 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    a different length — a proportional face makes three of those read as three sizes of type.
    It fades rather than ellipses: a router's name is long and the tail of it is not the reading. */
 .quick-label {
-  flex: 1;
+  /* The whole cell's width, and centred under the glyph it belongs to. `flex: 1` was the row layout
+     asking the label to take what was left over; in a column it would ask it to take what is left
+     over *vertically*, which is a name stretched down the cell. */
+  width: 100%;
   min-width: 0;
-  text-align: left;
+  text-align: center;
   font-family: "Mono", monospace;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   letter-spacing: 0.04em;
   line-height: 1;
   color: var(--text-faint);
@@ -2452,24 +2360,81 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   box-shadow: inset 0 0 0 2px var(--section-color);
 }
 
-/* The two levels, upright and against the right edge. Each is the amount itself rather than a track
-   with a knob on it: the column fills from the floor, which is the same drawing the charge beside it
-   is, and there is no handle to aim at because the whole bar is the target. */
-#quick-levels {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.55rem;
-  flex: 1;
-  min-height: 0;
-  padding: 0.4rem 0;
+/* ── The connectors' faces ─────────────────────────────────────────────────────────────
+   A connector says three things and they are not the same kind of thing: what it *is* never
+   changes, what it is *attached to* changes constantly, and its glyph is neither — it is the
+   thing the eye finds the cell by. So the name is set at the top as a heading, the reading sits
+   under it, and the glyph goes behind both at the size of the cell: a watermark rather than an
+   icon, which is what lets a 26px glyph in an 89px cell stop being a small mark floating in a
+   large empty box. It is the *only* connector layout that does this — the cable at the foot of
+   the media module is a 30px strip and a watermark in a strip is a smear behind one line of text.
+   The word "off" is gone from every reading here rather than made faint: a dark, unlit cell with
+   nothing written under its name already says off, and spending the one line a cell has on
+   repeating that leaves nowhere for the half that is news. Only what is attached is written.
+   No outline on these, lit or unlit. The cell is already a shape — a squircle of lighter glass on
+   a dark panel — and an outline around a glyph that fills it is a second edge drawn just inside the
+   first. What says a connector is on is its own colour and the light coming off the glyph, which is
+   a thing the eye reads before it reads a border anyway. */
+#quick-row-links .quick-mode {
+  position: relative;
+  overflow: hidden;
+  justify-content: space-between;
+  padding: 0.42rem 0.5rem;
+  gap: 0;
+  border: none;
 }
+#quick-row-links .quick-mode.on { box-shadow: none; }
+/* Audiowide and not the panel's Mono: this is the one word on the cell that this interface *chose*,
+   and everything else in the panel is a reading that came from somewhere else. A name in the display
+   face and a router's name in mono is the difference said in the type rather than in a rule about
+   which line means what. */
+.quick-name {
+  width: 100%;
+  text-align: center;
+  font-family: "Audiowide", sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--text-body);
+  white-space: nowrap;
+  transition: color 200ms ease;
+}
+.quick-mode.on .quick-name { color: var(--section-color); }
+/* Behind the words and not under them: `z-index` would be a stacking context per cell, and the
+   two spans are already painted after it in document order — all this has to do is leave the
+   flow so the name and the reading keep the whole height to lay themselves out in. */
+#quick-row-links .quick-icon {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+#quick-row-links .quick-mode svg {
+  width: auto;
+  height: 108%;
+  /* The glyph is drawn to a square box and the cell is wider than it is tall, so filling the
+     height is what fills the cell — filling the width would leave it standing in a letterbox. */
+}
+/* The light a lit connector gives off, and it is the glyph that gives it: `drop-shadow` follows the
+   alpha of what is drawn, so an aeroplane glows aeroplane-shaped where a `box-shadow` would glow
+   cell-shaped — which is the border this rule just took away, coming back as a halo. Two of them,
+   near and far, because one radius is a rim and the light wants a core and a bloom. Only on the
+   glyph: the name over it stays a flat colour, since a word wearing the same halo is a word out of
+   focus. Transitioned with the opacity so switching a radio on is one movement of light. */
+#quick-row-links .quick-mode.on .quick-icon {
+  opacity: 0.42;
+  filter: drop-shadow(0 0 6px var(--section-color)) drop-shadow(0 0 18px var(--section-color));
+}
+
 /* A drag and never a tap, exactly as the settings panel's sliders are and for the same reason: a
    bar that jumps to wherever it was touched changes the phone because a finger came down on its way
    somewhere else. `pan-y` leaves the panel's own gestures alone until this one has been earned. */
 .level {
   position: relative;
   overflow: hidden;
-  width: 62px;
+  flex: 1;
+  min-width: 0;
   border-radius: 22px;
   corner-shape: squircle;
   background: var(--sunken);
@@ -2504,21 +2469,33 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .level-icon svg { width: 24px; height: 24px; fill: currentColor; }
 .level.lit { color: var(--text-bright); }
 
-/* The six states. Two rows of three round buttons — what is left of the switch once the track it
-   did not need is taken away, which is the knob the icon was already riding in. */
-#quick-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.45rem;
-  justify-items: center;
-  width: 100%;
+/* A state, and it is a bubble of its own rather than a circle inside a titled box. No size here for
+   the same reason the connectors carry none: the grid it stands in owns that.
+   It is round again, and round is the shape a state *is* here: the panel is squircles because a
+   squircle is what a box of things looks like, and a state is not a box — it is the one control in
+   this panel with nothing in it but a glyph and no reading to lay out, so the shape can be the
+   smallest one that holds the glyph. `aspect-ratio` rather than a width and a height, because the
+   grid cell it stands in is neither square nor a size this file knows; `place-self: center` so the
+   circle is the *whole* of what the mirror measures — stretched to the cell it would be an ellipse,
+   and `border-radius: 50%` on an oblong is an oblong with round ends. `corner-shape` back to round
+   for the same reason: a squircle at half its shortest side is still a squircle, not a circle. */
+/* `.quick-bubble` and not a bare `.quick-knob`, and it is the third time this file has been bitten by
+   the same thing: `.quick-bubble` writes `border-radius: 24px; corner-shape: squircle` further down
+   the sheet, one class deep like this rule, so on source order alone every state was drawn as a 24px
+   squircle and the circle never appeared. Two classes here outrank it wherever it stands. */
+.quick-bubble.quick-knob {
+  border-radius: 50%;
+  corner-shape: round;
 }
 .quick-knob {
-  width: 58px;
-  height: 58px;
-  border-radius: 999px;
-  background: var(--sunken);
-  border: 1px solid var(--border);
+  /* The cell's full width, and the height follows from it. `place-self: center` alone was the whole
+     of the bug: centring a grid item makes it shrink to its contents, and the contents of a state is
+     a 26px glyph — so every state came out as a 26px disc adrift in a cell four times that. The
+     width is the cell's and the circle is as big as the column allows; the row is taller than the
+     column here, so it is the column that decides and nothing overflows. */
+  width: 100%;
+  aspect-ratio: 1;
+  place-self: center;
   color: var(--text-icon);
   display: grid;
   place-items: center;
@@ -2535,10 +2512,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .quick-icon { display: grid; place-items: center; }
 .quick-icon svg { width: 26px; height: 26px; fill: currentColor; }
 /* A whole revolution, because a whole revolution is the one rotation that leaves nothing crooked behind it: the button ends where it started and only the glyph in it has changed. The swap lands at the half turn, where the icon is upside down and hardest to read, which is exactly why the turn is what carries it — the state changing is the cause and the new glyph is the consequence. */
-/* Carries the panel's own id because the arrival rule further down — `#status-panel.showing .quick-knob` — outranks a bare two-class selector and never stops applying: the panel keeps `.showing` for as long as it is open, so that `animation` declaration sat on top of every press for the whole life of the panel and the turn was never the animation that ran. */
-#status-panel.showing .quick-knob.turning { animation: knob-turn 460ms var(--ease-enter); }
+/* Carries the panel's own id because the arrival rule further down — `#quick-panel.showing .quick-knob` — outranks a bare two-class selector and never stops applying: the panel keeps `.showing` for as long as it is open, so that `animation` declaration sat on top of every press for the whole life of the panel and the turn was never the animation that ran. */
+/* The *glyph* turns and not the button, which the states now share with the links — and it is no longer only about labels. A state is a `.quick-bubble` since the split, so the arrival rule further down (`#quick-panel.showing .quick-bubble`) matches it with the same specificity and wins on source order: a turn written on the button itself would be outranked by the pop for the whole life of the panel, which is exactly the bug this file already records once. Written on the glyph it is three classes deep and outranks the contents rule above it. */
+#quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
 /* The four links turn too, and they always did — the rebuild moved them from a knob to a wide button with a label beside the glyph and left the turn behind on the class they no longer wear, so `.turning` was still being written by the script onto buttons no rule matched. It is the *glyph* that turns here and not the button: the whole box revolving would take its label round with it, and a word upside down at the half turn is unreadable in a way an icon is not — the icon is what changed, so the icon is what answers. */
-#status-panel.showing .quick-mode.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
+#quick-panel.showing .quick-mode.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
 @keyframes knob-turn {
   from { rotate: 0deg; }
   to   { rotate: 360deg; }
@@ -2547,84 +2525,392 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    for the same state — one colour for one truth, wherever it is being said. */
 .quick-knob.on .record-dot { fill: #e5342b; }
 
-/* ── The panel filling ─────────────────────────────────────────────────────────────────
-   The box opening is one movement and what is in it arriving is another, and the panel used to
-   have only the first: the whole set of controls was simply *there* at full size behind a
-   160ms fade, which is a picture being uncovered rather than a panel being filled.
 
-   Three groups start together, because none of them is the consequence of another — the links,
-   the two levels and the charge are three readings that are all equally true the moment the
-   panel is asked for. Only the states at the foot wait, and they wait on the levels: they are
-   the last thing the thumb reaches and the one group that reads as a row rather than as a
-   column, so a row of them turning in after everything else has settled is the panel finishing
-   rather than the panel still loading.
+/* ── The quick settings, as bubbles ────────────────────────────────────────────────────
+   Every module is its own bubble, and this is the frame they are laid out in. The frame is
+   never seen and never touched: it exists so that where a module stands is a flexbox rather
+   than eight sets of coordinates that have to be kept in agreement, and so that the whole set
+   can be told to arrive or to leave in one class.
 
-   `backwards` and never `both`. A fill mode that holds the last frame keeps writing `scale: 1`
-   for the life of the panel, and an animation outranks the `:active` rule underneath it — every
-   press response in here would be dead. Backwards holds only the *first* frame through the
-   delay, which is the half that is actually needed, and lets go the moment the run is over. */
-#status-panel.showing .quick-mode {
-  animation: quick-mode-in 400ms var(--ease-split) calc(var(--panel-at, 90ms) + var(--rank, 0) * 70ms) backwards;
-}
-#status-panel.showing .quick-mode:nth-child(2) { --rank: 1; }
-#status-panel.showing .quick-mode:nth-child(3) { --rank: 2; }
-#status-panel.showing .quick-mode:nth-child(4) { --rank: 3; }
-/* Sideways, out of the edge the charge is not on, so the four of them read as being dealt into
-   the corner rather than as four boxes fading up in place. */
-@keyframes quick-mode-in {
-  from { opacity: 0; translate: -18px 0; }
-  to   { opacity: 1; translate: 0 0; }
+   Sizes the script also has to know are named here and mirrored in js/status.js — the margin the
+   panel keeps off the screen and the cell the charge stands in are both read there, because the
+   Status bubble's open box is written from them. */
+:root {
+  /* Mirrors STATUS_MARGIN in js/status.js. */
+  --quick-margin: 10px;
+  --quick-gap: 8px;
+  /* The three rows of the connector grid, and with them the height of the charge standing beside it. It is written rather than measured because the charge is a *sibling* of the frame, not a child — the two have to agree on one height without either being able to read the other. */
+  --quick-links-tall: 300px;
+  /* The width the charge's own bubble opens to, and it is what `#status.open` is sized from. Half again as wide as the 64 it was: at that width the cell was a stripe, and a level read off a stripe is a level being measured rather than seen. */
+  --quick-cell: 96px;
+  /* The foot module at rest, which is what it is with nothing playing and nothing in flight. Half again as much again on top of it while a song is playing — see `#quick-media.sounding`. */
+  --quick-media-tall: 54px;
+  /* The cable strip at the foot of that module, and it is added to the module rather than taken out of it: the song and the transport need every pixel of the 54 they have, and a cable arriving is not a reason for the title to lose a line. */
+  --quick-media-cable: 30px;
 }
 
-/* A level is a column that fills from the floor, so it arrives the way it fills: up out of its
-   own foot. Both at once — they are two of one thing, and staggering them would say one of them
-   came first. */
-#status-panel.showing .level {
-  transform-origin: bottom;
-  animation: level-in 420ms var(--ease-split) var(--panel-at, 90ms) backwards;
-}
-@keyframes level-in {
-  from { opacity: 0; scale: 1 0.1; }
-  to   { opacity: 1; scale: 1 1; }
+#quick-panel {
+  position: fixed;
+  left: var(--quick-left, 0px);
+  top: var(--quick-top, 0px);
+  width: var(--quick-width, 0px);
+  height: var(--quick-height, 0px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--quick-gap);
+  /* The frame answers nothing; each module takes its own touches back. A container that heard
+     them would swallow the tap-anywhere-to-close that the panel's background is. */
+  pointer-events: none;
+  z-index: 29;
 }
 
-/* The cell arrives as the object it is, and the liquid pours into it: the box swells up off its
-   own base while the level runs up from the floor behind the glass. The rise is a `translate` on
-   the fill rather than its height, so it costs no layout and rides over the height transition
-   the charge itself already owns. */
-#status-panel.showing #quick-battery {
-  transform-origin: bottom;
-  animation: battery-in 440ms var(--ease-split) var(--panel-at, 90ms) backwards;
+/* The frosted screen. `position: fixed` rather than a flex child, because it is the whole screen
+   and not a row of the panel. What the host frosts is this element's own box, mirrored down the
+   same bridge every bubble's glass goes down — so the fade out is a *shrinking* pane the way
+   motion.md says glass leaves, and the ground drawn over it is ours and can genuinely fade. */
+/* The blur's *strength*, as a number of its own rather than as the pane's size. It has to be registered or it is a string, and a string does not interpolate — an unregistered custom property jumps from 0 to 1 on the transition's last frame and the whole ramp is one step. It is read per frame in js/liquid.js and sent to the host as the share of the scrim's radius actually to apply, which is the only way this can fade at all: the compositor's blur is a fixed number on a View and nothing the page draws can cross-fade it. */
+@property --scrim-frost {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
 }
-@keyframes battery-in {
-  from { opacity: 0; scale: 0.82; }
-  to   { opacity: 1; scale: 1; }
+#quick-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 6, 8, 0.42);
+  opacity: 0;
+  --scrim-frost: 0;
+  /* The ramp home runs off the *absence* of `showing` rather than off `leaving`, because `leaving` is taken away at the end of the modules' own flight — well inside this 450ms — and the frost would snap the rest of the way to nothing the moment it went. */
+  transition: opacity 180ms var(--ease-split), --scrim-frost 450ms var(--ease-sweep);
 }
-#status-panel.showing #battery-fill {
-  animation: liquid-pour 620ms var(--ease-enter) var(--panel-at, 90ms) backwards;
+#quick-panel.showing #quick-scrim {
+  opacity: 1;
+  --scrim-frost: 1;
+  /* The frost was 450 in, which is twice the whole of the panel's arrival now — the modules had been
+     standing there for a fifth of a second before the screen behind them had finished going soft, and
+     that gap is most of what read as the open being slow. The dark ground stays quick and the frost is
+     no longer allowed to be the slowest thing on the way *in*; it is still the slowest on the way out,
+     which is deliberate and is where it belongs. Mirrors SCRIM_FROST_MS in status.js. */
+  transition-duration: 150ms, 260ms;
+}
+/* The panel does not close on its own background — a tap here is nothing at all — but the flick
+   that puts it away may start nowhere else, so the scrim still has to hear a finger. It hears one
+   only while the panel is up: a full-screen element with pointer-events on at rest would swallow
+   the whole phone. */
+#quick-panel.showing #quick-scrim { pointer-events: auto; }
+/* Quicker than anything else leaving: the panel going home over an unfrosted screen for a moment
+   reads as the panel having already gone. */
+/* The dark ground alone. The frost behind it is on its own 450ms clock and is still the last thing on the screen to go — it is what the panel was standing on, so it outlives the panel rather than leaving with it — but it no longer outlives it by three quarters of a second. */
+#quick-panel.leaving #quick-scrim { opacity: 0; transition-duration: 140ms, 450ms; }
+
+/* What every module is made of. The skin is the liquid's — html.liquid blanks the background and
+   the mirror paints it — so what is written here is the shape, and the shape is what is measured. */
+.quick-bubble {
+  position: relative;
+  box-sizing: border-box;
+  border-radius: 24px;
+  corner-shape: squircle;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  pointer-events: auto;
+  /* Centred, because the note is that they arrive *into* their final position rather than out of
+     an edge: a module growing from its own middle is a drop landing where it belongs. */
+  transform-origin: center;
+  opacity: 0;
+}
+/* The connectors' grid. Two columns and three rows, one cell each, and no placement written by hand:
+   with the cable gone to the foot module there is no shape here that spans, so the auto flow lands
+   every one of them exactly where a hand-written `grid-area` would have — and a list of seven areas
+   kept in step with a list of six buttons is a second copy of the markup. It was five columns of
+   two-column cells for as long as the cable took the fifth on its own; the width per connector is
+   the same, because two of five and one of two are the same half.
+   The right-hand column of the drawing is the charge, which is not a cell here — the Status bubble
+   hangs there and is not in this flow, so the room is subtracted with a padding rather than held by
+   a placeholder that would have to be kept the same size as a bubble it cannot see. */
+#quick-row-links {
+  height: var(--quick-links-tall);
+  flex: none;
+  padding-right: calc(var(--quick-cell) + var(--quick-gap));
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: var(--quick-gap);
+}
+
+#quick-row-body {
+  display: flex;
+  gap: var(--quick-gap);
+  flex: 1;
+  min-height: 0;
+}
+/* Three across and two down, in the order the two titled boxes used to say: the screen's three,
+   then the phone's three. The grouping is the order now — a row is a group nobody has to read. */
+#quick-row-knobs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: var(--quick-gap);
+  flex: 1;
+  min-width: 0;
+}
+#quick-row-levels {
+  display: flex;
+  gap: var(--quick-gap);
+  /* A tenth narrower than the 156 they were: the panel gained thirteen bubbles and the room had to
+     come from the one pair of shapes here that is wider than it needs a thumb to be. Still wide
+     enough to drag up — a level is held rather than tapped, and a thumb travelling up a 48px column
+     is a thumb mostly off it. The knobs beside them are `flex: 1` and take the room back without a
+     second number to keep in step. */
+  width: 140px;
+  flex: none;
+}
+
+/* The module at the foot. Its height is a transition rather than two rules, because a song starting
+   is a state change and the whole panel above it reflows on the same frames — the switches and the
+   levels are `flex: 1` against `min-height: 0` and give the room up continuously, which is the one
+   case motion.md's measure-and-put-back is *not* needed for.
+   The negative bottom margin is the growth into the screen edge: the frame it stands in is inset by
+   the panel's margin on all four sides, and this bubble alone gives that margin back. */
+#quick-media {
+  height: var(--quick-media-tall);
+  margin-bottom: calc(-1 * var(--quick-margin));
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.85rem;
+  transition: height 320ms var(--ease-split);
+}
+/* Half again as much again, and it is the one height in this panel written as an arithmetic on
+   another one rather than as a second number: the note asks for 150% *more*, so it is the resting
+   height plus that, and changing the resting height carries the grown one with it. */
+#quick-media.sounding { height: calc(var(--quick-media-tall) * 2.5); }
+/* And the strip on top of whichever of the two the module is wearing. Two rules rather than one
+   because the grown height is itself an arithmetic on the resting one, and a single `calc` adding
+   the strip to `height` is not a thing CSS lets a rule do to the rule above it. */
+#quick-media.cabled { height: calc(var(--quick-media-tall) + var(--quick-media-cable)); }
+#quick-media.sounding.cabled { height: calc(var(--quick-media-tall) * 2.5 + var(--quick-media-cable)); }
+/* What the module wears with no song: the head and its track. A song takes them away rather than
+   covering them up — two readings drawn on top of each other is what a stack looks like when it
+   loses, and the transfer's line is the one this bubble falls back to. */
+#quick-media.sounding #quick-media-head,
+#quick-media.sounding #quick-media-track { display: none; }
+#quick-media:not(.sounding) #quick-media-now { display: none; }
+#quick-media-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+#quick-media-kind {
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+#quick-media.running #quick-media-kind { color: var(--section-color); }
+#quick-media-reading {
+  font-family: "Mono", monospace;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-body);
+}
+/* A hairline with nothing in flight, and the same box grown into a track when there is: a module
+   that disappeared between downloads would take the foot of the panel with it every time. */
+#quick-media-track {
+  height: 2px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  transition: height 220ms var(--ease-split);
+}
+#quick-media.running #quick-media-track { height: 8px; }
+#quick-media-fill {
+  height: 100%;
+  width: var(--transfer-share, 0%);
+  border-radius: 999px;
+  background: var(--section-color);
+  transition: width 220ms var(--ease-split);
+}
+
+/* The song. Cover, the two lines, and the transport — laid out across the width rather than down
+   it for the same reason the lock screen's Now bubble is: this is worked with the thumb of the hand
+   already holding the phone, and controls huddled at one end are controls that thumb cannot reach. */
+#quick-media-now {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+#quick-media-art {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 14px;
+  corner-shape: squircle;
+  object-fit: cover;
+  background: var(--sunken);
+}
+#quick-media-lines {
+  flex: 1;
+  min-width: 0;
+}
+#quick-media-title {
+  font-size: 0.82rem;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  /* Fades, never ellipses — the same end-of-the-reading rule every label on this bar follows. */
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+}
+#quick-media-artist {
+  font-family: "Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+}
+#quick-media-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+}
+#quick-media-transport .transport { width: 40px; height: 40px; }
+#quick-media-transport svg { width: 22px; height: 22px; fill: currentColor; }
+
+
+/* ── The panel arriving and leaving ────────────────────────────────────────────────────
+   The modules are thrown in one at a time in a shuffled order, sixty milliseconds apart, and
+   each of them lands before the controls inside it start. The order is shuffled on every open
+   because a fixed one is a sequence that gets learnt, and a learnt sequence is a loading bar.
+
+   Each module's own contents are keyed off that module's rank rather than off the last module in
+   the set. Waiting for all six would put the first button nearly a second after the panel was
+   asked for; keyed per module, the buttons still arrive after the bubble that carries them, which
+   is the whole of what "the buttons animate in afterwards" means. */
+/* Each module arrives where it belongs rather than out of the Status bubble. The sling it replaces
+   was the right idea said too loudly: six drops crossing the screen from one corner is six flights
+   to watch before anything can be read, and the bubble they came out of was never the point — the
+   panel is, and the panel is already where it is going to be.
+
+   So it is PORTFOLIO's enter, which is opacity plus a short rise from below and nothing clever:
+   `{ opacity: 0, y: 18 }` to `{ opacity: 1, y: 0 }`. What is added to it here is the tilt and the
+   pop. The tilt is a few degrees either way, written per module by the script and reshuffled on
+   every open, and it is what stops six identical rises reading as one sheet being slid up: each
+   module is a thing that was *thrown* and each of them lands crooked by a different amount in a
+   different direction. Coming back to true is the realignment — it is a different correction every
+   time because the throw was, and it is the last thing to finish, which is what makes the set look
+   settled rather than placed.
+
+   The pop is the landing and belongs at the end, not the start: the box overshoots its own size by
+   a few percent once it has stopped rising, on the family's own overshoot curve, so the bounce is
+   read as the module arriving at a surface rather than as it inflating on the way. Rotation and
+   scale are separate properties here rather than one `transform`, so the tilt's own curve and the
+   pop's are allowed to disagree — which is the whole of why the correction reads as a settle. */
+#quick-panel.showing .quick-bubble {
+  opacity: 1;
+  animation: bubble-pop 150ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
+}
+/* Fired up from a third of a screen below, out of nothing, and caught by a magnet at the top of the
+   flight: the module overshoots the place it belongs, hangs there for a frame, and is dragged the
+   last few pixels back down onto it. That drag is the whole of the effect — a shot that simply
+   decelerated into place is a box being flown to a coordinate, and what makes it read as *pulled*
+   is that it went past and had to come back.
+   It was a 12px rise from a fifth of its size, which is a nudge: at that distance there is nothing
+   to accelerate out of and nothing to be caught from, and the launch and the catch collapse into
+   one small wobble. The distance is what makes the two phases separable, so the throw is written
+   from the screen rather than in pixels — `--quick-throw`, thirty percent of the real display
+   height, mirrored out of `fitStatusPanel` because the page cannot ask `vh` for it: the layout
+   viewport this WebView hands out is 877 tall inside a 780-tall surface, so `30vh` is a third of a
+   screen that does not exist. */
+@keyframes bubble-pop {
+  0% {
+    opacity: 0;
+    translate: 0 var(--quick-throw, 234px);
+    scale: 0;
+    rotate: var(--tilt, 6deg);
+    /* The shot: almost the whole distance is spent in the first third of the time, so what is
+       watched is the arrival rather than the journey. */
+    animation-timing-function: cubic-bezier(0.05, 0.86, 0.2, 1);
+  }
+  /* Solid well before it has finished rising: a box still fading while it lands is a box that
+     arrives twice. */
+  24% { opacity: 1; }
+  /* Past the mark, and this is the pushover rather than a landing — the box is above where it
+     belongs and larger than it will be, with the tilt swung through true. */
+  62% {
+    opacity: 1;
+    translate: 0 -5px;
+    scale: 1.03;
+    rotate: calc(var(--tilt, 6deg) * -0.18);
+    animation-timing-function: var(--ease-grow);
+  }
+  100% { opacity: 1; translate: 0 0; scale: 1; rotate: 0deg; }
+}
+/* A short beat behind the box rather than the half second the drop needed: at 0.92 of its size the
+   module is already the module, so what the contents are waiting for is the rise to be underway,
+   not a circle to become a rectangle. */
+#quick-panel.showing .quick-bubble > * {
+  animation: quick-contents-in 60ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 46ms) backwards;
+}
+@keyframes quick-contents-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* The enter run backwards, and quicker: this is one state change rather than two, so what a module
+   leaves by is the way it came — back down to the fifth of its size it was thrown in at, back onto
+   the tilt it landed off, and out. It keeps the module's own throw so the set does not suddenly
+   agree with itself on the way out. The overshoot is not reversed with it: an anticipation before a
+   leave is a thing bracing, and nothing here is bracing. */
+#quick-panel.leaving .quick-bubble {
+  opacity: 1;
+  animation: bubble-drop 110ms var(--ease-leave) calc(var(--pop-rank, 0) * 4ms) both;
+}
+@keyframes bubble-drop {
+  0%   { opacity: 1; translate: 0 0; scale: 1; rotate: 0deg; }
+  100% { opacity: 0; translate: 0 var(--quick-throw, 234px); scale: 0; rotate: var(--tilt, 6deg); }
+}
+/* Emptied a touch ahead of the box, so what fades is a module and not a module with four buttons
+   still at full strength inside it. */
+#quick-panel.leaving .quick-bubble > * {
+  opacity: 0;
+  transition: opacity 80ms linear;
+}
+
+/* A level is a column that fills from the floor, so what arrives inside it is the liquid: the
+   bubble itself has already popped in, and the fill runs up out of its own foot after it. */
+#quick-panel.showing .level-fill {
+  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 64ms) backwards;
 }
 @keyframes liquid-pour {
   from { translate: 0 100%; }
   to   { translate: 0 0; }
 }
 
-/* The states, after the levels have landed — 420ms of level plus the delay they started on. The
-   turn is the one the button already does when it is pressed, read as an arrival: thrown in
-   small and off true and swung past its mark, exactly as a reading coming back to the closed
-   bubble is. The tilt alternates so six of them do not read as one rehearsed move. */
-#status-panel.showing .quick-knob {
-  animation: knob-in 460ms var(--ease-split) calc(var(--panel-at, 90ms) + 420ms + var(--rank, 0) * 45ms) backwards;
+/* The cell arrives as the object it is, and the liquid pours into it: the box swells up off its
+   own base while the level runs up from the floor behind the glass. The rise is a `translate` on
+   the fill rather than its height, so it costs no layout and rides over the height transition the
+   charge itself already owns. */
+/* `bubble-pop` itself, and it takes a rank like every other module does. It had a copy of that keyframe under its own name and a delay of `--panel-at` with nothing added to it, which is two faults in one rule: a duplicated animation is one that will be tuned in one place and not the other, and no rank made the charge unconditionally the first thing on the screen — a head start nothing earned, since the charge is not the subject of the panel but one reading in it. Being in `shuffleQuickRanks`'s list is the whole of what it gets instead, so where it falls in the queue is drawn fresh on every open, and the tilt comes with it: a set where fifteen things were thrown and one was placed reads as one thing being placed. */
+#status-panel.showing #quick-battery {
+  transform-origin: bottom;
+  animation: bubble-pop 150ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
 }
-#status-panel.showing .quick-knob:nth-child(2) { --rank: 1; --knob-tilt: -14deg; }
-#status-panel.showing .quick-knob:nth-child(3) { --rank: 2; }
-#status-panel.showing .quick-knob:nth-child(4) { --rank: 3; --knob-tilt: -14deg; }
-#status-panel.showing .quick-knob:nth-child(5) { --rank: 4; }
-#status-panel.showing .quick-knob:nth-child(6) { --rank: 5; --knob-tilt: -14deg; }
-@keyframes knob-in {
-  0%   { opacity: 0; scale: 0; rotate: var(--knob-tilt, 12deg); }
-  55%  { opacity: 1; scale: 1.12; rotate: calc(var(--knob-tilt, 12deg) * -0.3); }
-  100% { opacity: 1; scale: 1; rotate: 0deg; }
+/* Behind its own cell by the same rank, or the well fills before there is a well to fill: the pour used to start with the panel because the cell did too, and the two have to stay tied now that the cell can be last in the queue. */
+#status-panel.showing #battery-fill {
+  animation: liquid-pour 320ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
 }
+
+/* The states used to have an arrival of their own — thrown in small and off true, after the module
+   carrying them had landed — because they were three circles inside a box and the box's pop was not
+   theirs. Each of them is a bubble now, so it pops like every other bubble here, and the rule that
+   gave them their own one was worse than redundant: `#quick-panel.showing .quick-knob` matches with
+   exactly the same specificity as `#quick-panel.showing .quick-bubble` and stood later in the file,
+   so it *replaced* the pop for six of the sixteen. One arrival, one owner. */
 
 
 /* ── The Clock bubble ──────────────────────────────────────────────────────────────────
@@ -2640,7 +2926,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   position: absolute;
   z-index: 3;
   top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2);
-  left: var(--clock-left, 8px);
+  left: var(--clock-left, 14px);
   /* Auto until a mod is standing in it: the digits are what the box is worth while it is only
      the time, and a width in pixels there would be a second copy of the font's own metrics. The
      script writes a measured pixel value into this before it grows, because a transition from
@@ -2669,8 +2955,66 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     height var(--grow-ms) var(--ease-grow),
     border-radius var(--grow-ms) ease-out,
     padding var(--clock-width-ms, 300ms) var(--ease-split),
+    /* Where the box begins, which only ever moves for the reach past the screen edges further down
+       — and it moves on the same clock as the dimension it belongs to, because a growth whose two
+       halves ease apart is a box scrubbing sideways rather than opening out. */
+    left var(--clock-width-ms, 300ms) var(--ease-split),
+    top var(--grow-ms) var(--ease-grow),
     translate var(--clock-fly-ms, 420ms) var(--ease-split),
     scale 320ms var(--ease-split);
+}
+/* ── Reaching the edges, while the Status bubble is expanded ────────────────────────────
+   With the panel open the two bubbles left standing on the bar run into the screen and out past
+   it: the clock into the left edge and the top one, the main bubble into the top one. They are
+   *grown*, never moved — the box gets bigger towards the edge and every pixel of the room it takes
+   is handed straight back as padding on the same side, so nothing inside shifts by so much as a
+   pixel. Moving them instead was built once and is the thing this replaces: zeroing `--clock-left`
+   and `--status-right` did put the boxes against the edges and carried the digits and the readings
+   along with them, and what that reads as is the time sliding sideways rather than a bubble
+   reaching. A growth reads as the bar being held by the screen; a move reads as the contents
+   having been re-laid-out.
+
+   `--edge-over` is how far *past* the edge it goes, and it is a real distance rather than a token
+   overhang: the corner radius has to end up off the screen, or the bubble is a rounded box parked
+   against the edge instead of something running off it.
+
+   The state is read with `:has()` off the panel itself rather than off a class the script would
+   have to add: the panel opening already writes `showing`, and a second flag saying the same thing
+   is a second thing that can be wrong. The mirror needs no help either — the skin and the blur pane
+   are measured off these boxes every frame, and `openStatusPanel` already stirs the liquid for
+   longer than this transition lasts. */
+:root { --edge-over: 20px; }
+html:has(#quick-panel.showing) #clock {
+  left: calc(-1 * var(--edge-over));
+  top: calc(-1 * var(--edge-over));
+  /* The inset it used to stand off the edge, plus the overhang, given back so the digits do not
+     move. The `0.7rem` is this bubble's own resting padding, repeated rather than referenced —
+     there is no custom property for it, and inventing one for a single sum would be a token that
+     exists only to be summed. */
+  padding-left: calc(0.7rem + var(--clock-left, 14px) + var(--edge-over));
+  padding-top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
+  /* Both dimensions carry the room the padding took, or the box would keep its size and the
+     contents would be pushed out of it rather than the box growing around them.
+     Width is the subtle one and the `auto` is deliberate: with nothing standing in the clock
+     `--clock-width` *is* `auto`, and `calc(auto + 20px)` is invalid at computed-value time — which
+     unsets the property back to its initial `auto`, exactly the shrink-to-the-digits box that is
+     wanted there. With a mod standing in it the variable is the measured pixel width the script
+     wrote, and the sum is a real length. One declaration, both cases, no branch in the script. */
+  width: calc(var(--clock-width, auto) + var(--clock-left, 14px) + var(--edge-over));
+  height: calc(var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
+}
+/* The main bubble takes the same growth upwards and no more: the punch hole is not near a side, so
+   the only edge it has to reach is the one above it. It is the one box here that is `content-box`,
+   which is why the height is left alone — padding on a content-box element grows the border box on
+   its own, and every state that gives this bubble a height (`.alerting` and the rest) goes on
+   owning that number rather than fighting a rule with an id and a `:has()` in front of it. */
+html:has(#quick-panel.showing) #pill {
+  /* The list put back with one property added to it, never replaced: `top` is already in there and
+     the padding that pays the growth back has to ease on the same clock, or the box opens upwards
+     while the contents step. */
+  transition: var(--pill-transition), padding var(--grow-ms) var(--ease-grow);
+  top: calc(-1 * var(--edge-over));
+  padding-top: calc(var(--grab, 0px) + var(--edge-over));
 }
 /* 1.03, the one press response every bubble here shares. */
 #clock.pressing { scale: 1.03; }

@@ -568,6 +568,9 @@
     { group: 'Colour', key: 'backgroundAlpha', name: 'Background alpha', min: 0, max: 100 },
 
     { group: 'Glass', key: 'blurRadius',  name: 'Backdrop blur', min: 0, max: 60 },
+    // Its own range as well as its own number: the screen behind an open panel is meant to stop
+    // being readable, which is further than any bubble's glass ever goes.
+    { group: 'Glass', key: 'scrimBlurRadius', name: 'Panel blur', min: 0, max: 150 },
     { group: 'Glass', key: 'gooStrength', name: 'Goo strength',  min: 0, max: 200 },
     { group: 'Glass', key: 'edgeMerge',   name: 'Wet the screen edges', min: 0, max: 1,
       labels: ['No', 'Yes'] },

@@ -109,6 +109,7 @@ object ConnectivityWatch {
             )
         }
         readZen(context)
+        readConnected(context)
 
         val manager = context.getSystemService(ConnectivityManager::class.java)
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -161,8 +162,12 @@ object ConnectivityWatch {
             TETHER_STATE ->
                 isHotspotOn = !intent.getStringArrayListExtra(TETHER_ACTIVE).isNullOrEmpty()
 
+            // Empty and never null: null is what `publish` reads as "nothing is paired", so a device
+            // that connects while BLUETOOTH_CONNECT is ungranted — the name comes back null — used to
+            // *un*report itself at the moment it arrived. The pairing is the news; the name is a
+            // detail the page already knows how to do without.
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                pairedName = nameOf(intent)
+                pairedName = nameOf(intent) ?: ""
                 pairedCharge = -1
             }
 
@@ -178,13 +183,17 @@ object ConnectivityWatch {
                 if (state != BluetoothAdapter.STATE_ON) {
                     pairedName = null
                     pairedCharge = -1
+                } else {
+                    // The radio coming back up reconnects whatever was on it, and those reconnections
+                    // are the ones most likely to happen before this receiver is listening again.
+                    readConnected(context)
                 }
             }
 
             BLUETOOTH_BATTERY -> {
                 val charge = intent.getIntExtra(BLUETOOTH_BATTERY_EXTRA, -1)
                 if (charge in 0..100) {
-                    if (pairedName == null) pairedName = nameOf(intent)
+                    if (pairedName == null) pairedName = nameOf(intent) ?: ""
                     pairedCharge = charge
                 }
             }
@@ -198,6 +207,41 @@ object ConnectivityWatch {
      * bubble says so with its icon and leaves the name out, rather than the pairing vanishing
      * because a permission is missing.
      */
+    /**
+     * What is already connected, which every broadcast in this file is silent about: ACL_CONNECTED
+     * fires when a device *arrives*, and a pair of buds is on the phone long before this service is
+     * — so a phone that has been wearing headphones all morning reported "nothing paired" until they
+     * were taken off and put back on. It is the same late-binding trap the SSID and the zen rule
+     * each have their own answer to, and this is bluetooth's.
+     *
+     * A profile proxy and not the manager's `getConnectedDevices`: that one only knows GATT, and
+     * what is worth naming up there is audio. A2DP and the headset profile between them cover
+     * everything this phone connects to. The proxy is closed the moment it has answered — it is a
+     * bind into another process, and holding one open all day for a reading taken once is the
+     * polling this file exists not to do.
+     */
+    private fun readConnected(context: Context) {
+        val adapter = context.getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter ?: return
+        if (!runCatching { adapter.isEnabled }.getOrDefault(false)) return
+        val listener = object : android.bluetooth.BluetoothProfile.ServiceListener {
+            override fun onServiceConnected(profile: Int, proxy: android.bluetooth.BluetoothProfile) {
+                val device = runCatching { proxy.connectedDevices.firstOrNull() }.getOrNull()
+                runCatching { adapter.closeProfileProxy(profile, proxy) }
+                // Whichever profile answers first wins, and the second one is not allowed to
+                // overwrite it: both proxies are asked at once because either may be the one
+                // holding the device, and a headset that is also A2DP would otherwise be named
+                // twice with whichever reply happened to land last.
+                if (device == null || pairedName != null) return
+                pairedName = runCatching { device.name }.getOrNull() ?: ""
+                publish()
+            }
+
+            override fun onServiceDisconnected(profile: Int) {}
+        }
+        runCatching { adapter.getProfileProxy(context, listener, android.bluetooth.BluetoothProfile.A2DP) }
+        runCatching { adapter.getProfileProxy(context, listener, android.bluetooth.BluetoothProfile.HEADSET) }
+    }
+
     private fun nameOf(intent: Intent): String? {
         val device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
         return runCatching { device?.name }.getOrNull()

@@ -30,6 +30,10 @@ object SystemToggles {
             "settings get global low_power;" +
             "settings get global mobile_data;" +
             "settings get system screen_brightness;" +
+            "settings get global airplane_mode_on;" +
+            // A mode rather than a flag, the way zen is: 0 is off and 1, 2 and 3 are the three ways
+            // the phone is allowed to work out where it is standing.
+            "settings get secure location_mode;" +
             // Greped on the phone: this one command narrates what it is doing over several lines, and
             // every line of it would shift the index of everything read after it.
             "cmd media_session volume --stream 3 --get 2>&1 | grep -m1 'volume is'"
@@ -72,6 +76,13 @@ object SystemToggles {
         answer.put("saver", line(6) == "1")
         answer.put("mobile", line(7) == "1")
         answer.put("mic", MicrophoneAccess.read() == MicrophoneAccess.ALLOWED)
+        answer.put("plane", line(9) == "1")
+        // location_mode is a mode rather than a flag, the way zen_mode is: 0 is off and 1, 2 and 3
+        // are the three ways the phone is allowed to work out where it is standing.
+        answer.put("gps", line(10).toIntOrNull()?.let { it != 0 } ?: false)
+        // Nothing about the hotspot is read here. Samsung keeps no settings key for it, and the
+        // page is already told: ConnectivityWatch listens to the tether broadcast, so the switch is
+        // lit off the connectivity payload rather than off a second answer that would disagree.
         // The two levels, as percentages: the ranges are the phone's business and the panel draws a
         // share of a bar. Missing rather than zero where the phone would not say — a slider standing
         // at the floor is a reading, and "we could not ask" is not one.
@@ -79,7 +90,7 @@ object SystemToggles {
         if (brightness >= 0 && brightnessMax > 0) {
             answer.put("brightness", brightness * 100 / brightnessMax)
         }
-        volumeOf(line(9)).takeIf { it >= 0 }?.let { answer.put("volume", it) }
+        volumeOf(line(11)).takeIf { it >= 0 }?.let { answer.put("volume", it) }
         // Nothing about a recording is read here: the page is already told when one starts and
         // stops, because that is the Now bubble's own mod arriving. Asking the shell for it as
         // well would be a second answer to a question that already has one.
@@ -130,6 +141,19 @@ object SystemToggles {
             "dim" -> "settings put secure reduce_bright_colors_activated $one"
             "rotate" -> "settings put system accelerometer_rotation $one"
             "saver" -> "settings put global low_power $one"
+            // The setting alone changes nothing — writing airplane_mode_on without the broadcast
+            // leaves every radio up under a phone that says it is in aeroplane mode — and the
+            // broadcast needs a permission no sideloaded app gets. The connectivity shell command
+            // does both halves in one call, which is why it is not a `settings put` like its
+            // neighbours here.
+            "plane" -> "cmd connectivity airplane-mode " + if (isOn) "enable" else "disable"
+            "gps" -> "cmd location set-location-enabled " + if (isOn) "true" else "false"
+            // No setting behind it either, and for a different reason from the recorder's: starting
+            // a hotspot from the shell means handing `cmd wifi start-softap` an SSID, a band and a
+            // password, which is this app inventing a network rather than switching the phone's own
+            // one on. The tile carries the configuration the person already saved.
+            "hotspot" -> "cmd statusbar click-tile " +
+                "com.android.systemui/com.android.systemui.qs.tiles.HotspotTile"
             // The recorder has no setting behind it — it is a quick settings tile and pressing it
             // is the only way in. One UI's own recorder is Smart Capture's tile service.
             "recording" -> "cmd statusbar click-tile " +

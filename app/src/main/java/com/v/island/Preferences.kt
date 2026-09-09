@@ -27,6 +27,14 @@ object Preferences {
     /** Radius in dp of the system blur behind the window. 0 = plain transparency. */
     const val BLUR = "blurRadius"
 
+    /**
+     * The same, for the screen frosted behind an open quick-settings panel, and it is its own
+     * number rather than BLUR's: stopping what is behind a panel from being read and leaving what
+     * is behind a bubble legible are two different asks, and One UI frosts its own quick settings
+     * far harder than it frosts a pop-up.
+     */
+    const val SCRIM_BLUR = "scrimBlurRadius"
+
     /** 0 = icon only, 1 = name only, 2 = both. */
     const val NOTIFICATION_IDENTITY = "notificationIdentity"
 
@@ -121,6 +129,7 @@ object Preferences {
         // The neon green --section-color in dna.css was born as, mirrored here as an int.
         ACCENT to 0x5BFD5B,
         BLUR to 60,
+        SCRIM_BLUR to 63,
         NOTIFICATION_IDENTITY to 2,
         GOO to 100,
         MOD_WIDTH to 56,

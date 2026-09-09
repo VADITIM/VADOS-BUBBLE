@@ -28,7 +28,7 @@ const statusFaces = {
   panel: document.getElementById('status-panel'),
 };
 
-/** Mirrors --status-right in pill.css: how far its right edge stands off the screen edge. */
+/** Mirrors --status-right in pill.css: how far its right edge stands off the screen edge. Where the bubble stands, and not something to give up for reaching the edge — see CLOCK_LEFT, which was zeroed once and slid its digits along with the box. */
 const STATUS_RIGHT = 14;
 
 /** Its flight out of the punch hole, matching the Now bubble's at the other end. */
@@ -45,10 +45,10 @@ const STATUS_LAND = 0.42;
    on the same canvas, it merges with whatever it passes, and it is still taken downwards — the top
    edge is the line the row rests on and an open bubble that climbs is one that has left the bar.
    Its size is measured rather than written down, because the screen is not a constant. */
-/** How far the panel stands off the screen's edges. The foot is its own number and much the larger: the bottom row of controls is what lands there, and ten pixels put it on the gesture handle. */
+/** How far the panel stands off the screen's edges, and it is one number on all four sides now: the panel is the whole screen, so the bottom row stands the same ten pixels off the bottom edge that the sides stand off theirs. The foot was thirty, to keep the transfer bubble clear of the gesture handle — the handle is drawn over the panel rather than under it and the twenty pixels bought nothing but a strip of frosted wallpaper along the bottom of every open. */
 const STATUS_MARGIN = 10;
-const STATUS_MARGIN_FOOT = 30;
-const STATUS_PANEL = { width: 0, height: 0, ms: 420 };
+const STATUS_MARGIN_FOOT = STATUS_MARGIN;
+const STATUS_PANEL = { width: 0, height: 0, ms: 220 };
 
 /**
  * The screen, in the page's own units — and **never `window.innerWidth`**, which is not it.
@@ -70,12 +70,35 @@ const screenHeight = () => document.documentElement.clientHeight;
  * one at exactly that line plus the pad every grown bubble drops by — so it is read off the bubble
  * instead of re-derived from the three custom properties the host writes it from.
  */
+/**
+ * How far clear of the row the panel stands, on top of the pad every grown bubble drops by. The pad
+ * is measured from the line the closed row rests on and the row's bubbles are 34 tall, so the pad
+ * alone put the panel's top row eight pixels *above* their bottoms — well inside the goo's reach,
+ * and the connectors grew necks up into the clock and the main bubble. Mirrors `--quick-clearance`
+ * in pill.css, which is what places the charge; this is what places the frame beside it, and the two
+ * have to land on one line.
+ */
+const QUICK_CLEARANCE = 22;
+
 function fitStatusPanel() {
-  const top = statusPill.getBoundingClientRect().top + GROWN_PAD;
+  const top = statusPill.getBoundingClientRect().top + GROWN_PAD + QUICK_CLEARANCE;
   STATUS_PANEL.width = Math.round(screenWidth() - STATUS_MARGIN * 2);
   STATUS_PANEL.height = Math.round(screenHeight() - top - STATUS_MARGIN_FOOT);
   root.style.setProperty('--status-panel-width', STATUS_PANEL.width + 'px');
   root.style.setProperty('--status-panel-height', STATUS_PANEL.height + 'px');
+  // The same box, handed to the frame the modules are laid out in. It is written here rather than
+  // in the stylesheet because the top of it is read off the bubble, and the bubble does not exist
+  // at load — this is the one function that runs when it does.
+  root.style.setProperty('--quick-left', Math.round(statusPanelLeft()) + 'px');
+  root.style.setProperty('--quick-top', Math.round(top) + 'px');
+  root.style.setProperty('--quick-width', STATUS_PANEL.width + 'px');
+  root.style.setProperty('--quick-height', STATUS_PANEL.height + 'px');
+  // How far below where it belongs a module is fired from: thirty percent of the display. It is
+  // written here rather than left as `30vh` in the stylesheet for the reason screenHeight() exists
+  // at all — the layout viewport this WebView reports is 877 tall inside a 780-tall surface, so
+  // every viewport unit in this page is a percentage of a screen that is not there. Mirrors
+  // `--quick-throw` in pill.css, which is read by bubble-pop and bubble-drop.
+  root.style.setProperty('--quick-throw', Math.round(screenHeight() * 0.3) + 'px');
 }
 fitStatusPanel();
 
@@ -127,6 +150,12 @@ const GLYPHS = {
   upload: '<svg viewBox="0 0 24 24"><path d="M12 3l5.7 5.7-1.4 1.4L13 6.8V16h-2V6.8L7.7 10.1 6.3 8.7zM5 18h14v2H5z"/></svg>',
   transferDone: '<svg viewBox="0 0 24 24"><path d="M9.8 16.2 5.6 12l-1.4 1.4 5.6 5.6L20.4 7.9 19 6.5z"/></svg>',
   hotspot: '<svg viewBox="0 0 24 24"><path d="M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM7.8 5.8 6.4 4.4a10 10 0 0 0 0 15.2l1.4-1.4a8 8 0 0 1 0-12.4zm9.8-1.4-1.4 1.4a8 8 0 0 1 0 12.4l1.4 1.4a10 10 0 0 0 0-15.2z"/></svg>',
+  // The pin, and not a globe or a compass: what this switch decides is whether the phone may work
+  // out where it is standing, and the pin is the mark that answers exactly that question.
+  gps: '<svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 4.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg>',
+  // Aeroplane mode. Drawn as the plane rather than as every radio crossed out at once, because the
+  // one thing every phone on earth agrees this switch is called is the picture of the aircraft.
+  plane: '<svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>',
   // Do not disturb, drawn as the bar through the circle rather than as a crossed-out bell: it
   // is a mode the phone is in, not a notification that was refused.
   zen: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 8 8 8 8 0 0 1-8 8 8 8 0 0 1-8-8 8 8 0 0 1 8-8zM7.5 11h9v2h-9z"/></svg>',
@@ -143,6 +172,11 @@ const GLYPHS = {
   zenDrive: '<svg viewBox="0 0 24 24"><path d="M6.5 5h11l2 6H4.5zM4 12h16a1 1 0 0 1 1 1v5h-3v-2H6v2H3v-5a1 1 0 0 1 1-1zm2.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm11 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>',
   zenExercise: '<svg viewBox="0 0 24 24"><path d="M4 9h2v6H4zm14 0h2v6h-2zM7 7h2v10H7zm8 0h2v10h-2zM9.5 11h5v2h-5z"/></svg>',
   zenGame: '<svg viewBox="0 0 24 24"><path d="M7 7h10a5 5 0 0 1 0 10 4 4 0 0 1-2.8-1.2L13 14.6h-2l-1.2 1.2A4 4 0 0 1 7 17a5 5 0 0 1 0-10zm-1.5 3v1.5H4v2h1.5V15h2v-1.5H9v-2H7.5V10zm10 0a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z"/></svg>',
+  // Do not disturb, drawn as the sign it is everywhere else: a ring with a bar across it. There is no
+  // off face for it and there should not be — a mode has one shape and the colour says which end it
+  // is at, and a ring with the bar taken out is a ring, which is a different symbol rather than this
+  // one switched off. See GLYPHS_OFF.
+  modus: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7.5 11h9v2h-9z"/></svg>',
   dim: '<svg viewBox="-7.5 0 32 32"><path fill="currentColor" d="M9.75 8.25v0.219c0 0.844-0.375 1.25-1.156 1.25s-1.125-0.406-1.125-1.25v-0.219c0-0.813 0.344-1.219 1.125-1.219s1.156 0.406 1.156 1.219zM12.063 9.25l0.156-0.188c0.469-0.688 1.031-0.781 1.625-0.344 0.625 0.438 0.719 1.031 0.25 1.719l-0.188 0.156c-0.469 0.688-1.031 0.781-1.625 0.313-0.625-0.438-0.688-0.969-0.219-1.656zM5 9.063l0.125 0.188c0.469 0.688 0.406 1.219-0.188 1.656-0.625 0.469-1.219 0.375-1.688-0.313l-0.125-0.156c-0.469-0.688-0.406-1.281 0.188-1.719 0.625-0.438 1.219-0.281 1.688 0.344zM8.594 11.125c2.656 0 4.844 2.188 4.844 4.875 0 2.656-2.188 4.813-4.844 4.813-2.688 0-4.844-2.156-4.844-4.813 0-2.688 2.156-4.875 4.844-4.875zM1.594 12.5l0.219 0.063c0.813 0.25 1.063 0.719 0.844 1.469-0.25 0.75-0.75 0.969-1.531 0.719l-0.219-0.063c-0.781-0.25-1.063-0.719-0.844-1.469 0.25-0.75 0.75-0.969 1.531-0.719zM15.375 12.563l0.219-0.063c0.813-0.25 1.313-0.031 1.531 0.719s-0.031 1.219-0.844 1.469l-0.188 0.063c-0.813 0.25-1.313 0.031-1.531-0.719-0.25-0.75 0.031-1.219 0.813-1.469zM8.594 18.688c1.469 0 2.688-1.219 2.688-2.688 0-1.5-1.219-2.719-2.688-2.719-1.5 0-2.719 1.219-2.719 2.719 0 1.469 1.219 2.688 2.719 2.688zM0.906 17.281l0.219-0.063c0.781-0.25 1.281-0.063 1.531 0.688 0.219 0.75-0.031 1.219-0.844 1.469l-0.219 0.063c-0.781 0.25-1.281 0.063-1.531-0.688-0.219-0.75 0.063-1.219 0.844-1.469zM16.094 17.219l0.188 0.063c0.813 0.25 1.063 0.719 0.844 1.469s-0.719 0.938-1.531 0.688l-0.219-0.063c-0.781-0.25-1.063-0.719-0.813-1.469 0.219-0.75 0.719-0.938 1.531-0.688zM3.125 21.563l0.125-0.188c0.469-0.688 1.063-0.75 1.688-0.313 0.594 0.438 0.656 0.969 0.188 1.656l-0.125 0.188c-0.469 0.688-1.063 0.75-1.688 0.313-0.594-0.438-0.656-0.969-0.188-1.656zM13.906 21.375l0.188 0.188c0.469 0.688 0.375 1.219-0.25 1.656-0.594 0.438-1.156 0.375-1.625-0.313l-0.156-0.188c-0.469-0.688-0.406-1.219 0.219-1.656 0.594-0.438 1.156-0.375 1.625 0.313zM9.75 23.469v0.25c0 0.844-0.375 1.25-1.156 1.25s-1.125-0.406-1.125-1.25v-0.25c0-0.844 0.344-1.25 1.125-1.25s1.156 0.406 1.156 1.25z"></path></svg>',
   rotate: '<svg viewBox="0 0 24 24"><path fill="none" d="M20.4898 14.9907C19.8414 16.831 18.6124 18.4108 16.9879 19.492C15.3635 20.5732 13.4316 21.0972 11.4835 20.9851C9.5353 20.873 7.67634 20.1308 6.18668 18.8704C4.69703 17.61 3.65738 15.8996 3.22438 13.997C2.79138 12.0944 2.98849 10.1026 3.78602 8.32177C4.58354 6.54091 5.93827 5.06746 7.64608 4.12343C9.35389 3.17941 11.3223 2.81593 13.2546 3.08779C16.5171 3.54676 18.6725 5.91142 21 8M21 8V2M21 8H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   saver: '<svg viewBox="0 0 24 24"><path d="M9 2h6v2h1.5A1.5 1.5 0 0 1 18 5.5v15A1.5 1.5 0 0 1 16.5 22h-9A1.5 1.5 0 0 1 6 20.5v-15A1.5 1.5 0 0 1 7.5 4H9zm3.6 5-4.1 7h2.6l-.7 5 4.1-7h-2.6z"/></svg>',
@@ -337,6 +371,7 @@ function paintStatus() {
   statusPill.classList.toggle('plugged', isPlugged);
   paintBattery();
   paintModeLabels();
+  paintQuickMedia();
 
   const shown = wanted();
   const names = shown.map(slot => slot.name);
@@ -591,8 +626,78 @@ function statusPanelLeft() {
   return (screenWidth() - STATUS_PANEL.width) / 2;
 }
 
+/**
+ * The modules, which are bubbles rather than groups inside a box. The frame they stand in is
+ * never seen and never touched — see the comment over #quick-panel in pill.html — so what this
+ * list is for is the two things only the script can decide: what order they arrive in, and where
+ * each of them is aiming when it goes home.
+ */
+const quickPanel = document.getElementById('quick-panel');
+const quickScrim = document.getElementById('quick-scrim');
+// The charge is in the list and is not in the frame: it is the Status bubble's own face, hung at the top right rather than laid out with the modules, and it is a `.quick-bubble` nowhere in the markup because it is not one — it is the bubble the panel grew out of. What it shares with them is the arrival, which is the whole of what this list decides, so it is appended by hand. Left out, it had a rank of nothing and so a delay of nothing, and was the first thing on the screen on every single open.
+const quickBubbles = [...quickPanel.querySelectorAll('.quick-bubble'), document.getElementById('quick-battery')];
+
+/**
+ * Five milliseconds between one module arriving and the next. Mirrors the `* 5ms` the arrival
+ * and the sling in pill.css are both written against — the rank is a number here and a multiplier
+ * there, so the two have to agree on what a rank is worth. It was sixty, which put the last of six
+ * modules three hundred milliseconds behind the first before its own pop had even started; the
+ * whole open is four hundred and fifty and a stagger cannot be two thirds of it.
+ *
+ * Eighteen until the groups were split, then eleven. A stagger is multiplied by however many things
+ * there are, and fifteen of them at eleven is a hundred and sixty-five milliseconds of queue behind a
+ * hundred and fifty of pop — the tail was longer than the animation it was a tail of, which is what
+ * "too slow" actually was here. Five puts the last module seventy-five behind the first and the whole
+ * set on screen inside a quarter second. motion.md's rule holds: the term to cut in a slow sequence
+ * is the stagger, not the thing being staggered.
+ */
+const QUICK_STAGGER = 5;
+
+/** The same on the way out, where it is tighter. Mirrors the `* 4ms` in `#quick-panel.leaving .quick-bubble`. */
+const QUICK_DROP_STAGGER = 4;
+
+/**
+ * How long the frost behind the panel takes to reach nothing. Mirrors the `--scrim-frost` transition
+ * on `#quick-scrim` in pill.css, and it is here for one reason: the ramp is only *sent* to the host
+ * while the liquid mirror is running, so the script has to know how long to keep the frames coming.
+ */
+const SCRIM_FROST_MS = 450;
+
+/**
+ * A fresh order every time the panel is asked for. A fixed one is a sequence, and a sequence that
+ * can be learnt is read as a loading bar rather than as six things landing at once-ish.
+ */
+function shuffleQuickRanks() {
+  const ranks = quickBubbles.map((bubble, index) => index);
+  for (let at = ranks.length - 1; at > 0; at -= 1) {
+    const swap = Math.floor(Math.random() * (at + 1));
+    [ranks[at], ranks[swap]] = [ranks[swap], ranks[at]];
+  }
+  quickBubbles.forEach((bubble, index) => {
+    bubble.style.setProperty('--pop-rank', ranks[index]);
+    bubble.style.setProperty('--tilt', quickTilt() + 'deg');
+  });
+}
+
+/**
+ * How crooked one module arrives, in degrees, and which way. It is written here rather than in the
+ * stylesheet for the same reason the order is: a tilt that is the same every time is a tilt that
+ * gets learnt, and six modules that lean by the amounts they leaned last time read as one drawing
+ * rather than as six things landing. The floor matters as much as the ceiling — under about four
+ * degrees the correction at the end of the pop is too small to be seen, and a rise with no visible
+ * settle on it is the plain fade this replaced.
+ */
+const QUICK_TILT_LEAST = 3;
+const QUICK_TILT_MOST = 6;
+function quickTilt() {
+  const size = QUICK_TILT_LEAST + Math.random() * (QUICK_TILT_MOST - QUICK_TILT_LEAST);
+  return Math.round((Math.random() < 0.5 ? -size : size) * 10) / 10;
+}
+
 /** The tidy-up at the end of a collapse, held so a panel asked for again mid-close can call it off. */
 let panelSettle = null;
+/** The same, for the modules: they land later than the bubble does, so putting them away is its own clock. */
+let quickSettle = null;
 
 export function openStatusPanel() {
   if (statusOpen) return;
@@ -601,6 +706,7 @@ export function openStatusPanel() {
   // `panel-closing` is what makes the bubble hold and hear nothing, so a panel opening under it
   // would stand there deaf until a stale timeout happened to free it.
   clearTimeout(panelSettle);
+  clearTimeout(quickSettle);
   statusPill.classList.remove('panel-closing');
   // A finger outranks an announcement: the panel takes the bubble's faces and its width, so the
   // charge is put away rather than left holding a class the panel is about to disagree with.
@@ -637,15 +743,30 @@ export function openStatusPanel() {
   const was = statusPill.getBoundingClientRect().left;
   root.style.setProperty('--status-fly-ms', '0ms');
   statusPill.classList.add('open');
-  root.style.setProperty('--status-fly', Math.round(was - statusPanelLeft()) + 'px');
+  // **The bubble's own new left, measured after the class lands** — not `statusPanelLeft()`, which is
+  // where the *frame* of modules begins. The two are different boxes: the frame starts at the middle
+  // of the screen and the charge is right-anchored ten pixels off the edge, so the offset this was
+  // handed was a hundred and fifty pixels of a journey the bubble was never making. It jumped left,
+  // then flew back right across most of the screen to a place it had already been standing next to.
+  // The close has always measured it this way; the open is what disagreed.
+  root.style.setProperty('--status-fly', Math.round(was - statusPill.getBoundingClientRect().left) + 'px');
   // Read back, so the browser has actually computed the frame we are about to move away from.
   void statusPill.offsetWidth;
+  // A fresh order for the modules, and it is chosen before the frame they start on rather than
+  // during it: the delay is a custom property the animation reads once when it begins.
+  shuffleQuickRanks();
+  quickPanel.classList.remove('leaving');
   requestAnimationFrame(() => {
     root.style.setProperty('--status-fly-ms', STATUS_PANEL.ms + 'ms');
     root.style.setProperty('--status-fly', '0px');
     showStatusFace('panel');
+    quickPanel.classList.add('showing');
   });
-  stirLiquid(STATUS_PANEL.ms + 160);
+  // Long enough to cover the last module landing as well as the charge growing: the modules are
+  // bubbles in the same body of liquid, so the skin has to go on being mirrored until the slowest
+  // of them has stopped moving. Six ranks of stagger plus the pop itself, plus the arrivals inside.
+  // It covers the frost's own 600ms ramp several times over, which is why that is not a term here.
+  stirLiquid(STATUS_PANEL.ms + quickBubbles.length * QUICK_STAGGER + 260);
 }
 
 export function closeStatusPanel() {
@@ -657,6 +778,10 @@ export function closeStatusPanel() {
   // at the end of the collapse, below.
   statusPill.classList.add('panel-closing');
   showStatusFace('closed');
+  // The tilt each module wears is left exactly as it arrived rather than shuffled again: a set that
+  // came in leaning one way and went out leaning another is two different sets of things.
+  quickPanel.classList.remove('showing');
+  quickPanel.classList.add('leaving');
   // The same jump, put back the same way: taking `open` off moves the anchor back to the screen's
   // right edge, so the flight holds it where the panel was standing for one frame first.
   const was = statusPill.getBoundingClientRect().left;
@@ -671,7 +796,13 @@ export function closeStatusPanel() {
   // The proxy comes off with the panel rather than after it: `panel-closing` is already on, so this
   // hands the room straight back and the collapse happens under a bubble that answers to nothing.
   fitStatusProxy();
-  stirLiquid(STATUS_PANEL.ms + 160);
+  // Mirrors `bubble-drop` in pill.css: the last module starts at its rank and takes 180ms to go.
+  const dropped = quickBubbles.length * QUICK_DROP_STAGGER + 180;
+  // The frost is still the longest thing on the screen — it takes 450ms to reach nothing and
+  // the mirror is what sends the host each step of that, so a stir that stopped with the modules
+  // would leave the blur standing at whatever strength the last frame it sent happened to catch.
+  // Mirrors the `--scrim-frost` ramp in pill.css.
+  stirLiquid(Math.max(STATUS_PANEL.ms, dropped, SCRIM_FROST_MS) + 160);
   panelSettle = setTimeout(() => {
     // The class first and the fit second, and never the other way round: `panel-closing` is what
     // makes `fitStatusProxy` answer nothing, so fitting under it would hand back zero and leave the
@@ -681,7 +812,13 @@ export function closeStatusPanel() {
     // Back to the bar's own height once the panel has finished coming in, and not before: a
     // filter region that shrinks mid-collapse clips what is still moving.
     root.style.removeProperty('--liquid-tall');
-  }, STATUS_PANEL.ms + 40);
+  }, Math.max(STATUS_PANEL.ms, dropped) + 40);
+  // The modules are put away on their own clock, and it is the later of the two: `leaving` is what
+  // holds them visible through the sling, so taking it off with the bubble would be six of them
+  // blinking out mid-flight. The bubble's own tidy-up may not wait for them either — that is the
+  // proxy coming back, and a Status bubble that cannot be touched for three quarters of a second
+  // after a close is a bubble that ignores the tap asking for the panel again.
+  quickSettle = setTimeout(() => quickPanel.classList.remove('leaving'), dropped + 40);
 }
 
 /**
@@ -695,6 +832,14 @@ statusPill.addEventListener('click', () => {
   bridge.triggerHaptic('tap');
   closeStatusPanel();
 });
+
+/* The panel's own background does **not** close it, and that is the deliberate half of the pair
+   above. A tap on an open *bubble* closes it because the bubble is the thing that was opened; the
+   scrim is not the panel, it is the room the panel is standing in, and this panel fills the screen
+   to every edge — so most of what a thumb lands on while reaching the bottom row is background, and
+   a background that dismisses turns every missed press into a panel that vanished for no reason the
+   finger can account for. The scrim keeps its `pointer-events` regardless: it is what the flick that
+   puts the panel away has to start on, since that gesture may now begin nowhere else. */
 
 /* ── The switches ──────────────────────────────────────────────────────────────────────── */
 
@@ -716,7 +861,12 @@ const faceOf = control => control.querySelector('.quick-icon') || control;
 function paintToggles(state) {
   toggles = state;
   quickModes.forEach(button => {
-    setControl(button, Boolean(state[button.dataset.toggle]), false);
+    const name = button.dataset.toggle;
+    setControl(button, Boolean(state[name]), false);
+    // The same lie the knobs are protected from: with no shell there is no reading behind a
+    // connector either, and a button sitting at "off" for that reason is one the user can act on.
+    // USB and the hotspot are left out because neither is judged on a setting — see paintModeLabels.
+    if (name !== 'usb' && name !== 'hotspot') button.classList.toggle('unavailable', !(name in state));
   });
   paintModeLabels();
   paintLevels(state);
@@ -741,10 +891,16 @@ function paintToggles(state) {
 let toggles = {};
 
 /**
- * What each link is attached to, under its glyph. A colour says a radio is on and nothing else,
+ * What each link is attached to, under its name. A colour says a radio is on and nothing else,
  * and "on" is the half of a link nobody has to be told — the network, the pair of headphones, the
- * cable are the reading. Where there is no name to give, the state is said in words instead of a
- * blank being left: an empty line under a lit glyph reads as a label that failed to load.
+ * cable are the reading.
+ *
+ * Nothing here writes "off". A cell that is dark, unlit and carrying nothing under its name has
+ * already said it, and the one line a cell has is worth more spent on the half that is news: the
+ * blank is the reading rather than a label that failed to load, because the name above it is now
+ * always there to be the thing that did load. Every branch that used to end in the word ends in
+ * an empty string, and only what is genuinely attached — or genuinely doing something, like a
+ * hotspot nobody has joined — is written at all.
  */
 function paintModeLabels() {
   const paired = attached && attached.bluetooth;
@@ -752,24 +908,53 @@ function paintModeLabels() {
     // A cable is not a switch: it is either in the phone or it is not, and what the switch under
     // it does is decide what the cable is allowed to carry.
     usb: !(attached && attached.usb) ? 'no cable' : toggles.usb ? 'file transfer' : 'charging only',
-    bluetooth: paired ? (paired.name || 'connected') : toggles.bluetooth ? 'nothing paired' : 'off',
+    bluetooth: paired ? (paired.name || 'connected') : toggles.bluetooth ? 'nothing paired' : '',
     wifi: attached && attached.link === 'wifi' && attached.ssid
       ? attached.ssid
-      : toggles.wifi ? 'not connected' : 'off',
+      : toggles.wifi ? 'not connected' : '',
     // The generation is the name of a mobile link the way an SSID is the name of a wifi one — it is
     // what the phone will say about the network it is on, and it is already on the bar.
-    mobile: !toggles.mobile ? 'off'
+    mobile: !toggles.mobile ? ''
       : attached && attached.link === 'mobile' ? (attached.generation || 'connected')
       : 'standby',
+    // Whether anything is actually using the phone as its way out, which is the half of a hotspot
+    // that matters: a hotspot nobody joined is a radio burning for nothing.
+    hotspot: attached && attached.hotspot ? 'sharing' : toggles.hotspot ? 'nobody joined' : '',
+    // The mode, and it says what it *does* rather than repeating its own name back: every radio is
+    // down is the reading, and "aeroplane mode" under an aeroplane is the label said twice.
+    plane: toggles.plane ? 'radios off' : '',
+    // Nothing to write in either direction: lit is on and dark is off, and with the name standing
+    // over the cell the word "on" under it is the cell saying its own state in place of a reading.
+    gps: '',
   };
   quickModes.forEach(button => {
     const name = button.dataset.toggle;
-    button.querySelector('.quick-label').textContent = text[name] || '';
-    // The USB switch answers to a cable rather than to a setting: with nothing plugged in there
-    // is nothing for it to grant, and a live-looking button that silently does nothing is worse
-    // than one that says it has no subject.
-    if (name === 'usb') button.classList.toggle('unavailable', !(attached && attached.usb));
+    // The cable has no label to write — it is the one connector with no name to give, so it stands
+    // in the narrow column wearing its glyph alone. Every other button here has one.
+    const label = button.querySelector('.quick-label');
+    if (label) label.textContent = text[name] || '';
+    // The USB switch answers to a cable rather than to a setting: with nothing plugged in there is
+    // nothing for it to grant. It is no longer dimmed for that — it stands at the foot of the media
+    // module now, where a permanently greyed row would be height spent on the absence of a thing —
+    // so it is drawn or it is not, and the module gives its height back either way.
+    if (name === 'usb') {
+      const cabled = Boolean(attached && attached.usb);
+      button.classList.toggle('attached', cabled);
+      // Only when it actually changes: this runs on both clocks and on every reading, and a stir per
+      // reading is the mirror never being allowed to stop on a panel that is standing still.
+      if (cabled !== quickMedia.classList.contains('cabled')) {
+        quickMedia.classList.toggle('cabled', cabled);
+        stirLiquid(QUICK_MEDIA_GROW + 120);
+      }
+    }
   });
+  // The hotspot's truth is not a setting. Samsung keeps no key for it, and the tether broadcast
+  // ConnectivityWatch is already listening to is what says whether the phone is lending its link
+  // out — so this one switch is lit from the connectivity payload rather than from the shell's
+  // reading, and it is painted here rather than in paintToggles because this function runs on both
+  // clocks and paintToggles only ever runs on the shell's.
+  const hotspot = quickModes.find(button => button.dataset.toggle === 'hotspot');
+  if (hotspot && attached) setControl(hotspot, Boolean(attached.hotspot), false);
 }
 
 /** Whether the Now bubble is currently carrying a recording, which is where that truth lives. */
@@ -788,7 +973,10 @@ const batteryReading = document.getElementById('battery-reading');
 /**
  * The colour the level is drawn in, in five bands rather than as a gradient: a band is a reading
  * and a gradient is a number said twice, and what a glance wants off a battery is which of the
- * five situations it is in. Mirrors the bands in the backlog: 100-86, 85-61, 60-36, 35-16, 15-0.
+ * five situations it is in. The bands: 100-86, 85-61, 60-31, 30-16, 15-0.
+ * The 31 is a mirror of `BatteryWatch.LOW`, which is 30: the announcement and the colour are one
+ * reading, and they were half a band apart — the bubble went orange at 35 and only said so at 30,
+ * which reads as the panel and the bar disagreeing about the same phone.
  */
 function chargeColour() {
   // Plugged in outranks every band, the same way it outranks them on the bar: the level is no
@@ -797,7 +985,7 @@ function chargeColour() {
   if (isPlugged) return ANNOUNCE_COLOURS.charging;
   if (charge >= 86) return '#5bfd5b';
   if (charge >= 61) return '#2fbf2f';
-  if (charge >= 36) return '#ffd429';
+  if (charge >= 31) return '#ffd429';
   if (charge >= 16) return '#ff9020';
   return '#e5342b';
 }
@@ -806,10 +994,10 @@ function chargeColour() {
  * Which of the three the bar's own reading is in. Three and not the panel's five: the panel is
  * being looked at and can afford a scale, the bar is being glanced past and only has room for
  * the question "is this fine, is this getting on, is this a problem". The two boundaries are the
- * bottom two of chargeColour()'s, so a charge crossing 36 or 16 changes in both places at once.
+ * bottom two of chargeColour()'s, so a charge crossing 31 or 16 changes in both places at once.
  */
 function chargeBand() {
-  if (charge >= 36) return 'ok';
+  if (charge >= 31) return 'ok';
   if (charge >= 16) return 'low';
   return 'critical';
 }
@@ -824,8 +1012,6 @@ function paintBattery() {
   batteryBox.style.setProperty('--charge-color', chargeColour());
   // Low is the battery's own alarm and belongs to the reading, not to a slot beside it. Not while it is plugged in: a phone at 9% on a cable is a phone being fixed.
   batteryBox.classList.toggle('low', !isPlugged && charge >= 0 && charge < 15);
-  // Charging is a thing happening to the liquid rather than a colour written on it, so the class carries it: the bubbles only rise while this is on, and they are drawn from nothing rather than paused, because a paused animation still holds nine circles standing in the middle of a still surface.
-  batteryBox.classList.toggle('charging', isPlugged);
 }
 
 /** The control behind the battery's tap: one truth, worked from two places in the same panel. */
@@ -1040,11 +1226,18 @@ let panelPushed = false;
 
 export function statusPanelPush(action, x, y) {
   if (action === 'down') {
-    // Not from a bar. The levels are worked with a long vertical drag and the push is a short
-    // one, so every brightness change made upwards was also a dismiss: the panel went away under
-    // the finger that was setting it. A gesture that starts on a control belongs to that control.
+    // **From the panel's own background and from nowhere else.** A gesture that starts on a control
+    // belongs to that control, and this used to say so about the levels alone — the one place the
+    // clash had actually been noticed, because a brightness drag upwards is a dismiss drawn in the
+    // same stroke. But every module in this panel is grabbed, not only the two bars: a knob pressed
+    // and held wanders, a link is pushed at, the charge is held to reach Samsung's own screen, and
+    // all of them travel the twenty-four pixels this reads as a flick sooner or later. So every one
+    // of them was a dismiss waiting to happen, and what it looked like from the outside is that
+    // nothing in the panel could be grabbed at all — whatever the finger did, the panel went away.
+    // The scrim is the only thing under a finger that means "not a control", so it is the only
+    // thing the push may begin on.
     const on = document.elementFromPoint(x, y);
-    panelPushFrom = on && on.closest('.level') ? null : { x, y };
+    panelPushFrom = on === quickScrim ? { x, y } : null;
     panelPushed = false;
     return;
   }
@@ -1154,6 +1347,89 @@ export function setTransfer(payload) {
   transfer = null;
   paintStatus();
 }
+
+/* ── The module at the foot ────────────────────────────────────────────────────────────── */
+
+/** How long the foot module takes to change height. Mirrors the `transition` on `#quick-media` in pill.css; the mirror only paints while it is stirred, so a height that moves without one moves under glass that has stopped following it. */
+const QUICK_MEDIA_GROW = 320;
+
+const quickMedia = document.getElementById('quick-media');
+const quickMediaKind = document.getElementById('quick-media-kind');
+const quickMediaReading = document.getElementById('quick-media-reading');
+const quickMediaArt = document.getElementById('quick-media-art');
+const quickMediaTitle = document.getElementById('quick-media-title');
+const quickMediaArtist = document.getElementById('quick-media-artist');
+const quickMediaPlayPath = document.getElementById('quick-media-play-path');
+
+/**
+ * The foot module, wearing whichever of its two readings is true.
+ *
+ * Media is the base mod and a transfer takes it over, which is the way round the panel needed
+ * rather than the way it was built: a file in flight is a thing that happens a few times a week and
+ * a song is a thing that is playing most of the time the panel is opened at all, so the bubble that
+ * used to say "No transfer" nine openings out of ten now says what is playing.
+ *
+ * A transfer outranks a song while it is running, for the same reason it outranks it on the closed
+ * bubble: a song is a state and a transfer is a thing in progress, and what is in progress is what
+ * a panel opened mid-download was opened to look at.
+ *
+ * The share is a share and never a size: `done` and `total` are the notification's own progress
+ * ints, in whatever unit the app that posted them chose, so bytes written beside them would be a
+ * number this page invented. A percentage is the one reading those two are.
+ */
+export function paintQuickMedia() {
+  const running = Boolean(transfer);
+  const song = !running && shared.media ? shared.media : null;
+  quickMedia.classList.toggle('running', running);
+  // The same debt the cable's row owes and for the same reason: a song starting takes this module
+  // from 54 to 135 over 320ms, and the glass behind it only follows while the mirror is running.
+  if (Boolean(song) !== quickMedia.classList.contains('sounding')) {
+    quickMedia.classList.toggle('sounding', Boolean(song));
+    stirLiquid(QUICK_MEDIA_GROW + 120);
+  }
+  if (song) {
+    quickMediaTitle.textContent = song.title || '';
+    quickMediaArtist.textContent = song.artist || '';
+    // Absent rather than empty: an `<img>` with no source draws the browser's own broken glyph,
+    // which is the one thing worse than a blank square where a cover belongs.
+    if (song.artBase64) quickMediaArt.src = song.artBase64;
+    else quickMediaArt.removeAttribute('src');
+    quickMediaPlayPath.setAttribute('d', song.isPlaying ? 'M6 5h4v14H6zm8 0h4v14h-4z' : 'M8 5v14l11-7z');
+    return;
+  }
+  if (!running) {
+    quickMediaKind.textContent = 'Nothing playing';
+    quickMediaReading.textContent = '';
+    quickMedia.style.setProperty('--transfer-share', '0%');
+    return;
+  }
+  quickMediaKind.textContent = transfer.mod === 'upload' ? 'Upload' : 'Download';
+  // A finished one keeps its full bar for the moment it stands there wearing the tick, because the
+  // bar going back to nothing is the one thing that would read as the transfer having failed.
+  const share = transfer.isDone || !transfer.total
+    ? 100
+    : Math.round((transfer.done / transfer.total) * 100);
+  quickMediaReading.textContent = transfer.isDone ? 'Done' : share + '%';
+  quickMedia.style.setProperty('--transfer-share', share + '%');
+}
+
+/* The transport, straight through to the host. It is the same three commands the player face and
+   the lock screen's bubble send — one name each, no state of its own — so nothing here has to know
+   what is playing beyond what paintQuickMedia has already drawn. */
+[
+  ['quick-media-previous', () => 'previous'],
+  // The two ends of one control, asked as one question, so the glyph and the request cannot
+  // disagree. Nothing is painted here on the press: onMediaUpdate comes back and repaints, which is
+  // the button saying what it did rather than what it asked for.
+  ['quick-media-play', () => (shared.media && shared.media.isPlaying ? 'pause' : 'play')],
+  ['quick-media-next', () => 'next'],
+].forEach(([id, command]) => {
+  document.getElementById(id).addEventListener('click', event => {
+    event.stopPropagation();
+    bridge.triggerHaptic('tap');
+    bridge.mediaControl(command());
+  });
+});
 
 function holdTheTick() {
   clearTimeout(transferTick);
