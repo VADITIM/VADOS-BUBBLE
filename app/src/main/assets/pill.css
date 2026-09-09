@@ -2154,11 +2154,12 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: none;
   border: none;
   flex: none;
-  width: 64px;
+  width: 74px;
   height: var(--quick-links-tall);
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   padding: 0;
 
   color: #fff;
@@ -2202,6 +2203,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
   margin: 0;
+  flex: none;
+  height: 75%;
   display: grid;
   place-items: center;
   border-radius: 16px;
@@ -2241,15 +2244,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #battery-fill {
-  
 
 
 
-  border-radius: 0;
+
+  border-radius: 0 0 12px 12px;
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
   height: var(--charge-height, 0%);
   z-index: 1;
   background: var(--charge-color, var(--text-faint));
@@ -2424,6 +2427,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   writing-mode: vertical-lr;
   text-orientation: upright;
   text-align: start;
+  line-height: 0.4;
 }
 
 #quick-row-links .quick-icon {
