@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.os.IBinder
 import rikka.shizuku.Shizuku
 
-/** Thin front door to a shell-UID command runner, bound lazily and never assumed present. */
+
 object ShizukuShell {
 
     private const val PERMISSION_REQUEST = 4711
@@ -24,7 +24,7 @@ object ShizukuShell {
         }
     }
 
-    /** True only when Shizuku is running, has granted us access, and the runner is bound. */
+    
     val isReady: Boolean get() = service != null
 
     fun isRunning(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
@@ -46,7 +46,7 @@ object ShizukuShell {
         runCatching { Shizuku.bindUserService(arguments, connection) }
     }
 
-    /** Null means the command could not be run at all, which is not the same as empty output. */
+    
     fun run(command: String): String? =
         service?.let { runCatching { it.execute(command) }.getOrNull() }
 }

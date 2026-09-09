@@ -29,8 +29,8 @@ android {
 }
 
 dependencies {
-    // The only dependency in the project: the microphone-access toggle needs a
-    // shell UID, and Shizuku is the no-root way to get one.
+    
+    
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
 }

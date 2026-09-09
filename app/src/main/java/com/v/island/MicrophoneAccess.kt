@@ -1,14 +1,14 @@
 package com.v.island
 
-/**
- * The system-wide "Mikrofonzugriff" toggle — the same switch One UI puts in
- * Steuerung und Warnungen. It is sensor-privacy state, not a secure setting, so
- * it is only reachable with a shell UID.
- *
- * In `dumpsys sensor_privacy`, sensor 1 is the microphone and toggle type 1 is the
- * software toggle; state 1 means privacy is on, so access is blocked. Verified on
- * this device by toggling it from adb and diffing the dump.
- */
+
+
+
+
+
+
+
+
+
 object MicrophoneAccess {
 
     const val ALLOWED = "allowed"

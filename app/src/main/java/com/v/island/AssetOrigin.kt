@@ -7,16 +7,16 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 
-/**
- * Serves `assets/` over a virtual https origin so the page can be ES modules.
- *
- * Chromium gives every `file://` document its own opaque origin and then refuses the module
- * fetches an import graph is made of, so a page loaded from `file:///android_asset/` can carry
- * inline script and nothing else — which is why `pill.html` was one 6,000-line file for as long
- * as it was loaded that way. `appassets.androidplatform.net` is the domain reserved for exactly
- * this and resolves nowhere on the internet, so a request that misses the interceptor fails
- * rather than reaching a network, and every asset is same-origin with the page that asks for it.
- */
+
+
+
+
+
+
+
+
+
+
 object AssetOrigin {
 
     const val ROOT = "https://appassets.androidplatform.net/"
@@ -45,8 +45,8 @@ object AssetOrigin {
                 val stream = context.assets.open(path)
                 WebResourceResponse(MIME[path.substringAfterLast('.', "")], "utf-8", stream)
             } catch (missing: java.io.IOException) {
-                // A mistyped import is otherwise a silently dead page, and this is the log every
-                // other console line from the interface already goes to.
+                
+                
                 Log.w("IslandBubble", "asset not found: $path")
                 null
             }
