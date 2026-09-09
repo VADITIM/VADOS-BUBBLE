@@ -2423,8 +2423,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #quick-row-links .quick-icon {
   grid-area: bubble;
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
   corner-shape: round;
   background: var(--pill-background);
@@ -2467,32 +2467,32 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   height: 4px;
   border-radius: 50%;
   background: currentColor;
-  will-change: transform, filter;
+  will-change: transform;
 }
 #quick-row-links .quick-label.waiting .quick-dot:nth-child(1) { animation: quick-dot-wave-1 1.8s ease-in-out infinite; }
 #quick-row-links .quick-label.waiting .quick-dot:nth-child(2) { animation: quick-dot-wave-2 1.8s ease-in-out infinite; }
 #quick-row-links .quick-label.waiting .quick-dot:nth-child(3) { animation: quick-dot-wave-3 1.8s ease-in-out infinite; }
 
 @keyframes quick-dot-wave-1 {
-  0%, 100%  { transform: translateY(0); filter: blur(0); }
-  10%       { transform: translateY(-60%); filter: blur(0.6px); }
-  22%       { transform: translateY(0); filter: blur(0); }
-  66%       { transform: translateY(-60%); filter: blur(0.6px); }
-  78%       { transform: translateY(0); filter: blur(0); }
+  0%, 100%  { transform: translateY(0); }
+  10%       { transform: translateY(-60%); }
+  22%       { transform: translateY(0); }
+  66%       { transform: translateY(-60%); }
+  78%       { transform: translateY(0); }
 }
 @keyframes quick-dot-wave-2 {
-  0%, 100%  { transform: translateY(0); filter: blur(0); }
-  22%       { transform: translateY(-60%); filter: blur(0.6px); }
-  34%       { transform: translateY(0); filter: blur(0); }
-  66%       { transform: translateY(-60%); filter: blur(0.6px); }
-  78%       { transform: translateY(0); filter: blur(0); }
+  0%, 100%  { transform: translateY(0); }
+  22%       { transform: translateY(-60%); }
+  34%       { transform: translateY(0); }
+  66%       { transform: translateY(-60%); }
+  78%       { transform: translateY(0); }
 }
 @keyframes quick-dot-wave-3 {
-  0%, 100%  { transform: translateY(0); filter: blur(0); }
-  34%       { transform: translateY(-60%); filter: blur(0.6px); }
-  46%       { transform: translateY(0); filter: blur(0); }
-  66%       { transform: translateY(-60%); filter: blur(0.6px); }
-  78%       { transform: translateY(0); filter: blur(0); }
+  0%, 100%  { transform: translateY(0); }
+  34%       { transform: translateY(-60%); }
+  46%       { transform: translateY(0); }
+  66%       { transform: translateY(-60%); }
+  78%       { transform: translateY(0); }
 }
 
 
@@ -2729,7 +2729,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #quick-row-knobs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, auto);
+  align-content: space-between;
   gap: var(--quick-gap);
   flex: 1;
   min-width: 0;
@@ -2743,7 +2744,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-  width: 210px;
+  width: 179px;
   flex: none;
 }
 
