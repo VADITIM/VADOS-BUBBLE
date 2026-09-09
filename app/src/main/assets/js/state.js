@@ -150,7 +150,7 @@ export const shared = {
   current: null,           
   
   
-  compact: { width: 130, height: 34 },
+  compact: { width: 76, height: 26 },
   dwellTimer: null,
   holdTimer: null,
   growTimer: null,

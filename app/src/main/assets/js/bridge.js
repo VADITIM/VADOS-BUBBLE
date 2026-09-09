@@ -6,8 +6,9 @@ import { nowOpen, nowOwnsClock, nowTouch } from './now.js';
 import { closeStatusPanel, openStatusPanel, statusHolds, statusOpen, statusPanelPush, statusPill, statusTouch } from './status.js';
 import { clockHolds, clockPill, clockTouch } from './clock.js';
 import { lockHolds, lockPill } from './lock.js';
-import { ensureClosedWindow, paintSatellites, paintShift, setSize } from './row.js';
+import { ensureClosedWindow, paintSatellites, paintShift, setSize, toClosed } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
+import { openHistory } from './tabs.js';
 
 
 
@@ -244,4 +245,9 @@ window.setCameraActive = isActive =>
 window.onToggleStatusPanel = () => {
   if (statusOpen) closeStatusPanel();
   else openStatusPanel();
+};
+
+window.onToggleNotifications = () => {
+  if (shared.state === 'extended' && shared.size === 'history') toClosed();
+  else openHistory();
 };

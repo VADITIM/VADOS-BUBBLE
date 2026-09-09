@@ -78,6 +78,20 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".NotificationsPanelActivity"
+            android:label="VADOS Notifications"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=".notifications"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".BubbleService"
             android:label="VADOS BUBBLE"

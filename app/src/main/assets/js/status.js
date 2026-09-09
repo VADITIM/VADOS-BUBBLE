@@ -37,13 +37,9 @@ const EDGE_OVER = 20;
 
 const PILL_DOCK_TALL = 130;
 const PILL_DOCK_TRANSFER_TALL = 46;
+// Main-Status-Idle docks even with no mod live, not only media/transfer: the row is not exempt from the corner-reach every other bubble in this state owes the panel.
+const PILL_DOCK_IDLE_TALL = 64;
 
-
-
-
-function dockShows() {
-  return Boolean(shared.media) || Boolean(transfer);
-}
 
 const CLOSED_FACE = { media: 'media', timer: 'timer', call: 'call' };
 function closedFace() {
@@ -54,13 +50,17 @@ function closedFace() {
 function fitPillDock() {
   const hasMedia = Boolean(shared.media);
   const hasTransfer = Boolean(transfer);
-  const tall = (hasMedia ? PILL_DOCK_TALL : 0) + (hasTransfer ? PILL_DOCK_TRANSFER_TALL : 0);
-  const width = STATUS_PANEL.width + EDGE_OVER * 2;
+  const tall = hasMedia || hasTransfer
+    ? (hasMedia ? PILL_DOCK_TALL : 0) + (hasTransfer ? PILL_DOCK_TRANSFER_TALL : 0)
+    : PILL_DOCK_IDLE_TALL;
+  // Merges with the screen's own left/right edges by --edge-over, exactly as Clock's and Status' own corner-reach do, rather than centring a measured width.
+  const width = screenWidth() + EDGE_OVER * 2;
   const bottom = screenHeight() - STATUS_MARGIN_FOOT;
   const top = bottom - tall;
-  root.style.setProperty('--pill-dock-width', Math.round(width) + 'px');
   root.style.setProperty('--pill-dock-top', Math.round(top) + 'px');
   root.style.setProperty('--pill-dock-height', Math.round(tall + EDGE_OVER) + 'px');
+  // #quick-panel's own bottom padding, so its column gives back exactly the room the dock is standing in rather than the two overlapping.
+  root.style.setProperty('--quick-dock-pad', Math.round(tall) + 'px');
   bridge.setWindowBounds(Math.round(width), Math.round(bottom), 0, 0);
 }
 
@@ -69,15 +69,10 @@ export function refreshDock() {
 }
 
 function paintDock() {
-  const showing = dockShows();
-  pill.classList.toggle('panel-dock', showing);
-  pill.classList.toggle('dock-transfer', showing && Boolean(transfer));
-  dockTransfer.classList.toggle('showing', showing && Boolean(transfer));
-  if (!showing) {
-    showFace(closedFace());
-    applyClosedWindow();
-    return;
-  }
+  const hasTransfer = Boolean(transfer);
+  pill.classList.add('panel-dock');
+  pill.classList.toggle('dock-transfer', hasTransfer);
+  dockTransfer.classList.toggle('showing', hasTransfer);
   fitPillDock();
   showFace(shared.media ? 'player' : closedFace());
   if (transfer) {

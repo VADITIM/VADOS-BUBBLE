@@ -145,6 +145,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.push("window.onToggleStatusPanel()")
         }
 
+
+        fun toggleNotifications() {
+            instance?.push("window.onToggleNotifications()")
+        }
+
         
 
 

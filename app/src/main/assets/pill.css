@@ -5,8 +5,8 @@
 
   --pill-solid: rgb(0, 0, 0);
   --pill-alpha: 1;
-  --pill-width: 130px;
-  --pill-height: 34px;
+  --pill-width: 76px;
+  --pill-height: 26px;
   
 
 
@@ -2130,13 +2130,30 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #status.open {
-  right: calc(-1 * var(--edge-over));
-  top: calc(-1 * var(--edge-over));
-  padding-right: calc(0.55rem + var(--status-right, 14px) + var(--edge-over));
-  padding-top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
-  height: calc(var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
+  /* --corner-margin pulls the box back off the true corner by a few pixels rather than merging flush with it, mirroring Clock's own corner-grow. */
+  right: calc(-1 * var(--edge-over) + var(--corner-margin));
+  top: calc(-1 * var(--edge-over) + var(--corner-margin));
+  /* Equal padding both sides lands the content-box's right edge exactly on the true screen edge (mirroring Clock) so centring the icon row is genuinely screen-edge-to-inward-edge, not merely the middle of the corner overhang. --corner-padding-scale (+15%) is layered on top rather than folded into --corner-margin, mirroring Clock's own comment. */
+  padding-right: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
+  padding-left: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
+  padding-bottom: calc(0.4rem * var(--corner-padding-scale, 1.15));
+  padding-top: calc((var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-padding-scale, 1.15));
+  /* +30% now (was +15%), downward only since top is pinned above by --edge-over already — --corner-grow-scale mirrors Clock's own corner-grow height in the same file (states.md#clock-status-idle-and-main-status-idle). */
+  height: calc((var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-grow-scale, 1.3));
+  /* With the battery reading dropped below, the box can be left with one bare icon and no width to grow from (auto width hugs whatever content is left) — a floor keeps it a real, centred module rather than a glyph pinned in the corner with no room around it. Extended (was 56px) so the box also grows further out toward the screen edge, mirroring Clock's own width extension, rather than only hugging its content. */
+  min-width: calc(56px + var(--edge-over));
+  /* Nudges the icon row toward the true top-right corner it is reaching for, rather than sitting dead-centre of the grown box's now-larger padding — right pushed further than top since the box's own reach is mostly rightward. */
+  margin-top: -6px;
+  margin-right: -14px;
   z-index: 30;
 }
+/* Was flex-end/flex-end, pinning the icon row to the fixed top-right corner (states.md#clock-status-idle-and-main-status-idle). Equal padding above (mirroring Clock's own centring) puts the content-box's right edge at the true screen edge, so centred here is between that edge and the box's inward edge, not merely the middle of the corner. */
+#status.open .status-face { align-items: center; justify-content: center; }
+/* The own-charge reading is dropped from this state entirely — it is what the giant battery module in the panel body already says, so the corner icon row does not need to repeat it. */
+#status.open .status-slot[data-slot="battery"] { display: none; }
+/* --mod-glyph is the shared main-row badge size (16px, meant to stand inline with a mod's own reading) and is deliberately left alone everywhere else; this corner icon has the whole grown box to itself and read as too small at that scale, so it gets its own fixed floor instead of a scaled fraction of the shared token. */
+#status.open .status-slot-inner { width: calc(20px * var(--corner-grow-scale, 1.3)); height: calc(20px * var(--corner-grow-scale, 1.3)); }
+#status.open .status-slot-inner.is-text { font-size: calc(0.72rem * var(--corner-grow-scale, 1.3)); }
 
 
 
@@ -2614,6 +2631,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   top: var(--quick-top, 0px);
   width: var(--quick-width, 0px);
   height: var(--quick-height, 0px);
+  box-sizing: border-box;
+  /* Main-Status-Idle's own dock stands at this same bottom edge (status.js's fitPillDock, mirrored here as --quick-dock-pad); the column gives that room back rather than the two overlapping. */
+  padding-bottom: var(--quick-dock-pad, 0px);
   display: flex;
   flex-direction: column;
   gap: var(--quick-gap);
@@ -2621,7 +2641,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     left var(--grow-ms) var(--ease-grow),
     top var(--grow-ms) var(--ease-grow),
     width var(--grow-ms) var(--ease-grow),
-    height var(--grow-ms) var(--ease-grow);
+    height var(--grow-ms) var(--ease-grow),
+    padding-bottom var(--grow-ms) var(--ease-grow);
   pointer-events: none;
   z-index: 29;
 }
@@ -2903,26 +2924,39 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-:root { --edge-over: 20px; }
+:root { --edge-over: 20px; --corner-grow-scale: 1.3; --corner-margin: 8px; --corner-padding-scale: 1.15; }
 #clock.corner-grow {
-  left: calc(-1 * var(--edge-over));
-  top: calc(-1 * var(--edge-over));
-  
+  /* --corner-margin pulls the box back off the true corner by a few pixels rather than merging flush with it — flush read as the reading sitting in the physical corner itself, cropped by the display's own edge, on the phone. */
+  left: calc(-1 * var(--edge-over) + var(--corner-margin));
+  top: calc(-1 * var(--edge-over) + var(--corner-margin));
+  /* Time over date now, not the idle row — a column lets justify-content (main axis) centre the pair vertically in the taller box while align-items (cross axis) centres each of them horizontally, which padding-left/-right below make a true screen-edge-to-inward-edge centre rather than a centre of whatever the row's own padding happened to be. */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Equal padding either side lands the content-box's left edge exactly at the true screen edge (the box's own left already sits at -edge-over + corner-margin, so edge-over - corner-margin cancels the remainder) and holds the same distance on the inward side, so align-items: center above is centring between the screen edge and the bubble's inward edge, not merely between two arbitrary insets. --corner-padding-scale (+15%) is layered on top of that cancellation rather than folded into --corner-margin, so the edge math above stays legible on its own. */
+  padding-left: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
+  padding-right: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
+  padding-top: calc((var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-padding-scale, 1.15));
+  padding-bottom: calc(0.4rem * var(--corner-padding-scale, 1.15));
+  /* Nudges the time/date stack toward the true top-left corner it is reaching for, rather than sitting dead-centre of the grown box's now-larger padding — left pushed further than top since the box's own reach is mostly leftward. */
+  margin-top: -6px;
+  margin-left: -14px;
 
 
 
-  padding-left: calc(0.7rem + var(--clock-left, 14px) + var(--edge-over));
-  padding-top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
-  
 
 
 
 
-
-
-  width: calc(var(--clock-width, auto) + var(--clock-left, 14px) + var(--edge-over));
-  height: calc(var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over));
+  /* Extends the box's own right edge, on top of the left/top corner reach above, so it grows further out toward the screen edge rather than only toward the bar. */
+  width: calc(var(--clock-width, auto) + var(--clock-left, 14px) + var(--edge-over) * 2);
+  /* +30% now (was +15%), downward only since top is pinned above by --edge-over already — --corner-grow-scale mirrors on Status' own height in the same file (states.md#clock-status-idle-and-main-status-idle). */
+  height: calc((var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-grow-scale, 1.3));
+  /* Drawn above the panel (29) and the grown Status bubble (30), the same exception Main's own dock is (states.md#clock-status-idle-and-main-status-idle). */
+  z-index: 31;
 }
+#clock.corner-grow #clock-face { font-size: calc(0.68rem * var(--corner-grow-scale, 1.3)); }
+#clock.corner-grow #clock-date { font-size: calc(0.62rem * var(--corner-grow-scale, 1.3)); }
 
 
 
@@ -2946,11 +2980,17 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* a hand-picked constant). --pill-dock-* are written before .panel-dock is added, so the box */
 /* is ready the instant the class starts easing width/height/top on the ordinary --pill-transition. */
 #pill.panel-dock {
-  width: var(--pill-dock-width, var(--pill-width));
+  /* Merges with the screen's own left/right edges the same way Clock's and Status' own corner-reach do, rather than a measured width centred by auto margins — which breaks the instant that measured width is wider than the container, since --pill-width is not auto and margin-inline:auto degrades to a one-sided offset under that over-constraint. */
+  transition: var(--pill-transition), left var(--grow-ms) var(--ease-grow), right var(--grow-ms) var(--ease-grow);
+  left: calc(-1 * var(--edge-over));
+  right: calc(-1 * var(--edge-over));
+  width: auto;
   top: var(--pill-dock-top, var(--grab, 0px));
   height: var(--pill-dock-height, var(--pill-height));
   padding-bottom: var(--edge-over);
   border-radius: 26px;
+  /* Drawn above the panel (29) and the grown Status bubble (30): a bubble not part of Main-Status-Idle stays behind the panel, but Main and Clock are the two named exceptions (bubbles.md). */
+  z-index: 31;
 }
 
 #clock.pressing { scale: 1.03; }
@@ -3040,7 +3080,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     margin-left var(--grow-ms) var(--ease-grow);
 }
 #clock.corner-grow #clock-date {
-  margin-left: 0.65rem;
+  /* Was margin-left, spacing the date beside the time in the old row; the pair stacks now, so the gap is above it instead. */
+  margin-left: 0;
+  margin-top: 0.15rem;
+  justify-content: center;
   max-width: 70px;
   opacity: 0.75;
   translate: 0 0;

@@ -118,8 +118,8 @@ object Preferences {
 
 
     val defaults = mapOf(
-        WIDTH to 85,
-        HEIGHT to 30,
+        WIDTH to 76,
+        HEIGHT to 26,
         HORIZONTAL_OFFSET to 0,
         VERTICAL_OFFSET to 3,
         RED to 0,
