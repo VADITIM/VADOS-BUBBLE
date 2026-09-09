@@ -5,6 +5,8 @@
 @font-face { font-family: "Striker";   src: url('fonts/Striker.otf')           format('opentype'); }
 @font-face { font-family: "Audiowide"; src: url('fonts/Audiowide-Regular.ttf') format('truetype'); }
 @font-face { font-family: "Mono";      src: url('fonts/SpaceMono-Regular.ttf') format('truetype'); }
+/* Semibold only — VADOS DNA's newest face, and this app has no use yet for any weight but the one the quick panel's connector names wear. */
+@font-face { font-family: "Clash";     src: url('fonts/ClashDisplay-Semibold.otf') format('opentype'); font-weight: 600; }
 
 :root {
   --ground: #181818;

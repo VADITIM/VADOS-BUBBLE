@@ -2376,6 +2376,14 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
    of the cell, and **nothing about its background**: the whole of the cell going bright is the one
    reading this panel may not use, because the glyph here is drawn at the size of the cell and
    anything lighting it lights the entire bubble. That is the same rule the glow fell to. */
+/* The cell used to be wider than it is tall — the row stretches every button to fill both its
+   share of --quick-links-tall and its share of the row's own width, and on this screen those are
+   two different numbers. Squared to a literal 1:1 by sizing off the one number here that is fixed
+   rather than derived from the screen's own width: the row's height. Un-stretched from the track
+   (justify-self/align-self default to stretch on a grid item) and centred in it, at eighty percent
+   of that height — a smaller control standing in the same grid, not the grid itself shrinking,
+   which would also shrink the charge cell beside it since --quick-links-tall is the two of them's
+   shared number. */
 #quick-row-links .quick-mode {
   position: relative;
   overflow: hidden;
@@ -2383,6 +2391,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   padding: 0.42rem 0.5rem;
   gap: 0;
   border: none;
+  aspect-ratio: 1;
+  height: 80%;
+  align-self: center;
+  justify-self: center;
 }
 /* The ring and the wash both, and the background is written back to the resting one rather than left
    out: `.quick-mode.on` tints the box a sixth of the way to the accent, which never painted while the
@@ -2395,14 +2407,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   box-shadow: none;
   background: var(--pill-background);
 }
-/* Audiowide and not the panel's Mono: this is the one word on the cell that this interface *chose*,
-   and everything else in the panel is a reading that came from somewhere else. A name in the display
-   face and a router's name in mono is the difference said in the type rather than in a rule about
-   which line means what. */
+/* Clash Display Semibold and not the panel's Mono: this is the one word on the cell that this
+   interface *chose*, and everything else in the panel is a reading that came from somewhere else. A
+   name in the display face and a router's name in mono is the difference said in the type rather
+   than in a rule about which line means what. Was Audiowide; VADOS DNA's labels moved to Clash. */
 .quick-name {
   width: 100%;
   text-align: center;
-  font-family: "Audiowide", sans-serif;
+  font-family: "Clash", sans-serif;
+  font-weight: 600;
   font-size: 0.62rem;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -2424,8 +2437,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #quick-row-links .quick-mode svg {
   width: auto;
   height: 108%;
-  /* The glyph is drawn to a square box and the cell is wider than it is tall, so filling the
-     height is what fills the cell — filling the width would leave it standing in a letterbox. */
+  /* The glyph and the cell are both square now, so filling either axis fills the whole cell — the
+     108 is a deliberate slight bleed past the cell's own edge, kept from when the cell was wider
+     than tall and filling by height was what filled it. */
 }
 /* A lit connector says so by the watermark coming up out of the cell and by the name over it taking
    the accent, and by nothing else. It used to give off light as well — two `drop-shadow`s on the
@@ -2528,7 +2542,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .quick-icon svg { width: 26px; height: 26px; fill: currentColor; }
 /* A whole revolution, because a whole revolution is the one rotation that leaves nothing crooked behind it: the button ends where it started and only the glyph in it has changed. The swap lands at the half turn, where the icon is upside down and hardest to read, which is exactly why the turn is what carries it — the state changing is the cause and the new glyph is the consequence. */
 /* Carries the panel's own id because the arrival rule further down — `#quick-panel.showing .quick-knob` — outranks a bare two-class selector and never stops applying: the panel keeps `.showing` for as long as it is open, so that `animation` declaration sat on top of every press for the whole life of the panel and the turn was never the animation that ran. */
-/* The *glyph* turns and not the button, which the states now share with the links — and it is no longer only about labels. A state is a `.quick-bubble` since the split, so the arrival rule further down (`#quick-panel.showing .quick-bubble`) matches it with the same specificity and wins on source order: a turn written on the button itself would be outranked by the pop for the whole life of the panel, which is exactly the bug this file already records once. Written on the glyph it is three classes deep and outranks the contents rule above it. */
+/* The *glyph* turns and not the button, which the states now share with the links — and it is no longer only about labels. A state is a `.quick-bubble` since the split, so the arrival rule further down (`#quick-panel.showing .quick-bubble`) matches it with the same specificity and wins on source order: a turn written on the button itself would be outranked by the pop for the whole life of the panel, which is exactly the bug this file already records once. Written on the glyph it stands on an element the pop never touches, which is also what the contents rule — three classes deep, animating every child of a module — used to have to be outranked for; that rule has gone with the growth it was waiting out. */
 #quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
 /* The four links turn too, and they always did — the rebuild moved them from a knob to a wide button with a label beside the glyph and left the turn behind on the class they no longer wear, so `.turning` was still being written by the script onto buttons no rule matched. It is the *glyph* that turns here and not the button: the whole box revolving would take its label round with it, and a word upside down at the half turn is unreadable in a way an icon is not — the icon is what changed, so the icon is what answers. */
 #quick-panel.showing .quick-mode.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
@@ -2560,6 +2574,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   --quick-cell: 96px;
   /* The foot module at rest, which is what it is with nothing playing and nothing in flight. Half again as much again on top of it while a song is playing — see `#quick-media.sounding`. */
   --quick-media-tall: 54px;
+  /* How long a module takes to grow, and it is `--grow-ms` for the states a tap opens rather than a number of this panel's own: the arrival *is* the bubble's Extended growth, so it takes the bubble's clock. Mirrors QUICK_POP in js/status.js, which keeps the liquid mirror running for the length of it. */
+  --quick-pop: 460ms;
   /* The cable strip at the foot of that module, and it is added to the module rather than taken out of it: the song and the transport need every pixel of the 54 they have, and a cable arriving is not a reason for the title to lose a line. */
   --quick-media-cable: 30px;
 }
@@ -2631,8 +2647,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: var(--pill-background);
   border: 1px solid var(--border);
   pointer-events: auto;
-  /* Centred, because the note is that they arrive *into* their final position rather than out of
-     an edge: a module growing from its own middle is a drop landing where it belongs. */
+  /* Centred, because what turns and what pops here are both corrections at the end of a flight rather than a growth out of an edge: the tilt swings through true about the module's own middle and the landing's 1.03 is read off the same point. */
   transform-origin: center;
   opacity: 0;
 }
@@ -2801,116 +2816,47 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 /* ── The panel arriving and leaving ────────────────────────────────────────────────────
-   The modules are thrown in one at a time in a shuffled order, sixty milliseconds apart, and
-   each of them lands before the controls inside it start. The order is shuffled on every open
-   because a fixed one is a sequence that gets learnt, and a learnt sequence is a loading bar.
-
-   Each module's own contents are keyed off that module's rank rather than off the last module in
-   the set. Waiting for all six would put the first button nearly a second after the panel was
-   asked for; keyed per module, the buttons still arrive after the bubble that carries them, which
-   is the whole of what "the buttons animate in afterwards" means. */
-/* Each module arrives where it belongs rather than out of the Status bubble. The sling it replaces
-   was the right idea said too loudly: six drops crossing the screen from one corner is six flights
-   to watch before anything can be read, and the bubble they came out of was never the point — the
-   panel is, and the panel is already where it is going to be.
-
-   So it is PORTFOLIO's enter, which is opacity plus a short rise from below and nothing clever:
-   `{ opacity: 0, y: 18 }` to `{ opacity: 1, y: 0 }`. What is added to it here is the tilt and the
-   pop. The tilt is a few degrees either way, written per module by the script and reshuffled on
-   every open, and it is what stops six identical rises reading as one sheet being slid up: each
-   module is a thing that was *thrown* and each of them lands crooked by a different amount in a
-   different direction. Coming back to true is the realignment — it is a different correction every
-   time because the throw was, and it is the last thing to finish, which is what makes the set look
-   settled rather than placed.
-
-   The pop is the landing and belongs at the end, not the start: the box overshoots its own size by
-   a few percent once it has stopped rising, on the family's own overshoot curve, so the bounce is
-   read as the module arriving at a surface rather than as it inflating on the way. Rotation and
-   scale are separate properties here rather than one `transform`, so the tilt's own curve and the
-   pop's are allowed to disagree — which is the whole of why the correction reads as a settle. */
+   Every module grows into its own place in a shuffled order, five milliseconds apart. The order is
+   shuffled on every open because a fixed one is a sequence that gets learnt, and a learnt sequence
+   is a loading bar. */
+/* This is the bubble's own Extended-to-Idle collapse, run backwards, and it is that on purpose rather than by resemblance: `#pill.player, #pill.timer, #pill.history, #pill.expanded, #pill.picture` transition their box over `--grow-ms: 460ms` on `--ease-grow` with the face crossing over 280ms inside it, so a module opening is the same state change written for a smaller box — one growth out of a drop, on the same curve, on the same clock. What it replaces is a whole arrival of its own: a per-module throw measured off the bottom edge of the screen, a random tilt corrected on landing, and a two-phase shot with a magnet at the top of it. Three rounds of tuning went into where that flight started and how long it took, and the answer was still "too fast" — because it was the wrong animation, not a wrong number on the right one. The bubble already had one arrival that works and everything else here is a variation of it. */
+/* Nothing here translates, so nothing needs a start position: a module grows where it stands. That is also what retires the tilt — it was there because fifteen shapes rising the same way read as one sheet being slid up, and fifteen shapes growing in place cannot read as a sheet at all, because no part of the set ever moves off the spot it belongs on. */
 #quick-panel.showing .quick-bubble {
   opacity: 1;
-  animation: bubble-pop 150ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
+  animation: bubble-grow var(--quick-pop) var(--ease-grow) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
 }
-/* Fired up from below the bottom edge of the screen, out of nothing, and caught by a magnet at the
-   top of the flight: the module overshoots the place it belongs, hangs there for a frame, and is
-   dragged the last few pixels back down onto it. That drag is the whole of the effect — a shot that
-   simply decelerated into place is a box being flown to a coordinate, and what makes it read as
-   *pulled* is that it went past and had to come back.
-   It was a 12px rise from a fifth of its size, which is a nudge: at that distance there is nothing
-   to accelerate out of and nothing to be caught from, and the launch and the catch collapse into
-   one small wobble.
-   `--quick-throw` is **per module and measured**, not one number for the set, and that is the whole
-   of the difference between a set that comes off the screen and a set that comes off nothing. It
-   was thirty percent of the display height written once on the root — which is a *relative* start,
-   the same distance below each module's own place rather than the same place — so what every module
-   had in common was its journey and not where it began: the top row set off from a third of the way
-   down the screen, the foot module from below the bottom edge, and fifteen shapes launched from
-   fifteen heights read as the panel assembling out of its own middle. Written per module as the
-   distance from that module's own top down to the screen's bottom edge (`shuffleQuickRanks`), every
-   one of them starts underneath the screen and the row nearest the foot simply has least to travel.
-   It is measured in the script rather than left as a `vh` here for the reason `screenHeight()`
-   exists at all: the layout viewport this WebView hands out is 877 tall inside a 780-tall surface,
-   so every viewport unit in this page is a share of a screen that is not there. */
-@keyframes bubble-pop {
-  0% {
-    opacity: 0;
-    translate: 0 var(--quick-throw, 234px);
-    scale: 0;
-    rotate: var(--tilt, 6deg);
-    /* The shot: almost the whole distance is spent in the first third of the time, so what is
-       watched is the arrival rather than the journey. */
-    animation-timing-function: cubic-bezier(0.05, 0.86, 0.2, 1);
-  }
-  /* Solid well before it has finished rising: a box still fading while it lands is a box that
-     arrives twice. */
-  24% { opacity: 1; }
-  /* Past the mark, and this is the pushover rather than a landing — the box is above where it
-     belongs and larger than it will be, with the tilt swung through true. */
-  62% {
-    opacity: 1;
-    translate: 0 -5px;
-    scale: 1.03;
-    rotate: calc(var(--tilt, 6deg) * -0.18);
-    animation-timing-function: var(--ease-grow);
-  }
-  100% { opacity: 1; translate: 0 0; scale: 1; rotate: 0deg; }
+/* A fifth, which is what the pill collapses to and so what it grows out of — its idle box is about a third of an open one across and a fifth of it tall, and one scale cannot be both. Not zero: a module that starts at nothing has no drop to be seen waiting as its rank comes up, and the overshoot in `--ease-grow` is a correction of a growth rather than the growth itself. */
+@keyframes bubble-grow {
+  from { scale: 0.2; }
+  to   { scale: 1; }
 }
-/* A short beat behind the box rather than the half second the drop needed: at 0.92 of its size the
-   module is already the module, so what the contents are waiting for is the rise to be underway,
-   not a circle to become a rectangle. */
+/* The face crossing over the growth rather than racing it, which is the second half of what the pill does with a state a tap opens — `#pill.player .face.showing` and its siblings take 280ms of plain `ease` inside the same 460. On a scaled box it earns its place twice: the contents scale with it, so without this the glyph and its label stand legible at a fifth of their size for the first frames, which reads as the module being zoomed rather than grown. */
 #quick-panel.showing .quick-bubble > * {
-  animation: quick-contents-in 60ms linear calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 46ms) backwards;
+  animation: quick-contents-in 280ms ease calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
 }
 @keyframes quick-contents-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 
-/* The enter run backwards, and quicker: this is one state change rather than two, so what a module
-   leaves by is the way it came — back down to the fifth of its size it was thrown in at, back onto
-   the tilt it landed off, and out. It keeps the module's own throw so the set does not suddenly
-   agree with itself on the way out. The overshoot is not reversed with it: an anticipation before a
-   leave is a thing bracing, and nothing here is bracing. */
+/* The growth run forwards, which is the collapse it was taken from: this is one state change rather
+   than two, so what a module leaves by is the way it came, back down to the fifth of its size it
+   grew out of. Quicker, and it takes the fade with it — the pill has an idle box to collapse *to*
+   and a module has nowhere to land, so what is a shape change for the bubble is a shape change and
+   a departure here. The overshoot is not reversed with it: `--ease-leave` has none, and an
+   anticipation before a leave is a thing bracing, which nothing here is. */
 #quick-panel.leaving .quick-bubble {
-  opacity: 1;
-  animation: bubble-drop 110ms var(--ease-leave) calc(var(--pop-rank, 0) * 4ms) both;
+  animation: bubble-collapse 110ms var(--ease-leave) calc(var(--pop-rank, 0) * 4ms) both;
 }
-@keyframes bubble-drop {
-  0%   { opacity: 1; translate: 0 0; scale: 1; rotate: 0deg; }
-  100% { opacity: 0; translate: 0 var(--quick-throw, 234px); scale: 0; rotate: var(--tilt, 6deg); }
-}
-/* Emptied a touch ahead of the box, so what fades is a module and not a module with four buttons
-   still at full strength inside it. */
-#quick-panel.leaving .quick-bubble > * {
-  opacity: 0;
-  transition: opacity 80ms linear;
+@keyframes bubble-collapse {
+  from { opacity: 1; scale: 1; }
+  to   { opacity: 0; scale: 0.2; }
 }
 
-/* A level is a column that fills from the floor, so what arrives inside it is the liquid: the
-   bubble itself has already popped in, and the fill runs up out of its own foot after it. */
+/* A level is a column that fills from the floor, so what arrives inside it is the liquid: the well
+   is most of the way grown and the fill then runs up out of its own foot. */
 #quick-panel.showing .level-fill {
-  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 64ms) backwards;
+  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
 }
 @keyframes liquid-pour {
   from { translate: 0 100%; }
@@ -2924,11 +2870,12 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 /* The charge has no arrival of its own, and that is the rule rather than an omission. It is not a
    module standing in the panel — it is the face of the Status bubble, and the Status bubble opening
    out into it *is* its animation: the box grows down out of the closed pill and the cell is what the
-   box now is. Thrown in on `bubble-pop` as well, as it was, the one shape on the screen with a
-   genuine growth behind it was the one shape also flying: the cell came up from a third of a screen
-   below, crooked on its own tilt, while the bubble it is the inside of was opening out around it —
-   two answers to one arrival, and the reason it read as the battery sliding in from the side of a
-   bubble that was expanding anyway. Nothing here moves the cell; the growth is the whole of it. */
+   box now is. Thrown in with the modules as it was, back when their arrival was a
+   flight, the one shape on the screen with a genuine growth behind it was the one shape also flying:
+   the cell came up from a third of a screen below, crooked on its own tilt, while the bubble it is
+   the inside of was opening out around it — two answers to one arrival, and the reason it read as
+   the battery sliding in from the side of a bubble that was expanding anyway. Nothing here moves the
+   cell; the growth is the whole of it, and it is now the growth every module beside it is doing. */
 /* The pour is the exception and belongs to the cell rather than to its arrival: it is the liquid
    running up out of the well's own floor once there is a well, so it keeps the panel's clock and no
    longer waits on a rank the charge does not have. */
@@ -2937,11 +2884,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 /* The states used to have an arrival of their own — thrown in small and off true, after the module
-   carrying them had landed — because they were three circles inside a box and the box's pop was not
-   theirs. Each of them is a bubble now, so it pops like every other bubble here, and the rule that
-   gave them their own one was worse than redundant: `#quick-panel.showing .quick-knob` matches with
-   exactly the same specificity as `#quick-panel.showing .quick-bubble` and stood later in the file,
-   so it *replaced* the pop for six of the sixteen. One arrival, one owner. */
+   carrying them had landed — because they were three circles inside a box and the box's own arrival
+   was not theirs. Each of them is a bubble now, so it grows like every other bubble here, and the
+   rule that gave them their own one was worse than redundant: `#quick-panel.showing .quick-knob`
+   matches with exactly the same specificity as `#quick-panel.showing .quick-bubble` and stood later
+   in the file, so it *replaced* the arrival for six of the sixteen. One arrival, one owner. */
 
 
 /* ── The Clock bubble ──────────────────────────────────────────────────────────────────

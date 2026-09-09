@@ -650,6 +650,9 @@ const QUICK_STAGGER = 5;
 /** The same on the way out, where it is tighter. Mirrors the `* 4ms` in `#quick-panel.leaving .quick-bubble`. */
 const QUICK_DROP_STAGGER = 4;
 
+/** How long one module takes to grow, which is the clock the Extended states take (`--grow-ms: 460ms`) because the arrival *is* the bubble's own growth written for a smaller box. Mirrors `--quick-pop` in pill.css, and it is named on this side because the liquid mirror has to be stirred for exactly as long as the last module is still moving — a growth that outlives the stir is a growth whose glass stops being sent part-way through it. */
+const QUICK_POP = 460;
+
 /**
  * How long the frost behind the panel takes to reach nothing. Mirrors the `--scrim-frost` transition
  * on `#quick-scrim` in pill.css, and it is here for one reason: the ramp is only *sent* to the host
@@ -659,7 +662,10 @@ const SCRIM_FROST_MS = 450;
 
 /**
  * A fresh order every time the panel is asked for. A fixed one is a sequence, and a sequence that
- * can be learnt is read as a loading bar rather than as six things landing at once-ish.
+ * can be learnt is read as a loading bar rather than as fifteen things landing at once-ish. The rank
+ * is the only thing written per module now: a module grows where it stands, so there is no start
+ * position to measure and no tilt to correct — both of those belonged to a flight the arrival no
+ * longer is. See `bubble-grow` in pill.css.
  */
 function shuffleQuickRanks() {
   const ranks = quickBubbles.map((bubble, index) => index);
@@ -667,37 +673,7 @@ function shuffleQuickRanks() {
     const swap = Math.floor(Math.random() * (at + 1));
     [ranks[at], ranks[swap]] = [ranks[swap], ranks[at]];
   }
-  // Every module starts underneath the screen, which is a place rather than a distance — so the
-  // distance is its own: from this module's top edge down to the bottom of the display, so the box
-  // is entirely below the edge on the frame it sets off and the foot of the panel simply has less
-  // ground to cover than the top of it. It was one number on the root for the whole set (thirty
-  // percent of the display), which is the same *journey* for everybody and therefore fifteen
-  // different starting heights — the top row began a third of the way down the screen, in full
-  // view, which is what "the bubbles at the top start further up" was. Read here, one pass over
-  // the set, because the frame has just been measured by fitStatusPanel() and this runs before the
-  // class that starts the animation goes on; the keyframes read it once when they begin.
-  const floor = screenHeight();
-  const throws = quickBubbles.map(bubble => Math.round(floor - bubble.getBoundingClientRect().top));
-  quickBubbles.forEach((bubble, index) => {
-    bubble.style.setProperty('--pop-rank', ranks[index]);
-    bubble.style.setProperty('--tilt', quickTilt() + 'deg');
-    bubble.style.setProperty('--quick-throw', throws[index] + 'px');
-  });
-}
-
-/**
- * How crooked one module arrives, in degrees, and which way. It is written here rather than in the
- * stylesheet for the same reason the order is: a tilt that is the same every time is a tilt that
- * gets learnt, and six modules that lean by the amounts they leaned last time read as one drawing
- * rather than as six things landing. The floor matters as much as the ceiling — under about four
- * degrees the correction at the end of the pop is too small to be seen, and a rise with no visible
- * settle on it is the plain fade this replaced.
- */
-const QUICK_TILT_LEAST = 3;
-const QUICK_TILT_MOST = 6;
-function quickTilt() {
-  const size = QUICK_TILT_LEAST + Math.random() * (QUICK_TILT_MOST - QUICK_TILT_LEAST);
-  return Math.round((Math.random() < 0.5 ? -size : size) * 10) / 10;
+  quickBubbles.forEach((bubble, index) => bubble.style.setProperty('--pop-rank', ranks[index]));
 }
 
 /** The tidy-up at the end of a collapse, held so a panel asked for again mid-close can call it off. */
@@ -758,10 +734,11 @@ export function openStatusPanel() {
   root.style.setProperty('--status-fly', Math.round(was - statusPill.getBoundingClientRect().left) + 'px');
   // Read back, so the browser has actually computed the frame we are about to move away from.
   void statusPill.offsetWidth;
+  // `bubble-collapse` is filled `both`, so a panel asked for again inside the close's own quarter second finds every module still holding the last frame of it, shrunk to a fifth and invisible. The class comes off here rather than being left to the settle timer that this open has already cancelled.
+  quickPanel.classList.remove('leaving');
   // A fresh order for the modules, and it is chosen before the frame they start on rather than
   // during it: the delay is a custom property the animation reads once when it begins.
   shuffleQuickRanks();
-  quickPanel.classList.remove('leaving');
   requestAnimationFrame(() => {
     root.style.setProperty('--status-fly-ms', STATUS_PANEL.ms + 'ms');
     root.style.setProperty('--status-fly', '0px');
@@ -770,9 +747,10 @@ export function openStatusPanel() {
   });
   // Long enough to cover the last module landing as well as the charge growing: the modules are
   // bubbles in the same body of liquid, so the skin has to go on being mirrored until the slowest
-  // of them has stopped moving. Six ranks of stagger plus the pop itself, plus the arrivals inside.
-  // It covers the frost's own 600ms ramp several times over, which is why that is not a term here.
-  stirLiquid(STATUS_PANEL.ms + quickBubbles.length * QUICK_STAGGER + 260);
+  // of them has stopped moving. Fifteen ranks of stagger plus the growth itself, on top of the
+  // bubble's own. It covers the frost's own ramp several times over, which is why that is not a
+  // term here.
+  stirLiquid(STATUS_PANEL.ms + quickBubbles.length * QUICK_STAGGER + QUICK_POP);
 }
 
 export function closeStatusPanel() {
@@ -802,7 +780,7 @@ export function closeStatusPanel() {
   // The proxy comes off with the panel rather than after it: `panel-closing` is already on, so this
   // hands the room straight back and the collapse happens under a bubble that answers to nothing.
   fitStatusProxy();
-  // Mirrors `bubble-drop` in pill.css: the last module starts at its rank and takes 180ms to go.
+  // Mirrors `bubble-collapse` in pill.css: the last module starts at its rank and takes 180ms to go.
   const dropped = quickBubbles.length * QUICK_DROP_STAGGER + 180;
   // The frost is still the longest thing on the screen — it takes 450ms to reach nothing and
   // the mirror is what sends the host each step of that, so a stir that stopped with the modules
