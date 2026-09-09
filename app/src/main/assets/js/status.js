@@ -3,7 +3,7 @@ import { clockPill } from './clock.js';
 import { stirLiquid } from './liquid.js';
 import { rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
-import { applyClosedWindow, showFace, toClosed } from './row.js';
+import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 
 
@@ -45,6 +45,12 @@ function dockShows() {
   return Boolean(shared.media) || Boolean(transfer);
 }
 
+const CLOSED_FACE = { media: 'media', timer: 'timer', call: 'call' };
+function closedFace() {
+  const owner = liveMods()[0];
+  return owner ? CLOSED_FACE[owner] : 'idle';
+}
+
 function fitPillDock() {
   const hasMedia = Boolean(shared.media);
   const hasTransfer = Boolean(transfer);
@@ -68,13 +74,12 @@ function paintDock() {
   pill.classList.toggle('dock-transfer', showing && Boolean(transfer));
   dockTransfer.classList.toggle('showing', showing && Boolean(transfer));
   if (!showing) {
-    showFace('idle');
+    showFace(closedFace());
     applyClosedWindow();
     return;
   }
   fitPillDock();
-  if (shared.media) showFace('player');
-  else showFace('idle');
+  showFace(shared.media ? 'player' : closedFace());
   if (transfer) {
     dockTransferGlyph.innerHTML = transfer.isDone ? GLYPHS.transferDone : GLYPHS[transfer.mod];
     const share = transfer.isDone || !transfer.total ? 100 : Math.round((transfer.done / transfer.total) * 100);
@@ -811,7 +816,7 @@ export function closeStatusPanel() {
   clockPill.classList.remove('corner-grow');
   pill.classList.remove('panel-dock', 'dock-transfer');
   dockTransfer.classList.remove('showing');
-  showFace('idle');
+  showFace(closedFace());
   applyClosedWindow();
 
   fitStatusProxy();
