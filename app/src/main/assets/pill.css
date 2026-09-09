@@ -2224,9 +2224,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #battery-reading {
   z-index: 3;
   position: relative;
+  font-family: "Clash", sans-serif;
   font-size: 1.875rem;
   line-height: 1;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2321,9 +2322,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   width: 100%;
   min-width: 0;
   text-align: center;
-  font-family: "Mono", monospace;
+  font-family: "ClashMedium", sans-serif;
+  font-weight: 500;
   font-size: 0.66rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   line-height: 1;
   color: var(--text-faint);
   white-space: nowrap;
@@ -2364,17 +2366,25 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 #quick-row-links .quick-mode {
   position: relative;
-  overflow: hidden;
-  justify-content: space-between;
-  padding: 0.42rem 0.5rem;
+  overflow: visible;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "name   bubble"
+    ".      label";
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.3rem;
+  padding: 0;
   gap: 0;
   border: none;
-  aspect-ratio: 1;
-  height: 80%;
+  background: none;
+  aspect-ratio: auto;
+  height: auto;
   align-self: center;
-  justify-self: center;
+  justify-self: stretch;
 }
-
 
 
 
@@ -2383,7 +2393,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 #quick-row-links .quick-mode.on {
   box-shadow: none;
-  background: var(--pill-background);
+  background: none;
 }
 
 
@@ -2392,10 +2402,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .quick-name {
   width: 100%;
   text-align: center;
-  font-family: "Clash", sans-serif;
-  font-weight: 600;
+  font-family: "Mono", monospace;
+  font-weight: 500;
   font-size: 0.62rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   line-height: 1;
   color: var(--text-body);
   white-space: nowrap;
@@ -2403,31 +2413,39 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 .quick-mode.on .quick-name { color: var(--section-color); }
 
-
+#quick-row-links .quick-name {
+  grid-area: name;
+  width: auto;
+  text-align: right;
+}
 
 #quick-row-links .quick-icon {
-  position: absolute;
-  inset: 0;
+  grid-area: bubble;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
   pointer-events: none;
-  opacity: 0.16;
-  transition: opacity 200ms ease;
+  opacity: 1;
+  mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
+  transition: color 200ms ease;
 }
 #quick-row-links .quick-mode svg {
-  width: auto;
-  height: 108%;
-  
-
-
+  width: 100%;
+  height: 100%;
 }
 
-
-
-
-
-
+#quick-row-links .quick-label {
+  grid-area: label;
+  justify-self: center;
+}
 
 #quick-row-links .quick-mode.on .quick-icon {
-  opacity: 0.42;
+  color: var(--section-color);
 }
 
 
@@ -2646,6 +2664,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   height: var(--quick-links-tall);
   flex: 1;
   min-width: 0;
+  margin-top: -0.5rem;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
