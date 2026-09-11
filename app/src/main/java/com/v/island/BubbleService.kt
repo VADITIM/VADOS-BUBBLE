@@ -62,9 +62,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private const val BLEED = 14
 
         
-        private const val PULL_GRAB = 24
-
-        
         private const val SHADE_STRIP = 48
 
         
@@ -503,7 +500,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         proxyParams = WindowManager.LayoutParams(
             dp(compactWidth() + (GRAB + BLEED) * 2),
-            dp(compactHeight() + topGrab() + GRAB + BLEED + PULL_GRAB),
+            dp(compactHeight() + topGrab() + GRAB),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             BASE_FLAGS,
             PixelFormat.TRANSLUCENT
@@ -651,6 +648,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         )
         applyVisibility()
         ShizukuShell.bind(this)
+        SystemToggles.attach(this)
         instance = this
 
         MediaControl.start(this) { media -> deliverMedia(media) }
@@ -844,7 +842,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         params.x = dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET))
         proxyParams.width = dp(compactWidth() + (GRAB + BLEED) * 2)
-        proxyParams.height = dp(compactHeight() + topGrab() + GRAB + BLEED + PULL_GRAB)
+        proxyParams.height = dp(compactHeight() + topGrab() + GRAB)
         proxyParams.x = params.x
         proxyParams.y = 0
         blurRadius = Preferences.get(preferences, Preferences.BLUR)
@@ -1236,9 +1234,38 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             .vibrate(VibrationEffect.createPredefined(effect))
     }
 
+    /* TrafficStats counts from boot, not from midnight, so the day's figure is the total minus a stamp taken at the first read of each day; a total below the stamp is the counters having restarted with the phone and re-stamps rather than reporting a negative day. */
+    private fun dataUsedToday(): String {
+        val total = android.net.TrafficStats.getTotalRxBytes() + android.net.TrafficStats.getTotalTxBytes()
+        val store = Preferences.of(this)
+        val day = java.time.LocalDate.now().toEpochDay()
+        var base = store.getLong(Preferences.DATA_BASE, total)
+        if (day != store.getLong(Preferences.DATA_DAY, -1L) || total < base) {
+            base = total
+            store.edit().putLong(Preferences.DATA_DAY, day).putLong(Preferences.DATA_BASE, base).apply()
+        }
+        val used = total - base
+        val megabytes = used / 1024.0 / 1024.0
+        return if (megabytes >= 1024) String.format("%.1f GB", megabytes / 1024)
+        else String.format("%.0f MB", megabytes)
+    }
+
     private fun vibrate(effect: VibrationEffect) {
         getSystemService(VibratorManager::class.java).defaultVibrator.vibrate(effect)
     }
+
+    private val togglesWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+    private val togglesQueued = java.util.concurrent.atomic.AtomicInteger(0)
+    private val levelTargets = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    // `svc wifi enable` and its siblings hand the ask to a system service and return before it has landed, so the read taken straight afterwards still says what the switch was a moment ago — which is the switch turning on, falling back off under the read, and coming on again at the next one. What was asked for is held over the read until the phone agrees with it.
+    private val toggleIntents = java.util.concurrent.ConcurrentHashMap<String, Pair<Boolean, Long>>()
+
+    // How long a switch may stand for what was asked before the phone's own answer wins instead. Past it, a command the shell refused is a switch that goes back rather than one that lies.
+    private val TOGGLE_SETTLE_MILLIS = 2_500L
+
+    // How soon after a switch the phone is asked again, for as long as one is still standing for an ask nothing has confirmed.
+    private val TOGGLE_RECHECK_MILLIS = 400L
 
     inner class Bridge {
         @JavascriptInterface
@@ -1280,10 +1307,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 isGrown = heightDp >= 0
                 proxyParams.width =
                     dp((if (widthDp < 0) compactWidth() else widthDp) + (GRAB + BLEED) * 2)
+                // The proxy ended a grace margin below the bubble's own bottom edge, and every point in that margin routes to the bubble, so a tap aimed at the app underneath opened the bubble and a tap under a closing one reopened it. The margin is sideways and upward now: a grown state ends at its own bottom edge, the compact bubble GRAB past its.
                 proxyParams.height =
                     dp(
-                        (if (isGrown) heightDp else compactHeight()) + topGrab() + GRAB + BLEED +
-                            (if (isGrown) 0 else PULL_GRAB)
+                        if (isGrown) heightDp + topGrab()
+                        else compactHeight() + topGrab() + GRAB
                     )
                 
                 
@@ -1468,6 +1496,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 .onFailure { android.util.Log.w("IslandBubble", "no clock app", it) }
         }
 
+        @JavascriptInterface
+        fun openControlPanel() {
+            val intent = Intent(this@BubbleService, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { startActivity(intent) }
+                .onFailure { android.util.Log.w("IslandBubble", "no control panel", it) }
+        }
+
+        @JavascriptInterface
+        fun openPowerMenu() {
+            performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+        }
+
         
 
 
@@ -1534,6 +1575,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun readTorchLit(): Boolean = TorchWatch.isLit
 
+        @JavascriptInterface
+        fun readDataToday(): String = dataUsedToday()
+
         
 
 
@@ -1561,7 +1605,40 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         @JavascriptInterface
         fun requestToggles() {
-            Thread { push("window.onTogglesChanged(${SystemToggles.read()})") }.start()
+            queueToggleWork { }
+        }
+
+        // Every setToggle and setLevel used to start its own thread, so a fast run of taps or a single drag put a dozen concurrent binder calls into the Shizuku shell and whichever landed last, rather than whichever was asked last, decided the state; one worker now runs them in the order they were asked.
+        private fun queueToggleWork(work: () -> Unit) {
+            togglesQueued.incrementAndGet()
+            togglesWorker.execute {
+                work()
+                // Reading the whole of system settings costs a dozen shell commands and would answer with a half-applied state anyway, so only the last piece of queued work reports back.
+                if (togglesQueued.decrementAndGet() == 0) reportToggles()
+            }
+        }
+
+        private fun reportToggles() {
+            val state = SystemToggles.read()
+            var isWaiting = false
+            val now = android.os.SystemClock.uptimeMillis()
+            for ((name, intent) in toggleIntents) {
+                val (wanted, deadline) = intent
+                // A switch the read cannot see at all — the hotspot and the recorder are asked for by tapping a system tile — has nothing that could ever confirm it, and a name written in here would make the page believe the panel reports it.
+                if (!state.has(name) || state.optBoolean(name) == wanted || now > deadline) {
+                    toggleIntents.remove(name)
+                    continue
+                }
+                state.put(name, wanted)
+                isWaiting = true
+            }
+            push("window.onTogglesChanged($state)")
+            // Nothing else asks again, so a switch still standing for an unconfirmed ask has to bring the next read with it — otherwise it holds that ask until someone reopens the panel.
+            if (isWaiting) {
+                togglesWorker.schedule(
+                    { reportToggles() }, TOGGLE_RECHECK_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS
+                )
+            }
         }
 
         
@@ -1571,16 +1648,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         @JavascriptInterface
         fun setToggle(name: String, isOn: Boolean) {
-            Thread {
-                SystemToggles.set(name, isOn)
-                push("window.onTogglesChanged(${SystemToggles.read()})")
-            }.start()
+            toggleIntents[name] = isOn to
+                (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
+            queueToggleWork { SystemToggles.set(name, isOn) }
         }
 
-        
+        // A drag asks far faster than a shell command can answer, so each frame only leaves its value behind: the first queued run takes the newest one and the runs behind it find nothing left and cost nothing.
         @JavascriptInterface
         fun setLevel(name: String, percent: Int) {
-            Thread { SystemToggles.setLevel(name, percent) }.start()
+            levelTargets[name] = percent
+            togglesWorker.execute {
+                val target = levelTargets.remove(name) ?: return@execute
+                SystemToggles.setLevel(name, target)
+            }
         }
 
         

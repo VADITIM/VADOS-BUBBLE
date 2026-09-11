@@ -109,12 +109,6 @@
     <div id="history-list"></div>
   </div>
 
-  <div id="dock-transfer">
-    <span id="dock-transfer-glyph"></span>
-    <span id="dock-transfer-reading"></span>
-  </div>
-
-
 
 
 
@@ -170,77 +164,68 @@
 
 <div id="status">
   <div class="status-face showing" id="status-closed"></div>
-  
-
-
   <div class="status-face" id="status-charge"></div>
+  <div class="status-face" id="status-actions">
+    <button class="status-action" id="status-settings"></button>
+    <button class="status-action" id="status-power"></button>
+  </div>
 </div>
 
 
 
 
-
-
-
-
-
-
-
-
 <div id="quick-panel">
-  
-
-
-
   <div id="quick-scrim"></div>
-  
 
+  <div id="stats-section">
+  <div id="quick-weather">
+    <span id="weather-reading"></span>
+    <span id="weather-glyph"></span>
+  </div>
 
-
-
-
-
-  <div id="quick-row-top">
-    <div id="quick-row-links">
-      <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-name">Hotspot</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-name">Flight</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-bubble quick-mode" data-toggle="gps"><span class="quick-name">Location</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-bubble quick-mode" data-toggle="mobile"><span class="quick-name">Mobile</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-bubble quick-mode" data-toggle="wifi"><span class="quick-name">Wi-Fi</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-      <button class="quick-bubble quick-mode" data-toggle="bluetooth"><span class="quick-name">Bluetooth</span><span class="quick-icon"></span><span class="quick-label"></span></button>
-    </div>
-    <div class="quick-bubble" id="quick-battery">
-      <span id="battery-pin"></span>
-      <div id="battery-cell">
-      <div id="battery-fill"></div>
-      <span id="battery-glyph"></span>
-      <span id="battery-reading"></span>
+  <div id="quick-row-vitals">
+    <div class="quick-bubble" id="quick-vitals">
+      <div id="vitals-list">
+        <div class="vital" data-vital="storage"><span class="vital-dot"></span><span class="vital-name">Storage</span><span class="vital-reading"></span></div>
+        <div class="vital" data-vital="ram"><span class="vital-dot"></span><span class="vital-name">Ram</span><span class="vital-reading"></span></div>
+        <div class="vital" data-vital="cpu"><span class="vital-dot"></span><span class="vital-name">CPU</span><span class="vital-reading"></span></div>
       </div>
+      <span id="vitals-uptime"></span>
+    </div>
+
+    <div class="quick-bubble" id="quick-battery">
+      <div id="battery-cell">
+        <div id="battery-fill"></div>
+        <span id="battery-glyph"></span>
+        <span id="battery-reading"></span>
+        <span id="battery-remaining"></span>
+      </div>
+      <span id="battery-pin"></span>
     </div>
   </div>
 
-  
-
-
-
-
-  <div id="quick-row-body">
-    <div id="quick-row-knobs">
-      <button class="quick-bubble quick-knob" data-toggle="modus"><span class="quick-icon"></span></button>
-      <button class="quick-bubble quick-knob" data-toggle="dim"><span class="quick-icon"></span></button>
-      <button class="quick-bubble quick-knob" data-toggle="rotate"><span class="quick-icon"></span></button>
-      <button class="quick-bubble quick-knob" data-toggle="saver"><span class="quick-icon"></span></button>
-      <button class="quick-bubble quick-knob" data-toggle="recording"><span class="quick-icon"></span></button>
-      <button class="quick-bubble quick-knob" data-toggle="mic"><span class="quick-icon"></span></button>
+  <div id="quick-transfer">
+    <div id="transfer-head">
+      <span id="transfer-glyph"></span>
+      <span id="transfer-reading"></span>
     </div>
+    <div id="transfer-track"><div id="transfer-fill"></div></div>
+  </div>
 
-    
+  </div>
 
+  <div class="quick-divider"></div>
 
-
-
-
-
+  <div id="system-section">
+  <div id="quick-row-body">
+    <div id="quick-grid">
+      <button class="quick-bubble quick-mode" data-toggle="hotspot"><span class="quick-icon"></span><svg class="quick-ring" viewBox="-39 -39 78 78"><circle class="ring-arc" r="33"/><g class="ring-text"></g></svg></button>
+      <button class="quick-bubble quick-mode" data-toggle="plane"><span class="quick-icon"></span><svg class="quick-ring" viewBox="-39 -39 78 78"><circle class="ring-arc" r="33"/><g class="ring-text"></g></svg></button>
+      <button class="quick-bubble quick-mode" data-toggle="mobile"><span class="quick-icon"></span><svg class="quick-ring" viewBox="-39 -39 78 78"><circle class="ring-arc" r="33"/><g class="ring-text"></g></svg></button>
+      <button class="quick-bubble quick-mode" data-toggle="gps"><span class="quick-icon"></span><svg class="quick-ring" viewBox="-39 -39 78 78"><circle class="ring-arc" r="33"/><g class="ring-text"></g></svg></button>
+      <button class="quick-bubble quick-mode" data-toggle="wifi"><span class="quick-icon"></span><svg class="quick-ring" viewBox="-39 -39 78 78"><circle class="ring-arc" r="33"/><g class="ring-text"></g></svg></button>
+      <button class="quick-bubble quick-mode" data-toggle="bluetooth"><span class="quick-icon"></span><svg class="quick-ring" viewBox="-39 -39 78 78"><circle class="ring-arc" r="33"/><g class="ring-text"></g></svg></button>
+    </div>
 
     <div id="quick-row-levels">
       <div class="quick-bubble level" data-level="brightness">
@@ -254,21 +239,26 @@
     </div>
   </div>
 
-  
+  </div>
 
+  <div class="quick-divider"></div>
 
+  <div id="toggle-section">
+  <div id="quick-knob-window">
+    <div id="quick-row-knobs">
+      <button class="quick-bubble quick-knob" data-toggle="augenkomfort"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="modus"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="dim"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="recording"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="camera" data-open="com.sec.android.app.camera"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="rotate"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="mic"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="saver"><span class="quick-icon"></span></button>
+      <button class="quick-bubble quick-knob" data-toggle="comdirect" data-open="de.comdirect.app"><span class="quick-icon"></span></button>
+    </div>
+  </div>
 
-
-
-
-
-
-
-
-
-
-
-  <button class="quick-bubble quick-mode" id="quick-media-usb" data-toggle="usb"><span class="quick-icon"></span><span class="quick-label"></span></button>
+  </div>
 </div>
 
 

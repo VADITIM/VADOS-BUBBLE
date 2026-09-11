@@ -164,18 +164,11 @@ playerSpeed.addEventListener('click', event => {
   bridge.triggerHaptic('tap');
 });
 
-let shownAccent = '';
-
 export function paintMedia() {
   if (!shared.media || shared.isScrubbing) return;
-  
-  
-  
-  const accent = shared.media.accent || 'var(--section-color)';
-  if (accent !== shownAccent) {
-    shownAccent = accent;
-    document.documentElement.style.setProperty('--app-accent', accent);
-  }
+  document.documentElement.style.setProperty(
+    '--app-accent', shared.media.accent || 'var(--section-color)'
+  );
   pill.classList.toggle('sounding', Boolean(shared.media.isPlaying));
 
   paintArt(shared.media.artBase64 || '');
@@ -448,4 +441,16 @@ export function typeInto(element, next) {
     state.timer = setTimeout(step, TYPE_MILLIS);
   };
   step();
+}
+
+// The arriving Now bubble types its labels in, so they have to be genuinely empty at the moment it is born. Asking typeInto for '' instead untyped them over the flight, and typeInto reads a half-untyped label as a prefix of the real one and types it forward again — the labels never cleared and the arrival raced its own leftovers.
+export function blankLockLabels() {
+  for (const id of ['lock-title', 'lock-artist']) {
+    const element = document.getElementById(id);
+    const running = typing.get(element);
+    if (running) clearTimeout(running.timer);
+    typing.delete(element);
+    element.classList.remove('typing');
+    element.textContent = '';
+  }
 }

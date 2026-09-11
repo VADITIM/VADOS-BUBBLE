@@ -1,5 +1,8 @@
 package com.v.island
 
+import android.content.Context
+import android.media.AudioManager
+import android.provider.Settings
 import org.json.JSONObject
 
 
@@ -36,6 +39,7 @@ object SystemToggles {
             "settings get secure location_mode;" +
             
             
+            "settings get system blue_light_filter;" +
             "cmd media_session volume --stream 3 --get 2>&1 | grep -m1 'volume is'"
 
     
@@ -90,7 +94,8 @@ object SystemToggles {
         if (brightness >= 0 && brightnessMax > 0) {
             answer.put("brightness", brightness * 100 / brightnessMax)
         }
-        volumeOf(line(11)).takeIf { it >= 0 }?.let { answer.put("volume", it) }
+        answer.put("augenkomfort", line(11) == "1")
+        volumeOf(line(12)).takeIf { it >= 0 }?.let { answer.put("volume", it) }
         
         
         
@@ -106,17 +111,52 @@ object SystemToggles {
 
     fun setLevel(name: String, percent: Int): Boolean {
         val share = percent.coerceIn(0, 100)
-        val command = when (name) {
-            
-            
-            "brightness" -> if (brightnessMax <= 0) return false else
-                "settings put system screen_brightness_mode 0;" +
-                    "settings put system screen_brightness " +
-                    (share * brightnessMax / 100).coerceAtLeast(1)
-            "volume" -> "cmd media_session volume --stream 3 --set " + volumeIndex(share)
-            else -> return false
+        // A level used to be written with `settings put` and `cmd media_session`, and each of those forks a shell and then a whole app_process to run one Java command — a fifth of a second per frame, which is why a drag arrived as a series of late jumps however tightly the calls were queued. Both are one in-process call away, so the shell is now only the fallback for a phone that has not handed over WRITE_SETTINGS.
+        val context = host ?: return false
+        return when (name) {
+            "brightness" -> {
+                if (brightnessMax <= 0) return false
+                val level = (share * brightnessMax / 100).coerceAtLeast(1)
+                if (!Settings.System.canWrite(context)) {
+                    ShizukuShell.run(
+                        "settings put system screen_brightness_mode 0;" +
+                            "settings put system screen_brightness $level"
+                    ) != null
+                } else runCatching {
+                    if (Settings.System.getInt(
+                            context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, 0
+                        ) != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+                    ) {
+                        Settings.System.putInt(
+                            context.contentResolver,
+                            Settings.System.SCREEN_BRIGHTNESS_MODE,
+                            Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+                        )
+                    }
+                    Settings.System.putInt(
+                        context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, level
+                    )
+                }.isSuccess
+            }
+            "volume" -> runCatching {
+                val audio = context.getSystemService(AudioManager::class.java)
+                volumeTop = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, volumeIndex(share), 0)
+            }.isSuccess
+            else -> false
         }
-        return ShizukuShell.run(command) != null
+    }
+
+    private var host: Context? = null
+
+    // WRITE_SETTINGS is an app op rather than a permission a grant dialog can hand over, so Shizuku sets it once instead of sending the user to the Settings app for it — and it has to wait for the shell to actually connect, which is a callback and not the return of bind().
+    fun attach(context: Context) {
+        host = context.applicationContext
+        ShizukuShell.onReady {
+            val app = host ?: return@onReady
+            if (Settings.System.canWrite(app)) return@onReady
+            ShizukuShell.run("appops set ${app.packageName} WRITE_SETTINGS allow")
+        }
     }
 
     
@@ -141,6 +181,7 @@ object SystemToggles {
             "dim" -> "settings put secure reduce_bright_colors_activated $one"
             "rotate" -> "settings put system accelerometer_rotation $one"
             "saver" -> "settings put global low_power $one"
+            "augenkomfort" -> "settings put system blue_light_filter $one"
             
             
             

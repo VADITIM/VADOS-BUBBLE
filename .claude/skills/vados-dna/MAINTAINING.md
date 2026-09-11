@@ -10,11 +10,44 @@ something.
 | A platform fought you, and the workaround generalises | `platforms/<platform>.md` — as a *rule*, not a bug report |
 | A new project exists, or an existing one changed direction | `map/00-projects.md`, plus a detail file if it is a pillar |
 | A visual or motion decision that should hold everywhere | the matching `dna/` module |
+| A piece worth using again — a control, an effect, a transition, a loading state | `components/` — a new numbered entry, or a section in the one it belongs to |
+| A decision that holds in **both registers** | the `dna/` module — never both trees |
+| A decision that is only true of the **professional register** | the matching `pro/` module |
 | A one-off fix specific to one repo | **that repo's own docs**, not here |
+
+The PRO test, before writing anything into `pro/`: *is this a different rule, or the same rule in a
+different register?* A different rule that holds everywhere belongs in `dna/`, where both registers
+get it. Only a genuine register difference — a value, a ceiling, a demoted pattern — belongs in
+`pro/`. A base rule restated in `pro/` without being narrowed or contradicted is duplication, and
+duplication is what the delta-overlay shape exists to prevent.
+
+`pro/` files open by naming the base module they override, and `pro/00-index.md` accounts for every
+base module as overridden or inherited. Adding a `pro/` module means adding its row there in the same
+edit, or the next session cannot tell inherited from forgotten. The PRO-only accessibility module is
+numbered `11` so the two trees can never collide on a number.
 
 The test for promotion into `dna/`: *would this still be true on a different platform, in a different
 language, for a different kind of app?* If not, it is a platform note. If it is only true for one
 project, it belongs in that project's `.claude/`.
+
+## How to add a component
+
+A component earns an entry the second time it is wanted, not the first time it is written. New file
+in `components/`, numbered, named for the *thing* rather than for the project it came from.
+Sections, in order:
+
+1. **What it is**, in one paragraph, and which project it came from.
+2. **The layers line** — which of layout / styling / motion / behaviour are worth taking alone.
+3. **The code**, in liftable blocks. Real code from a working repo, not a paraphrase; a snippet that
+   has never run is a liability in a file people copy from.
+4. **The numbers that make it work**, each with the reason it is that number. A constant with no
+   stated reason will be "tidied" by the next session.
+5. **The traps**, written as the *symptom* someone will arrive with — "reads as stuttering when it
+   is actually running perfectly" beats "path length mismatch".
+6. **Anti-patterns**, one line each, pointing back at the section that explains them.
+
+Then add a row to `components/00-catalogue.md`. If the component came out of a project, say so in
+that project's `map/` file too, so the map and the catalogue point at each other.
 
 ## How to add a platform
 
@@ -49,13 +82,13 @@ Keep the numbering stable. `dna/` modules are referenced by number from project 
 
 ## Repository
 
-This skill lives in `https://github.com/VADITIM/claude-config` (branch `global`) alongside the rest
+This skill lives in `https://github.com/VADITIM/agent-config` (branch `global`) alongside the rest
 of the global configuration. Changes are committed and pushed there, not left local.
 
 It was called `VADITIM/.claude` until the leading dot turned out to make it unattachable on Claude
 Code on the web — the clone path collides with `~/.claude` itself — so a session could not fetch the
-DNA at all and worked without it while believing it was bound. Anything still pointing at that name
-is stale.
+DNA at all and worked without it while believing it was bound. It was then `claude-config` for a
+while, and is `agent-config` now. Anything pointing at either older name is stale.
 
 Where a project vendors a copy of this skill into its own `.claude/skills/`, that copy is downstream:
 edit here, then re-vendor. A fix made only in the vendored copy is a fix that exists in one repo and

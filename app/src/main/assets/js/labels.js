@@ -33,7 +33,6 @@ const LABELS = [
   '#lock-title', '#lock-artist',
   '.lock-note-who', '.lock-note-said',
   '#timer-remaining', '#timer-label',
-  '.quick-label',
 ].join(', ');
 
 

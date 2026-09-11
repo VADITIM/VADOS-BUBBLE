@@ -122,20 +122,28 @@ export function isClockLit() {
 
 
 
+// The clock's touchable window was the clock's own box to the pixel, so a tap on the Now bubble standing there landed beside it as often as on it. Mirrored by `clockHolds`, which decides the same thing on the page's side.
+const CLOCK_GRACE = 10;
+
 export function fitClockProxy() {
   const box = clockPill.getBoundingClientRect();
   if (!isBorn || !isClockLit() || !box.width) {
     bridge.setClockProxy(0, 0, 0);
     return;
   }
-  bridge.setClockProxy(Math.round(box.width), Math.round(box.bottom), Math.round(box.left));
+  bridge.setClockProxy(
+    Math.round(box.width + CLOCK_GRACE * 2),
+    Math.round(box.bottom),
+    Math.round(box.left - CLOCK_GRACE)
+  );
 }
 
 
 export function clockHolds(x, y) {
   if (!isClockLit()) return false;
   const box = clockPill.getBoundingClientRect();
-  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+  return x >= box.left - CLOCK_GRACE && x <= box.right + CLOCK_GRACE &&
+    y >= box.top && y <= box.bottom;
 }
 
 let clockHeld = false;

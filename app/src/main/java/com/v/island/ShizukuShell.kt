@@ -17,6 +17,9 @@ object ShizukuShell {
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             service = IShellService.Stub.asInterface(binder)
+            val waiting = ArrayList(waiters)
+            waiters.clear()
+            waiting.forEach { Thread(it).start() }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -24,7 +27,13 @@ object ShizukuShell {
         }
     }
 
-    
+    private val waiters = mutableListOf<() -> Unit>()
+
+    fun onReady(work: () -> Unit) {
+        if (service != null) Thread(work).start() else waiters.add(work)
+    }
+
+
     val isReady: Boolean get() = service != null
 
     fun isRunning(): Boolean = runCatching { Shizuku.pingBinder() }.getOrDefault(false)

@@ -45,6 +45,17 @@ applied until something else is tapped. Every hover effect becomes a stuck state
 - **Deliberate exceptions** are allowed and should be listed explicitly in the project's rules, so
   they read as decisions rather than oversights. Here: the panel border glow, and one title's
   character interaction.
+- **A hover-only affordance that is the only way to reach some content needs a real touch path, not a
+  bigger tap target.** Give the trigger `tabindex="0"` and open on `:focus`, with the hover rule
+  guarded by `hoverable` — a tap focuses it, a tap anywhere else blurs it closed, and it becomes
+  keyboard-reachable for free. It must be `:focus` and not `:focus-visible`: a tap does not produce
+  `:focus-visible`. The module's info card is the reference case (`components/11-module.md §5`).
+- **A magnetic / pointer-following field is a hover effect and gets the same gate.** A touch screen
+  synthesises one `mousemove` on tap and never the matching leave, so the field engages at the
+  finger's position and stays there — the failure is louder than a stuck tint because the element
+  has physically moved (`components/10-magnetic.md §1`). Every pointer-position listener also needs a
+  `blur` handler: `mouseup` and `mouseleave` both fail to fire when the interaction ends outside the
+  window.
 
 ## Touch equivalents are different interactions, not bigger hit areas
 
@@ -79,6 +90,53 @@ scrolls the document back to 0 whenever the bar returns.
 
 Scrollable regions set `overscroll-behavior: contain` so a scroll never chains out into that runway.
 
+## Step sliders are dots, and the dot is liquid
+
+A control with a handful of discrete settings — brightness, intensity, a 1-to-5 anything — is never
+a continuous track with a knob on it, and never a row of buttons. It is a rail of squircle slots
+with one round dot travelling along it, and the dot **merges into the slot it reaches** rather than
+lighting it up: the two run together like water, hold as one shape, and pull apart as the finger
+moves on. The value is legible from across the room as *where the liquid is*, and dragging feels
+like pushing a drop along a channel rather than scrubbing a number.
+
+Two layers, one filter:
+
+- **Rail** — every slot at full size, low opacity. The shape of what is possible.
+- **Flow** — the dot, plus the same slots scaled by how near the dot is (`1 - |dot - index|`,
+  floored at zero). This layer alone carries the goo filter.
+
+```html
+<filter id="goo" x="-30%" y="-30%" width="160%" height="160%">
+  <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blurred"/>
+  <feColorMatrix in="blurred" type="matrix"
+    values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10"/>
+</filter>
+```
+
+That is the whole metaball: one blur, then one alpha contrast steep enough to snap the blurred edges
+back to hard ones. Shapes bridge at roughly **twice the deviation**, so the deviation and the gap
+between slots are one decision and not two — five bridges at ten pixels, so the slots stand further
+apart than that, or the rail fuses into a single bar and never separates again.
+
+Rules that come with it:
+
+- **Everything inside the flowing layer is solid.** A half-transparent shape falls below the
+  contrast's threshold and is erased rather than merged. The transparency is worn by the layer,
+  never by what is in it.
+- **Size is the only variable.** A slot the dot has reached is full size, one a whole step away is
+  nothing at all, and in between both are part-grown and the blur bridges them. Never fade a slot in
+  and out — a fading shape dissolves under the contrast instead of flowing.
+- **The dot follows the finger continuously and settles on release**, snapping to the nearest step.
+  It is a slider, so it is dragged; stepping it by tapping is a different control.
+- **The value is committed once, on release.** Sent every frame it makes hardware stutter — a light
+  re-strikes, an audio scrub judders — and nobody can read a number changing sixty times a second.
+- **Haptic on the settle, not on every step crossed.** One piece of feedback for one decision.
+- The same material is used for every other merge in the interface: if two shapes on one surface are
+  made of the same stuff and approach each other, they run together, with the same deviation and the
+  same contrast. The product then reads as one body of water rather than as one clever widget.
+  Merging happens within a single goo layer on a single surface — nothing bridges across two windows
+  or two canvases.
+
 ## Feedback
 
 - Every pressable thing owns its press feedback, because the OS tap highlight is removed globally.
@@ -89,6 +147,9 @@ Scrollable regions set `overscroll-behavior: contain` so a scroll never chains o
 
 ## Anti-patterns
 
-Scroll-driven interfaces. Hover as the only route to information. A tap that merely previews. Two
+Scroll-driven interfaces. Continuous tracks and knobs for a handful of discrete steps, and step
+controls built as rows of buttons. Committing a slider's value on every frame of the drag rather
+than on release. Half-transparent shapes inside a goo layer. Fading a step in and out instead of
+growing it. Hover as the only route to information. A tap that merely previews. Two
 handlers competing for one axis. Removing a platform affordance without replacing it. Key handlers
 that bypass the central state change. Width-based decisions about touch.

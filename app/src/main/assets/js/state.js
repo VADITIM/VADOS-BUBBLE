@@ -14,11 +14,12 @@ export const faces = {
 };
 export const bridge = window.Android || {
   ready() {}, setWindowSize() {}, setWindowBounds() {}, setBlurFrame() {}, triggerHaptic() {}, onSwipeDismiss() {},
-  mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, setTorchLit() {},
+  mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, readDataToday() { return '0 MB'; }, setTorchLit() {},
   setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
   openNotification() {}, dismissNotification() {}, timerAction() {},
   setTorch() {}, setLockProxy() {}, setStatusProxy() {}, setClockProxy() {},
-  openConnectionSettings() {}, openClock() {}, requestToggles() {}, setToggle() {}, setLevel() {},
+  openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
+  requestToggles() {}, setToggle() {}, setLevel() {},
   recordingAction() {}, setNotesProxy() {}, mediaSpeed() {},
   note() {}, wakeFrames() {},
 };

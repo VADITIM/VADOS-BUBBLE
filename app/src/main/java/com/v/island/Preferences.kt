@@ -143,6 +143,10 @@ object Preferences {
         BAR_LOCKED to 0
     )
 
+    /* Long-valued and deliberately outside `defaults`: that map is Int-only and asJson walks all of it, so a byte count listed there would be read back with getInt and throw. */
+    const val DATA_DAY = "dataDay"
+    const val DATA_BASE = "dataBaseBytes"
+
     fun of(context: Context): SharedPreferences =
         context.getSharedPreferences(STORE, Context.MODE_PRIVATE)
 

@@ -1,7 +1,12 @@
 # Style DNA — VADITIM
 
 Part of the `vados-dna` skill. A project uses this only when the user points at it — "use VADOS DNA".
-The project map lives in `../map/`, the per-engine pitfalls in `../platforms/`.
+The built pieces live in `../components/`, the project map in `../map/`, the per-engine pitfalls in
+`../platforms/`. These modules are the *rules*; `../components/00-catalogue.md` is the shelf of
+things already built to them — read it before writing a UI piece that sounds like it exists.
+
+This is the **base register**. A project that asks for **VADOS DNA PRO** reads these modules and then
+the overrides in `../pro/`, starting at `../pro/00-index.md`.
 
 The portable identity behind these apps, extracted from PORTFOLIO25 and written to be handed to
 another model or dropped into another project. It describes *how the work looks, moves, reads and is
@@ -35,7 +40,7 @@ and all at once.
 | 03 | [Surface](03-surface.md) | The panel primitive, radius policy, the masked border glow, diagonal slices, chrome removal |
 | 04 | [Layout and sizing](04-layout-and-sizing.md) | Two axes never a width, two apps one codebase, the fluid scale lever, ramp rules, reserved space |
 | 05 | [Motion](05-motion.md) | Intent, the three-phase law, timing tables, easing and asymmetry, choreography, the named patterns, degradation, the authoring checklist |
-| 06 | [Interaction](06-interaction.md) | Stateful navigation, pointer-vs-orientation decisions, hover on touch, touch equivalents, gesture ownership |
+| 06 | [Interaction](06-interaction.md) | Stateful navigation, pointer-vs-orientation decisions, hover on touch, touch equivalents, gesture ownership, liquid step sliders |
 | 07 | [Architecture](07-architecture.md) | The registry as source of truth, module layout, state ownership, docs discipline, verification |
 | 08 | [Voice](08-voice.md) | Register, product vocabulary, terminal tones, progressive disclosure, motion notices |
 | 09 | [Code style](09-code-style.md) | Naming, comment policy, region banners, anti-defaults, file organisation |

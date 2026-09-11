@@ -201,7 +201,8 @@ otherwise. A plain fade or slide on text is the *exception*, not the default.
 5. Bar opacity → `0` once collapsed.
 
 The text is never seen fading in. It is *wiped into existence* by a bar that was already there. Start
-delays come from the positional stagger (§5).
+delays come from the positional stagger (§5). Full entry, with the engine implementation, the three
+label modes and the traps: `components/08-text-reveal.md`.
 
 **Leave:** text re-clips to `inset(0 100% 0 0)` in `0.3s` `power2.in`, bar opacity to `0`. No stagger,
 no bar sweep — the reveal is a construction, the exit is a cut.
@@ -264,9 +265,27 @@ Characters appear one at a time behind a blinking caret bar. `0.06s`/char typing
 `0.03s`/char deleting — deletion always reads faster than typing. Caret blinks at `0.5s`, and by
 default keeps blinking after the line finishes. Optionally deletes **from the front** of the line,
 holding the text's right edge still, so the caret stays put and blinks rather than travelling
-backwards with the characters.
+backwards with the characters. Full entry: `components/09-typewriter.md`.
 
-### 6.6 Haptic punctuation
+### 6.6 The magnetic field
+
+Things near the pointer lean toward it. One target (a button travelling ≤40% of the way to the
+cursor, `power3.out` in and `elastic.out(1, 0.3)` home) or thousands (a canvas dot grid, springs on
+position and lerps on scale and brightness, three different radii so force and light have different
+reach). **Pointer-only, gated on the device axis** — a touch screen synthesises one `mousemove` and
+never the matching leave, so the field engages and stays engaged. Full entry:
+`components/10-magnetic.md`.
+
+### 6.7 The assembly
+
+An object that arrives by being *built* rather than by appearing: its parts fall in from off-screen in
+a shuffled order, `power4.out`, a fixed stagger plus a random jitter of most of one step, with the
+opacity snapping on in `0.1s` rather than fading over the travel. A shadow blooms while the parts
+rain, then squashes for `~0.09s` at the computed landing time and recovers over `0.4s` — the impact is
+on the ground, not on the object. **Enter-only.** The leave is the whole assembled thing sliding away
+in `0.22s`; the construction is never run backwards. Full entry: `components/12-cube-3d.md §6`.
+
+### 6.8 Haptic punctuation
 
 A `10ms` vibration on the completion of a screen transition, where the platform offers it. Motion
 that ends on a physical device should be felt ending.
@@ -277,7 +296,28 @@ that ends on a physical device should be felt ending.
 
 Platform-specific in expression, universal in substance.
 
-- **Transform and opacity only.** Layout properties are never animated.
+- **Transform and opacity only.** Layout properties are never animated. The one sanctioned exception
+  is a container tweening its own `height` because its *content's* natural height changed — and it
+  only holds with all three guards in `components/11-module.md §7` (detach the size observer for the
+  duration, re-baseline instead of tweening through a viewport resize, clear the inline height on
+  completion). Reaching for `scale` instead is worse, not safer: the layout box stays at its old size
+  and any other tween touching `scale` silently overwrites it.
+- **Two choreographies must never write the same transform property on one element.** An engine
+  composes `x/y/xPercent/yPercent/rotation/scale` into a single matrix, so two systems writing `y` do
+  not layer — the last write wins and the other silently stops working, with no error and nothing to
+  grep for. Give the second system a different property (`yPercent` against `y`), a wrapper element,
+  or an additive composite. The symptom is always "one of my two animations mysteriously does
+  nothing".
+- **Every stage of a multi-stage choreography returns the time it finishes**, and the next stage
+  starts from that number. Four stages chained by four authored delay constants is four numbers that
+  drift apart the first time any duration changes. Authored numbers are for deliberate *overlaps*,
+  applied to a computed time (`playLabelReveals(names, done - 0.35)`).
+- **Reduced motion removes movement that carries no content; it does not remove the content.** A
+  typed line, a drag, a value counting up — these are the information, and collapsing them leaves a
+  screen that says less. Carve those out explicitly and let everything ambient collapse. The exit
+  half of such an animation is never carved out: an exit that runs at full speed under a collapsed
+  time scale leaves text standing on a screen that is already gone
+  (`components/09-typewriter.md §4–5`).
 - **Persistent targets.** Screens are never unmounted — the animation engine needs stable objects to
   address. Never animate something that can be conditionally removed from the tree.
 - **`overwrite: 'auto'`** on anything whose enter and leave can race. In a menu you can navigate

@@ -77,7 +77,12 @@ function morphInto(face, before) {
   if (crossed) stirLiquid(MORPH_MS + 120);
 }
 
+// Every mod paints `--app-accent` once, when its payload arrives, so an alert borrowing the same property left the mod wearing the notification's colour once the alert was gone — and media caches its accent, so for media it never came back at all. The face that is showing owns the colour.
+const FACE_OWNERS = { media: 'media', player: 'media', timer: 'timer', timerPanel: 'timer', call: 'call' };
+
 export function showFace(name) {
+  const owner = FACE_OWNERS[name];
+  if (owner) root.style.setProperty('--app-accent', accentOf(owner));
   const arriving = faces[name];
   const leaving = Object.values(faces).find(element => element.classList.contains('showing'));
   const before = arriving && leaving && leaving !== arriving ? measureMorphs(leaving) : null;

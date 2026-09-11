@@ -1,10 +1,28 @@
 # Dynamic Bubble — the Android arm
 
-`C:\Users\vadim\source\Android Dynamic Island` · Kotlin + WebView + Shizuku · Galaxy S25
+`C:\Users\vadim\source\VADOS-BUBBLE` · Kotlin + WebView + Shizuku · Galaxy S25
 (SM-S931B, Android 16 / SDK 36, One UI 8.5) · sideload only, one device, no Play Store.
 
 An overlay pill at the punch-hole — a Dynamic Island for a Samsung phone — with the motion language
 borrowed from the other projects and retuned for the platform.
+
+## What it gave the component library
+
+Most of `components/` came out of this repo, and the entries carry the code rather than a
+description of it:
+
+| Component | What this project contributed |
+|---|---|
+| [Goo / liquid](../components/01-goo-liquid.md) | The whole effect: the filter pair, the **measured** deviation, the mirrored skin, the region rules, the opaque-inside-the-filter law |
+| [The bubble](../components/02-bubble.md) | Three properties three owners, the rubber band, one block radius, the added springback, hold-to-open |
+| [Panel and field](../components/03-panel-and-field.md) | The field card, the drag-only slider, the colour field |
+| [Screen transition](../components/04-screen-transition.md) | The port that proved the transition survives a WebView unchanged |
+| [Controls](../components/05-controls.md) | Link buttons, the rotary knob and its half-turn glyph swap, glyph pairs, the liquid switch |
+| [Level and waves](../components/06-level-and-waves.md) | The banded level and the two-crest wave |
+
+The rule this repo added to the DNA at large: **a skin that is mirrored off the real boxes cannot
+disagree with them**, and everything that changes a size owes that mirror the length of its own
+transition.
 
 ## What it proves
 

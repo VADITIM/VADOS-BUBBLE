@@ -7,8 +7,8 @@
 - Don't refactor adjacent code while fixing a bug.
 - No dead code, no commented-out blocks, no version guards for versions this phone cannot run.
 - WHY comments, never WHAT. If code needs a "what" comment, rename instead.
-- **One line per comment, length unbounded.** A comment carries the intent the code cannot: the decision, the trap, the "or else". It never narrates the line below it — a comment restating the code is deleted, not shortened. A 400-word single line holding real context is fine and preferred over splitting it across several lines. It is one logical comment, so it is one physical line. Applies to files being edited anyway, never as a scanning pass of its own.
-- The prose comments in this codebase are load-bearing: most of them record a platform trap that cost an afternoon. Do not trim them for brevity.
+- **One line per comment, length unbounded.** Comments become a rare exception and only written to a code block, never to a line. They serve the purpose of explaining what went wrong and why it was fixed, after fixes have been applied. DO NEVER write comments except error explainations. The code itself is the WHAT, and the commit message is the HOW.
+
 
 ## Naming
 

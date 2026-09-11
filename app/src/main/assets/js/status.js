@@ -3,6 +3,7 @@ import { clockPill } from './clock.js';
 import { stirLiquid } from './liquid.js';
 import { rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
+import { closePanelNow, openPanelNow } from './lock.js';
 import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 
@@ -26,19 +27,12 @@ const statusClosed = document.getElementById('status-closed');
 const statusFaces = {
   closed: statusClosed,
   charge: document.getElementById('status-charge'),
+  actions: document.getElementById('status-actions'),
 };
 
 
 const STATUS_RIGHT = 14;
 
-
-const EDGE_OVER = 20;
-
-
-const PILL_DOCK_TALL = 130;
-const PILL_DOCK_TRANSFER_TALL = 46;
-// Main-Status-Idle docks even with no mod live, not only media/transfer: the row is not exempt from the corner-reach every other bubble in this state owes the panel.
-const PILL_DOCK_IDLE_TALL = 64;
 
 
 const CLOSED_FACE = { media: 'media', timer: 'timer', call: 'call' };
@@ -47,39 +41,31 @@ function closedFace() {
   return owner ? CLOSED_FACE[owner] : 'idle';
 }
 
-function fitPillDock() {
-  const hasMedia = Boolean(shared.media);
-  const hasTransfer = Boolean(transfer);
-  const tall = hasMedia || hasTransfer
-    ? (hasMedia ? PILL_DOCK_TALL : 0) + (hasTransfer ? PILL_DOCK_TRANSFER_TALL : 0)
-    : PILL_DOCK_IDLE_TALL;
-  // Merges with the screen's own left/right edges by --edge-over, exactly as Clock's and Status' own corner-reach do, rather than centring a measured width.
-  const width = screenWidth() + EDGE_OVER * 2;
-  const bottom = screenHeight() - STATUS_MARGIN_FOOT;
-  const top = bottom - tall;
-  root.style.setProperty('--pill-dock-top', Math.round(top) + 'px');
-  root.style.setProperty('--pill-dock-height', Math.round(tall + EDGE_OVER) + 'px');
-  // #quick-panel's own bottom padding, so its column gives back exactly the room the dock is standing in rather than the two overlapping.
-  root.style.setProperty('--quick-dock-pad', Math.round(tall) + 'px');
-  bridge.setWindowBounds(Math.round(width), Math.round(bottom), 0, 0);
-}
+const TRANSFER_COLOUR = { download: '#f09b3a', upload: '#3a8cff' };
 
 export function refreshDock() {
-  if (statusOpen) paintDock();
+  if (statusOpen) paintTransferStrip();
 }
 
-function paintDock() {
-  const hasTransfer = Boolean(transfer);
-  pill.classList.add('panel-dock');
-  pill.classList.toggle('dock-transfer', hasTransfer);
-  dockTransfer.classList.toggle('showing', hasTransfer);
-  fitPillDock();
-  showFace(shared.media ? 'player' : closedFace());
-  if (transfer) {
-    dockTransferGlyph.innerHTML = transfer.isDone ? GLYPHS.transferDone : GLYPHS[transfer.mod];
-    const share = transfer.isDone || !transfer.total ? 100 : Math.round((transfer.done / transfer.total) * 100);
-    dockTransferReading.textContent = transfer.isDone ? 'Done' : share + '%';
+function paintTransferStrip() {
+  const isLive = Boolean(transfer);
+  transferStrip.classList.toggle('idle', !isLive);
+  if (!isLive) {
+    transferGlyph.innerHTML = GLYPHS.dataToday;
+    transferReading.textContent = bridge.readDataToday() + ' today';
+    return;
   }
+  transferGlyph.innerHTML = transfer.isDone ? GLYPHS.transferDone : GLYPHS[transfer.mod];
+  const share = transfer.isDone || !transfer.total ? 100 : Math.round((transfer.done / transfer.total) * 100);
+  transferReading.textContent = transfer.isDone ? 'Done' : share + '%';
+  transferStrip.style.setProperty('--transfer-share', share + '%');
+  transferStrip.style.setProperty('--transfer-color', TRANSFER_COLOUR[transfer.mod] || 'var(--section-color)');
+}
+
+// Main leaves the punch hole for the top edge while the panel is open: its own mod has gone down to the Now bubble, so what is left is a bare bubble curving into the screen's own top edge.
+function raiseMain() {
+  pill.classList.add('panel-top');
+  showFace(closedFace());
   stirLiquid(320);
 }
 
@@ -131,9 +117,12 @@ const screenHeight = () => document.documentElement.clientHeight;
 
 
 const QUICK_CLEARANCE = 22;
+// Mirrors --corner-inset and --corner-tall in pill.css. The panel used to start a clearance below the Status bubble's rect, which is measured while that bubble is still the small one on the bar — so the panel began where the closed bubble was and the grown one came down on top of the weather line.
+const CORNER_INSET = 10;
+const CORNER_TALL = 40;
 
 function fitStatusPanel() {
-  const top = statusPill.getBoundingClientRect().top + GROWN_PAD + QUICK_CLEARANCE;
+  const top = CORNER_INSET + CORNER_TALL + QUICK_CLEARANCE;
   STATUS_PANEL.width = Math.round(screenWidth() - STATUS_MARGIN * 2);
   STATUS_PANEL.height = Math.round(screenHeight() - top - STATUS_MARGIN_FOOT);
   
@@ -193,6 +182,7 @@ const GLYPHS = {
   download: '<svg viewBox="0 0 24 24"><path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4L11 12.2zM5 18h14v2H5z"/></svg>',
   upload: '<svg viewBox="0 0 24 24"><path d="M12 3l5.7 5.7-1.4 1.4L13 6.8V16h-2V6.8L7.7 10.1 6.3 8.7zM5 18h14v2H5z"/></svg>',
   transferDone: '<svg viewBox="0 0 24 24"><path d="M9.8 16.2 5.6 12l-1.4 1.4 5.6 5.6L20.4 7.9 19 6.5z"/></svg>',
+  dataToday: '<svg viewBox="0 0 24 24"><path d="M4 14h3v6H4zm6.5-5h3v11h-3zM17 4h3v16h-3z"/></svg>',
   hotspot: '<svg viewBox="0 0 24 24"><path d="M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM7.8 5.8 6.4 4.4a10 10 0 0 0 0 15.2l1.4-1.4a8 8 0 0 1 0-12.4zm9.8-1.4-1.4 1.4a8 8 0 0 1 0 12.4l1.4 1.4a10 10 0 0 0 0-15.2z"/></svg>',
   
   
@@ -223,7 +213,10 @@ const GLYPHS = {
   modus: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7.5 11h9v2h-9z"/></svg>',
   dim: '<svg viewBox="-7.5 0 32 32"><path fill="currentColor" d="M9.75 8.25v0.219c0 0.844-0.375 1.25-1.156 1.25s-1.125-0.406-1.125-1.25v-0.219c0-0.813 0.344-1.219 1.125-1.219s1.156 0.406 1.156 1.219zM12.063 9.25l0.156-0.188c0.469-0.688 1.031-0.781 1.625-0.344 0.625 0.438 0.719 1.031 0.25 1.719l-0.188 0.156c-0.469 0.688-1.031 0.781-1.625 0.313-0.625-0.438-0.688-0.969-0.219-1.656zM5 9.063l0.125 0.188c0.469 0.688 0.406 1.219-0.188 1.656-0.625 0.469-1.219 0.375-1.688-0.313l-0.125-0.156c-0.469-0.688-0.406-1.281 0.188-1.719 0.625-0.438 1.219-0.281 1.688 0.344zM8.594 11.125c2.656 0 4.844 2.188 4.844 4.875 0 2.656-2.188 4.813-4.844 4.813-2.688 0-4.844-2.156-4.844-4.813 0-2.688 2.156-4.875 4.844-4.875zM1.594 12.5l0.219 0.063c0.813 0.25 1.063 0.719 0.844 1.469-0.25 0.75-0.75 0.969-1.531 0.719l-0.219-0.063c-0.781-0.25-1.063-0.719-0.844-1.469 0.25-0.75 0.75-0.969 1.531-0.719zM15.375 12.563l0.219-0.063c0.813-0.25 1.313-0.031 1.531 0.719s-0.031 1.219-0.844 1.469l-0.188 0.063c-0.813 0.25-1.313 0.031-1.531-0.719-0.25-0.75 0.031-1.219 0.813-1.469zM8.594 18.688c1.469 0 2.688-1.219 2.688-2.688 0-1.5-1.219-2.719-2.688-2.719-1.5 0-2.719 1.219-2.719 2.719 0 1.469 1.219 2.688 2.719 2.688zM0.906 17.281l0.219-0.063c0.781-0.25 1.281-0.063 1.531 0.688 0.219 0.75-0.031 1.219-0.844 1.469l-0.219 0.063c-0.781 0.25-1.281 0.063-1.531-0.688-0.219-0.75 0.063-1.219 0.844-1.469zM16.094 17.219l0.188 0.063c0.813 0.25 1.063 0.719 0.844 1.469s-0.719 0.938-1.531 0.688l-0.219-0.063c-0.781-0.25-1.063-0.719-0.813-1.469 0.219-0.75 0.719-0.938 1.531-0.688zM3.125 21.563l0.125-0.188c0.469-0.688 1.063-0.75 1.688-0.313 0.594 0.438 0.656 0.969 0.188 1.656l-0.125 0.188c-0.469 0.688-1.063 0.75-1.688 0.313-0.594-0.438-0.656-0.969-0.188-1.656zM13.906 21.375l0.188 0.188c0.469 0.688 0.375 1.219-0.25 1.656-0.594 0.438-1.156 0.375-1.625-0.313l-0.156-0.188c-0.469-0.688-0.406-1.219 0.219-1.656 0.594-0.438 1.156-0.375 1.625 0.313zM9.75 23.469v0.25c0 0.844-0.375 1.25-1.156 1.25s-1.125-0.406-1.125-1.25v-0.25c0-0.844 0.344-1.25 1.125-1.25s1.156 0.406 1.156 1.25z"></path></svg>',
   rotate: '<svg viewBox="0 0 24 24"><path fill="none" d="M20.4898 14.9907C19.8414 16.831 18.6124 18.4108 16.9879 19.492C15.3635 20.5732 13.4316 21.0972 11.4835 20.9851C9.5353 20.873 7.67634 20.1308 6.18668 18.8704C4.69703 17.61 3.65738 15.8996 3.22438 13.997C2.79138 12.0944 2.98849 10.1026 3.78602 8.32177C4.58354 6.54091 5.93827 5.06746 7.64608 4.12343C9.35389 3.17941 11.3223 2.81593 13.2546 3.08779C16.5171 3.54676 18.6725 5.91142 21 8M21 8V2M21 8H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  saver: '<svg viewBox="0 0 24 24"><path d="M9 2h6v2h1.5A1.5 1.5 0 0 1 18 5.5v15A1.5 1.5 0 0 1 16.5 22h-9A1.5 1.5 0 0 1 6 20.5v-15A1.5 1.5 0 0 1 7.5 4H9zm3.6 5-4.1 7h2.6l-.7 5 4.1-7h-2.6z"/></svg>',
+  saver: '<svg viewBox="0 0 32 32" fill="currentColor"><path d="M18.605 2.022v0zM18.605 2.022l-2.256 11.856 8.174 0.027-11.127 16.072 2.257-13.043-8.174-0.029zM18.606 0.023c-0.054 0-0.108 0.002-0.161 0.006-0.353 0.028-0.587 0.147-0.864 0.333-0.154 0.102-0.295 0.228-0.419 0.373-0.037 0.043-0.071 0.088-0.103 0.134l-11.207 14.832c-0.442 0.607-0.508 1.407-0.168 2.076s1.026 1.093 1.779 1.099l5.773 0.042-1.815 10.694c-0.172 0.919 0.318 1.835 1.18 2.204 0.257 0.11 0.527 0.163 0.793 0.163 0.629 0 1.145-0.294 1.533-0.825l11.22-16.072c0.442-0.607 0.507-1.408 0.168-2.076-0.34-0.669-1.026-1.093-1.779-1.098l-5.773-0.010 1.796-9.402c0.038-0.151 0.057-0.308 0.057-0.47 0-1.082-0.861-1.964-1.939-1.999-0.024-0.001-0.047-0.001-0.071-0.001v0z"/></svg>',
+  augenkomfort: '<svg viewBox="0 0 24 24"><path fill="none" d="M15.0007 12C15.0007 13.6569 13.6576 15 12.0007 15C10.3439 15 9.00073 13.6569 9.00073 12C9.00073 10.3431 10.3439 9 12.0007 9C13.6576 9 15.0007 10.3431 15.0007 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" d="M12.0012 5C7.52354 5 3.73326 7.94288 2.45898 12C3.73324 16.0571 7.52354 19 12.0012 19C16.4788 19 20.2691 16.0571 21.5434 12C20.2691 7.94291 16.4788 5 12.0012 5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  camera: '<svg viewBox="0 0 24 24"><circle fill="none" cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path fill="none" d="M22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  comdirect: '<svg viewBox="0 0 192 192" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path fill="none" d="M164.181 144.948a74.37 73.795 0 0 1-81.836 20.19 74.37 73.795 0 0 1-48.233-68.637 74.37 73.795 0 0 1 47.384-69.217 74.37 73.795 0 0 1 82.079 19.196"/><path fill="none" d="M139.233 123.543a40.627 40.627 0 0 1-44.706 11.116A40.627 40.627 0 0 1 68.178 96.87a40.627 40.627 0 0 1 25.885-38.106 40.627 40.627 0 0 1 44.838 10.568"/><path fill="none" d="m163.604 46.52-24.732 22.788"/><path fill="none" d="m139.167 123.575 24.973 21.273"/></svg>',
   
   recording: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle class="record-dot" cx="12" cy="12" r="4.5" fill="currentColor"/></svg>',
   mic: '<svg viewBox="0 0 24 24"><path fill="none" d="M12 17V21M12 21H9M12 21H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect fill="none" x="10" y="3" width="4" height="10" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" d="M17.7378 12.7542C17.3674 13.9659 16.6228 15.0293 15.6109 15.7918C14.599 16.5544 13.3716 16.977 12.1047 16.9991C10.8378 17.0212 9.59647 16.6417 8.55854 15.9149C7.52061 15.1881 6.73941 14.1515 6.32689 12.9534" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -415,7 +408,7 @@ function paintStatus() {
   statusPill.classList.toggle('plugged', isPlugged);
   paintBattery();
   paintModeLabels();
-  if (statusOpen) paintDock();
+  if (statusOpen) paintTransferStrip();
 
   const shown = wanted();
   const names = shown.map(slot => slot.name);
@@ -659,6 +652,77 @@ export function statusHolds(x, y) {
 
 export let statusOpen = false;
 
+/* The actions face is absolutely positioned and so contributes no width of its own: the open size is a number rather than something the contents can be asked for. */
+const STATUS_CORNER_WIDE = 96;
+const CLOCK_CORNER_LEAVE = 260;
+const clockDate = document.getElementById('clock-date');
+
+let cornerIdleWide = 0;
+let clockIdleWide = 0;
+let clockCornerWide = 0;
+
+function ownsClockWidth() {
+  return !clockPill.classList.contains('now-live');
+}
+
+/* The two corner bubbles grew by transitioning `width: auto` under interpolate-size, which eases the box but not what is being laid out inside it: the pair arrived at their new type size in the first frame and the box caught up around them. They are measured and driven in pixels now, the way the Now bubble's own growth already was. */
+function pinCornerWidths() {
+  cornerIdleWide = Math.round(statusPill.getBoundingClientRect().width);
+  root.style.setProperty('--status-width-ms', '0ms');
+  root.style.setProperty('--status-width', cornerIdleWide + 'px');
+  if (!ownsClockWidth()) return;
+  clockIdleWide = Math.round(clockPill.getBoundingClientRect().width);
+  /* The corner width was the idle one plus a fixed allowance, which the date at its corner size ran straight out of. It is asked of the grown box itself instead, with the class on and the width back at auto for one uncommitted layout. */
+  clockPill.classList.add('corner-grow');
+  root.style.setProperty('--clock-width', 'auto');
+  /* Floored at the Status bubble's own corner width: the two stand at opposite ends of the same line and one of them being narrower reads as the pair not matching rather than as one holding less. */
+  clockCornerWide = Math.max(STATUS_CORNER_WIDE, Math.ceil(clockPill.getBoundingClientRect().width));
+  clockPill.classList.remove('corner-grow');
+  root.style.setProperty('--clock-width-ms', '0ms');
+  root.style.setProperty('--clock-width', clockIdleWide + 'px');
+}
+
+function growCornerWidths() {
+  root.style.setProperty('--status-width-ms', STATUS_PANEL.ms + 'ms');
+  root.style.setProperty('--status-width', STATUS_CORNER_WIDE + 'px');
+  if (!ownsClockWidth()) return;
+  root.style.setProperty('--clock-width-ms', STATUS_PANEL.ms + 'ms');
+  root.style.setProperty('--clock-width', clockCornerWide + 'px');
+}
+
+function shrinkCornerWidths() {
+  root.style.setProperty('--status-width-ms', STATUS_PANEL.ms + 'ms');
+  root.style.setProperty('--status-width', cornerIdleWide + 'px');
+  if (!ownsClockWidth()) return;
+  root.style.setProperty('--clock-width-ms', STATUS_PANEL.ms + 'ms');
+  root.style.setProperty('--clock-width', clockIdleWide + 'px');
+}
+
+function releaseCornerWidths() {
+  root.style.removeProperty('--status-width');
+  root.style.removeProperty('--status-width-ms');
+  if (!ownsClockWidth()) return;
+  root.style.removeProperty('--clock-width');
+  root.style.removeProperty('--clock-width-ms');
+}
+
+/* Left in flow the date collapsed its own max-width and its margin as the box retracted around it, so it travelled twice on the way out. It is held at the offset it already stood at inside the Clock and only fades; the Clock wears `overflow: hidden` for the same stretch, so whatever the shrinking box stops covering is cut rather than pushed. */
+function pinCornerDate() {
+  const box = clockDate.getBoundingClientRect();
+  if (!box.width) return;
+  const around = clockPill.getBoundingClientRect();
+  clockDate.style.left = Math.round(box.left - around.left) + 'px';
+  clockDate.style.top = Math.round(box.top - around.top) + 'px';
+  clockDate.classList.add('handed-over');
+  clockPill.classList.add('corner-leaving');
+  setTimeout(() => {
+    clockPill.classList.remove('corner-leaving');
+    clockDate.classList.remove('handed-over');
+    clockDate.style.removeProperty('left');
+    clockDate.style.removeProperty('top');
+  }, CLOCK_CORNER_LEAVE + 60);
+}
+
 function showStatusFace(name) {
   Object.entries(statusFaces).forEach(([key, face]) => {
     face.classList.toggle('showing', key === name);
@@ -677,7 +741,6 @@ function statusPanelLeft() {
 
 
 const quickPanel = document.getElementById('quick-panel');
-const quickScrim = document.getElementById('quick-scrim');
 
 const quickBubbles = [...quickPanel.querySelectorAll('.quick-bubble')];
 
@@ -755,14 +818,17 @@ export function openStatusPanel() {
 
 
   statusOpen = true;
-  paintDock();
+  raiseMain();
+  paintTransferStrip();
+  paintVitals();
+  enterPanelNow();
 
 
   bridge.requestToggles();
 
 
 
-  root.style.setProperty('--liquid-tall', (STATUS_PANEL.height + GROWN_PAD + 24 + PILL_DOCK_TALL + PILL_DOCK_TRANSFER_TALL) + 'px');
+  root.style.setProperty('--liquid-tall', (STATUS_PANEL.height + GROWN_PAD + 24) + 'px');
 
 
 
@@ -774,8 +840,11 @@ export function openStatusPanel() {
 
 
 
+  pinCornerWidths();
   statusPill.classList.add('open');
+  showStatusFace('actions');
   clockPill.classList.add('corner-grow');
+  requestAnimationFrame(growCornerWidths);
 
   quickPanel.classList.remove('leaving');
   
@@ -807,10 +876,13 @@ export function closeStatusPanel() {
   quickPanel.classList.add('leaving');
   
   
+  pinCornerDate();
   statusPill.classList.remove('open');
   clockPill.classList.remove('corner-grow');
-  pill.classList.remove('panel-dock', 'dock-transfer');
-  dockTransfer.classList.remove('showing');
+  shrinkCornerWidths();
+  pill.classList.remove('panel-top');
+  quickPanel.classList.remove('level-solo');
+  leavePanelNow();
   showFace(closedFace());
   applyClosedWindow();
 
@@ -827,6 +899,7 @@ export function closeStatusPanel() {
     
     
     statusPill.classList.remove('panel-closing');
+    releaseCornerWidths();
     fitStatusProxy();
     
     
@@ -862,6 +935,32 @@ statusPill.addEventListener('click', () => {
 
 
 
+// The row runs on forever, and what makes it run is three copies of the nine standing end to end: the shift wraps by one copy's width, so a flick never reaches an end and never has to be told it has. The copies are made here rather than written into the page because they are the same nine toggles, and they are made before anything reads the row so that every copy is painted and pressed like the original.
+const KNOB_COPIES = 3;
+
+const knobRow = document.getElementById('quick-row-knobs');
+const knobOriginals = [...knobRow.children];
+for (let copy = 1; copy < KNOB_COPIES; copy += 1) {
+  knobOriginals.forEach(knob => knobRow.appendChild(knob.cloneNode(true)));
+}
+
+
+
+// RING_RADIUS mirrors the ring circle's r in pill.html and --quick-ring-size in pill.css: the arc and the characters have to sit on the same circle, and there is no build step joining the three files.
+const RING_RADIUS = 33;
+const RING_STEP = 10.4;
+const RING_BURST_MS = 420;
+
+function drawRing(ring, reading) {
+  const characters = [...reading];
+  const start = -((characters.length - 1) / 2) * RING_STEP;
+  ring.querySelector('.ring-text').innerHTML = characters.map((character, index) => {
+    const turn = (start + index * RING_STEP).toFixed(2);
+    const glyph = character === ' ' ? '&#160;' : character;
+    return `<g transform="rotate(${turn}) translate(0 ${-RING_RADIUS})"><text class="ring-char" style="--index:${index}">${glyph}</text></g>`;
+  }).join('');
+}
+
 const quickModes = [...document.querySelectorAll('.quick-mode')];
 const quickKnobs = [...document.querySelectorAll('.quick-knob')];
 
@@ -890,6 +989,7 @@ function paintToggles(state) {
   paintModeLabels();
   paintLevels(state);
   quickKnobs.forEach(knob => {
+    if (knob.dataset.open) return;
     const name = knob.dataset.toggle;
     const value = name === 'recording' ? isRecordingLive() : state[name];
     setControl(knob, Boolean(value), false);
@@ -956,26 +1056,22 @@ function paintModeLabels() {
     const name = button.dataset.toggle;
 
 
-    const label = button.querySelector('.quick-label');
-    if (label) {
+    const ring = button.querySelector('.quick-ring');
+    if (ring) {
       const reading = text[name] || '';
-      const isWaiting = reading && reading === waiting[name];
-      const wasWaiting = label.classList.contains('waiting');
-      label.classList.toggle('waiting', isWaiting);
-      if (isWaiting) {
-        if (!wasWaiting) {
-          label.textContent = '';
-          for (let dot = 0; dot < 3; dot += 1) {
-            const span = document.createElement('span');
-            span.className = 'quick-dot';
-            label.appendChild(span);
-          }
-        }
-      } else {
-        label.textContent = reading;
+      const isWaiting = Boolean(reading) && reading === waiting[name];
+      const wasWaiting = button.classList.contains('searching');
+      button.classList.toggle('searching', isWaiting);
+      const written = isWaiting ? '' : reading;
+      if (button.dataset.ring !== written) {
+        drawRing(ring, written);
+        button.dataset.ring = written;
+      }
+      if (wasWaiting && !isWaiting) {
+        button.classList.add('found');
+        window.setTimeout(() => button.classList.remove('found'), RING_BURST_MS);
       }
     }
-    
     
     
     
@@ -1004,6 +1100,7 @@ function isRecordingLive() {
 const batteryBox = document.getElementById('quick-battery');
 const batteryGlyphBox = document.getElementById('battery-glyph');
 const batteryReading = document.getElementById('battery-reading');
+const batteryRemaining = document.getElementById('battery-remaining');
 
 
 
@@ -1043,10 +1140,13 @@ function paintBattery() {
   
   batteryGlyphBox.innerHTML = isPlugged ? BATTERY_GLYPHS.charging : '';
   batteryReading.textContent = charge >= 0 ? charge + '%' : '--';
-  batteryBox.style.setProperty('--charge-height', Math.max(0, charge) + '%');
+  // Stubbed alongside the vitals: nothing reads BatteryManager's own time-to-empty yet, so the line keeps its place and says nothing rather than saying a number nobody computed.
+  batteryRemaining.textContent = '';
+  batteryBox.style.setProperty('--charge-width', Math.max(0, charge) + '%');
   batteryBox.style.setProperty('--charge-color', chargeColour());
   
   batteryBox.classList.toggle('low', !isPlugged && charge >= 0 && charge < 15);
+  batteryBox.classList.toggle('charging', isPlugged);
 }
 
 
@@ -1129,8 +1229,11 @@ levels.forEach(level => {
   level.addEventListener('touchstart', event => {
     event.stopPropagation();
     from = event.touches[0].clientY;
+    level.classList.add('holding');
     share = parseFloat(level.style.getPropertyValue('--level')) || 0;
     sent = share;
+    clearTimeout(soloTimer);
+    soloTimer = setTimeout(() => enterSolo(level), SOLO_HOLD);
   }, { passive: true });
 
   level.addEventListener('touchmove', event => {
@@ -1140,7 +1243,9 @@ levels.forEach(level => {
     if (!level.classList.contains('dragging')) {
       if (Math.abs(travelled) < LEVEL_SLOP) return;
       level.classList.add('dragging');
-      bridge.triggerHaptic('tap');
+      // The drag used to cancel the hold that merges the bars, which put the merge behind a finger held perfectly still for 420ms — a slider is grabbed and moved, so that gesture is not one anybody makes and the merge was unreachable. Taking the bar is what merges it, whether the finger then travels or waits.
+      clearTimeout(soloTimer);
+      enterSolo(level);
     }
     
     
@@ -1155,7 +1260,15 @@ levels.forEach(level => {
   ['touchend', 'touchcancel'].forEach(type => {
     level.addEventListener(type, () => {
       from = null;
-      level.classList.remove('dragging');
+      // The 2% gate above lets the last few percent of a drag go unsent, which left the panel showing one number and the phone standing at another, so the value under the finger is always sent again on release.
+      const settled = Math.round(parseFloat(level.style.getPropertyValue('--level')) || 0);
+      if (level.classList.contains('dragging') && settled !== sent) {
+        sent = settled;
+        bridge.setLevel(name, settled);
+      }
+      level.classList.remove('dragging', 'holding');
+      clearTimeout(soloTimer);
+      leaveSolo();
     }, { passive: true });
   });
 
@@ -1187,9 +1300,13 @@ const KNOB_TURN = 460;
 
 
 
+const turnTimers = new WeakMap();
+
 function setControl(control, isOn, isTurning) {
   const wasOn = control.classList.contains('on');
   control.classList.toggle('on', isOn);
+  // Each turn armed its own timer to swap the glyph half a rotation later, so tapping faster than a rotation left several of them queued and the last to fire wrote whichever face it had been told about, not the one the control had settled on.
+  clearTimeout(turnTimers.get(control));
   if (!isTurning) {
     if (wasOn !== isOn) faceOf(control).innerHTML = glyphFor(control.dataset.toggle, isOn);
     return;
@@ -1200,9 +1317,9 @@ function setControl(control, isOn, isTurning) {
   control.classList.remove('turning');
   void control.offsetWidth;
   control.classList.add('turning');
-  setTimeout(() => {
+  turnTimers.set(control, setTimeout(() => {
     faceOf(control).innerHTML = glyphFor(control.dataset.toggle, control.classList.contains('on'));
-  }, KNOB_TURN / 2);
+  }, KNOB_TURN / 2));
 }
 
 function pressToggle(name, element) {
@@ -1219,10 +1336,101 @@ function pressToggle(name, element) {
 [...quickModes, ...quickKnobs].forEach(control => {
   control.addEventListener('click', event => {
     event.stopPropagation();
-    if (control.classList.contains('unavailable')) return;
+    if (control.classList.contains('unavailable') || knobSwiped) return;
+    if (control.dataset.open) {
+      bridge.triggerHaptic('tap');
+      bridge.openApp(control.dataset.open);
+      closeStatusPanel();
+      return;
+    }
     pressToggle(control.dataset.toggle, control);
   });
 });
+
+// The nine toggles are one row inside a window five wide, and the four beyond either edge are reached by dragging it. Nothing here can scroll: the panel is driven by touches the host synthesises against a proxy, and a synthetic touch moves no scroll box, so the row is carried by hand. The drag also has to disarm whichever toggle the finger came down on, because the bridge only withholds its click for a travel shorter than a tap's own slop and a short drag would otherwise flip a switch as well as move the row.
+const KNOB_DRAG_SLOP = 8;
+
+// Pixels per millisecond a flick is allowed to leave behind, and how much of that survives each frame of the glide.
+const KNOB_FLING_CAP = 4;
+const KNOB_FRICTION = 0.94;
+const KNOB_STILL = 0.02;
+
+const knobWindow = document.getElementById('quick-knob-window');
+
+let knobFrom = null;
+let knobStart = 0;
+let knobShift = 0;
+let knobSwiped = false;
+let knobLast = null;
+let knobSpeed = 0;
+let knobGlide = 0;
+let knobGlideAt = 0;
+
+function setKnobShift(value) {
+  const cycle = knobRow.scrollWidth / KNOB_COPIES;
+  let shift = cycle > 0 ? value % cycle : value;
+  if (shift > 0) shift -= cycle;
+  knobShift = shift;
+  knobRow.style.setProperty('--knob-shift', shift.toFixed(1) + 'px');
+}
+
+// The row's width changes with the toggles when the Now bubble opens, and the wrap is measured off that width. Watching the row re-wraps it on every frame of that transition rather than on a duration this file would have to keep in step with the CSS.
+new ResizeObserver(() => setKnobShift(knobShift)).observe(knobRow);
+
+function stopKnobGlide() {
+  cancelAnimationFrame(knobGlide);
+  knobGlide = 0;
+  knobSpeed = 0;
+}
+
+function glideKnobs(at) {
+  const step = Math.min(32, at - knobGlideAt);
+  knobGlideAt = at;
+  setKnobShift(knobShift + knobSpeed * step);
+  knobSpeed *= Math.pow(KNOB_FRICTION, step / 16);
+  if (Math.abs(knobSpeed) < KNOB_STILL) {
+    stopKnobGlide();
+    return;
+  }
+  knobGlide = requestAnimationFrame(glideKnobs);
+}
+
+knobRow.addEventListener('touchstart', event => {
+  stopKnobGlide();
+  knobFrom = event.touches[0].clientX;
+  knobStart = knobShift;
+  knobSwiped = false;
+  knobLast = { x: knobFrom, at: performance.now() };
+}, { passive: true });
+
+knobRow.addEventListener('touchmove', event => {
+  if (knobFrom === null) return;
+  const x = event.touches[0].clientX;
+  if (!knobSwiped && Math.abs(x - knobFrom) < KNOB_DRAG_SLOP) return;
+  // The slop is spent before the row starts moving, so it is taken off the travel rather than jumped over — otherwise the row leaps the whole slop the moment a drag is recognised.
+  if (!knobSwiped) {
+    knobSwiped = true;
+    knobStart = knobShift - (x - knobFrom);
+  }
+  const at = performance.now();
+  const span = at - knobLast.at;
+  if (span > 0) knobSpeed = (x - knobLast.x) / span;
+  knobLast = { x, at };
+  setKnobShift(knobStart + (x - knobFrom));
+}, { passive: true });
+
+function releaseKnobs() {
+  if (knobFrom === null) return;
+  knobFrom = null;
+  if (!knobSwiped) return;
+  knobSpeed = Math.max(-KNOB_FLING_CAP, Math.min(KNOB_FLING_CAP, knobSpeed));
+  if (Math.abs(knobSpeed) < KNOB_STILL) return;
+  knobGlideAt = performance.now();
+  knobGlide = requestAnimationFrame(glideKnobs);
+}
+
+knobRow.addEventListener('touchend', releaseKnobs, { passive: true });
+knobRow.addEventListener('touchcancel', releaseKnobs, { passive: true });
 
 
 
@@ -1256,8 +1464,40 @@ let statusDrop = 0;
 
 
 
+// Every tap inside the open panel used to close it: the proxy resolves a touch against the Status bubble's box, and nothing in the panel is a descendant of that bubble, so each control's press fell back to the bubble itself, which reads a press as "close". The panel resolves its own targets now, and answers with nothing where a tap really is meant to close.
+const QUICK_GRACE = 26;
+
+const QUICK_CONTROLS = '.quick-mode, .quick-knob, .level, #quick-battery, #quick-vitals';
+
+export function statusPanelTarget(x, y) {
+  if (!statusOpen) return null;
+  const hit = document.elementFromPoint(x, y);
+  const under = hit && quickPanel.contains(hit) ? hit.closest(QUICK_CONTROLS) : null;
+  if (under) return under;
+  let nearest = null;
+  let closest = QUICK_GRACE;
+  const knobs = knobWindow.getBoundingClientRect();
+  for (const control of quickPanel.querySelectorAll(QUICK_CONTROLS)) {
+    const box = control.getBoundingClientRect();
+    // A toggle scrolled past the window's edge is still in the document and still a candidate for the grace radius, so a tap near the edge would answer with a switch nobody can see.
+    if (control.classList.contains('quick-knob') && (box.left < knobs.left - 1 || box.right > knobs.right + 1)) continue;
+    const across = Math.max(box.left - x, 0, x - box.right);
+    const down = Math.max(box.top - y, 0, y - box.bottom);
+    const gap = Math.hypot(across, down);
+    if (gap >= closest) continue;
+    closest = gap;
+    nearest = control;
+  }
+  return nearest;
+}
+
+
 let panelPushFrom = null;
 let panelPushed = false;
+
+
+// The Now bubble is thrown home along the flick that dismissed the panel, so how far across that flick had gone when it crossed has to survive the two calls between here and the throw. It is reported in pixels rather than as a ratio: what those pixels are worth as an angle is the throw's business and not this one's. Every other way the panel closes has no hand behind it and leaves this at nothing.
+let panelPushLean = 0;
 
 export function statusPanelPush(action, x, y) {
   if (action === 'down') {
@@ -1271,14 +1511,14 @@ export function statusPanelPush(action, x, y) {
     
     
     
-    const on = document.elementFromPoint(x, y);
-    panelPushFrom = on === quickScrim ? { x, y } : null;
+    panelPushFrom = statusPanelTarget(x, y) ? null : { x, y };
     panelPushed = false;
     return;
   }
   if (action !== 'move' || !panelPushFrom || panelPushed) return;
   if (y - panelPushFrom.y < -24 && Math.abs(x - panelPushFrom.x) < 40) {
     panelPushed = true;
+    panelPushLean = x - panelPushFrom.x;
     panelPushFrom = null;
     bridge.triggerHaptic('dismiss');
     closeStatusPanel();
@@ -1383,9 +1623,9 @@ export function setTransfer(payload) {
   paintStatus();
 }
 
-const dockTransfer = document.getElementById('dock-transfer');
-const dockTransferGlyph = document.getElementById('dock-transfer-glyph');
-const dockTransferReading = document.getElementById('dock-transfer-reading');
+const transferStrip = document.getElementById('quick-transfer');
+const transferGlyph = document.getElementById('transfer-glyph');
+const transferReading = document.getElementById('transfer-reading');
 
 function holdTheTick() {
   clearTimeout(transferTick);
@@ -1417,3 +1657,178 @@ window.addEventListener('resize', () => {
 });
 
 root.style.setProperty('--status-right', STATUS_RIGHT + 'px');
+
+
+
+
+
+const ACTION_GLYPHS = {
+  settings: '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 8.25C9.92894 8.25 8.25 9.92893 8.25 12C8.25 14.0711 9.92894 15.75 12 15.75C14.0711 15.75 15.75 14.0711 15.75 12C15.75 9.92893 14.0711 8.25 12 8.25ZM9.75 12C9.75 10.7574 10.7574 9.75 12 9.75C13.2426 9.75 14.25 10.7574 14.25 12C14.25 13.2426 13.2426 14.25 12 14.25C10.7574 14.25 9.75 13.2426 9.75 12Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M11.9747 1.25C11.5303 1.24999 11.1592 1.24999 10.8546 1.27077C10.5375 1.29241 10.238 1.33905 9.94761 1.45933C9.27379 1.73844 8.73843 2.27379 8.45932 2.94762C8.31402 3.29842 8.27467 3.66812 8.25964 4.06996C8.24756 4.39299 8.08454 4.66251 7.84395 4.80141C7.60337 4.94031 7.28845 4.94673 7.00266 4.79568C6.64714 4.60777 6.30729 4.45699 5.93083 4.40743C5.20773 4.31223 4.47642 4.50819 3.89779 4.95219C3.64843 5.14353 3.45827 5.3796 3.28099 5.6434C3.11068 5.89681 2.92517 6.21815 2.70294 6.60307L2.67769 6.64681C2.45545 7.03172 2.26993 7.35304 2.13562 7.62723C1.99581 7.91267 1.88644 8.19539 1.84541 8.50701C1.75021 9.23012 1.94617 9.96142 2.39016 10.5401C2.62128 10.8412 2.92173 11.0602 3.26217 11.2741C3.53595 11.4461 3.68788 11.7221 3.68786 12C3.68785 12.2778 3.53592 12.5538 3.26217 12.7258C2.92169 12.9397 2.62121 13.1587 2.39007 13.4599C1.94607 14.0385 1.75012 14.7698 1.84531 15.4929C1.88634 15.8045 1.99571 16.0873 2.13552 16.3727C2.26983 16.6469 2.45535 16.9682 2.67758 17.3531L2.70284 17.3969C2.92507 17.7818 3.11058 18.1031 3.28089 18.3565C3.45817 18.6203 3.64833 18.8564 3.89769 19.0477C4.47632 19.4917 5.20763 19.6877 5.93073 19.5925C6.30717 19.5429 6.647 19.3922 7.0025 19.2043C7.28833 19.0532 7.60329 19.0596 7.8439 19.1986C8.08452 19.3375 8.24756 19.607 8.25964 19.9301C8.27467 20.3319 8.31403 20.7016 8.45932 21.0524C8.73843 21.7262 9.27379 22.2616 9.94761 22.5407C10.238 22.661 10.5375 22.7076 10.8546 22.7292C11.1592 22.75 11.5303 22.75 11.9747 22.75H12.0252C12.4697 22.75 12.8407 22.75 13.1454 22.7292C13.4625 22.7076 13.762 22.661 14.0524 22.5407C14.7262 22.2616 15.2616 21.7262 15.5407 21.0524C15.686 20.7016 15.7253 20.3319 15.7403 19.93C15.7524 19.607 15.9154 19.3375 16.156 19.1985C16.3966 19.0596 16.7116 19.0532 16.9974 19.2042C17.3529 19.3921 17.6927 19.5429 18.0692 19.5924C18.7923 19.6876 19.5236 19.4917 20.1022 19.0477C20.3516 18.8563 20.5417 18.6203 20.719 18.3565C20.8893 18.1031 21.0748 17.7818 21.297 17.3969L21.3223 17.3531C21.5445 16.9682 21.7301 16.6468 21.8644 16.3726C22.0042 16.0872 22.1135 15.8045 22.1546 15.4929C22.2498 14.7697 22.0538 14.0384 21.6098 13.4598C21.3787 13.1586 21.0782 12.9397 20.7378 12.7258C20.464 12.5538 20.3121 12.2778 20.3121 11.9999C20.3121 11.7221 20.464 11.4462 20.7377 11.2742C21.0783 11.0603 21.3788 10.8414 21.6099 10.5401C22.0539 9.96149 22.2499 9.23019 22.1547 8.50708C22.1136 8.19546 22.0043 7.91274 21.8645 7.6273C21.7302 7.35313 21.5447 7.03183 21.3224 6.64695L21.2972 6.60318C21.0749 6.21825 20.8894 5.89688 20.7191 5.64347C20.5418 5.37967 20.3517 5.1436 20.1023 4.95225C19.5237 4.50826 18.7924 4.3123 18.0692 4.4075C17.6928 4.45706 17.353 4.60782 16.9975 4.79572C16.7117 4.94679 16.3967 4.94036 16.1561 4.80144C15.9155 4.66253 15.7524 4.39297 15.7403 4.06991C15.7253 3.66808 15.686 3.2984 15.5407 2.94762C15.2616 2.27379 14.7262 1.73844 14.0524 1.45933C13.762 1.33905 13.4625 1.29241 13.1454 1.27077C12.8407 1.24999 12.4697 1.24999 12.0252 1.25H11.9747ZM10.5216 2.84515C10.5988 2.81319 10.716 2.78372 10.9567 2.76729C11.2042 2.75041 11.5238 2.75 12 2.75C12.4762 2.75 12.7958 2.75041 13.0432 2.76729C13.284 2.78372 13.4012 2.81319 13.4783 2.84515C13.7846 2.97202 14.028 3.21536 14.1548 3.52165C14.1949 3.61826 14.228 3.76887 14.2414 4.12597C14.271 4.91835 14.68 5.68129 15.4061 6.10048C16.1321 6.51968 16.9974 6.4924 17.6984 6.12188C18.0143 5.9549 18.1614 5.90832 18.265 5.89467C18.5937 5.8514 18.9261 5.94047 19.1891 6.14228C19.2554 6.19312 19.3395 6.27989 19.4741 6.48016C19.6125 6.68603 19.7726 6.9626 20.0107 7.375C20.2488 7.78741 20.4083 8.06438 20.5174 8.28713C20.6235 8.50382 20.6566 8.62007 20.6675 8.70287C20.7108 9.03155 20.6217 9.36397 20.4199 9.62698C20.3562 9.70995 20.2424 9.81399 19.9397 10.0041C19.2684 10.426 18.8122 11.1616 18.8121 11.9999C18.8121 12.8383 19.2683 13.574 19.9397 13.9959C20.2423 14.186 20.3561 14.29 20.4198 14.373C20.6216 14.636 20.7107 14.9684 20.6674 15.2971C20.6565 15.3799 20.6234 15.4961 20.5173 15.7128C20.4082 15.9355 20.2487 16.2125 20.0106 16.6249C19.7725 17.0373 19.6124 17.3139 19.474 17.5198C19.3394 17.72 19.2553 17.8068 19.189 17.8576C18.926 18.0595 18.5936 18.1485 18.2649 18.1053C18.1613 18.0916 18.0142 18.045 17.6983 17.8781C16.9973 17.5075 16.132 17.4803 15.4059 17.8995C14.68 18.3187 14.271 19.0816 14.2414 19.874C14.228 20.2311 14.1949 20.3817 14.1548 20.4784C14.028 20.7846 13.7846 21.028 13.4783 21.1549C13.4012 21.1868 13.284 21.2163 13.0432 21.2327C12.7958 21.2496 12.4762 21.25 12 21.25C11.5238 21.25 11.2042 21.2496 10.9567 21.2327C10.716 21.2163 10.5988 21.1868 10.5216 21.1549C10.2154 21.028 9.97201 20.7846 9.84514 20.4784C9.80512 20.3817 9.77195 20.2311 9.75859 19.874C9.72896 19.0817 9.31997 18.3187 8.5939 17.8995C7.86784 17.4803 7.00262 17.5076 6.30158 17.8781C5.98565 18.0451 5.83863 18.0917 5.73495 18.1053C5.40626 18.1486 5.07385 18.0595 4.81084 17.8577C4.74458 17.8069 4.66045 17.7201 4.52586 17.5198C4.38751 17.314 4.22736 17.0374 3.98926 16.625C3.75115 16.2126 3.59171 15.9356 3.4826 15.7129C3.37646 15.4962 3.34338 15.3799 3.33248 15.2971C3.28921 14.9684 3.37828 14.636 3.5801 14.373C3.64376 14.2901 3.75761 14.186 4.0602 13.9959C4.73158 13.5741 5.18782 12.8384 5.18786 12.0001C5.18791 11.1616 4.73165 10.4259 4.06021 10.004C3.75769 9.81389 3.64385 9.70987 3.58019 9.62691C3.37838 9.3639 3.28931 9.03149 3.33258 8.7028C3.34348 8.62001 3.37656 8.50375 3.4827 8.28707C3.59181 8.06431 3.75125 7.78734 3.98935 7.37493C4.22746 6.96253 4.3876 6.68596 4.52596 6.48009C4.66055 6.27983 4.74468 6.19305 4.81093 6.14222C5.07395 5.9404 5.40636 5.85133 5.73504 5.8946C5.83873 5.90825 5.98576 5.95483 6.30173 6.12184C7.00273 6.49235 7.86791 6.51962 8.59394 6.10045C9.31998 5.68128 9.72896 4.91837 9.75859 4.12602C9.77195 3.76889 9.80512 3.61827 9.84514 3.52165C9.97201 3.21536 10.2154 2.97202 10.5216 2.84515Z"/></svg>',
+  power: '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M13 3C13 2.44772 12.5523 2 12 2C11.4477 2 11 2.44772 11 3V12C11 12.5523 11.4477 13 12 13C12.5523 13 13 12.5523 13 12V3ZM8.6092 5.8744C9.09211 5.60643 9.26636 4.99771 8.99839 4.5148C8.73042 4.03188 8.12171 3.85763 7.63879 4.1256C4.87453 5.65948 3 8.61014 3 12C3 16.9706 7.02944 21 12 21C16.9706 21 21 16.9706 21 12C21 8.66747 19.1882 5.75928 16.5007 4.20465C16.0227 3.92811 15.4109 4.09147 15.1344 4.56953C14.8579 5.04759 15.0212 5.65932 15.4993 5.93586C17.5942 7.14771 19 9.41027 19 12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12C5 9.3658 6.45462 7.06997 8.6092 5.8744Z"/></svg>',
+};
+
+const WEATHER_GLYPHS = {
+  clear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.4"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M19.8 4.2l-2.1 2.1M6.3 17.7l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24"><path d="M7 19a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 10.5a4.25 4.25 0 0 1-.5 8.5z"/></svg>',
+  rain: '<svg viewBox="0 0 24 24"><path d="M7 15a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 6.5a4.25 4.25 0 0 1-.5 8.5z"/><path d="M8.5 17.5 7 21M13 17.5 11.5 21M17.5 17.5 16 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+};
+
+const statusSettings = document.getElementById('status-settings');
+const statusPower = document.getElementById('status-power');
+statusSettings.innerHTML = ACTION_GLYPHS.settings;
+statusPower.innerHTML = ACTION_GLYPHS.power;
+
+statusSettings.addEventListener('click', event => {
+  event.stopPropagation();
+  bridge.triggerHaptic('tap');
+  bridge.openControlPanel();
+  closeStatusPanel();
+});
+
+statusPower.addEventListener('click', event => {
+  event.stopPropagation();
+  bridge.triggerHaptic('expand');
+  bridge.openPowerMenu();
+  closeStatusPanel();
+});
+
+
+
+
+const weatherReading = document.getElementById('weather-reading');
+const weatherGlyph = document.getElementById('weather-glyph');
+
+// Stubbed: no weather source is wired yet, so the line stands at its own shape rather than at a number that would be a lie the moment it was believed.
+window.onWeather = payload => {
+  const known = Boolean(payload);
+  weatherReading.textContent = known ? Math.round(payload.celsius) + '°C' : '--°C';
+  weatherGlyph.innerHTML = WEATHER_GLYPHS[(payload && payload.sky) || 'cloud'];
+};
+window.onWeather(null);
+
+
+
+
+const vitalReadings = {
+  storage: document.querySelector('.vital[data-vital="storage"] .vital-reading'),
+  ram: document.querySelector('.vital[data-vital="ram"] .vital-reading'),
+  cpu: document.querySelector('.vital[data-vital="cpu"] .vital-reading'),
+};
+const vitalsBox = document.getElementById('quick-vitals');
+const vitalsUptime = document.getElementById('vitals-uptime');
+
+let vitals = null;
+
+// Stubbed for the same reason the weather line is: StatFs, MemoryInfo, the thermal zones and SystemClock.elapsedRealtime have no watcher on the Kotlin side yet, so the module is laid out and reads em-dashes until one is written.
+window.onVitals = payload => {
+  vitals = payload;
+  if (statusOpen) paintVitals();
+};
+
+function paintVitals() {
+  vitalReadings.storage.textContent = vitals ? vitals.storage : '—';
+  vitalReadings.ram.textContent = vitals ? vitals.ram : '—';
+  vitalReadings.cpu.textContent = vitals ? vitals.cpu : '—';
+  vitalsUptime.textContent = vitals ? vitals.uptime : '—';
+}
+
+let vitalsHeld = false;
+let vitalsHoldTimer = 0;
+
+vitalsBox.addEventListener('touchstart', () => {
+  vitalsHeld = false;
+  vitalsBox.classList.add('pressing');
+  vitalsHoldTimer = setTimeout(() => {
+    vitalsHeld = true;
+    vitalsBox.classList.remove('pressing');
+    bridge.triggerHaptic('expand');
+  }, HOLD_MILLIS);
+}, { passive: true });
+
+['touchend', 'touchcancel'].forEach(type => {
+  vitalsBox.addEventListener(type, () => {
+    clearTimeout(vitalsHoldTimer);
+    vitalsBox.classList.remove('pressing');
+  }, { passive: true });
+});
+
+vitalsBox.addEventListener('click', event => {
+  event.stopPropagation();
+  if (vitalsHeld) return;
+  bridge.triggerHaptic('tap');
+  // Clearing the RAM has no host call behind it yet — the readouts above it are stubbed for the same reason.
+});
+
+
+
+
+// The brightness bar held clears the panel: the frost goes first and the modules leave behind it on the panel's own close, and the lift runs the same order — frost back first, then the modules grow in. Volume takes the merge and leaves the panel standing.
+const levelsRow = document.getElementById('quick-row-levels');
+export const SOLO_HOLD = 420;
+// Mirrors --solo-ms and --solo-out in pill.css; SOLO_OUT is the panel's own collapse allowance, the same 110ms and slack closeStatusPanel gives it.
+const SOLO_TRAVEL = 420;
+const SOLO_OUT = 180;
+const SOLO_FROST = 260;
+const SOLO_IN = QUICK_POP + quickBubbles.length * QUICK_STAGGER;
+
+let soloTimer = 0;
+let soloBackTimer = 0;
+let soloLevel = null;
+
+function enterSolo(level) {
+  if (soloLevel) return;
+  soloLevel = level;
+  clearTimeout(soloBackTimer);
+  quickPanel.classList.remove('solo-in');
+  levelsRow.dataset.held = level.dataset.level;
+  levelsRow.classList.add('merged');
+  levels.forEach(other => other.classList.toggle('solo-hidden', other !== level));
+  if (level.dataset.level === 'brightness') {
+    const panelBox = quickPanel.getBoundingClientRect();
+    const rowBox = levelsRow.getBoundingClientRect();
+    const lift = Math.round((panelBox.top + panelBox.height / 2) - (rowBox.top + rowBox.height / 2));
+    root.style.setProperty('--solo-lift', lift + 'px');
+    quickPanel.classList.add('solo-out', 'level-solo');
+  }
+  bridge.triggerHaptic('expand');
+  stirLiquid(SOLO_OUT + SOLO_FROST + SOLO_TRAVEL);
+}
+
+function leaveSolo() {
+  if (!soloLevel) return;
+  soloLevel = null;
+  levelsRow.classList.remove('merged');
+  delete levelsRow.dataset.held;
+  levels.forEach(other => other.classList.remove('solo-hidden'));
+  if (!quickPanel.classList.contains('solo-out')) {
+    stirLiquid(SOLO_TRAVEL);
+    return;
+  }
+  quickPanel.classList.remove('level-solo');
+  soloBackTimer = setTimeout(() => {
+    quickPanel.classList.remove('solo-out');
+    quickPanel.classList.add('solo-in');
+    soloBackTimer = setTimeout(() => quickPanel.classList.remove('solo-in'), SOLO_IN);
+  }, SOLO_FROST);
+  stirLiquid(SOLO_FROST + Math.max(SOLO_IN, SOLO_TRAVEL));
+}
+
+
+
+
+let panelNowOpen = false;
+
+export function setPanelNowOpen(open) {
+  panelNowOpen = open;
+  quickPanel.classList.toggle('now-open', open);
+}
+
+function enterPanelNow() {
+  openPanelNow(panelNowOpen);
+}
+
+function leavePanelNow() {
+  const lean = panelPushLean;
+  panelPushLean = 0;
+  closePanelNow(lean);
+}

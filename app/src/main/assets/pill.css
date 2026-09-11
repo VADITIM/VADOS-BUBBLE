@@ -53,6 +53,9 @@
 
 
   --ease-grow: cubic-bezier(0.22, 1.12, 0.36, 1);
+
+  /* The four bubbles that move as objects — Main, Status, Clock and Now — take their size and their place on the bubble family's own curve rather than on the panel's gentler one; a bubble arriving on an ease-out is a box being positioned. Everything that is not one of the four keeps --ease-grow. */
+  --ease-bubble: cubic-bezier(0.2, 1.7, 0.35, 1);
   
 
 
@@ -129,15 +132,15 @@ html, body {
 
 
 
-    width var(--width-ms, var(--grow-ms)) var(--width-ease, var(--ease-grow))
+    width var(--width-ms, var(--grow-ms)) var(--width-ease, var(--ease-bubble))
       var(--width-delay, 0ms),
-    height var(--grow-ms) var(--ease-grow),
+    height var(--grow-ms) var(--ease-bubble),
     
 
     border-radius var(--grow-ms) ease-out,
-    top var(--grow-ms) var(--ease-grow),
-    padding-right var(--grow-ms) var(--ease-grow),
-    padding-bottom var(--grow-ms) var(--ease-grow),
+    top var(--grow-ms) var(--ease-bubble),
+    padding-right var(--grow-ms) var(--ease-bubble),
+    padding-bottom var(--grow-ms) var(--ease-bubble),
 
     translate var(--carry-ms, var(--shift-ms, var(--grow-ms))) var(--ease-split) var(--shift-delay, 0ms),
     scale 350ms linear,
@@ -309,6 +312,12 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
   transition: var(--lock-transition);
 }
 #lock-now.showing { opacity: 1; scale: 1; pointer-events: auto; }
+
+#lock-now.idle { pointer-events: none; }
+#lock-now.idle > * { opacity: 0; }
+
+/* The drop leaves by fading, and it keeps `showing` while it does so it stays in the goo layer: `isSkinned` reads that class, so dropping it would take the blob out of the mirror in one frame and the neck would cut rather than thin. What the blob follows instead is this opacity — the layer skips anything under an alpha of 0.01 — so the shape and its skin go out together. */
+#lock-now.melting { opacity: 0; pointer-events: none; }
 
 
 
@@ -1898,6 +1907,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   border-radius: calc(var(--pill-height) / 2);
   background: var(--pill-background);
   border: 1px solid var(--border);
+  width: var(--status-width, auto);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1922,9 +1932,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     opacity 200ms ease,
 
 
-    width var(--status-width-ms, 300ms) var(--ease-split),
-    height var(--grow-ms) var(--ease-grow),
-    top var(--grow-ms) var(--ease-grow),
+    width var(--status-width-ms, 300ms) var(--ease-bubble),
+    height var(--grow-ms) var(--ease-bubble),
+    top var(--grow-ms) var(--ease-bubble),
     right var(--status-width-ms, 300ms) var(--ease-split),
     padding var(--status-width-ms, 300ms) var(--ease-split),
     --blob-fill 280ms ease,
@@ -1959,9 +1969,22 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease;
+  /* The two faces used to cross on opacity alone, so the panel opening read as one set of glyphs being swapped for another rather than as the bubble turning over into what it now is. The face carries the scale and its own contents carry the turn: a whole face rotating tips the row it is standing in, and it is the readings that are being handed over rather than the row. */
+  scale: 0.62;
+  transition:
+    opacity 160ms ease,
+    scale 300ms var(--ease-split);
 }
-.status-face.showing { opacity: 1; pointer-events: auto; }
+.status-face.showing { opacity: 1; scale: 1; pointer-events: auto; }
+
+.status-face > * {
+  rotate: -26deg;
+  scale: 0.6;
+  transition:
+    rotate 300ms var(--ease-split),
+    scale 300ms var(--ease-split);
+}
+.status-face.showing > * { rotate: 0deg; scale: 1; }
 #status.open .status-face { align-items: flex-start; justify-content: flex-end; }
 
 
@@ -2130,499 +2153,71 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #status.open {
-  /* --corner-margin pulls the box back off the true corner by a few pixels rather than merging flush with it, mirroring Clock's own corner-grow. */
-  right: calc(-1 * var(--edge-over) + var(--corner-margin));
-  top: calc(-1 * var(--edge-over) + var(--corner-margin));
-  /* Equal padding both sides lands the content-box's right edge exactly on the true screen edge (mirroring Clock) so centring the icon row is genuinely screen-edge-to-inward-edge, not merely the middle of the corner overhang. --corner-padding-scale (+15%) is layered on top rather than folded into --corner-margin, mirroring Clock's own comment. */
-  padding-right: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
-  padding-left: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
-  padding-bottom: calc(0.4rem * var(--corner-padding-scale, 1.15));
-  padding-top: calc((var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-padding-scale, 1.15));
-  /* +30% now (was +15%), downward only since top is pinned above by --edge-over already — --corner-grow-scale mirrors Clock's own corner-grow height in the same file (states.md#clock-status-idle-and-main-status-idle). */
-  height: calc((var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-grow-scale, 1.3));
-  /* With the battery reading dropped below, the box can be left with one bare icon and no width to grow from (auto width hugs whatever content is left) — a floor keeps it a real, centred module rather than a glyph pinned in the corner with no room around it. Extended (was 56px) so the box also grows further out toward the screen edge, mirroring Clock's own width extension, rather than only hugging its content. */
-  min-width: calc(56px + var(--edge-over));
-  /* Nudges the icon row toward the true top-right corner it is reaching for, rather than sitting dead-centre of the grown box's now-larger padding — right pushed further than top since the box's own reach is mostly rightward. */
-  margin-top: -6px;
-  margin-right: -14px;
+  right: var(--corner-inset);
+  top: var(--corner-inset);
+  padding: 0 0.7rem;
+  height: var(--corner-tall);
+  border-radius: var(--corner-radius);
   z-index: 30;
 }
-/* Was flex-end/flex-end, pinning the icon row to the fixed top-right corner (states.md#clock-status-idle-and-main-status-idle). Equal padding above (mirroring Clock's own centring) puts the content-box's right edge at the true screen edge, so centred here is between that edge and the box's inward edge, not merely the middle of the corner. */
 #status.open .status-face { align-items: center; justify-content: center; }
-/* The own-charge reading is dropped from this state entirely — it is what the giant battery module in the panel body already says, so the corner icon row does not need to repeat it. */
-#status.open .status-slot[data-slot="battery"] { display: none; }
-/* --mod-glyph is the shared main-row badge size (16px, meant to stand inline with a mod's own reading) and is deliberately left alone everywhere else; this corner icon has the whole grown box to itself and read as too small at that scale, so it gets its own fixed floor instead of a scaled fraction of the shared token. */
-#status.open .status-slot-inner { width: calc(20px * var(--corner-grow-scale, 1.3)); height: calc(20px * var(--corner-grow-scale, 1.3)); }
-#status.open .status-slot-inner.is-text { font-size: calc(0.72rem * var(--corner-grow-scale, 1.3)); }
 
 
 
 
-
-
-
-
-
-
-
-
-
-#quick-battery {
-  --battery-well: rgba(10, 9, 13, 0.85);
-  background: none;
-  border: none;
-  flex: none;
-  width: 74px;
-  height: var(--quick-links-tall);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-
-  color: #fff;
-  transition: scale 200ms var(--ease-split);
+#status-actions {
+  gap: 0.9rem;
 }
-#quick-battery.pressing { scale: 0.97; }
+#status.open #status-closed { display: none; }
 
-
-
-
-#battery-pin {
-  width: 38px;
-  height: 11px;
-  border-radius: 5px 5px 0 0;
-  background: var(--battery-well);
-  
-
-  border: 2px solid var(--battery-edge, var(--charge-color, var(--text-faint)));
-  border-bottom: none;
-  
-
-  margin-bottom: -2px;
-  transition: border-color 500ms ease;
-}
-
-
-
-
-
-
-
-#battery-cell {
-  position: relative;
-  overflow: hidden;
-  border: 2px solid var(--charge-color, var(--text-faint));
-  transition: border-color 500ms ease;
-  flex: 1;
-  
-  width: 100%;
-  
-
-
-  margin: 0;
-  flex: none;
-  height: 75%;
-  display: grid;
-  place-items: center;
-  border-radius: 16px;
-  corner-shape: squircle;
-  background: var(--battery-well);
-}
-
-
-#quick-battery.saving { --battery-edge: var(--section-color); }
-#quick-battery.low { --battery-edge: #e5342b; }
-
-#battery-glyph {
-  position: absolute;
-  top: 8px;
+.status-action {
   width: 26px;
   height: 26px;
-  z-index: 3;
-}
-#battery-glyph svg { width: 100%; height: 100%; fill: currentColor; }
-#battery-reading {
-  z-index: 3;
-  position: relative;
-  font-family: "Clash", sans-serif;
-  font-size: 1.875rem;
-  line-height: 1;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-
-
-
-
-
-
-
-
-
-#battery-fill {
-
-
-
-
-  border-radius: 12px;
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: 4px;
-  height: var(--charge-height, 0%);
-  z-index: 1;
-  background: var(--charge-color, var(--text-faint));
-  transition: height 700ms var(--ease-enter), background 500ms ease;
-}
-
-
-
-
-
-
-
-
-.quick-mode {
-  
-
-
-
-
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.3rem;
-  padding: 0 0.5rem;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease, scale 200ms var(--ease-split);
-}
-
-
-
-
-
-#quick-media-usb {
-  flex-direction: row;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 0.55rem;
-  height: 44px;
-  flex: none;
-  padding: 0 0.85rem;
-}
-
-
-
-#quick-media-usb:not(.attached) { display: none; }
-#quick-media-usb svg { width: 20px; height: 20px; }
-#quick-media-usb .quick-label { width: auto; text-align: left; }
-.quick-mode svg { width: 28px; height: 28px; fill: currentColor; }
-.quick-mode:active { scale: 0.96; }
-
-
-
-
-
-.quick-label {
-  
-
-
-  width: 100%;
-  min-width: 0;
-  text-align: center;
-  font-family: "ClashMedium", sans-serif;
-  font-weight: 500;
-  font-size: 0.66rem;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  color: var(--text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
-  transition: color 200ms ease;
-}
-.quick-mode.on .quick-label { color: color-mix(in srgb, var(--section-color) 70%, var(--text-body)); }
-.quick-mode.unavailable { opacity: 0.4; }
-.quick-mode.on {
-  color: var(--section-color);
-  background: color-mix(in srgb, var(--section-color) 16%, transparent);
-  box-shadow: inset 0 0 0 2px var(--section-color);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#quick-row-links .quick-mode {
-  position: relative;
-  overflow: visible;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    "bubble"
-    "label";
-  align-items: center;
-  justify-items: center;
-  row-gap: 0.3rem;
   padding: 0;
-  gap: 0;
   border: none;
   background: none;
-  aspect-ratio: auto;
-  height: auto;
-  align-self: center;
-  justify-self: stretch;
-}
-
-
-
-
-
-
-#quick-row-links .quick-mode.on {
-  box-shadow: none;
-  background: none;
-}
-
-
-
-
-.quick-name {
-  width: 100%;
-  text-align: center;
-  font-family: "Mono", monospace;
-  font-weight: 500;
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  color: var(--text-body);
-  white-space: nowrap;
-  transition: color 200ms ease;
-}
-.quick-mode.on .quick-name { color: var(--section-color); }
-
-#quick-row-links .quick-name {
-  display: none;
-}
-
-#quick-row-links .quick-icon {
-  grid-area: bubble;
-  position: relative;
-  width: 68px;
-  height: 68px;
-  border-radius: 50%;
-  corner-shape: round;
-  background: var(--pill-background);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  pointer-events: none;
-  transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease;
-}
-#quick-row-links .quick-mode svg {
-  width: 62%;
-  height: 62%;
-  mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
-  -webkit-mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
-}
-
-#quick-row-links .quick-label {
-  grid-area: label;
-  justify-self: center;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
-}
-
-#quick-row-links .quick-mode.on .quick-icon {
-  color: var(--section-color);
-  box-shadow: inset 0 0 0 2px var(--section-color);
-}
-
-#quick-row-links .quick-label.waiting {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 4px;
-  height: 0.66rem;
-  text-shadow: none;
-}
-#quick-row-links .quick-label.waiting .quick-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: currentColor;
-  will-change: transform;
-}
-#quick-row-links .quick-label.waiting .quick-dot:nth-child(1) { animation: quick-dot-wave-1 1.8s ease-in-out infinite; }
-#quick-row-links .quick-label.waiting .quick-dot:nth-child(2) { animation: quick-dot-wave-2 1.8s ease-in-out infinite; }
-#quick-row-links .quick-label.waiting .quick-dot:nth-child(3) { animation: quick-dot-wave-3 1.8s ease-in-out infinite; }
-
-@keyframes quick-dot-wave-1 {
-  0%, 100%  { transform: translateY(0); }
-  10%       { transform: translateY(-60%); }
-  22%       { transform: translateY(0); }
-  66%       { transform: translateY(-60%); }
-  78%       { transform: translateY(0); }
-}
-@keyframes quick-dot-wave-2 {
-  0%, 100%  { transform: translateY(0); }
-  22%       { transform: translateY(-60%); }
-  34%       { transform: translateY(0); }
-  66%       { transform: translateY(-60%); }
-  78%       { transform: translateY(0); }
-}
-@keyframes quick-dot-wave-3 {
-  0%, 100%  { transform: translateY(0); }
-  34%       { transform: translateY(-60%); }
-  46%       { transform: translateY(0); }
-  66%       { transform: translateY(-60%); }
-  78%       { transform: translateY(0); }
-}
-
-
-
-
-.level {
-  position: relative;
-  overflow: hidden;
-  flex: 1;
-  min-width: 0;
-  border-radius: 22px;
-  corner-shape: squircle;
-  background: var(--sunken);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  touch-action: pan-y;
-  transition: scale 200ms var(--ease-split);
-}
-.level.dragging { scale: 1.03; }
-.level-fill {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--level, 0%);
-  background: color-mix(in srgb, var(--section-color) 34%, transparent);
-  border-top: 1px solid color-mix(in srgb, var(--section-color) 70%, transparent);
-  
-
-  transition: height 220ms var(--ease-leave);
-}
-.level.dragging .level-fill { transition: none; }
-
-.level-icon {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 12px;
   display: grid;
   place-items: center;
+  color: var(--text-bright);
+  transition: scale 200ms var(--ease-split), color 200ms ease;
 }
-.level-icon svg { width: 24px; height: 24px; fill: currentColor; }
-.level.lit { color: var(--text-bright); }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.quick-bubble.quick-knob {
-  border-radius: 50%;
-  corner-shape: round;
-}
-.quick-knob {
-  
-
-
-
-
-  width: 100%;
-  aspect-ratio: 1;
-  place-self: center;
-  color: var(--text-icon);
-  display: grid;
-  place-items: center;
-  padding: 0;
-  transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease, scale 200ms var(--ease-split);
-}
-.quick-knob:active { scale: 0.94; }
-
-
-
-
-
-.quick-knob.on {
-  color: var(--section-color);
-  box-shadow: inset 0 0 0 2px var(--section-color);
-}
-.quick-knob.unavailable { opacity: 0.4; }
-.quick-icon { display: grid; place-items: center; }
-.quick-icon svg { width: 26px; height: 26px; fill: currentColor; }
-
-
-
-#quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
-
-#quick-panel.showing .quick-mode.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
-@keyframes knob-turn {
-  from { rotate: 0deg; }
-  to   { rotate: 360deg; }
-}
-
-
-.quick-knob.on .record-dot { fill: #e5342b; }
-
-
-
-
-
-
+.status-action svg { width: 100%; height: 100%; fill: currentColor; }
+/* Written with the arrival rule's specificity rather than left to source order: `.status-face.showing > *` stands on this button for as long as the panel is open (motion.md#an-arrival-animation-outranks-the-press-animation-on-the-same-element). */
+.status-face.showing .status-action:active { scale: 0.9; }
+#status-power { color: #e5342b; }
 
 
 
 
 :root {
-  
   --quick-margin: 10px;
-  --quick-gap: 8px;
-  
-
-  --quick-links-tall: 300px;
-
+  --quick-gap: 10px;
   --quick-pop: 460ms;
+
+  --quick-stats-share: 27%;
+  --quick-toggle-share: 27.5%;
+  --quick-transfer-tall: 26px;
+
+  --quick-vitals-tall: 80px;
+  --quick-grid-tall: 233px;
+  --quick-grid-icon: 60px;
+  --quick-ring-size: 78px;
+  --quick-grid-column: 80px;
+  --quick-levels-wide: 108px;
+  --quick-levels-tall: 285px;
+  --quick-knob-size: 56px;
+  --quick-knob-icon: 27px;
+  --quick-stats-drop: 12px;
+  --quick-stats-inset: 10px;
+  --quick-divider-room: 34px;
+  --quick-divider-shift: -18px;
+  --quick-knob-gap: 5px;
+  --quick-levels-inset: 14px;
+  --solo-ms: 420ms;
+  /* Mirrors SOLO_OUT and SOLO_FROST in status.js. */
+  --solo-out: 180ms;
+  --solo-frost: 260ms;
+  --battery-well: rgba(10, 9, 13, 0.85);
 }
 
 #quick-panel {
@@ -2632,8 +2227,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   width: var(--quick-width, 0px);
   height: var(--quick-height, 0px);
   box-sizing: border-box;
-  /* Main-Status-Idle's own dock stands at this same bottom edge (status.js's fitPillDock, mirrored here as --quick-dock-pad); the column gives that room back rather than the two overlapping. */
-  padding-bottom: var(--quick-dock-pad, 0px);
   display: flex;
   flex-direction: column;
   gap: var(--quick-gap);
@@ -2641,13 +2234,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     left var(--grow-ms) var(--ease-grow),
     top var(--grow-ms) var(--ease-grow),
     width var(--grow-ms) var(--ease-grow),
-    height var(--grow-ms) var(--ease-grow),
-    padding-bottom var(--grow-ms) var(--ease-grow);
+    height var(--grow-ms) var(--ease-grow);
   pointer-events: none;
   z-index: 29;
 }
-
-
 
 
 
@@ -2663,30 +2253,63 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: rgba(6, 6, 8, 0.42);
   opacity: 0;
   --scrim-frost: 0;
-  
   transition: opacity 180ms var(--ease-split), --scrim-frost 450ms var(--ease-sweep);
 }
 #quick-panel.showing #quick-scrim {
   opacity: 1;
   --scrim-frost: 1;
-  
-
-
-
-
   transition-duration: 150ms, 260ms;
+  pointer-events: auto;
 }
-
-
-
-
-#quick-panel.showing #quick-scrim { pointer-events: auto; }
-
-
-
 #quick-panel.leaving #quick-scrim { opacity: 0; transition-duration: 140ms, 450ms; }
 
 
+
+
+#stats-section {
+  flex: 0 0 var(--quick-stats-share);
+  min-height: 0;
+  box-sizing: border-box;
+  padding-top: var(--quick-stats-drop);
+  padding-inline: var(--quick-stats-inset);
+  display: flex;
+  flex-direction: column;
+  gap: var(--quick-gap);
+}
+
+#system-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* The Now bubble's room is this section's padding rather than the panel's: on the panel it came off the height every section's share is a percentage of, so a mod arriving down there resized the stats and the system sections too — which is exactly what those two are not allowed to do. Here it costs the one section that is meant to give way. */
+#toggle-section {
+  flex: 0 0 var(--quick-toggle-share);
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--quick-gap);
+}
+
+.quick-divider {
+  flex: none;
+  width: 46%;
+  height: 1px;
+  margin: var(--quick-divider-room) auto;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, var(--text-muted), transparent);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+/* Growing the shared margin moved nothing: the middle section is `flex: 1`, so every pixel added to a divider's margin came straight back out of the section between them and both lines stayed where they were. The outward move has to be a pull past the section boundary, which is what the negative side is. */
+#stats-section + .quick-divider { margin-top: var(--quick-divider-shift); }
+#system-section + .quick-divider { margin-bottom: var(--quick-divider-shift); }
+#quick-panel.showing .quick-divider { opacity: 0.5; transition-delay: 180ms; }
 
 
 
@@ -2699,7 +2322,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: var(--pill-background);
   border: 1px solid var(--border);
   pointer-events: auto;
-  
   transform-origin: center;
   opacity: 0;
 }
@@ -2707,86 +2329,503 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
+#quick-weather {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  height: 1.1rem;
+  font-family: "ClashMedium", sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+#quick-panel.showing #quick-weather { opacity: 1; transition-delay: 160ms; }
+#weather-glyph svg { width: 16px; height: 16px; fill: currentColor; }
 
 
-#quick-row-top {
+
+
+#quick-row-vitals {
   display: flex;
   gap: var(--quick-gap);
   flex: none;
+  height: var(--quick-vitals-tall);
 }
 
-#quick-row-links {
-  height: var(--quick-links-tall);
+#quick-vitals {
   flex: 1;
   min-width: 0;
-  margin-top: -0.5rem;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: var(--quick-gap);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 0.9rem;
+  transition: scale 200ms var(--ease-split);
 }
+#quick-vitals.pressing { scale: 0.97; }
+
+#vitals-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.28rem;
+  min-width: 0;
+}
+.vital {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "Mono", monospace;
+  font-size: 0.64rem;
+  line-height: 1;
+  color: var(--text-body);
+  white-space: nowrap;
+}
+.vital-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--section-color);
+}
+.vital[data-vital="ram"] .vital-dot { background: #8a5bfd; }
+.vital[data-vital="cpu"] .vital-dot { background: #fd8a5b; }
+.vital-reading {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+#vitals-uptime {
+  flex: none;
+  font-family: "Clash", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+
+
+
+#quick-battery {
+  background: none;
+  border: none;
+  flex: none;
+  width: 150px;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  color: #fff;
+  transition: scale 200ms var(--ease-split);
+}
+#quick-battery.pressing { scale: 0.97; }
+
+#battery-cell {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  height: 100%;
+  border: 2px solid transparent;
+  border-radius: 22px;
+  corner-shape: squircle;
+  background: var(--battery-well);
+  display: grid;
+  place-items: center;
+  transition: border-color 500ms ease;
+}
+#quick-battery.charging #battery-cell { border-color: var(--charge-color, var(--text-faint)); }
+
+#battery-pin {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 58%;
+  margin-left: 5px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--battery-well);
+  transition: border-color 500ms ease;
+}
+/* The pin's fill was a share of `--charge-width`, which resolves against the pin's own 20px rather than against the cell — at 47% that came to less than the insets and the fill was never drawn at all. The pin is the terminal, not a second gauge: it carries the charge colour whole. */
+#battery-pin::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 4px;
+  background: var(--battery-edge, var(--charge-color, var(--text-faint)));
+  transition: background 500ms ease;
+}
+#quick-battery.charging #battery-pin { border-color: var(--charge-color, var(--text-faint)); }
+#quick-battery.saving { --battery-edge: var(--section-color); }
+#quick-battery.low { --battery-edge: #e5342b; }
+
+#battery-fill {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  top: 4px;
+  width: var(--charge-width, 0%);
+  border-radius: 17px 4px 4px 17px;
+  z-index: 1;
+  background: var(--charge-color, var(--text-faint));
+  transition: width 700ms var(--ease-enter), background 500ms ease;
+}
+#battery-glyph {
+  position: absolute;
+  top: 7px;
+  left: 9px;
+  width: 20px;
+  height: 20px;
+  z-index: 3;
+}
+#battery-glyph svg { width: 100%; height: 100%; fill: currentColor; }
+#battery-reading {
+  z-index: 3;
+  position: relative;
+  font-family: "Clash", sans-serif;
+  font-size: 1.75rem;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+#battery-remaining {
+  position: absolute;
+  right: 9px;
+  bottom: 6px;
+  z-index: 3;
+  font-family: "Mono", monospace;
+  font-size: 0.58rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.82);
+  font-variant-numeric: tabular-nums;
+}
+
+
+
+
+/* The strip keeps its room whether or not a file is in flight: drawn with display:none it took its height back and every module above it slid, so a transfer starting was the whole stats column moving rather than one bar appearing. */
+#quick-transfer.idle #transfer-track { display: none; }
+#quick-transfer {
+  flex: none;
+  height: var(--quick-transfer-tall);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0 0.2rem;
+  box-sizing: border-box;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+#quick-panel.showing #quick-transfer { opacity: 1; transition-delay: 200ms; }
+
+#transfer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: "Mono", monospace;
+  font-size: 0.66rem;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+#transfer-glyph svg { width: 15px; height: 15px; fill: currentColor; }
+
+#transfer-track {
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--sunken);
+}
+#transfer-fill {
+  height: 100%;
+  width: var(--transfer-share, 0%);
+  border-radius: 4px;
+  background: var(--transfer-color, var(--section-color));
+  transition: width 320ms var(--ease-split), background 400ms ease;
+}
+
+
+
 
 #quick-row-body {
   display: flex;
   gap: var(--quick-gap);
-  flex: 1;
+  flex: 0 0 var(--quick-grid-tall);
   min-height: 0;
-  transition: flex-basis 320ms var(--ease-split);
 }
 
-
-#quick-row-knobs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  align-content: stretch;
-  gap: var(--quick-gap);
+#quick-grid {
   flex: 1;
   min-width: 0;
-  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, var(--quick-grid-column));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  justify-content: center;
+  row-gap: var(--quick-gap);
+  column-gap: var(--quick-knob-gap);
 }
-#quick-row-levels {
-  display: flex;
-  gap: var(--quick-gap);
 
-
-
-  min-width: 130px;
-  width: 179px;
-  flex: 0 1 179px;
-  min-height: 0;
+.quick-mode {
+  position: relative;
+  overflow: visible;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  transition: color 200ms ease, scale 200ms var(--ease-split);
 }
-/* Main's dock takes its height from #quick-row-body's own flex-basis (fitPillDock() in status.js, mirroring --pill-dock-tall), so the knobs and levels flex-scale down with it instead of clipping. */
+.quick-mode:active { scale: 0.96; }
+.quick-mode.unavailable { opacity: 0.4; }
 
+.quick-icon { display: grid; place-items: center; }
+.quick-icon svg { width: 26px; height: 26px; fill: currentColor; }
 
+#quick-grid .quick-icon {
+  width: var(--quick-grid-icon);
+  height: var(--quick-grid-icon);
+  border-radius: 50%;
+  corner-shape: round;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease;
+}
+#quick-grid .quick-icon svg {
+  width: 62%;
+  height: 62%;
+  mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
+}
+#quick-grid .quick-mode.on .quick-icon {
+  color: var(--section-color);
+  box-shadow: inset 0 0 0 2px var(--section-color);
+}
 
-
-
-
-
-/* Main-Status-Idle's own dock: #pill.panel-dock (below, near --pill-dock-* vars) is the box. */
-/* #player-face is reused verbatim inside it — .face is already inset:0, so it fills whatever */
-/* height fitPillDock() gives the box with no dock-specific override needed. #dock-transfer is */
-/* the one piece of markup this state adds, since Main carries no transfer face anywhere else; */
-/* it is pinned under #player-face, always at the very bottom, never the reverse (states.md). */
-#dock-transfer {
-  display: none;
+.quick-ring {
   position: absolute;
-  left: 1.1rem;
-  right: 1.1rem;
-  bottom: 0.85rem;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: "Mono", monospace;
-  font-size: 0.68rem;
-  color: var(--text-body);
+  left: 50%;
+  top: 50%;
+  width: var(--quick-ring-size);
+  height: var(--quick-ring-size);
+  margin-left: calc(var(--quick-ring-size) / -2);
+  margin-top: calc(var(--quick-ring-size) / -2);
+  overflow: visible;
+  pointer-events: none;
+  color: var(--text-faint);
+  animation: ring-turn 18s linear infinite;
+  transition: color 200ms ease;
 }
-#pill.panel-dock #dock-transfer.showing { display: flex; }
-#pill.dock-transfer #player-face { padding-bottom: 2.6rem; }
-#dock-transfer-glyph svg { width: 18px; height: 18px; fill: currentColor; }
-#dock-transfer-reading { font-variant-numeric: tabular-nums; }
+.quick-mode.on .quick-ring { color: color-mix(in srgb, var(--section-color) 70%, var(--text-body)); }
+
+.ring-char {
+  font-family: "Mono", monospace;
+  font-size: 7.5px;
+  fill: currentColor;
+  text-anchor: middle;
+  transform-box: fill-box;
+  transform-origin: center;
+  dominant-baseline: central;
+  animation: ring-char-in 320ms var(--ease-grow) backwards;
+  animation-delay: calc(var(--index) * 26ms);
+}
+
+.ring-arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 52 155;
+  opacity: 0;
+}
+.quick-mode.searching .ring-arc {
+  opacity: 1;
+  animation: ring-arc-turn 1100ms linear infinite;
+}
+.quick-mode.found .ring-arc { animation: ring-arc-burst 420ms var(--ease-grow); }
+
+@keyframes ring-turn {
+  from { rotate: 0deg; }
+  to   { rotate: 360deg; }
+}
+@keyframes ring-arc-turn {
+  from { rotate: 0deg; }
+  to   { rotate: 360deg; }
+}
+@keyframes ring-arc-burst {
+  0%   { opacity: 1; scale: 1; }
+  100% { opacity: 0; scale: 1.35; }
+}
+@keyframes ring-char-in {
+  from { scale: 0; opacity: 0; }
+  to   { scale: 1; opacity: 1; }
+}
 
 
+
+
+#quick-row-levels {
+  display: block;
+  position: relative;
+  flex: none;
+  align-self: center;
+  transition: translate var(--solo-ms) var(--ease-split) var(--solo-frost);
+  width: var(--quick-levels-wide);
+  height: var(--quick-levels-tall);
+  margin-right: var(--quick-levels-inset);
+  min-height: 0;
+}
+
+/* The bars are placed rather than laid out, so a merge can move one edge and leave the other three where they are. Laid out as flex items they could only be merged by shrinking one and growing the other, which is the two of them shoving each other along the row rather than one taking the other in. */
+.level {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--pill-background);
+  border: 2px solid var(--pill-background);
+  color: var(--text-muted);
+  touch-action: pan-y;
+  transition:
+    scale 200ms var(--ease-split),
+    left var(--solo-ms) var(--ease-split),
+    right var(--solo-ms) var(--ease-split);
+}
+.level[data-level="brightness"] { left: 0; right: calc(50% + var(--quick-knob-gap) / 2); }
+.level[data-level="volume"] { left: calc(50% + var(--quick-knob-gap) / 2); right: 0; }
+.level.dragging { scale: 1.03; }
+/* The bar under the finger is pinned opaque from the frame the finger lands rather than from the frame the merge starts: the frost now leaves before the modules do, and a bar still carrying any of the panel's own fade went down with the glass for those frames. Nothing the panel does to itself may reach the one control being held. */
+.level.holding {
+  opacity: 1;
+  animation: none;
+  background: rgb(from var(--pill-background) r g b);
+  border-color: rgb(from var(--pill-background) r g b);
+}
+
+/* Both bars travel to the same box — the one under the finger is on top and the other grows into it from behind, and is dropped only once it has arrived and is completely covered. Leaving the far one standing while the near one grew over it was the first version: two bodies converging read as a merge, one body growing over a parked one reads as it being covered up. The box stops a tenth of the row short of the far edge, so the merged bar is narrower than the pair was, which is what says two became one rather than one grew. */
+#quick-row-levels.merged[data-held="brightness"] .level { left: 0; right: 10%; }
+#quick-row-levels.merged[data-held="volume"] .level { left: 10%; right: 0; }
+/* The bar under the finger is pinned opaque for the overlap: the same colour with its alpha dropped rather than a second black written here, so it stays right if --pill-background ever gains one. Nothing can then show through it while the far bar is underneath, whatever that token is carrying. */
+#quick-row-levels.merged .level:not(.solo-hidden) {
+  z-index: 1;
+  background: rgb(from var(--pill-background) r g b);
+  border-color: rgb(from var(--pill-background) r g b);
+}
+/* The far bar is cut in one frame once it has arrived, never faded. It is opaque and so is the bar covering it, but their antialiased edges and their two-pixel borders stack where they coincide, so an alpha ramp walks that composite down over several frames and the merged bar's own edge lightens under it. Held at full opacity until the boxes are identical and then dropped outright, every frame up to the cut renders exactly what the overlap rendered. */
+#quick-row-levels.merged .level.solo-hidden {
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    left var(--solo-ms) var(--ease-split),
+    right var(--solo-ms) var(--ease-split),
+    visibility 0s linear var(--solo-ms);
+}
+.level-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--level, 0%);
+  background: var(--section-color);
+  transition: height 220ms var(--ease-leave);
+}
+.level.dragging .level-fill { transition: none; }
+
+.level-icon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 14px;
+  display: grid;
+  place-items: center;
+}
+.level-icon svg { width: 24px; height: 24px; fill: currentColor; }
+.level.lit { color: var(--text-bright); }
+
+
+
+
+#quick-knob-window {
+  flex: none;
+  width: 100%;
+  height: var(--quick-knob-size);
+  overflow: clip;
+  transition: width var(--grow-ms) var(--ease-grow), height var(--grow-ms) var(--ease-grow);
+}
+
+#quick-row-knobs {
+  display: flex;
+  align-items: center;
+  gap: var(--quick-knob-gap);
+  width: max-content;
+  height: 100%;
+  translate: var(--knob-shift, 0px) 0;
+}
+
+.quick-bubble.quick-knob {
+  border-radius: 50%;
+  corner-shape: round;
+}
+.quick-knob {
+  width: var(--quick-knob-size);
+  height: var(--quick-knob-size);
+  flex: none;
+  color: var(--text-icon);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition:
+    background 200ms ease,
+    box-shadow 200ms ease,
+    color 200ms ease,
+    scale 200ms var(--ease-split),
+    width var(--grow-ms) var(--ease-grow),
+    height var(--grow-ms) var(--ease-grow);
+}
+.quick-knob:active { scale: 0.94; }
+.quick-knob.on {
+  color: var(--section-color);
+  box-shadow: inset 0 0 0 2px var(--section-color);
+}
+.quick-knob.unavailable { opacity: 0.4; }
+.quick-knob .quick-icon svg {
+  width: var(--quick-knob-icon, 22px);
+  height: var(--quick-knob-icon, 22px);
+  transition: width var(--grow-ms) var(--ease-grow), height var(--grow-ms) var(--ease-grow);
+}
+.quick-knob.on .record-dot { fill: #e5342b; }
+
+#quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
+#quick-panel.showing .quick-mode.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
+@keyframes knob-turn {
+  from { rotate: 0deg; }
+  to   { rotate: 360deg; }
+}
+
+
+
+
+/* Expanded, the Now bubble is what is being read, so the toggles give it the room rather than the two fighting over a section that has lost half its height: the row shrinks and the window with it, and the same nine stay reachable because the window scrolls either way. */
+#quick-panel.now-open {
+  --quick-knob-size: 40px;
+  --quick-knob-icon: 20px;
+  /* Mirrors LOCK_HEIGHT (124px) plus the stack's --lock-bottom (20px) in lock.js, less the panel's own STATUS_MARGIN_FOOT (10px), plus a gap: the room the expanded card stands in. */
+  --quick-now-room: 146px;
+}
+/* The card's room has to be padding on the side it stands on. `padding-top` moved the row down into the card instead — the section centres its row, so only a bottom pad lifts that centre clear of it. */
+#quick-panel.now-open #toggle-section { padding-bottom: var(--quick-now-room); }
 
 
 
@@ -2811,12 +2850,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   to   { opacity: 1; }
 }
 
-
-
-
-
-
-
 #quick-panel.leaving .quick-bubble {
   animation: bubble-collapse 110ms var(--ease-leave) calc(var(--pop-rank, 0) * 4ms) both;
 }
@@ -2824,8 +2857,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   from { opacity: 1; scale: 1; }
   to   { opacity: 0; scale: 0.2; }
 }
-
-
 
 #quick-panel.showing .level-fill {
   animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
@@ -2835,29 +2866,49 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   to   { translate: 0 0; }
 }
 
-
-
-
-
-
-
-
 #quick-panel.showing #battery-fill {
-  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
+  animation: liquid-pour-across 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
+}
+@keyframes liquid-pour-across {
+  from { translate: -100% 0; }
+  to   { translate: 0 0; }
 }
 
 
 
 
+/* The glass goes first and the modules follow it: the frost clearing is what says the panel is getting out of the way, so it leads both directions — out and back. The panel leaves under a held brightness bar the same way it leaves when it is closed, and comes back on the same grow it arrived on — same keyframes, same per-module stagger. A fade of its own was written here first and it was the wrong motion: the panel has one way of going and one way of coming, and a second one invented for this state makes the hold read as a different panel. Everything but the two bars, which are what the hold is about. */
+#quick-panel.solo-out .quick-bubble:not(.level) {
+  animation: bubble-collapse 110ms var(--ease-leave) calc(var(--solo-frost) + var(--pop-rank, 0) * 4ms) both;
+  pointer-events: none;
+}
+#quick-panel.solo-in .quick-bubble:not(.level) {
+  animation: bubble-grow var(--quick-pop) var(--ease-grow) calc(var(--pop-rank, 0) * 5ms) backwards;
+}
+#quick-panel.solo-in .quick-bubble:not(.level) > * {
+  animation: quick-contents-in 280ms ease calc(var(--pop-rank, 0) * 5ms) backwards;
+}
 
+#quick-panel.solo-out #quick-weather,
+#quick-panel.solo-out #quick-transfer,
+#quick-panel.solo-out .quick-divider {
+  opacity: 0;
+  transition: opacity 110ms var(--ease-leave) var(--solo-frost);
+}
+#quick-panel.solo-in #quick-weather { transition-delay: 160ms; }
+#quick-panel.solo-in .quick-divider { transition-delay: 180ms; }
+#quick-panel.solo-in #quick-transfer { transition-delay: 200ms; }
 
+#quick-panel.level-solo #quick-scrim {
+  opacity: 0;
+  --scrim-frost: 0;
+  transition:
+    opacity var(--solo-frost) var(--ease-leave),
+    --scrim-frost var(--solo-frost) var(--ease-sweep);
+}
 
-
-
-
-
-
-
+/* The bar is lifted to the middle of the emptied panel on translate, off the layout entirely. Growing the row body to 46% of the screen instead put the levels in the middle by making their container tall — and the connector grid shares that container and lays its three rows out as 1fr each, so every connector stretched to a third of the new height on the way out. A translate moves the one thing that is meant to move; it also leaves the bar's own height alone, which the drag needs, since the ratio it reads the finger against is measured off that height every frame. */
+#quick-panel.level-solo #quick-row-levels { translate: 0 var(--solo-lift, 0px); }
 
 
 
@@ -2893,14 +2944,14 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   transition:
     opacity 200ms ease,
     width var(--clock-width-ms, 300ms) var(--ease-split),
-    height var(--grow-ms) var(--ease-grow),
+    height var(--grow-ms) var(--ease-bubble),
     border-radius var(--grow-ms) ease-out,
     padding var(--clock-width-ms, 300ms) var(--ease-split),
     
 
 
     left var(--clock-width-ms, 300ms) var(--ease-split),
-    top var(--grow-ms) var(--ease-grow),
+    top var(--grow-ms) var(--ease-bubble),
     translate var(--clock-fly-ms, 420ms) var(--ease-split),
     scale 320ms var(--ease-split);
 }
@@ -2924,35 +2975,20 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-:root { --edge-over: 20px; --corner-grow-scale: 1.3; --corner-margin: 8px; --corner-padding-scale: 1.15; }
+/* The two corner bubbles stood past the screen's own edges by --edge-over and read as cropped by the display rather than as bubbles standing near it. They are inset boxes now: --corner-inset is the panel's own margin (STATUS_MARGIN in js/status.js), so all three left edges and all three right edges line up down the screen, and --corner-tall is what js/status.js adds to that inset to know where the panel may start. */
+:root { --edge-over: 20px; --corner-grow-scale: 1.15; --corner-inset: 10px; --corner-tall: 40px; --corner-radius: 18px; }
 #clock.corner-grow {
-  /* --corner-margin pulls the box back off the true corner by a few pixels rather than merging flush with it — flush read as the reading sitting in the physical corner itself, cropped by the display's own edge, on the phone. */
-  left: calc(-1 * var(--edge-over) + var(--corner-margin));
-  top: calc(-1 * var(--edge-over) + var(--corner-margin));
-  /* Time over date now, not the idle row — a column lets justify-content (main axis) centre the pair vertically in the taller box while align-items (cross axis) centres each of them horizontally, which padding-left/-right below make a true screen-edge-to-inward-edge centre rather than a centre of whatever the row's own padding happened to be. */
+  left: var(--corner-inset);
+  top: var(--corner-inset);
+  /* Time over date now, not the idle row — justify-content centres the pair down the taller box and align-items centres each of them across it. */
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* Equal padding either side lands the content-box's left edge exactly at the true screen edge (the box's own left already sits at -edge-over + corner-margin, so edge-over - corner-margin cancels the remainder) and holds the same distance on the inward side, so align-items: center above is centring between the screen edge and the bubble's inward edge, not merely between two arbitrary insets. --corner-padding-scale (+15%) is layered on top of that cancellation rather than folded into --corner-margin, so the edge math above stays legible on its own. */
-  padding-left: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
-  padding-right: calc((var(--edge-over) - var(--corner-margin)) * var(--corner-padding-scale, 1.15));
-  padding-top: calc((var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-padding-scale, 1.15));
-  padding-bottom: calc(0.4rem * var(--corner-padding-scale, 1.15));
-  /* Nudges the time/date stack toward the true top-left corner it is reaching for, rather than sitting dead-centre of the grown box's now-larger padding — left pushed further than top since the box's own reach is mostly leftward. */
-  margin-top: -6px;
-  margin-left: -14px;
-
-
-
-
-
-
-
-  /* Extends the box's own right edge, on top of the left/top corner reach above, so it grows further out toward the screen edge rather than only toward the bar. */
-  width: calc(var(--clock-width, auto) + var(--clock-left, 14px) + var(--edge-over) * 2);
-  /* +30% now (was +15%), downward only since top is pinned above by --edge-over already — --corner-grow-scale mirrors on Status' own height in the same file (states.md#clock-status-idle-and-main-status-idle). */
-  height: calc((var(--pill-height) - var(--status-short, 4px) + var(--grab, 0px) + var(--status-short, 4px) / 2 + var(--edge-over)) * var(--corner-grow-scale, 1.3));
-  /* Drawn above the panel (29) and the grown Status bubble (30), the same exception Main's own dock is (states.md#clock-status-idle-and-main-status-idle). */
+  padding: 0 0.7rem;
+  width: var(--clock-width, auto);
+  height: var(--corner-tall);
+  border-radius: var(--corner-radius);
+  /* Drawn above the panel (29) and the grown Status bubble (30), the same exception Main's own rise is (states.md#clock-status-idle-and-main-status-idle). */
   z-index: 31;
 }
 #clock.corner-grow #clock-face { font-size: calc(0.68rem * var(--corner-grow-scale, 1.3)); }
@@ -2974,22 +3010,12 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-/* Main-Status-Idle no longer reaches the top-right corner (see states.md). It docks at the */
-/* bottom of the quick-settings panel instead, growing width/height/top to a box status.js's */
-/* fitPillDock() measures off #quick-panel and the screen (mirrors STATUS_PANEL geometry, never */
-/* a hand-picked constant). --pill-dock-* are written before .panel-dock is added, so the box */
-/* is ready the instant the class starts easing width/height/top on the ordinary --pill-transition. */
-#pill.panel-dock {
-  /* Merges with the screen's own left/right edges the same way Clock's and Status' own corner-reach do, rather than a measured width centred by auto margins — which breaks the instant that measured width is wider than the container, since --pill-width is not auto and margin-inline:auto degrades to a one-sided offset under that over-constraint. */
-  transition: var(--pill-transition), left var(--grow-ms) var(--ease-grow), right var(--grow-ms) var(--ease-grow);
-  left: calc(-1 * var(--edge-over));
-  right: calc(-1 * var(--edge-over));
-  width: auto;
-  top: var(--pill-dock-top, var(--grab, 0px));
-  height: var(--pill-dock-height, var(--pill-height));
-  padding-bottom: var(--edge-over);
-  border-radius: 26px;
-  /* Drawn above the panel (29) and the grown Status bubble (30): a bubble not part of Main-Status-Idle stays behind the panel, but Main and Clock are the two named exceptions (bubbles.md). */
+#pill.panel-top {
+  transition: var(--pill-transition), top var(--grow-ms) var(--ease-grow);
+  top: calc(-1 * var(--edge-over));
+  height: calc(var(--pill-height) + var(--edge-over));
+  padding-top: var(--edge-over);
+  border-radius: 0 0 calc(var(--pill-height) / 2) calc(var(--pill-height) / 2);
   z-index: 31;
 }
 
@@ -3079,6 +3105,27 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     max-width var(--grow-ms) var(--ease-grow),
     margin-left var(--grow-ms) var(--ease-grow);
 }
+/* Held at the place it already stood while the bubble retracts out from under it: in flow it gave its max-width and margin back at the same time and slid on the way out. */
+/* The Status bubble's contents turn as they are handed over; the Clock's have no second face to be handed to, so the same turn is an animation on the class change rather than a state. */
+/* The Clock's turn is the pill's own, not its contents': it has one set of contents rather than two faces to hand between, so a time and a date rotating inside it read as the type being crooked rather than as the bubble arriving. `rotate` is free on the Clock — `transform` holds the drag, `scale` the pop, `translate` the flight — so the turn composes with all three. */
+@keyframes corner-turn-in {
+  from { rotate: -12deg; }
+  to { rotate: 0deg; }
+}
+#clock.corner-grow { animation: corner-turn-in 300ms var(--ease-split); }
+
+/* Held where it already stood while the box retracts out from under it: in flow it gave its max-width and its margin back at the same time and slid on the way out. What the shrinking box does not cover any more is cut, which is what `overflow: hidden` on the Clock is for and why it is worn only while this is running. */
+#clock.corner-leaving { overflow: hidden; }
+#clock-date.handed-over {
+  position: absolute;
+  max-width: none;
+  margin: 0;
+  font-size: calc(0.62rem * var(--corner-grow-scale, 1.15));
+  translate: 0 0;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-leave);
+}
+
 #clock.corner-grow #clock-date {
   /* Was margin-left, spacing the date beside the time in the old row; the pair stacks now, so the gap is above it instead. */
   margin-left: 0;
@@ -3487,8 +3534,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .lock-note-who:not(.runs-out),
 .lock-note-said:not(.runs-out),
 #timer-remaining:not(.runs-out),
-#timer-label:not(.runs-out),
-.quick-label:not(.runs-out) { mask-image: none; }
+#timer-label:not(.runs-out) { mask-image: none; }
 
 
 #player-meta:not(:has(.runs-out)) { mask-image: none; }
@@ -3514,3 +3560,72 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 
+
+
+
+
+
+/* The panel is a positioned box with z-index 29 and the Now bubble's stack carried none, so the bubble painted under the panel and its scrim whichever way round the two sat in the document. In the panel it is raised above it, the same exception the grown Clock bubble already is. */
+#lock-now.in-panel { z-index: 31; }
+
+/* The panel's two sizes are one shape at two scales, so the radius is one token read at both: the carrying bubble was rounder than its own corners wanted and the retracted one was a full pill, which read as two unrelated bubbles swapping places. */
+#lock-now.in-panel:not(.compact) { border-radius: var(--lock-panel-radius, 40px); }
+
+#lock-now.compact {
+  height: var(--lock-compact-height, 44px);
+  width: 190px;
+  align-self: center;
+  border-radius: var(--lock-compact-radius, 16px);
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 0.9rem;
+  transition: var(--lock-transition), width 340ms var(--ease-split);
+}
+#lock-now.compact #lock-buttons,
+#lock-now.compact #lock-timeline,
+#lock-now.compact #lock-artist { display: none; }
+/* The head was `flex: none` and centred, so a title longer than the bubble grew the head instead of clipping — it pushed the artwork off the left edge, never earned the .runs-out fade, and left the flanks of the bubble as bare padding rather than something a tap could land on. Filling the bubble gives the title a box to run out of and makes every pixel of the bubble the head. */
+#lock-now.compact #lock-head {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  gap: 0.5rem;
+  align-items: center;
+}
+#lock-now.compact #lock-art-slot {
+  --lock-art: 26px;
+  width: 26px;
+  height: 26px;
+}
+#lock-now.compact #lock-title {
+  font-size: 0.74rem;
+  text-align: left;
+}
+
+/* Small with a mod and small without one are one shape with one radius — the mod only appends its content. The idle bar used to be a shorter, fully round pill of its own, which read as two different bubbles rather than one bubble with nothing in it. */
+#lock-now.idle.compact { justify-content: center; }
+
+/* The arrival owns scale, opacity and width outright while it plays. Leaving the CSS transitions on meant three clocks running the one journey — the 320ms scale transition off .showing, the 340ms width transition off .compact and the flight's own keyframes — so the bubble changed size a second time after it had landed, at a moment none of the three agreed on. */
+#lock-now.arriving, #lock-now.flying { transition: none; }
+
+/* Timeline one narrows the box to a circle, and a stretched flex child narrowing collapses toward the start of its column rather than around its own middle — the ball would form at the left edge of the screen instead of where the bubble was standing. Centred, and with the width pinned to what was just measured, the first frame is identical and every frame after it closes inward.
+
+   This is not on .flying, and that is the whole of why the width now animates rather than jumping. Cross-axis stretch is what gives this bubble its width at all, so the frame align-self stops being stretch is the frame it shrink-to-fits its own content — and .flying goes on a frame BEFORE the box is measured, so what the draw read as its starting width was already the collapsed one and there was nothing left to travel. It goes on in the same breath as the animation that pins the width, so the two can never be a frame apart again. */
+#lock-now.circling { align-self: center; position: relative; }
+
+/* The cover has to sit in the middle of the ball for the whole of the draw, not only at the end of it. Left in the flex row it is pinned a fixed padding off an edge that is travelling inward as the box narrows, so it drifts the whole way down; taken out of the row and centred in the box, the narrowing carries it rather than dragging it. The jump that taking it out causes is what the draw's own animation on it is for. */
+#lock-now.circling #lock-art-slot {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: var(--lock-art, 44px);
+  height: var(--lock-art, 44px);
+}
+
+/* The cover fills the ball rather than standing in the middle of it: what is being carried home is the mod, so the drop that leaves is the artwork and not a bubble with a stamp on it. The slot's own box is what grows — the draw animates it from the size it was in the row up to the ball's diameter, square at every frame so the crop never stretches — and the image is told to follow it, since a fixed `--lock-art` on both is what pinned it at 44px inside a shape closing past it. The rounding is the bubble's: `#lock-now` clips, so the cover takes the circle from its parent instead of racing it with a radius of its own. */
+#lock-now.circling #lock-art { width: 100%; height: 100%; border-radius: inherit; }
+
+/* Main's own reading leaves while the shot is in the air, so what the shape lands on is a bare bubble rather than a face the arrival has to replace. It is a class of this file's own rather than the row's `leaving`, which is owned by the mod hand-over and time-boxed by a timer of its own — two callers on one class is the race, not the ordering. */
+html.lock-incoming .face.showing > * { opacity: 0; transition: opacity 160ms ease; }
