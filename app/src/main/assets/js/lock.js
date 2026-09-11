@@ -2,8 +2,6 @@ import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
 import { blankLockLabels, clock, flipPlaying, paintProgress, playPath, livePosition, shownPosition, songSwapping, typeLabels } from './mods/media.js';
 import { cancelSpring, HOLD_BLOCK, rubberBandPast, toy, untoy } from './motion.js';
 import { fitClockProxy } from './clock.js';
-import { fitNotesProxy, paintNotes } from './notes.js';
-import { paintPadlock } from './padlock.js';
 import { fitStatusProxy, setPanelNowOpen } from './status.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
@@ -17,7 +15,6 @@ window.setLockShift = lockX => {
   lockShift = Number(lockX) || 0;
   root.style.setProperty('--lock-x', lockShift + 'px');
   fitLockProxy();
-  fitNotesProxy();
 };
 
 const LOCK_HEIGHT = 124;
@@ -114,31 +111,11 @@ const LOCK_GROW = 340;
 const LOCK_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
 
 
-const LOCK_ARRIVE = 660;
-const LOCK_RECOIL = 16;
-
-
-const LOCK_DRAW = 0.12;
-const LOCK_LAND = 0.52;
-
-
-const LOCK_MAGNET = 30;
-const LOCK_MAGNET_EASE = 'cubic-bezier(0.35, 0, 0.25, 1)';
-
-
-const LOCK_ARRIVE_POP = 1.08;
-
-
 const LOCK_SPRIG_MS = 460;
 const LOCK_SPRIG_STAGGER = 80;
-const LOCK_SPRIG_TURN = 22;
 
 
 const LOCK_TYPE_IN = 140;
-
-function sprigAt(index) {
-  return Math.round(LOCK_ARRIVE * LOCK_LAND) + index * LOCK_SPRIG_STAGGER;
-}
 
 export const lockPill = document.getElementById('lock-now');
 
@@ -207,6 +184,8 @@ let lockFlight = null;
 
 
 let lockArrival = [];
+// The three animations the bubble's own shape is made of, kept apart from the reading's: the shape has landed a good half second before the last block of text has finished growing in under it, and handing it back to the stylesheet on the reading's clock is what left it standing in the flight's own values — and untouchable — long after it had visibly arrived.
+let lockShape = [];
 let lockTypeTimer = 0;
 
 function lockArriving() {
@@ -217,7 +196,10 @@ function stopLockArrival() {
   clearTimeout(lockTypeTimer);
   lockArrival.forEach(move => move.cancel());
   lockArrival = [];
-  lockPill.classList.remove('arriving');
+  lockShape.forEach(move => move.cancel());
+  lockShape = [];
+  lockPill.classList.remove('arriving', 'circling');
+  lockMovers.forEach(mover => mover.element.style.removeProperty('opacity'));
 }
 
 export function paintLock() {
@@ -365,9 +347,12 @@ export function paintLockProgress(position) {
 
 let shownProxy = '';
 
+// getBoundingClientRect reads the flight's own translate and scale, so a window measured during an arrival stands on a drop crossing the screen — which is why the proxy was withheld for the whole journey, and why the bubble could be seen for most of a second and not touched. The resting box is known from the frame the flight is worked out, so it is kept and the window is placed where the bubble is going to be.
+let lockRest = null;
+
 function fitLockProxy() {
-  const hidden = lockFlying || lockArriving() || !lockPill.classList.contains('showing') || lockPill.classList.contains('idle');
-  const box = hidden ? null : lockPill.getBoundingClientRect();
+  const hidden = lockFlying || !lockPill.classList.contains('showing') || lockPill.classList.contains('idle');
+  const box = hidden ? null : (lockArriving() && lockRest ? lockRest : lockPill.getBoundingClientRect());
   const proxy = hidden
     ? [0, 0, 0, 0]
     : [Math.round(box.width), Math.round(box.height), Math.round(box.left), Math.round(box.top)];
@@ -389,8 +374,8 @@ function fitLockProxy() {
 
 
 export function lockHolds(x, y) {
-  if (lockFlying || lockArriving() || !lockPill.classList.contains('showing') || lockPill.classList.contains('idle')) return false;
-  const box = lockPill.getBoundingClientRect();
+  if (lockFlying || !lockPill.classList.contains('showing') || lockPill.classList.contains('idle')) return false;
+  const box = lockArriving() && lockRest ? lockRest : lockPill.getBoundingClientRect();
   return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 }
 
@@ -403,7 +388,6 @@ window.refitProxies = () => {
   fitLockProxy();
   fitStatusProxy();
   fitClockProxy();
-  fitNotesProxy();
 };
 
 
@@ -679,9 +663,7 @@ window.onLock = next => {
   
   
   root.classList.toggle('locked', next);
-  paintPadlock(next);
-  paintNotes(next);
-  
+
   
   
   
@@ -1033,6 +1015,9 @@ export function openPanelNow(expanded) {
   lockPill.classList.add('in-panel');
   lockPill.classList.toggle('compact', !panelExpanded);
   lockOpen = false;
+  // The steal is one filter in liveMods(), so the row only lets go of the mod when something repaints it — and nothing did on this path, which left Main carrying a mod the Now bubble was already holding for the whole of the panel's arrival. Same two calls the keyguard's own steal makes.
+  paintSatellites();
+  ensureClosedWindow();
   paintLock();
   if (!lockPill.classList.contains('showing')) {
     lockPill.classList.remove('arriving');
@@ -1071,63 +1056,165 @@ function setPanelNowExpanded(expanded) {
   stirLiquid(900);
 }
 
-// The arrival is a slingshot onto a magnetic target rather than the leave read backwards. Reversed, it played the leave's own draw-and-release on rewind, and its scale keyframes ran against two CSS transitions nobody had taken off — the 320ms scale off .showing and the 340ms width off .compact — so the bubble changed size a second time after it had landed, on a clock none of the three agreed about. .arriving takes the CSS out of it for the length of the journey: one owner per property.
+// The arrival is the leave run the other way, on the leave's own numbers: the drop is born out of Main as a circle of exactly the diameter the shot ends at, flies the same damped-spring arc back to the bar, and only then opens out of the ball into the pill. It used to arrive as a full-width bar sliding in at 0.9 of its size, which read as a box being positioned rather than as the mod being handed back. .arriving takes the CSS off scale, width and opacity for the length of the journey: one owner per property.
 function playNowEnter() {
   const to = lockPill.getBoundingClientRect();
   const from = pill.getBoundingClientRect();
   if (!to.width || !from.width) return;
   stopLockArrival();
   lockPill.classList.add('arriving');
+  lockRest = to;
+  fitLockProxy();
+
+  const art = lockMovers[0].element.getBoundingClientRect();
+  // The radius the bubble opens back out to is whatever it wears where it is standing — 16 retracted in the panel, 40 carrying a song, 34 on the keyguard. Landed on a hardcoded 34 the shape had one more corner change left in it after the journey was over, on the border-radius transition's own clock rather than on the arrival's.
+  const restRadius = getComputedStyle(lockPill).borderTopLeftRadius;
+  const ball = Math.min(to.width, to.height);
+  const drop = (Math.min(from.width, mainRestHeight()) / ball) * 0.9;
 
   const dx = (from.left + from.width / 2) - (to.left + to.width / 2);
   const dy = (from.top + from.height / 2) - (to.top + to.height / 2);
-  const drop = Math.min(from.width / to.width, from.height / to.height) * 0.9;
   const reach = Math.hypot(dx, dy) || 1;
-  const unitX = dx / reach;
-  const unitY = dy / reach;
-  const along = distance =>
-    (unitX * distance).toFixed(1) + 'px ' + (unitY * distance).toFixed(1) + 'px';
 
-  lockArrival = [
-    lockPill.animate(
-      [
-        { translate: along(reach), offset: 0, easing: LOCK_DRAW_EASE },
-        { translate: along(reach + LOCK_RECOIL), offset: LOCK_DRAW, easing: LOCK_SHOT_EASE },
-        { translate: along(-LOCK_MAGNET), offset: LOCK_LAND, easing: LOCK_MAGNET_EASE },
-        { translate: along(LOCK_MAGNET * 0.34), offset: 0.7, easing: LOCK_MAGNET_EASE },
-        { translate: along(-LOCK_MAGNET * 0.11), offset: 0.86, easing: LOCK_MAGNET_EASE },
-        { translate: '0px 0px', offset: 1 },
-      ],
-      { duration: LOCK_ARRIVE }
-    ),
-    lockPill.animate(
-      [
-        { scale: drop, offset: 0, easing: LOCK_DRAW_EASE },
-        { scale: drop * 0.84, offset: LOCK_DRAW, easing: LOCK_SHOT_EASE },
-        { scale: 0.94, offset: LOCK_LAND, easing: LOCK_POP_EASE },
-        { scale: LOCK_ARRIVE_POP, offset: 0.66, easing: LOCK_MAGNET_EASE },
-        { scale: 0.985, offset: 0.84, easing: LOCK_MAGNET_EASE },
-        { scale: 1, offset: 1 },
-      ],
-      { duration: LOCK_ARRIVE }
-    ),
-    ...lockMovers.map((mover, index) => mover.element.animate(
-      [
-        { opacity: 0, scale: 0, rotate: '-' + LOCK_SPRIG_TURN + 'deg' },
-        { opacity: 1, scale: 1, rotate: '0deg' },
-      ],
-      { duration: LOCK_SPRIG_MS, delay: sprigAt(index), easing: LOCK_POP_EASE, fill: 'backwards' }
-    )),
-  ];
+  // Nothing threw this one, so the arc takes a side of its own: straight down the middle is the one shape this journey may not be, whichever way it is travelled.
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const angle = (side * LOCK_SHOT_ANGLE[0] * Math.PI) / 180;
+  const launchX = (Math.cos(angle) * -dx - Math.sin(angle) * -dy) / reach;
+  const launchY = (Math.sin(angle) * -dx + Math.cos(angle) * -dy) / reach;
 
+  const back = between(LOCK_DRAW_BACK);
+  const backX = -launchX * back;
+  const backY = -launchY * back;
+  const holdX = dx + launchX * reach * LOCK_SHOT_LEAD;
+  const holdY = dy + launchY * reach * LOCK_SHOT_LEAD;
+
+  const over = between(LOCK_SHOT_OVER);
+  const swing = swingFor(Math.min(0.35, Math.max(0.004, over / reach)));
+  const millis = Math.round(between(LOCK_SHOT_MILLIS));
+  const opening = Math.round(between(LOCK_DRAW_MILLIS));
+
+  const frames = [];
+  for (let index = 0; index < LOCK_SHOT_SAMPLES; index += 1) {
+    const step = index / (LOCK_SHOT_SAMPLES - 1);
+    const wound = step <= LOCK_SETTLE_FROM
+      ? 1
+      : 1 - smoothly((step - LOCK_SETTLE_FROM) / (1 - LOCK_SETTLE_FROM));
+    const travel = 1 - Math.exp(-LOCK_SHOT_DECAY * step) * Math.cos(swing * step) * wound;
+    const rest = 1 - travel;
+    const punch = Math.sin(Math.min(1, step / LOCK_PUNCH_SHARE) * Math.PI) ** 2;
+    const growing = drop + (LOCK_DRAW_SQUEEZE - drop) * (1 - rest * rest);
+    frames.push({
+      offset: step,
+      translate:
+        (rest * rest * dx + 2 * rest * travel * holdX + travel * travel * backX).toFixed(1) +
+        'px ' +
+        (rest * rest * dy + 2 * rest * travel * holdY + travel * travel * backY).toFixed(1) +
+        'px',
+      scale: growing * (1 + (LOCK_SHOT_PUNCH - 1) * punch),
+    });
+  }
+
+  // The class goes on in the same breath as the animation pinning the width, exactly as the leave's does: .circling takes the bubble off cross-axis stretch, so a frame between the two is a frame at its own content's width.
+  lockPill.classList.add('circling');
   blankLockLabels();
-  clearTimeout(lockTypeTimer);
-  lockTypeTimer = setTimeout(typeLabels, sprigAt(1) + LOCK_TYPE_IN);
-
-  lockArrival[0].addEventListener('finish', () => {
-    lockPill.classList.remove('arriving');
-    fitLockProxy();
+  lockMovers.forEach(mover => {
+    if (!mover.travels) mover.element.style.opacity = '0';
   });
 
-  stirLiquid(sprigAt(lockMovers.length) + LOCK_SPRIG_MS);
+  const held = [
+    { width: Math.round(ball) + 'px', borderRadius: Math.round(ball / 2) + 'px' },
+    { width: Math.round(ball) + 'px', borderRadius: Math.round(ball / 2) + 'px' },
+  ];
+  const heldArt = [
+    { translate: '0px 0px', width: Math.round(ball) + 'px', height: Math.round(ball) + 'px' },
+    { translate: '0px 0px', width: Math.round(ball) + 'px', height: Math.round(ball) + 'px' },
+  ];
+
+  lockShape = [
+    lockPill.animate(frames, { duration: millis, fill: 'forwards' }),
+    lockPill.animate(held, { duration: millis, fill: 'forwards' }),
+    lockMovers[0].element.animate(heldArt, { duration: millis, fill: 'forwards' }),
+  ];
+
+  lockShape[0].addEventListener('finish', () => openNowBall(to, art, ball, restRadius, backX, backY, opening));
+  stirLiquid(millis + opening + 200);
 }
+
+
+// The ball has landed on the point the leave's draw let go from. This is that draw read backwards: the circle opens out into the bar, the cover walks back to its slot at full size rather than being scaled into it, and the reading grows back under it one block after another.
+function openNowBall(to, art, ball, restRadius, backX, backY, millis) {
+  // The shot is forwards-filled too, so returning here without landing leaves the bubble standing as the ball it flew in as.
+  if (!lockArriving()) { landNowEnter(); return; }
+
+  const opening = lockPill.animate(
+    [
+      { width: Math.round(ball) + 'px', borderRadius: Math.round(ball / 2) + 'px' },
+      { width: Math.round(to.width) + 'px', borderRadius: restRadius },
+    ],
+    { duration: millis, easing: LOCK_SHOT_EASE, fill: 'forwards' }
+  );
+
+  lockShape.push(
+    lockPill.animate(
+      [
+        { translate: backX.toFixed(1) + 'px ' + backY.toFixed(1) + 'px', scale: LOCK_DRAW_SQUEEZE },
+        { translate: '0px 0px', scale: 1 },
+      ],
+      { duration: millis, easing: LOCK_POP_EASE, fill: 'forwards' }
+    ),
+    opening,
+    lockMovers[0].element.animate(
+      [
+        { translate: '0px 0px', width: Math.round(ball) + 'px', height: Math.round(ball) + 'px' },
+        {
+          translate:
+            ((art.left + art.width / 2) - (to.left + to.width / 2)).toFixed(1) + 'px ' +
+            ((art.top + art.height / 2) - (to.top + to.height / 2)).toFixed(1) + 'px',
+          width: Math.round(art.width) + 'px',
+          height: Math.round(art.height) + 'px',
+        },
+      ],
+      { duration: millis, easing: LOCK_SHOT_EASE, fill: 'forwards' }
+    )
+  );
+
+  const sprigs = lockMovers.filter(mover => !mover.travels);
+  sprigs.forEach((mover, index) => {
+    mover.element.style.removeProperty('opacity');
+    lockArrival.push(mover.element.animate(
+      [
+        { opacity: 0, translate: '0px ' + LOCK_LEAVE_DROP + 'px', scale: 0.94 },
+        { opacity: 1, translate: '0px 0px', scale: 1 },
+      ],
+      {
+        duration: LOCK_SPRIG_MS,
+        delay: millis + index * LOCK_SPRIG_STAGGER,
+        easing: LOCK_POP_EASE,
+        fill: 'backwards',
+      }
+    ));
+  });
+
+  clearTimeout(lockTypeTimer);
+  lockTypeTimer = setTimeout(typeLabels, millis + LOCK_SPRIG_STAGGER + LOCK_TYPE_IN);
+  // The shape is handed back to the stylesheet when the shape has landed, not when the last line of the reading has finished growing in under it.
+  opening.addEventListener('finish', landNowEnter);
+  stirLiquid(millis + LOCK_SPRIG_MS + sprigs.length * LOCK_SPRIG_STAGGER + 200);
+}
+
+// It bailed here when `arriving` had already been taken off, and every animation in the journey is `fill: forwards` — so bailing left the cover standing at the translate and the size the flight had given it, which is a picture measured against a bubble that was centred in the ball and is now a row. That is the artwork hanging outside the pill: nothing was mid-flight, the flight had simply never been let go of. Landing is idempotent instead, so the last thing that happens on this journey is always the stylesheet getting its properties back.
+function landNowEnter() {
+  lockShape.forEach(move => move.cancel());
+  lockShape = [];
+  lockPill.classList.remove('arriving', 'circling');
+  lockMovers.forEach(mover => mover.element.style.removeProperty('opacity'));
+  lockRest = null;
+  fitLockProxy();
+}
+
+// The window was placed off a box that was still easing towards its size: the retract and the open both fit the proxy on the spot and again when `settleLock`'s height animation finished, and the width under it is a 340ms CSS transition that finishes on the same frame or a shade later. So the compact bubble's window kept a width from part-way through the change while the bubble itself is centred — the coverage that was left of it sat over the left of the pill, and the whole right half of a bubble that was plainly there answered nothing. The box says when it has stopped.
+lockPill.addEventListener('transitionend', event => {
+  if (event.target !== lockPill) return;
+  if (event.propertyName !== 'width' && event.propertyName !== 'height') return;
+  fitLockProxy();
+});

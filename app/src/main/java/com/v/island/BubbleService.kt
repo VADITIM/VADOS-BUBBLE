@@ -271,14 +271,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private var shadeGuard: View? = null
 
-    
+
     private var shadeGuardParams: WindowManager.LayoutParams? = null
 
-    
-    private lateinit var notesProxy: View
-    private lateinit var notesProxyParams: WindowManager.LayoutParams
 
-    
 
 
 
@@ -513,31 +509,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
-        notesProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, notesProxyParams, "notes")
-                return true
-            }
-        }
-        
-        
-        
-        notesProxyParams = WindowManager.LayoutParams(
-            0, 0,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
         statusProxy = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
@@ -625,7 +596,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         windowManager.addView(lockProxy, lockProxyParams)
         windowManager.addView(statusProxy, statusProxyParams)
         windowManager.addView(clockProxy, clockProxyParams)
-        windowManager.addView(notesProxy, notesProxyParams)
         applyBarLock()
         readBarPolicy()
         
@@ -659,7 +629,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         BatteryWatch.start(
             this,
             { battery -> deliverBattery(battery) },
-            { percent, plugged -> instance?.push("window.onCharge($percent, $plugged)") }
+            { percent, plugged, remainingMinutes -> instance?.push("window.onCharge($percent, $plugged, $remainingMinutes)") }
         )
 
         
@@ -754,7 +724,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             lockProxy to lockProxyParams,
             statusProxy to statusProxyParams,
             clockProxy to clockProxyParams,
-            notesProxy to notesProxyParams,
         ).forEach { (view, viewParams) ->
             runCatching {
                 windowManager.removeView(view)
@@ -774,7 +743,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private fun applyVisibility() {
         val isHidden = isHidden()
         
-        stage.alpha = if (isHidden) 0f else 1f
+        /* `alpha = 0f` left the WebView visible to Chromium, so every animation and every rAF in the page went on running through a screen-off night at the high frame rate the stage had asked for and never given back. INVISIBLE stops the page drawing while leaving its timers and the bridge alone, and the frame rate drops back until something wakes it. */
+        stage.visibility = if (isHidden) View.INVISIBLE else View.VISIBLE
+        push("window.setStageHidden($isHidden)")
+        if (isHidden) {
+            stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_LOW
+            webView.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_LOW
+            framesWokeAt = 0L
+        }
         
         
         
@@ -799,8 +775,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
             clockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(clockProxy, clockProxyParams) }
-            notesProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            runCatching { windowManager.updateViewLayout(notesProxy, notesProxyParams) }
         } else {
             push("window.refitProxies()")
         }
@@ -826,7 +800,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             screenWatch = null
             awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
-            runCatching { windowManager.removeView(notesProxy) }
             runCatching { windowManager.removeView(clockProxy) }
             runCatching { windowManager.removeView(statusProxy) }
             runCatching { windowManager.removeView(lockProxy) }
@@ -1123,11 +1096,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setModWidth(${Preferences.get(preferences, Preferences.MOD_WIDTH)})")
         push("window.setNowPushes(${Preferences.get(preferences, Preferences.NOW_PUSHES)})")
         push("window.setAlertDwell(${Preferences.get(preferences, Preferences.ALERT_DWELL)})")
+        push("window.setQuickDividers(${Preferences.get(preferences, Preferences.QUICK_DIVIDERS)})")
         push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
+        push("window.setFonts(${Preferences.get(preferences, Preferences.FONT_CLOCK)},${Preferences.get(preferences, Preferences.FONT_MAIN)},${Preferences.get(preferences, Preferences.FONT_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_STATUS)},${Preferences.get(preferences, Preferences.FONT_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_BATTERY)},${Preferences.get(preferences, Preferences.FONT_STATS)},${Preferences.get(preferences, Preferences.FONT_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_CONTENT)})")
+        push("window.setFontSizes(${Preferences.get(preferences, Preferences.FONT_SIZE_CLOCK)},${Preferences.get(preferences, Preferences.FONT_SIZE_MAIN)},${Preferences.get(preferences, Preferences.FONT_SIZE_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATUS)},${Preferences.get(preferences, Preferences.FONT_SIZE_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_SIZE_BATTERY)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATS)},${Preferences.get(preferences, Preferences.FONT_SIZE_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_CONTENT)})")
         push("window.setLockShift(${Preferences.get(preferences, Preferences.LOCK_X)})")
-        push("window.setPadlockOffset(${Preferences.get(preferences, Preferences.PADLOCK_Y)})")
-        push("window.setNotesShown(${Preferences.get(preferences, Preferences.NOTES_SHOWN)})")
-        push("window.setPadlockShown(${Preferences.get(preferences, Preferences.PADLOCK_SHOWN)})")
         push("window.setUnreadCount(${IslandNotificationListener.count()})")
         
         
@@ -1170,6 +1143,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
     private fun wakeFrames() {
+        if (isHidden()) return
         val now = android.os.SystemClock.uptimeMillis()
         if (now - framesWokeAt < WAKE_FRAMES_EVERY) return
         framesWokeAt = now
@@ -1404,19 +1378,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         
         @JavascriptInterface
-        fun setNotesProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {
-            webView.post {
-                val isLive = widthDp > 0 && heightDp > 0
-                notesProxyParams.width = if (isLive) dp(widthDp) else 0
-                notesProxyParams.height = if (isLive) dp(heightDp) else 0
-                notesProxyParams.x = params.x + dp(leftDp)
-                notesProxyParams.y = dp(topDp)
-                notesProxyParams.flags = proxyFlags(isLive)
-                runCatching { windowManager.updateViewLayout(notesProxy, notesProxyParams) }
-            }
-        }
-
-        @JavascriptInterface
         fun setClockProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
             webView.post {
                 val isLive = widthDp > 0
@@ -1451,10 +1412,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 "bluetooth" -> android.provider.Settings.ACTION_BLUETOOTH_SETTINGS
                 "wifi" -> android.provider.Settings.ACTION_WIFI_SETTINGS
                 "mobile" -> android.provider.Settings.ACTION_DATA_ROAMING_SETTINGS
+                "plane" -> android.provider.Settings.ACTION_AIRPLANE_MODE_SETTINGS
                 "hotspot" -> "com.android.settings.WIFI_TETHER_SETTINGS"
                 "usb" -> "android.settings.USB_SETTINGS"
-                
+
                 "battery" -> android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
+                "vitals" -> android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS
                 else -> android.provider.Settings.ACTION_SETTINGS
             }
             if (kind == "battery" && runCatching {
@@ -1464,6 +1427,16 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                                 "com.samsung.android.lool",
                                 "com.samsung.android.sm.battery.ui.BatteryActivity"
                             )
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                    true
+                }.getOrDefault(false)
+            ) return
+            // Device Care's own dashboard is storage, RAM and battery in one screen with Optimise now on it — the closest thing this phone has to "the vitals card's own settings". Asked for by action rather than by class: SmartManagerDashBoardActivity is an older One UI's name for it, resolves to nothing here, and the silent fallback landed on Manage storage instead.
+            if (kind == "vitals" && runCatching {
+                    startActivity(
+                        Intent("com.samsung.android.sm.ACTION_DASHBOARD")
+                            .setPackage("com.samsung.android.lool")
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                     true
@@ -1606,6 +1579,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun requestToggles() {
             queueToggleWork { }
+        }
+
+        @JavascriptInterface
+        fun requestVitals() {
+            val context = this@BubbleService
+            Thread { push("window.onVitals(${VitalsWatch.read(context)})") }.start()
+        }
+
+        @JavascriptInterface
+        fun requestWeather() {
+            WeatherWatch.request(this@BubbleService) { weather ->
+                push("window.onWeather(${weather ?: "null"})")
+            }
         }
 
         // Every setToggle and setLevel used to start its own thread, so a fast run of taps or a single drag put a dozen concurrent binder calls into the Shizuku shell and whichever landed last, rather than whichever was asked last, decided the state; one worker now runs them in the order they were asked.

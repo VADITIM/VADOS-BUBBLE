@@ -48,6 +48,7 @@ function runCallClock() {
   }
   callTime.textContent = callElapsed();
   callTicker = setInterval(() => {
+    if (shared.isStageHidden) return;
     if (shared.call && shared.call.phone) callTime.textContent = callElapsed();
   }, 1000);
 }

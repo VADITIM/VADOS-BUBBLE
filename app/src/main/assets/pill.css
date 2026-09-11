@@ -1,3 +1,14 @@
+#clock { font-family: var(--font-clock); --font-scale: var(--font-size-clock, 1); }
+#pill { font-family: var(--font-main); --font-scale: var(--font-size-main, 1); }
+#satellite-left, #satellite-right { font-family: var(--font-satellite); --font-scale: var(--font-size-satellite, 1); }
+#status, #quick-panel { font-family: var(--font-status); --font-scale: var(--font-size-status, 1); }
+#double, #lock-now { font-family: var(--font-overlay); --font-scale: var(--font-size-overlay, 1); }
+#quick-battery, #status-charge { font-family: var(--font-battery); --font-scale: var(--font-size-battery, 1); }
+#stats-section { font-family: var(--font-stats); --font-scale: var(--font-size-stats, 1); }
+#quick-grid { font-family: var(--font-connectors); --font-scale: var(--font-size-connectors, 1); }
+#alert-head { font-family: var(--font-notification-heading); --font-scale: var(--font-size-notification-heading, 1); }
+#text { font-family: var(--font-notification-content); --font-scale: var(--font-size-notification-content, 1); }
+
 :root {
   --pill-background: rgba(0, 0, 0, 1);
   
@@ -53,6 +64,8 @@
 
 
   --ease-grow: cubic-bezier(0.22, 1.12, 0.36, 1);
+
+  --ease-sling: cubic-bezier(0.1, 1.45, 0.3, 1);
 
   /* The four bubbles that move as objects — Main, Status, Clock and Now — take their size and their place on the bubble family's own curve rather than on the panel's gentler one; a bubble arriving on an ease-out is a box being positioned. Everything that is not one of the four keeps --ease-grow. */
   --ease-bubble: cubic-bezier(0.2, 1.7, 0.35, 1);
@@ -380,7 +393,7 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 
 #lock-meta { flex: 1; min-width: 0; }
 #lock-title {
-  font-size: 0.88rem;
+  font-size: calc((0.88rem) * var(--font-scale, 1));
   
   min-height: 1lh;
   transition: font-size var(--grow-ms) var(--ease-split);
@@ -394,7 +407,7 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 }
 #lock-artist {
   margin-top: 0.2rem;
-  font-size: 0.66rem;
+  font-size: calc((0.66rem) * var(--font-scale, 1));
   min-height: 1lh;
   transition:
     font-size var(--grow-ms) var(--ease-split),
@@ -439,8 +452,8 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 #lock-now.open #lock-art-slot { width: 100%; }
 #lock-now.open #lock-art { border-radius: 1.5rem; }
 #lock-now.open #lock-meta { flex: none; text-align: center; }
-#lock-now.open #lock-title { font-size: 1.15rem; }
-#lock-now.open #lock-artist { font-size: 0.72rem; margin-top: 0.35rem; }
+#lock-now.open #lock-title { font-size: calc((1.15rem) * var(--font-scale, 1)); }
+#lock-now.open #lock-artist { font-size: calc((0.72rem) * var(--font-scale, 1)); margin-top: 0.35rem; }
 
 #lock-now.open #lock-title,
 #lock-now.open #lock-artist {
@@ -463,7 +476,7 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
   display: flex;
   justify-content: space-between;
   padding: 0 0 0.35rem;
-  font-size: 0.6rem;
+  font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.1rem;
   color: var(--text-muted);
 }
@@ -549,8 +562,8 @@ html.grown #liquid { height: 100%; }
 
 
 
-html.liquid #pill, html.liquid .satellite, html.liquid #lock-now, html.liquid .lock-note,
-html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #padlock {
+html.liquid #pill, html.liquid .satellite, html.liquid #lock-now,
+html.liquid #status, html.liquid #clock, html.liquid #double {
   background: transparent;
   border-color: transparent;
 }
@@ -750,7 +763,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #unread {
   position: absolute;
   left: 0.7rem;
-  font-size: 0.6rem;
+  font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.08rem;
   
   color: var(--text-muted);
@@ -836,7 +849,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   overflow: hidden;
 }
 #app-name {
-  font-size: 0.63rem;
+  font-size: calc((0.63rem) * var(--font-scale, 1));
   letter-spacing: 0.19rem;
   text-transform: uppercase;
   color: var(--app-accent);
@@ -850,7 +863,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 #title {
   text-align: right;
-  font-size: 0.68rem;
+  font-size: calc((0.68rem) * var(--font-scale, 1));
   letter-spacing: 0.04rem;
   color: var(--text-muted);
   flex: 1 1 50%;
@@ -897,7 +910,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 .message {
   min-width: 0;
-  font-size: 0.78rem;
+  font-size: calc((0.78rem) * var(--font-scale, 1));
   line-height: 1.4;
   color: var(--text);
   white-space: normal;
@@ -1161,7 +1174,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 @keyframes sweep { to { transform: rotate(360deg); } }
 
 #timer-remaining {
-  font-size: 0.62rem;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   letter-spacing: 0.02rem;
   color: var(--text-bright);
   font-variant-numeric: tabular-nums;
@@ -1193,13 +1206,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   padding: 0 1.1rem;
 }
 #timer-label {
-  font-size: 0.6rem;
+  font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.19rem;
   text-transform: uppercase;
   color: var(--app-accent);
 }
 #timer-clock {
-  font-size: 1.6rem;
+  font-size: calc((1.6rem) * var(--font-scale, 1));
   letter-spacing: 0.08rem;
   color: var(--text-bright);
   font-variant-numeric: tabular-nums;
@@ -1209,7 +1222,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   padding: 0.4rem 0.9rem;
   border: 1px solid var(--border-control);
   border-radius: 999px;
-  font-size: 0.63rem;
+  font-size: calc((0.63rem) * var(--font-scale, 1));
   letter-spacing: 0.14rem;
   text-transform: uppercase;
   color: var(--text-body);
@@ -1264,7 +1277,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 #call-name {
-  font-size: 0.62rem;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   letter-spacing: 0.02rem;
   color: var(--text-bright);
   overflow: hidden;
@@ -1290,7 +1303,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #call-time {
-  font-size: 0.62rem;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   letter-spacing: 0.02rem;
   color: var(--app-accent);
   font-variant-numeric: tabular-nums;
@@ -1366,12 +1379,12 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   min-height: 1lh;
 }
 #player-title {
-  font-size: 0.8rem;
+  font-size: calc((0.8rem) * var(--font-scale, 1));
   color: var(--text-bright);
 }
 #player-artist {
   margin-top: 0.25rem;
-  font-size: 0.68rem;
+  font-size: calc((0.68rem) * var(--font-scale, 1));
   letter-spacing: 0.1rem;
   text-transform: uppercase;
   color: var(--app-accent);
@@ -1470,7 +1483,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #player-clock {
   display: flex;
   justify-content: space-between;
-  font-size: 0.6rem;
+  font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.1rem;
   color: var(--text-muted);
 }
@@ -1509,13 +1522,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   flex: none;
 }
 #history-label {
-  font-size: 0.6rem;
+  font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.19rem;
   text-transform: uppercase;
   color: var(--text-label);
 }
 #history-count {
-  font-size: 0.6rem;
+  font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.08rem;
   color: var(--text-label);
   font-variant-numeric: tabular-nums;
@@ -1558,7 +1571,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .history-mark { align-self: stretch; border-radius: 999px; }
 .history-copy { min-width: 0; }
 .history-name {
-  font-size: 0.58rem;
+  font-size: calc((0.58rem) * var(--font-scale, 1));
   letter-spacing: 0.16rem;
   text-transform: uppercase;
 }
@@ -1572,7 +1585,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 .history-tally {
-  font-size: 0.56rem;
+  font-size: calc((0.56rem) * var(--font-scale, 1));
   letter-spacing: 0.06rem;
   color: var(--text-muted);
   flex: none;
@@ -1582,7 +1595,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 .history-when {
-  font-size: 0.56rem;
+  font-size: calc((0.56rem) * var(--font-scale, 1));
   letter-spacing: 0.04rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -1592,12 +1605,12 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 .history-who {
-  font-size: 0.72rem;
+  font-size: calc((0.72rem) * var(--font-scale, 1));
   margin-top: 0.15rem;
   overflow-wrap: anywhere;
 }
 .history-text {
-  font-size: 0.72rem;
+  font-size: calc((0.72rem) * var(--font-scale, 1));
   line-height: 1.4;
   color: var(--text-muted);
   
@@ -1613,7 +1626,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   border-top: 1px solid var(--border);
 }
 #history-empty {
-  font-size: 0.72rem;
+  font-size: calc((0.72rem) * var(--font-scale, 1));
   color: var(--text-muted);
   padding: 0.6rem 0.7rem;
 }
@@ -1824,7 +1837,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #now-reading {
-  font-size: 0.62rem;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   letter-spacing: 0.02rem;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
@@ -1843,7 +1856,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .now-face:not(.showing) #now-glyph { opacity: 0; translate: -12px 0; }
 
 #now-label {
-  font-size: 0.6rem;
+  font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.19rem;
   text-transform: uppercase;
   color: #ffffff;
@@ -2104,7 +2117,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .status-slot-inner.is-text {
   width: auto;
   height: auto;
-  font-size: 0.72rem;
+  font-size: calc((0.72rem) * var(--font-scale, 1));
   font-weight: 500;
   line-height: 1.1;
   letter-spacing: 0.01em;
@@ -2192,7 +2205,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 :root {
   --quick-margin: 10px;
   --quick-gap: 10px;
-  --quick-pop: 460ms;
+  --quick-pop: 360ms;
 
   --quick-stats-share: 27%;
   --quick-toggle-share: 27.5%;
@@ -2247,7 +2260,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   inherits: false;
   initial-value: 0;
 }
+/* The scrim is fixed and the sections are not, so it painted above them: every label under it read 42% darker, and only while a section was mid-animation — an opacity or transform animation makes a stacking context that lifts the section back over the scrim, which is why the text was white on the way in and grey the moment it settled. The scrim is pinned to the bottom of the panel's own stack instead. */
 #quick-scrim {
+  z-index: 0;
   position: fixed;
   inset: 0;
   background: rgba(6, 6, 8, 0.42);
@@ -2267,6 +2282,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #stats-section {
+  position: relative;
+  z-index: 1;
   flex: 0 0 var(--quick-stats-share);
   min-height: 0;
   box-sizing: border-box;
@@ -2278,6 +2295,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 #system-section {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -2287,6 +2306,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 /* The Now bubble's room is this section's padding rather than the panel's: on the panel it came off the height every section's share is a percentage of, so a mod arriving down there resized the stats and the system sections too — which is exactly what those two are not allowed to do. Here it costs the one section that is meant to give way. */
 #toggle-section {
+  position: relative;
+  z-index: 1;
   flex: 0 0 var(--quick-toggle-share);
   min-height: 0;
   box-sizing: border-box;
@@ -2311,6 +2332,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #system-section + .quick-divider { margin-bottom: var(--quick-divider-shift); }
 #quick-panel.showing .quick-divider { opacity: 0.5; transition-delay: 180ms; }
 
+/* The line is hidden rather than taken out of the column: its margins are what hold the three sections apart, so removing the element would collapse the spacing the panel is laid out on. */
+html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
+
 
 
 
@@ -2321,10 +2345,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   corner-shape: squircle;
   background: var(--pill-background);
   border: 1px solid var(--border);
-  pointer-events: auto;
   transform-origin: center;
   opacity: 0;
 }
+/* The panel is laid out at its full open box from load and only faded in, and `opacity: 0` takes nothing out of hit testing — so every quick bubble sat invisibly on top of the main bubble the whole time the panel was shut, and a tap on the lower half of an expanded bubble answered with a quick-mode button. Every proxy then read that as a touch outside the bubble and closed it on the way down, and the click on the way up reopened it. `#quick-panel` is already `pointer-events: none`; the children inherit it now unless the panel is actually showing. */
+#quick-panel.showing .quick-bubble { pointer-events: auto; }
 
 
 
@@ -2337,10 +2362,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   gap: 0.45rem;
   height: 1.1rem;
   font-family: "ClashMedium", sans-serif;
-  font-size: 0.78rem;
+  font-size: calc((0.78rem) * var(--font-scale, 1));
   letter-spacing: 0.02em;
   color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
   opacity: 0;
   transition: opacity 200ms ease;
 }
@@ -2363,52 +2387,94 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0 0.9rem;
+  gap: 0.6rem;
+  padding: 0.6rem 1.1rem;
   transition: scale 200ms var(--ease-split);
 }
 #quick-vitals.pressing { scale: 0.97; }
 
+#quick-vitals {
+  position: relative;
+  overflow: hidden;
+  --vitals-purge: 620ms;
+}
+#quick-vitals.cleaning::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  translate: -100% 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 38%, color-mix(in srgb, var(--section-color) 30%, transparent) 50%, transparent 62%);
+  animation: vitals-sweep var(--vitals-purge) var(--ease-grow);
+}
+#quick-vitals.cleaning .vital-gauge-fill { animation: vitals-purge var(--vitals-purge) var(--ease-grow); }
+#quick-vitals.cleaning .vital-glyph { animation: vitals-glyph-pulse var(--vitals-purge) var(--ease-bubble); }
+
+@keyframes vitals-sweep {
+  from { translate: -100% 0; }
+  to { translate: 100% 0; }
+}
+@keyframes vitals-purge {
+  55% { width: 8%; }
+}
+@keyframes vitals-glyph-pulse {
+  45% { scale: 1.2; }
+}
+
 #vitals-list {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.28rem;
-  min-width: 0;
+  gap: 0.4rem;
 }
 .vital {
-  display: flex;
+  --vital-color: var(--section-color);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.4rem;
+  column-gap: 0.5rem;
+  row-gap: 0.28rem;
   font-family: "Mono", monospace;
-  font-size: 0.64rem;
+  font-size: calc((0.64rem) * var(--font-scale, 1));
   line-height: 1;
   color: var(--text-body);
   white-space: nowrap;
 }
-.vital-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex: none;
-  background: var(--section-color);
+.vital[data-vital="ram"] { --vital-color: #8a5bfd; }
+.vital-glyph {
+  grid-row: 1 / span 2;
+  width: 15px;
+  height: 15px;
+  color: var(--vital-color);
 }
-.vital[data-vital="ram"] .vital-dot { background: #8a5bfd; }
-.vital[data-vital="cpu"] .vital-dot { background: #fd8a5b; }
+.vital-glyph svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: currentColor;
+}
 .vital-reading {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
-
-#vitals-uptime {
-  flex: none;
-  font-family: "Clash", sans-serif;
-  font-size: 1.35rem;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--text-bright);
-  font-variant-numeric: tabular-nums;
+.vital-gauge {
+  grid-column: 2;
+  height: 2px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--vital-color) 22%, transparent);
 }
+.vital-gauge-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--vital-color);
+  transition: width 360ms var(--ease-split);
+}
+
 
 
 
@@ -2463,18 +2529,20 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 #quick-battery.charging #battery-pin { border-color: var(--charge-color, var(--text-faint)); }
 #quick-battery.saving { --battery-edge: var(--section-color); }
-#quick-battery.low { --battery-edge: #e5342b; }
+#quick-battery.low { --battery-edge: #ff3b30; }
 
 #battery-fill {
   position: absolute;
   left: 4px;
   bottom: 4px;
   top: 4px;
-  width: var(--charge-width, 0%);
-  border-radius: 17px 4px 4px 17px;
+  /* The width was the raw percentage, which resolves against the cell's whole padding box and so ignored the 4px inset the fill keeps on each side — at high charge it ran out past the right border instead of sitting inside it the way the left edge does. */
+  width: max(0px, calc(var(--charge-width, 0%) - 8px));
+  border-radius: 17px;
+  corner-shape: squircle;
   z-index: 1;
   background: var(--charge-color, var(--text-faint));
-  transition: width 700ms var(--ease-enter), background 500ms ease;
+  transition: background 500ms ease;
 }
 #battery-glyph {
   position: absolute;
@@ -2488,8 +2556,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #battery-reading {
   z-index: 3;
   position: relative;
-  font-family: "Clash", sans-serif;
-  font-size: 1.75rem;
+  font-family: var(--font-battery);
+  font-size: calc((1.75rem) * var(--font-scale, 1));
   line-height: 1;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -2499,8 +2567,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   right: 9px;
   bottom: 6px;
   z-index: 3;
-  font-family: "Mono", monospace;
-  font-size: 0.58rem;
+  font-family: var(--font-battery);
+  font-size: calc((0.58rem) * var(--font-scale, 1));
   line-height: 1;
   color: rgba(255, 255, 255, 0.82);
   font-variant-numeric: tabular-nums;
@@ -2530,10 +2598,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   align-items: center;
   gap: 0.45rem;
   font-family: "Mono", monospace;
-  font-size: 0.66rem;
+  font-size: calc((0.66rem) * var(--font-scale, 1));
   line-height: 1;
   color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
   font-variant-numeric: tabular-nums;
 }
 #transfer-glyph svg { width: 15px; height: 15px; fill: currentColor; }
@@ -2596,7 +2663,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   border-radius: 50%;
   corner-shape: round;
   background: var(--pill-background);
-  border: 1px solid var(--border);
+  border: none;
   color: var(--text-muted);
   pointer-events: none;
   transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease;
@@ -2607,10 +2674,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
   -webkit-mask-image: radial-gradient(circle, #000 0%, #000 50%, transparent 100%);
 }
-#quick-grid .quick-mode.on .quick-icon {
-  color: var(--section-color);
-  box-shadow: inset 0 0 0 2px var(--section-color);
-}
+#quick-grid .quick-mode.on .quick-icon { color: var(--section-color); }
 
 .quick-ring {
   position: absolute;
@@ -2622,15 +2686,25 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   margin-top: calc(var(--quick-ring-size) / -2);
   overflow: visible;
   pointer-events: none;
+  transform-box: border-box;
+  transform-origin: center;
   color: var(--text-faint);
-  animation: ring-turn 18s linear infinite;
   transition: color 200ms ease;
 }
 .quick-mode.on .quick-ring { color: color-mix(in srgb, var(--section-color) 70%, var(--text-body)); }
 
+.ring-text {
+  transform-box: view-box;
+  transform-origin: center;
+}
+/* Six of these turned forever behind a panel that is laid out at its full box from load and only faded in, which was the largest single idle drain in the app. */
+#quick-panel.showing .ring-text {
+  animation: ring-turn 16s linear infinite;
+}
+
 .ring-char {
   font-family: "Mono", monospace;
-  font-size: 7.5px;
+  font-size: calc((9px) * var(--font-scale, 1));
   fill: currentColor;
   text-anchor: middle;
   transform-box: fill-box;
@@ -2640,35 +2714,70 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   animation-delay: calc(var(--index) * 26ms);
 }
 
-.ring-arc {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-dasharray: 52 155;
+.quick-mode.swapping .ring-char {
+  animation: ring-char-out 240ms var(--ease-split) forwards;
+  animation-delay: calc(var(--index) * 14ms);
+}
+.quick-mode.swapped .ring-char {
+  animation-duration: 180ms;
+  animation-delay: calc(var(--index) * 12ms);
+}
+
+.quick-charge {
+  position: absolute;
+  top: 50%;
+  left: calc(50% - var(--quick-grid-icon) / 2 + 6px);
+  translate: 0 -50%;
+  font-family: "Mono", monospace;
+  font-size: calc((8px) * var(--font-scale, 1));
+  line-height: 1;
+  pointer-events: none;
+  color: #66a05e;
+  transition: color 400ms ease;
+}
+.quick-charge[data-charge="low"] { color: #b99a34; }
+.quick-charge[data-charge="critical"] { color: #b8544c; }
+
+.ring-dots {
+  transform-box: view-box;
+  transform-origin: center;
+}
+
+.ring-dot {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
   opacity: 0;
 }
-.quick-mode.searching .ring-arc {
-  opacity: 1;
-  animation: ring-arc-turn 1100ms linear infinite;
+.quick-mode.searching .ring-dot {
+  animation: ring-dot-hop 3800ms linear infinite;
+  animation-delay: calc(var(--index) * 190ms);
 }
-.quick-mode.found .ring-arc { animation: ring-arc-burst 420ms var(--ease-grow); }
+.quick-mode.found .ring-dots { animation: ring-burst 420ms var(--ease-grow); }
 
 @keyframes ring-turn {
   from { rotate: 0deg; }
   to   { rotate: 360deg; }
 }
-@keyframes ring-arc-turn {
-  from { rotate: 0deg; }
-  to   { rotate: 360deg; }
+@keyframes ring-dot-hop {
+  0%     { opacity: 0; translate: 0 0; scale: 1; }
+  6.25%  { opacity: 0.4; }
+  12.5%  { opacity: 1; translate: 0 -4px; scale: 1.45; }
+  18.75% { opacity: 0.4; }
+  25%    { opacity: 0; translate: 0 0; scale: 1; }
+  100%   { opacity: 0; translate: 0 0; scale: 1; }
 }
-@keyframes ring-arc-burst {
+@keyframes ring-burst {
   0%   { opacity: 1; scale: 1; }
   100% { opacity: 0; scale: 1.35; }
 }
+@keyframes ring-char-out {
+  from { rotate: 0deg; scale: 1; opacity: 1; }
+  to   { rotate: 160deg; scale: 0; opacity: 0; }
+}
 @keyframes ring-char-in {
-  from { scale: 0; opacity: 0; }
-  to   { scale: 1; opacity: 1; }
+  from { rotate: -120deg; scale: 0; opacity: 0; }
+  to   { rotate: 0deg; scale: 1; opacity: 1; }
 }
 
 
@@ -2679,7 +2788,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   position: relative;
   flex: none;
   align-self: center;
-  transition: translate var(--solo-ms) var(--ease-split) var(--solo-frost);
+  transition: translate var(--solo-ms) var(--ease-split);
   width: var(--quick-levels-wide);
   height: var(--quick-levels-tall);
   margin-right: var(--quick-levels-inset);
@@ -2742,6 +2851,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   transition: height 220ms var(--ease-leave);
 }
 .level.dragging .level-fill { transition: none; }
+/* A level re-delivered while the panel was still arriving slid the fill from its old height to the new one under the pour, which read as the bar recalculating itself on screen. The fill keeps the height it last stood at, and any correction lands in one frame while the panel enters. */
+#quick-panel.entering .level-fill { transition: none; }
 
 .level-icon {
   position: absolute;
@@ -2759,9 +2870,13 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 #quick-knob-window {
   flex: none;
-  width: 100%;
+  /* Bled past the panel's own side margin (--quick-margin, mirroring STATUS_MARGIN in status.js) rather than stopping at it: a scrolling row that clips at the panel's inset reads as content cut off by a margin it should be free to ignore, where every other section in the column is right to respect that inset. */
+  width: calc(100% + var(--quick-margin) * 2);
+  margin-inline: calc(var(--quick-margin) * -1);
   height: var(--quick-knob-size);
-  overflow: clip;
+  /* The window clips the knob row sideways so the nine scroll inside it, and clipped on both axes it cut the arrival's own pull off — the bottom row starts furthest below its place, which is exactly the travel this box was hiding. */
+  overflow-x: clip;
+  overflow-y: visible;
   transition: width var(--grow-ms) var(--ease-grow), height var(--grow-ms) var(--ease-grow);
 }
 
@@ -2808,7 +2923,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .quick-knob.on .record-dot { fill: #e5342b; }
 
 #quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
-#quick-panel.showing .quick-mode.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
+#quick-panel.showing .quick-mode.turning .quick-icon { animation: mode-turn 460ms var(--ease-enter); }
+@keyframes mode-turn {
+  from { rotate: 0deg; scale: 0.55; }
+  to   { rotate: 360deg; scale: 1; }
+}
 @keyframes knob-turn {
   from { rotate: 0deg; }
   to   { rotate: 360deg; }
@@ -2834,16 +2953,16 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 #quick-panel.showing .quick-bubble {
   opacity: 1;
-  animation: bubble-grow var(--quick-pop) var(--ease-grow) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
+  animation: bubble-grow var(--quick-pop) var(--ease-sling) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
 }
 
 @keyframes bubble-grow {
-  from { scale: 0.2; }
-  to   { scale: 1; }
+  from { opacity: 0.2; scale: 0; rotate: var(--pop-turn, 0deg); translate: 0 var(--pop-from, 0px); }
+  to   { opacity: 1; scale: 1; rotate: 0deg; translate: 0 0; }
 }
 
 #quick-panel.showing .quick-bubble > * {
-  animation: quick-contents-in 280ms ease calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms) backwards;
+  animation: quick-contents-in 190ms ease calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
 }
 @keyframes quick-contents-in {
   from { opacity: 0; }
@@ -2851,49 +2970,48 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 #quick-panel.leaving .quick-bubble {
-  animation: bubble-collapse 110ms var(--ease-leave) calc(var(--pop-rank, 0) * 4ms) both;
+  animation: bubble-collapse 95ms var(--ease-leave) calc(var(--drop-rank, 0) * 20ms) both;
 }
 @keyframes bubble-collapse {
-  from { opacity: 1; scale: 1; }
-  to   { opacity: 0; scale: 0.2; }
+  from { opacity: 1; scale: 1; rotate: 0deg; translate: 0 0; }
+  to   { opacity: 0; scale: 0; rotate: var(--pop-turn-out, 0deg); translate: 0 calc(var(--pop-from, 0px) * 0.6); }
+}
+
+.quick-bubble.quick-mode,
+.quick-bubble.quick-knob {
+  --pop-turn: -360deg;
+  --pop-turn-out: 180deg;
 }
 
 #quick-panel.showing .level-fill {
-  animation: liquid-pour 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
+  animation: liquid-pour 110ms ease-out calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + 200ms) backwards;
 }
 @keyframes liquid-pour {
   from { translate: 0 100%; }
   to   { translate: 0 0; }
 }
 
-#quick-panel.showing #battery-fill {
-  animation: liquid-pour-across 110ms var(--ease-enter) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * 5ms + 200ms) backwards;
-}
-@keyframes liquid-pour-across {
-  from { translate: -100% 0; }
-  to   { translate: 0 0; }
-}
 
 
 
 
-/* The glass goes first and the modules follow it: the frost clearing is what says the panel is getting out of the way, so it leads both directions — out and back. The panel leaves under a held brightness bar the same way it leaves when it is closed, and comes back on the same grow it arrived on — same keyframes, same per-module stagger. A fade of its own was written here first and it was the wrong motion: the panel has one way of going and one way of coming, and a second one invented for this state makes the hold read as a different panel. Everything but the two bars, which are what the hold is about. */
+/* The frost, the modules and the bar's own lift all fire off the same class change now, rather than the modules and the lift waiting out the frost first — a held brightness bar is one gesture and reads as one motion only when everything it triggers starts on the same frame. The panel leaves under a held brightness bar the same way it leaves when it is closed, and comes back on the same grow it arrived on — same keyframes, same per-module stagger. A fade of its own was written here first and it was the wrong motion: the panel has one way of going and one way of coming, and a second one invented for this state makes the hold read as a different panel. Everything but the two bars, which are what the hold is about. */
 #quick-panel.solo-out .quick-bubble:not(.level) {
-  animation: bubble-collapse 110ms var(--ease-leave) calc(var(--solo-frost) + var(--pop-rank, 0) * 4ms) both;
+  animation: bubble-collapse 95ms var(--ease-leave) calc(var(--drop-rank, 0) * 20ms) both;
   pointer-events: none;
 }
 #quick-panel.solo-in .quick-bubble:not(.level) {
-  animation: bubble-grow var(--quick-pop) var(--ease-grow) calc(var(--pop-rank, 0) * 5ms) backwards;
+  animation: bubble-grow var(--quick-pop) var(--ease-sling) calc(var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
 }
 #quick-panel.solo-in .quick-bubble:not(.level) > * {
-  animation: quick-contents-in 280ms ease calc(var(--pop-rank, 0) * 5ms) backwards;
+  animation: quick-contents-in 190ms ease calc(var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
 }
 
 #quick-panel.solo-out #quick-weather,
 #quick-panel.solo-out #quick-transfer,
 #quick-panel.solo-out .quick-divider {
   opacity: 0;
-  transition: opacity 110ms var(--ease-leave) var(--solo-frost);
+  transition: opacity 110ms var(--ease-leave);
 }
 #quick-panel.solo-in #quick-weather { transition-delay: 160ms; }
 #quick-panel.solo-in .quick-divider { transition-delay: 180ms; }
@@ -2991,8 +3109,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   /* Drawn above the panel (29) and the grown Status bubble (30), the same exception Main's own rise is (states.md#clock-status-idle-and-main-status-idle). */
   z-index: 31;
 }
-#clock.corner-grow #clock-face { font-size: calc(0.68rem * var(--corner-grow-scale, 1.3)); }
-#clock.corner-grow #clock-date { font-size: calc(0.62rem * var(--corner-grow-scale, 1.3)); }
+#clock.corner-grow #clock-face { font-size: calc((calc(0.68rem * var(--corner-grow-scale, 1.3))) * var(--font-scale, 1)); }
+#clock.corner-grow #clock-date { font-size: calc((calc(0.62rem * var(--corner-grow-scale, 1.3))) * var(--font-scale, 1)); }
 
 
 
@@ -3012,11 +3130,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 #pill.panel-top {
   transition: var(--pill-transition), top var(--grow-ms) var(--ease-grow);
+  z-index: 31;
+}
+
+/* The rise is the closed bubble's alone. It pins a height and a radius, and it is written after every grown size, so an alert arriving while the panel stood open was drawn into the closed pill's 26px strip at the screen edge — the box was the rise's, the contents the alert's. Grown, the bubble keeps its own geometry and only the z-index of the rise, which is what puts it over the panel. */
+html:not(.grown) #pill.panel-top {
   top: calc(-1 * var(--edge-over));
   height: calc(var(--pill-height) + var(--edge-over));
   padding-top: var(--edge-over);
   border-radius: 0 0 calc(var(--pill-height) / 2) calc(var(--pill-height) / 2);
-  z-index: 31;
 }
 
 #clock.pressing { scale: 1.03; }
@@ -3056,7 +3178,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #clock.ticking { scale: 1.04; }
 #clock-face {
   
-  font-size: 0.68rem;
+  font-size: calc((0.68rem) * var(--font-scale, 1));
   font-weight: 500;
   
   font-variant-numeric: tabular-nums;
@@ -3074,7 +3196,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   flex-direction: column;
   align-items: center;
   align-self: center;
-  font-size: 0.29rem;
+  font-size: calc((0.29rem) * var(--font-scale, 1));
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   
@@ -3093,7 +3215,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   overflow: hidden;
   margin-left: 0;
   max-width: 0;
-  font-size: 0.62rem;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -3120,7 +3242,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   position: absolute;
   max-width: none;
   margin: 0;
-  font-size: calc(0.62rem * var(--corner-grow-scale, 1.15));
+  font-size: calc((calc(0.62rem * var(--corner-grow-scale, 1.15))) * var(--font-scale, 1));
   translate: 0 0;
   opacity: 0;
   transition: opacity 200ms var(--ease-leave);
@@ -3223,7 +3345,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-#double-fill {
+/* `#double` is only faded out, never `display: none`, so an infinite animation on a child kept the WebView compositing a frame every vsync around the clock, screen off included — every always-on animation is gated on the state that shows it now. */
+#double.showing #double-fill {
   animation: double-low 1.6s ease-in-out infinite;
 }
 @keyframes double-low {
@@ -3232,7 +3355,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 #double-reading {
-  font-size: 0.62rem;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   letter-spacing: 0.02rem;
   color: var(--text-bright);
   font-variant-numeric: tabular-nums;
@@ -3272,7 +3395,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #clock.recording-panel #now-record { display: flex; }
 #clock.recording-panel #now-slider { display: none; }
 #now-elapsed {
-  font-size: 1.5rem;
+  font-size: calc((1.5rem) * var(--font-scale, 1));
   font-weight: 300;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
@@ -3284,7 +3407,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   background: #e5342b;
   color: #ffffff;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: calc((0.8rem) * var(--font-scale, 1));
   font-weight: 500;
 }
 
@@ -3315,192 +3438,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-#padlock {
-  position: absolute;
-  z-index: 3;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
-  bottom: calc(var(--padlock-bottom, 300px) + var(--padlock-y, 0px));
-  width: 44px;
-  height: 44px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  background: var(--pill-background);
-  border: 1px solid var(--border);
-  display: grid;
-  place-items: center;
-  color: #ffffff;
-  opacity: 0;
-  overflow: visible;
-  transition:
-    opacity var(--padlock-fade-ms, 220ms) ease,
-    scale 320ms var(--ease-split);
-}
-#padlock.showing { opacity: 1; }
-#padlock-body { width: 56%; height: 56%; fill: currentColor; display: block; }
-
-
-#padlock-shackle {
-  transform-origin: 16px 10px;
-  transition: transform 260ms var(--ease-split);
-}
-#padlock.opened #padlock-shackle { transform: translateY(-2px) rotate(-22deg); }
-
-
-
-
-
-
-#lock-notes {
-  z-index: 2;
-  
-
-
-
-
-
-
-
-  flex: 0 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  
-
-
-  justify-content: flex-end;
-  overflow: visible;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 240ms ease;
-}
-#lock-notes.showing { opacity: 1; pointer-events: auto; }
-#lock-notes-list {
-  display: flex;
-  
-
-  flex-direction: column-reverse;
-  gap: 0.6rem;
-  min-height: 0;
-  overflow-y: auto;
-  
-  padding: 6px 4px;
-  margin: -6px -4px;
-  scrollbar-width: none;
-}
-.lock-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.7rem;
-  padding: 0.7rem 0.9rem;
-  border-radius: 24px;
-  corner-shape: squircle;
-  background: var(--pill-background);
-  border: 1px solid var(--border);
-  color: #ffffff;
-  transition: scale 220ms var(--ease-split);
-}
-.lock-note:active { scale: 0.97; }
-.lock-note-icon-wrap {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  overflow: hidden;
-  
-
-  box-shadow: 0 0 0 1.5px var(--note-accent, #ffffff);
-}
-.lock-note-icon { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-
-.lock-note-icon-wrap.fallback {
-  display: grid;
-  place-items: center;
-  background: var(--note-accent, #ffffff);
-  color: #000000;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.lock-note-copy { min-width: 0; flex: 1; padding-top: 0.05rem; }
-.lock-note-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  min-width: 0;
-}
-.lock-note-who {
-  font-size: 0.74rem;
-  font-weight: 500;
-  color: var(--note-accent, #ffffff);
-  white-space: nowrap;
-  overflow: hidden;
-  min-width: 0;
-  
-  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
-}
-
-.lock-note-app {
-  flex: none;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04rem;
-  color: var(--text-muted);
-}
-.lock-note-said {
-  margin-top: 0.15rem;
-  font-size: 0.76rem;
-  color: var(--text-body);
-  white-space: nowrap;
-  overflow: hidden;
-  mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
-}
-
-
-
-.lock-note-more {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 260ms var(--ease-grow);
-}
-.lock-note.expanded .lock-note-more { grid-template-rows: 1fr; }
-.lock-note-more-inner { overflow: hidden; min-height: 0; }
-.lock-note-line {
-  margin-top: 0.3rem;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  white-space: normal;
-}
-.lock-note-tally {
-  flex: none;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--note-accent, #ffffff);
-  color: #000000;
-  font-size: 0.6rem;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-}
-
-
-
-#lock-notes-list[data-more]:not([data-more=""])::after {
-  content: attr(data-more);
-  display: block;
-  margin: 0 auto 0.45rem;
-  width: fit-content;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  background: var(--pill-background);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 0.62rem;
-}
-
 
 
 
@@ -3510,7 +3447,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   border-radius: 34%;
   corner-shape: squircle;
   border: 1px solid var(--border-strong);
-  font-size: 0.62rem;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-body);
   font-variant-numeric: tabular-nums;
@@ -3531,8 +3468,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #call-name:not(.runs-out),
 #lock-title:not(.runs-out),
 #lock-artist:not(.runs-out),
-.lock-note-who:not(.runs-out),
-.lock-note-said:not(.runs-out),
 #timer-remaining:not(.runs-out),
 #timer-label:not(.runs-out) { mask-image: none; }
 
@@ -3600,7 +3535,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   height: 26px;
 }
 #lock-now.compact #lock-title {
-  font-size: 0.74rem;
+  font-size: calc((0.74rem) * var(--font-scale, 1));
   text-align: left;
 }
 

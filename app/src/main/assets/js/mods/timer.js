@@ -56,7 +56,7 @@ function runTimerClock() {
   clearInterval(shared.timerTicker);
   if (!shared.timer || !shared.timer.endsAt) return;
   shared.timerTicker = setInterval(() => {
-    if (!shared.timer) return;
+    if (!shared.timer || shared.isStageHidden) return;
     const reading = remainingText();
     timerRemaining.textContent = reading;
     timerClock.textContent = reading;

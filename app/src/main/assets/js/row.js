@@ -1380,6 +1380,7 @@ export function toClosed() {
   
   
   const wasOpen = !CLOSED.has(shared.size);
+  if (wasOpen) shared.closedInTouch = shared.isTouchDown;
   shared.state = 'idle';
   shared.current = null;
   pill.classList.remove('alert', 'with-image', 'charging');

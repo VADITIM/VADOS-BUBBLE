@@ -70,7 +70,10 @@ object ConnectivityWatch {
     private var zenName = ""
     private var isHotspotOn = false
     private var pairedName: String? = null
+    private val pairedNames = linkedSetOf<String>()
     private var pairedCharge = -1
+
+    private var lastPublished = ""
 
     fun start(context: Context, onChange: (JSONObject) -> Unit) {
         if (receiver != null) return
@@ -151,7 +154,9 @@ object ConnectivityWatch {
         isUsbConnected = false
         isHotspotOn = false
         pairedName = null
+        pairedNames.clear()
         pairedCharge = -1
+        lastPublished = ""
     }
 
     private fun hear(context: Context, intent: Intent) {
@@ -163,17 +168,17 @@ object ConnectivityWatch {
                 isHotspotOn = !intent.getStringArrayListExtra(TETHER_ACTIVE).isNullOrEmpty()
 
             
-            
-            
-            
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                pairedName = nameOf(intent) ?: ""
+                nameOf(intent)?.takeIf { it.isNotEmpty() }?.let { pairedNames.add(it) }
+                pairedName = pairedNames.firstOrNull()
                 pairedCharge = -1
+                readConnected(context)
             }
 
+            // A headset holds several ACL links at once — A2DP, the handsfree profile, and an LE one — and Android reports each of them separately, so one transport dropping while the rest stay up arrived here as the device having gone. The name was cleared on that first disconnect and the ring emptied with the headphones still playing. A disconnect is a reason to ask what is still connected, never an answer on its own.
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                pairedName = null
                 pairedCharge = -1
+                readConnected(context)
             }
 
             
@@ -182,6 +187,7 @@ object ConnectivityWatch {
                 val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.STATE_OFF)
                 if (state != BluetoothAdapter.STATE_ON) {
                     pairedName = null
+                    pairedNames.clear()
                     pairedCharge = -1
                 } else {
                     
@@ -193,7 +199,8 @@ object ConnectivityWatch {
             BLUETOOTH_BATTERY -> {
                 val charge = intent.getIntExtra(BLUETOOTH_BATTERY_EXTRA, -1)
                 if (charge in 0..100) {
-                    if (pairedName == null) pairedName = nameOf(intent) ?: ""
+                    nameOf(intent)?.takeIf { it.isNotEmpty() }?.let { pairedNames.add(it) }
+                    if (pairedName == null) pairedName = pairedNames.firstOrNull()
                     pairedCharge = charge
                 }
             }
@@ -220,19 +227,21 @@ object ConnectivityWatch {
 
 
 
+    // The first connected device of the first profile that answered used to be the whole answer, and it was latched — once a name was held, neither profile could correct it. A phone carries several devices at once, so what is published is the union of what both profiles report, rebuilt on every event rather than added to.
     private fun readConnected(context: Context) {
         val adapter = context.getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter ?: return
         if (!runCatching { adapter.isEnabled }.getOrDefault(false)) return
+        val found = linkedSetOf<String>()
         val listener = object : android.bluetooth.BluetoothProfile.ServiceListener {
             override fun onServiceConnected(profile: Int, proxy: android.bluetooth.BluetoothProfile) {
-                val device = runCatching { proxy.connectedDevices.firstOrNull() }.getOrNull()
+                val devices = runCatching { proxy.connectedDevices }.getOrDefault(emptyList())
                 runCatching { adapter.closeProfileProxy(profile, proxy) }
-                
-                
-                
-                
-                if (device == null || pairedName != null) return
-                pairedName = runCatching { device.name }.getOrNull() ?: ""
+                devices.forEach { device ->
+                    runCatching { device.name }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { found.add(it) }
+                }
+                pairedNames.clear()
+                pairedNames.addAll(found)
+                pairedName = pairedNames.firstOrNull()
                 publish()
             }
 
@@ -311,16 +320,10 @@ object ConnectivityWatch {
             else -> "none"
         }
         
-        
-        
-        
-        
-        generation = if (link == "mobile") {
-            val telephony = context.getSystemService(android.telephony.TelephonyManager::class.java)
-            runCatching { nameOfNetwork(telephony.dataNetworkType) }.getOrDefault("")
-        } else {
-            ""
-        }
+        // The generation was read only while mobile was the network carrying the default route, so the moment wifi took over the mobile state had nothing to say and fell to its waiting line — it sat searching for as long as wifi was up. The radio reports its data type whether or not it is the route being used, so the read is unconditional and "" stays the honest answer when there is no service.
+        generation = runCatching {
+            nameOfNetwork(context.getSystemService(android.telephony.TelephonyManager::class.java).dataNetworkType)
+        }.getOrDefault("")
         
         
         
@@ -344,15 +347,18 @@ object ConnectivityWatch {
         
         
         
-        if (isZen && zenName.isEmpty()) zenName = readZenName()
         
         
         if (link == "wifi" && ssid.isEmpty()) ssid = readSsid()
+        if (isZen && zenName.isEmpty()) zenName = readZenName()
         val paired = pairedName?.let {
-            JSONObject().put("name", it).put("charge", pairedCharge)
-        } ?: if (pairedCharge >= 0) JSONObject().put("charge", pairedCharge) else null
-        report?.invoke(
             JSONObject()
+                .put("name", it)
+                .put("names", org.json.JSONArray(pairedNames.toList()))
+                .put("charge", pairedCharge)
+        } ?: if (pairedCharge >= 0) JSONObject().put("charge", pairedCharge) else null
+        /* `onCapabilitiesChanged` fires on every signal-strength wobble the default network reports — several times a minute at rest — and each one rebuilt the whole payload, pushed it into the page and repainted a bar that says exactly what it said before. The payload is its own dedupe key: nothing leaves here twice. */
+        val payload = JSONObject()
                 .put("link", link)
                 .put("level", level)
                 .put("generation", generation)
@@ -362,6 +368,9 @@ object ConnectivityWatch {
                 .put("zen", isZen)
                 .put("zenName", zenName)
                 .put("bluetooth", paired ?: JSONObject.NULL)
-        )
+        val spelling = payload.toString()
+        if (spelling == lastPublished) return
+        lastPublished = spelling
+        report?.invoke(payload)
     }
 }

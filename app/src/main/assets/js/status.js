@@ -5,7 +5,7 @@ import { rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
 import { closePanelNow, openPanelNow } from './lock.js';
 import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
-import { GROWN_PAD, HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
+import { GROWN_PAD, HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
 
 
 
@@ -65,7 +65,8 @@ function paintTransferStrip() {
 // Main leaves the punch hole for the top edge while the panel is open: its own mod has gone down to the Now bubble, so what is left is a bare bubble curving into the screen's own top edge.
 function raiseMain() {
   pill.classList.add('panel-top');
-  showFace(closedFace());
+  // An Alert standing when the panel opens is grown, and handing it the closed face left the notification's box wearing the row's contents until its dwell ran out. The rise is a closed bubble's shape, so it only repaints a bubble that is in one.
+  if (!root.classList.contains('grown')) showFace(closedFace());
   stirLiquid(320);
 }
 
@@ -230,12 +231,6 @@ const GLYPHS = {
 
 
 const GLYPHS_OFF = {
-  wifi: '<svg viewBox="0 0 24 24" fill="none"><path d="M1.33309 8.07433C0.92156 8.44266 0.886539 9.07485 1.25487 9.48638C1.62319 9.89791 2.25539 9.93293 2.66691 9.5646L1.33309 8.07433ZM21.3331 9.5646C21.7446 9.93293 22.3768 9.89791 22.7451 9.48638C23.1135 9.07485 23.0784 8.44266 22.6669 8.07433L21.3331 9.5646ZM12 19C11.4477 19 11 19.4477 11 20C11 20.5523 11.4477 21 12 21V19ZM12.01 21C12.5623 21 13.01 20.5523 13.01 20C13.01 19.4477 12.5623 19 12.01 19V21ZM14.6905 17.04C15.099 17.4116 15.7315 17.3817 16.1031 16.9732C16.4748 16.5646 16.4448 15.9322 16.0363 15.5605L14.6905 17.04ZM18.0539 13.3403C18.4624 13.7119 19.0949 13.682 19.4665 13.2734C19.8381 12.8649 19.8082 12.2324 19.3997 11.8608L18.0539 13.3403ZM7.96372 15.5605C7.55517 15.9322 7.52524 16.5646 7.89687 16.9732C8.2685 17.3817 8.90095 17.4116 9.3095 17.04L7.96372 15.5605ZM4.60034 11.8608C4.19179 12.2324 4.16185 12.8649 4.53348 13.2734C4.90511 13.682 5.53756 13.7119 5.94611 13.3403L4.60034 11.8608ZM10.5705 4.06305C10.0204 4.1118 9.61391 4.59729 9.66266 5.14741C9.71141 5.69754 10.1969 6.10399 10.747 6.05525L10.5705 4.06305ZM17.3393 10.3798C16.8567 10.1114 16.2478 10.285 15.9794 10.7677C15.711 11.2504 15.8847 11.8593 16.3673 12.1277L17.3393 10.3798ZM3.70711 2.29289C3.31658 1.90237 2.68342 1.90237 2.29289 2.29289C1.90237 2.68342 1.90237 3.31658 2.29289 3.70711L3.70711 2.29289ZM20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L20.2929 21.7071ZM12 6C15.5863 6 18.8556 7.34716 21.3331 9.5646L22.6669 8.07433C19.8369 5.54138 16.0972 4 12 4V6ZM12 21H12.01V19H12V21ZM12 16C13.0367 16 13.9793 16.3931 14.6905 17.04L16.0363 15.5605C14.9713 14.5918 13.5536 14 12 14V16ZM9.3095 17.04C10.0207 16.3931 10.9633 16 12 16V14C10.4464 14 9.02872 14.5918 7.96372 15.5605L9.3095 17.04ZM10.747 6.05525C11.1596 6.01869 11.5775 6 12 6V4C11.5185 4 11.0417 4.0213 10.5705 4.06305L10.747 6.05525ZM16.3673 12.1277C16.9757 12.466 17.5412 12.874 18.0539 13.3403L19.3997 11.8608C18.7751 11.2927 18.0844 10.7941 17.3393 10.3798L16.3673 12.1277ZM2.29289 3.70711L5.46648 6.8807L6.8807 5.46648L3.70711 2.29289L2.29289 3.70711ZM2.66691 9.5646C3.81213 8.53961 5.12648 7.70074 6.56232 7.09494L5.78486 5.25224C4.14251 5.94517 2.64069 6.904 1.33309 8.07433L2.66691 9.5646ZM5.46648 6.8807L9.46042 10.8746L10.8746 9.46042L6.8807 5.46648L5.46648 6.8807ZM9.46042 10.8746L20.2929 21.7071L21.7071 20.2929L10.8746 9.46042L9.46042 10.8746ZM5.94611 13.3403C7.15939 12.2367 8.67355 11.4612 10.3496 11.1508L9.98543 9.18424C7.93271 9.5644 6.08108 10.5139 4.60034 11.8608L5.94611 13.3403Z" fill="currentColor"/></svg>',
-  
-  
-  
-  bluetooth: '<svg viewBox="0 0 24 24" fill="none"><path d="M7 17L17 7L12 2V22L17 17L7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 3.5L20.5 20.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
-  mobile: '<svg viewBox="0 0 24 24"><path d="M4 16h3v4H4zm5-3h3v7H9zm5-4h3v11h-3zm5-5h3v16h-3z" opacity="0.55"/><path fill="none" d="M3.5 3.5L20.5 20.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   mic: '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.00004 7.91421V11C9.00004 12.6569 10.3432 14 12 14C12.8503 14 13.6179 13.6463 14.1638 13.078L12.7487 11.6629C12.5655 11.8697 12.298 12 12 12C11.4478 12 11 11.5523 11 11V9.91422L9.00004 7.91421ZM13 9.08579V5C13 4.44772 12.5523 4 12 4C11.4478 4 11 4.44772 11 5V7.08579L9.00004 5.08579V5C9.00004 3.34315 10.3432 2 12 2C13.6569 2 15 3.34315 15 5V11C15 11.0283 14.9997 11.0565 14.9989 11.0846L13 9.08579ZM15.5782 14.4924C15.4023 14.6727 15.2121 14.8402 15.0091 14.9932C14.1658 15.6286 13.143 15.9808 12.0873 15.9992C12.0594 15.9997 12.0315 16 12.0036 16C10.977 16.0007 9.97424 15.6854 9.13216 15.0958C8.26722 14.4901 7.61622 13.6262 7.27245 12.6278C7.09264 12.1056 6.52356 11.8281 6.00136 12.0079C5.47917 12.1877 5.20161 12.7568 5.38141 13.279C5.86269 14.6767 6.77409 15.8862 7.98501 16.7341C8.88694 17.3656 9.92054 17.7724 11 17.9282V20H9.00004C8.44776 20 8.00004 20.4477 8.00004 21C8.00004 21.5523 8.44776 22 9.00004 22H12H15C15.5523 22 16 21.5523 16 21C16 20.4477 15.5523 20 15 20H13V17.9282C14.1618 17.7605 15.2678 17.3025 16.2127 16.5904C16.4905 16.3812 16.7509 16.1525 16.9925 15.9067L15.5782 14.4924ZM18.1876 14.2733L16.6785 12.7642C16.716 12.6648 16.7504 12.5639 16.7816 12.4619C16.943 11.9337 17.5021 11.6365 18.0302 11.7979C18.5584 11.9594 18.8556 12.5184 18.6942 13.0466C18.5639 13.4729 18.3938 13.8834 18.1876 14.2733Z" fill="currentColor"/><path d="M5 5L19 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
@@ -276,6 +271,18 @@ const ANNOUNCE_COLOURS = {
   low: '#ffb300',
   critical: '#ff3b30',
 };
+
+// Mirrors BatteryWatch.LOW and BatteryWatch.CRITICAL in BatteryWatch.kt, which fire the low/critical alerts at the same two marks this bubble changes colour at.
+const BATTERY_LOW = 40;
+const BATTERY_CRITICAL = 15;
+
+function batteryBand(level) {
+  if (level >= BATTERY_LOW) return 'ok';
+  if (level >= BATTERY_CRITICAL) return 'low';
+  return 'critical';
+}
+
+const BATTERY_COLOURS = { ok: ANNOUNCE_COLOURS.charging, low: ANNOUNCE_COLOURS.low, critical: ANNOUNCE_COLOURS.critical };
 
 
 
@@ -325,6 +332,7 @@ let attached = null;
 let transfer = null;
 let charge = -1;
 let isPlugged = false;
+let remainingMinutes = -1;
 let isBorn = false;
 
 
@@ -374,14 +382,9 @@ function wanted() {
   
   
   
-  const paired = attached && attached.bluetooth && attached.bluetooth.charge >= 0
-    ? attached.bluetooth.charge
-    : -1;
-  
-  const own = charge >= 0
+  const reading = charge >= 0
     ? '<span class="own-charge" data-charge="' + chargeBand() + '">' + charge + '%</span>'
     : '';
-  const reading = (paired >= 0 ? paired + '% · ' : '') + own;
   if (reading) shown.push({ name: 'battery', html: reading, isText: true });
   return shown.sort((one, two) => SLOTS[one.name] - SLOTS[two.name]);
 }
@@ -742,6 +745,15 @@ function statusPanelLeft() {
 
 const quickPanel = document.getElementById('quick-panel');
 
+// The row runs on forever, and what makes it run is three copies of the nine standing end to end: the shift wraps by one copy's width, so a flick never reaches an end and never has to be told it has. The copies are made here, before quickBubbles is captured below, so every copy is ranked and staggered like the original rather than reading --pop-rank and --pop-from as unset.
+const KNOB_COPIES = 3;
+
+const knobRow = document.getElementById('quick-row-knobs');
+const knobOriginals = [...knobRow.children];
+for (let copy = 1; copy < KNOB_COPIES; copy += 1) {
+  knobOriginals.forEach(knob => knobRow.appendChild(knob.cloneNode(true)));
+}
+
 const quickBubbles = [...quickPanel.querySelectorAll('.quick-bubble')];
 
 
@@ -758,13 +770,26 @@ const quickBubbles = [...quickPanel.querySelectorAll('.quick-bubble')];
 
 
 
-const QUICK_STAGGER = 5;
+const QUICK_RANK_STEPS = 6;
+
+// Share of a module's own growth that has run before the next band sets off: the centre starts when the edge is 70% of the way home, so the stagger is a fraction of the pop rather than a number standing beside it.
+const QUICK_OVERLAP = 0.7;
+
+const QUICK_PULL = 240;
+
+// The centre of the panel has no distance from the centre to be thrown across, so without a floor it has no journey at all and arrives as a bare scale. Every module travels at least this far along its own side.
+const QUICK_PULL_FLOOR = 56;
+
+const QUICK_JITTER = 50;
 
 
-const QUICK_DROP_STAGGER = 4;
+const QUICK_DROP_STAGGER = 20;
 
 
-const QUICK_POP = 460;
+const QUICK_POP = 360;
+
+// Written onto the panel as --pop-step rather than mirrored into pill.css: the gap between two bands is derived from the pop, and a second copy of it could only ever disagree.
+const QUICK_STAGGER = Math.round(QUICK_POP * QUICK_OVERLAP / QUICK_RANK_STEPS);
 
 
 
@@ -780,19 +805,32 @@ const SCRIM_FROST_MS = 450;
 
 
 
-function shuffleQuickRanks() {
-  const ranks = quickBubbles.map((bubble, index) => index);
-  for (let at = ranks.length - 1; at > 0; at -= 1) {
-    const swap = Math.floor(Math.random() * (at + 1));
-    [ranks[at], ranks[swap]] = [ranks[swap], ranks[at]];
+function rankQuickBubbles() {
+  quickPanel.style.setProperty('--pop-step', QUICK_STAGGER + 'ms');
+  const panelBox = quickPanel.getBoundingClientRect();
+  const panelCenter = panelBox.top + panelBox.height / 2;
+  const reach = panelBox.height / 2 || 1;
+  for (const bubble of quickBubbles) {
+    const box = bubble.getBoundingClientRect();
+    const fromCenter = Math.max(-1, Math.min(1, (box.top + box.height / 2 - panelCenter) / reach));
+    const edgeness = Math.abs(fromCenter);
+    const rank = Math.round((1 - edgeness) * QUICK_RANK_STEPS);
+    bubble.style.setProperty('--pop-rank', rank);
+    bubble.style.setProperty('--drop-rank', QUICK_RANK_STEPS - rank);
+    const side = fromCenter < 0 ? -1 : 1;
+    bubble.style.setProperty('--pop-from', Math.round(fromCenter * QUICK_PULL + side * QUICK_PULL_FLOOR) + 'px');
   }
-  quickBubbles.forEach((bubble, index) => bubble.style.setProperty('--pop-rank', ranks[index]));
+  for (const connector of quickPanel.querySelectorAll('.quick-mode')) {
+    connector.style.setProperty('--pop-jitter', Math.round(Math.random() * QUICK_JITTER) + 'ms');
+  }
 }
 
 
 let panelSettle = null;
 
 let quickSettle = null;
+
+let quickEntering = null;
 
 export function openStatusPanel() {
   if (statusOpen) return;
@@ -818,10 +856,13 @@ export function openStatusPanel() {
 
 
   statusOpen = true;
+  // The steal has to be on before Main is repainted: raiseMain asks closedFace(), which asks liveMods(), and with the Now bubble not yet holding the mod that answer was the mod's own face — so Main rose still wearing the thing that was being taken off it.
+  enterPanelNow();
   raiseMain();
   paintTransferStrip();
   paintVitals();
-  enterPanelNow();
+  bridge.requestVitals();
+  bridge.requestWeather();
 
 
   bridge.requestToggles();
@@ -849,16 +890,19 @@ export function openStatusPanel() {
   quickPanel.classList.remove('leaving');
   
   
-  shuffleQuickRanks();
+  rankQuickBubbles();
   
   
   quickPanel.classList.add('showing');
+  quickPanel.classList.add('entering');
+  clearTimeout(quickEntering);
+  quickEntering = setTimeout(() => quickPanel.classList.remove('entering'), QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
   
   
   
   
   
-  stirLiquid(STATUS_PANEL.ms + quickBubbles.length * QUICK_STAGGER + QUICK_POP);
+  stirLiquid(STATUS_PANEL.ms + QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
 }
 
 export function closeStatusPanel() {
@@ -873,6 +917,8 @@ export function closeStatusPanel() {
   
   
   quickPanel.classList.remove('showing');
+  clearTimeout(quickEntering);
+  quickPanel.classList.remove('entering');
   quickPanel.classList.add('leaving');
   
   
@@ -888,7 +934,7 @@ export function closeStatusPanel() {
 
   fitStatusProxy();
   
-  const dropped = quickBubbles.length * QUICK_DROP_STAGGER + 180;
+  const dropped = QUICK_RANK_STEPS * QUICK_DROP_STAGGER + 180;
   
   
   
@@ -935,30 +981,47 @@ statusPill.addEventListener('click', () => {
 
 
 
-// The row runs on forever, and what makes it run is three copies of the nine standing end to end: the shift wraps by one copy's width, so a flick never reaches an end and never has to be told it has. The copies are made here rather than written into the page because they are the same nine toggles, and they are made before anything reads the row so that every copy is painted and pressed like the original.
-const KNOB_COPIES = 3;
-
-const knobRow = document.getElementById('quick-row-knobs');
-const knobOriginals = [...knobRow.children];
-for (let copy = 1; copy < KNOB_COPIES; copy += 1) {
-  knobOriginals.forEach(knob => knobRow.appendChild(knob.cloneNode(true)));
-}
-
-
-
-// RING_RADIUS mirrors the ring circle's r in pill.html and --quick-ring-size in pill.css: the arc and the characters have to sit on the same circle, and there is no build step joining the three files.
-const RING_RADIUS = 33;
-const RING_STEP = 10.4;
+// RING_RADIUS mirrors half of --quick-grid-icon in pill.css: the ring is the button's border now, so the characters and the dots have to sit exactly on the icon's edge, and there is no build step joining the two files.
+const RING_RADIUS = 30;
+// RING_CENTER mirrors half the ring svg viewBox in pill.html: the viewBox used to be centred on zero, and Blink resolves `transform-box: view-box` from the viewport corner rather than from the viewBox origin, so the slow turn swung the whole reading around a point 39 units off the button. The box starts at zero now and every group is placed from this centre by hand.
+const RING_CENTER = 39;
+const RING_ADVANCE = 5.6;
+const RING_GAP = 3;
+const RING_DOTS = 20;
 const RING_BURST_MS = 420;
+// RING_SWAP_OUT_MS and RING_SWAP_IN_MS mirror the ring-char-out and ring-char-in durations plus their per-character delays in pill.css: the new reading is only drawn once the old one has finished collapsing, and there is no build step joining the two files.
+const RING_SWAP_OUT_MS = 340;
+const RING_SWAP_IN_MS = 260;
 
 function drawRing(ring, reading) {
   const characters = [...reading];
-  const start = -((characters.length - 1) / 2) * RING_STEP;
-  ring.querySelector('.ring-text').innerHTML = characters.map((character, index) => {
-    const turn = (start + index * RING_STEP).toFixed(2);
-    const glyph = character === ' ' ? '&#160;' : character;
-    return `<g transform="rotate(${turn}) translate(0 ${-RING_RADIUS})"><text class="ring-char" style="--index:${index}">${glyph}</text></g>`;
-  }).join('');
+  const text = ring.querySelector('.ring-text');
+  if (!characters.length) {
+    text.innerHTML = '';
+    return;
+  }
+  const slots = Math.round((2 * Math.PI * RING_RADIUS) / RING_ADVANCE);
+  const run = characters.length + RING_GAP;
+  const copies = Math.max(1, Math.floor(slots / run));
+  const step = 360 / (copies * run);
+  const marks = [];
+  for (let copy = 0; copy < copies; copy += 1) {
+    characters.forEach((character, index) => {
+      const turn = ((copy * run + index) * step).toFixed(2);
+      const glyph = character === ' ' ? '&#160;' : character;
+      marks.push(`<g transform="translate(${RING_CENTER} ${RING_CENTER}) rotate(${turn}) translate(0 ${-RING_RADIUS})"><text class="ring-char" style="--index:${index}">${glyph}</text></g>`);
+    });
+  }
+  text.innerHTML = marks.join('');
+}
+
+function drawDots(ring) {
+  const dots = [];
+  for (let index = 0; index < RING_DOTS; index += 1) {
+    const turn = ((index * 360) / RING_DOTS).toFixed(2);
+    dots.push(`<g transform="translate(${RING_CENTER} ${RING_CENTER}) rotate(${turn}) translate(0 ${-RING_RADIUS})"><circle class="ring-dot" r="1.6" style="--index:${index}"/></g>`);
+  }
+  ring.querySelector('.ring-dots').innerHTML = dots.join('');
 }
 
 const quickModes = [...document.querySelectorAll('.quick-mode')];
@@ -969,6 +1032,8 @@ const faceOf = control => control.querySelector('.quick-icon') || control;
 
 [...quickModes, ...quickKnobs].forEach(control => {
   faceOf(control).innerHTML = glyphFor(control.dataset.toggle, false);
+  const ring = control.querySelector('.quick-ring');
+  if (ring) drawDots(ring);
 });
 
 
@@ -1020,31 +1085,64 @@ let toggles = {};
 
 
 
+const PAIRED_SWAP_MS = 5000;
+let pairedTurn = 0;
+let pairedSwap = null;
+
+function holdPairedSwap(count) {
+  if (count > 1) {
+    if (!pairedSwap) {
+      pairedSwap = setInterval(() => {
+        pairedTurn += 1;
+        paintModeLabels();
+      }, PAIRED_SWAP_MS);
+    }
+    return;
+  }
+  clearInterval(pairedSwap);
+  pairedSwap = null;
+  pairedTurn = 0;
+}
+
+const pairedChargeBadge = document.querySelector('.quick-mode[data-toggle="bluetooth"] .quick-charge');
+
+function pairedChargeBand(level) {
+  if (level >= 31) return 'ok';
+  if (level >= 11) return 'low';
+  return 'critical';
+}
+
+function paintPairedCharge(level) {
+  pairedChargeBadge.textContent = level >= 0 ? level : '';
+  pairedChargeBadge.dataset.charge = level >= 0 ? pairedChargeBand(level) : '';
+}
 
 function paintModeLabels() {
   const paired = attached && attached.bluetooth;
+  const pairedList = (paired && paired.names) || (paired && paired.name ? [paired.name] : []);
+  const pairedShown = pairedList.length ? pairedList[pairedTurn % pairedList.length] : '';
+  holdPairedSwap(pairedList.length);
+  paintPairedCharge(paired && pairedList.length === 1 && paired.charge >= 0 ? paired.charge : -1);
   const text = {
     
     
     usb: !(attached && attached.usb) ? 'no cable' : toggles.usb ? 'file transfer' : 'charging only',
-    bluetooth: paired ? (paired.name || 'connected') : toggles.bluetooth ? 'nothing paired' : '',
+    bluetooth: paired ? (pairedShown || 'connected') : toggles.bluetooth ? 'nothing paired' : '',
     wifi: attached && attached.link === 'wifi' && attached.ssid
       ? attached.ssid
       : toggles.wifi ? 'not connected' : '',
     
     
-    mobile: !toggles.mobile ? ''
-      : attached && attached.link === 'mobile' ? (attached.generation || 'connected')
-      : 'standby',
+    mobile: !toggles.mobile ? '' : (attached && attached.generation) || 'standby',
     
     
-    hotspot: attached && attached.hotspot ? 'sharing' : toggles.hotspot ? 'nobody joined' : '',
+    hotspot: attached && attached.hotspot ? 'hotspot' : toggles.hotspot ? 'nobody joined' : '',
     
     
-    plane: toggles.plane ? 'radios off' : '',
+    plane: toggles.plane ? 'offline' : '',
     
     
-    gps: '',
+    gps: toggles.gps ? 'gps location' : '',
   };
   const waiting = {
     bluetooth: 'nothing paired',
@@ -1064,8 +1162,19 @@ function paintModeLabels() {
       button.classList.toggle('searching', isWaiting);
       const written = isWaiting ? '' : reading;
       if (button.dataset.ring !== written) {
-        drawRing(ring, written);
+        const wasReading = button.dataset.ring;
         button.dataset.ring = written;
+        if (wasReading && written) {
+          button.classList.add('swapping');
+          window.setTimeout(() => {
+            button.classList.remove('swapping');
+            button.classList.add('swapped');
+            drawRing(ring, written);
+            window.setTimeout(() => button.classList.remove('swapped'), RING_SWAP_IN_MS);
+          }, RING_SWAP_OUT_MS);
+        } else {
+          drawRing(ring, written);
+        }
       }
       if (wasWaiting && !isWaiting) {
         button.classList.add('found');
@@ -1111,15 +1220,8 @@ const batteryRemaining = document.getElementById('battery-remaining');
 
 
 function chargeColour() {
-  
-  
-  
   if (isPlugged) return ANNOUNCE_COLOURS.charging;
-  if (charge >= 86) return '#5bfd5b';
-  if (charge >= 61) return '#2fbf2f';
-  if (charge >= 31) return '#ffd429';
-  if (charge >= 16) return '#ff9020';
-  return '#e5342b';
+  return BATTERY_COLOURS[batteryBand(charge)];
 }
 
 
@@ -1128,24 +1230,26 @@ function chargeColour() {
 
 
 
-function chargeBand() {
-  if (charge >= 31) return 'ok';
-  if (charge >= 16) return 'low';
-  return 'critical';
-}
+const chargeBand = () => batteryBand(charge);
 
+function formatRemaining(minutes) {
+  if (minutes < 0) return '';
+  if (minutes < 1) return '<1m';
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return hours > 0 ? hours + 'h ' + mins + 'm' : mins + 'm';
+}
 
 function paintBattery() {
-  
-  
+
+
   batteryGlyphBox.innerHTML = isPlugged ? BATTERY_GLYPHS.charging : '';
   batteryReading.textContent = charge >= 0 ? charge + '%' : '--';
-  // Stubbed alongside the vitals: nothing reads BatteryManager's own time-to-empty yet, so the line keeps its place and says nothing rather than saying a number nobody computed.
-  batteryRemaining.textContent = '';
+  batteryRemaining.textContent = isPlugged ? formatRemaining(remainingMinutes) : '';
   batteryBox.style.setProperty('--charge-width', Math.max(0, charge) + '%');
   batteryBox.style.setProperty('--charge-color', chargeColour());
   
-  batteryBox.classList.toggle('low', !isPlugged && charge >= 0 && charge < 15);
+  batteryBox.classList.toggle('low', !isPlugged && charge >= 0 && batteryBand(charge) === 'critical');
   batteryBox.classList.toggle('charging', isPlugged);
 }
 
@@ -1225,10 +1329,12 @@ levels.forEach(level => {
   let from = null;
   let share = 0;
   let sent = -1;
+  let levelDrag = dragGate();
 
   level.addEventListener('touchstart', event => {
     event.stopPropagation();
     from = event.touches[0].clientY;
+    levelDrag = dragGate();
     level.classList.add('holding');
     share = parseFloat(level.style.getPropertyValue('--level')) || 0;
     sent = share;
@@ -1240,8 +1346,9 @@ levels.forEach(level => {
     if (from === null) return;
     event.stopPropagation();
     const travelled = from - event.touches[0].clientY;
+    const isDragging = levelDrag(event.touches[0].clientX, event.touches[0].clientY);
     if (!level.classList.contains('dragging')) {
-      if (Math.abs(travelled) < LEVEL_SLOP) return;
+      if (Math.abs(travelled) < LEVEL_SLOP || !isDragging) return;
       level.classList.add('dragging');
       // The drag used to cancel the hold that merges the bars, which put the merge behind a finger held perfectly still for 420ms — a slider is grabbed and moved, so that gesture is not one anybody makes and the merge was unreachable. Taking the bar is what merges it, whether the finger then travels or waits.
       clearTimeout(soloTimer);
@@ -1317,6 +1424,14 @@ function setControl(control, isOn, isTurning) {
   control.classList.remove('turning');
   void control.offsetWidth;
   control.classList.add('turning');
+  // The ring carries the same turn as the face rather than sharing the face's animation: `.ring-text` and the dots are already animating, and a second rule on one element does not add to the first, it replaces it. Two elements, two rules, and what is seen is the sum.
+  const ring = control.querySelector('.quick-ring');
+  if (ring) {
+    ring.animate(
+      [{ rotate: '0deg', scale: 0.55 }, { rotate: '360deg', scale: 1 }],
+      { duration: KNOB_TURN, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }
+    );
+  }
   turnTimers.set(control, setTimeout(() => {
     faceOf(control).innerHTML = glyphFor(control.dataset.toggle, control.classList.contains('on'));
   }, KNOB_TURN / 2));
@@ -1333,10 +1448,47 @@ function pressToggle(name, element) {
   bridge.setToggle(name, next);
 }
 
+const HOLD_OPENS = {
+  gps: 'com.life360.android.safetymapd',
+};
+
+let modeHeld = false;
+let modeHoldTimer = 0;
+let modeDownAt = null;
+
+function releaseModeHold() {
+  modeDownAt = null;
+  clearTimeout(modeHoldTimer);
+}
+
+quickModes.forEach(control => {
+  control.addEventListener('touchstart', event => {
+    modeHeld = false;
+    // Every forwarded move is dispatched whether or not the finger travelled, so cancelling the hold on the first of them let the timer expire only under a hand that never moved a pixel — which is no hand.
+    modeDownAt = { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY };
+    clearTimeout(modeHoldTimer);
+    modeHoldTimer = setTimeout(() => {
+      modeHeld = true;
+      const name = control.dataset.toggle;
+      bridge.triggerHaptic('expand');
+      if (HOLD_OPENS[name]) bridge.openApp(HOLD_OPENS[name]);
+      else bridge.openConnectionSettings(name);
+      closeStatusPanel();
+    }, HOLD_MILLIS);
+  }, { passive: true });
+  control.addEventListener('touchmove', event => {
+    if (!modeDownAt) return;
+    const touch = event.changedTouches[0];
+    if (Math.hypot(touch.clientX - modeDownAt.x, touch.clientY - modeDownAt.y) > KNOB_DRAG_SLOP) releaseModeHold();
+  }, { passive: true });
+  control.addEventListener('touchend', releaseModeHold, { passive: true });
+  control.addEventListener('touchcancel', releaseModeHold, { passive: true });
+});
+
 [...quickModes, ...quickKnobs].forEach(control => {
   control.addEventListener('click', event => {
     event.stopPropagation();
-    if (control.classList.contains('unavailable') || knobSwiped) return;
+    if (control.classList.contains('unavailable') || knobSwiped || modeHeld) return;
     if (control.dataset.open) {
       bridge.triggerHaptic('tap');
       bridge.openApp(control.dataset.open);
@@ -1365,6 +1517,7 @@ let knobLast = null;
 let knobSpeed = 0;
 let knobGlide = 0;
 let knobGlideAt = 0;
+let knobDrag = dragGate();
 
 function setKnobShift(value) {
   const cycle = knobRow.scrollWidth / KNOB_COPIES;
@@ -1400,13 +1553,14 @@ knobRow.addEventListener('touchstart', event => {
   knobFrom = event.touches[0].clientX;
   knobStart = knobShift;
   knobSwiped = false;
+  knobDrag = dragGate();
   knobLast = { x: knobFrom, at: performance.now() };
 }, { passive: true });
 
 knobRow.addEventListener('touchmove', event => {
   if (knobFrom === null) return;
   const x = event.touches[0].clientX;
-  if (!knobSwiped && Math.abs(x - knobFrom) < KNOB_DRAG_SLOP) return;
+  if (!knobSwiped && (Math.abs(x - knobFrom) < KNOB_DRAG_SLOP || !knobDrag(x, event.touches[0].clientY))) return;
   // The slop is spent before the row starts moving, so it is taken off the travel rather than jumped over — otherwise the row leaps the whole slop the moment a drag is recognised.
   if (!knobSwiped) {
     knobSwiped = true;
@@ -1642,9 +1796,10 @@ window.onConnectivity = state => {
 };
 
 
-window.onCharge = (level, plugged) => {
+window.onCharge = (level, plugged, remaining) => {
   charge = level;
   isPlugged = plugged;
+  remainingMinutes = remaining;
   paintStatus();
 };
 
@@ -1698,7 +1853,7 @@ statusPower.addEventListener('click', event => {
 const weatherReading = document.getElementById('weather-reading');
 const weatherGlyph = document.getElementById('weather-glyph');
 
-// Stubbed: no weather source is wired yet, so the line stands at its own shape rather than at a number that would be a lie the moment it was believed.
+// WeatherWatch answers requestWeather() off the phone's last known location; a miss (no fix, no network) arrives as null and the line stands at its own shape rather than at a number that would be a lie.
 window.onWeather = payload => {
   const known = Boolean(payload);
   weatherReading.textContent = known ? Math.round(payload.celsius) + '°C' : '--°C';
@@ -1709,27 +1864,30 @@ window.onWeather(null);
 
 
 
-const vitalReadings = {
-  storage: document.querySelector('.vital[data-vital="storage"] .vital-reading'),
-  ram: document.querySelector('.vital[data-vital="ram"] .vital-reading'),
-  cpu: document.querySelector('.vital[data-vital="cpu"] .vital-reading'),
+const vitalRows = {
+  storage: document.querySelector('.vital[data-vital="storage"]'),
+  ram: document.querySelector('.vital[data-vital="ram"]'),
 };
 const vitalsBox = document.getElementById('quick-vitals');
-const vitalsUptime = document.getElementById('vitals-uptime');
 
 let vitals = null;
 
-// Stubbed for the same reason the weather line is: StatFs, MemoryInfo, the thermal zones and SystemClock.elapsedRealtime have no watcher on the Kotlin side yet, so the module is laid out and reads em-dashes until one is written.
+// VitalsWatch answers requestVitals() with storage and RAM, read fresh each time.
 window.onVitals = payload => {
   vitals = payload;
   if (statusOpen) paintVitals();
 };
 
 function paintVitals() {
-  vitalReadings.storage.textContent = vitals ? vitals.storage : '—';
-  vitalReadings.ram.textContent = vitals ? vitals.ram : '—';
-  vitalReadings.cpu.textContent = vitals ? vitals.cpu : '—';
-  vitalsUptime.textContent = vitals ? vitals.uptime : '—';
+  paintVital(vitalRows.storage, vitals && vitals.storage);
+  paintVital(vitalRows.ram, vitals && vitals.ram);
+}
+
+function paintVital(row, reading) {
+  row.querySelector('.vital-reading').textContent = reading
+    ? reading.usedGigabytes.toFixed(1) + ' / ' + reading.totalGigabytes.toFixed(0) + ' GB'
+    : '—';
+  row.querySelector('.vital-gauge-fill').style.width = (reading ? reading.percent : 0) + '%';
 }
 
 let vitalsHeld = false;
@@ -1742,6 +1900,8 @@ vitalsBox.addEventListener('touchstart', () => {
     vitalsHeld = true;
     vitalsBox.classList.remove('pressing');
     bridge.triggerHaptic('expand');
+    bridge.openConnectionSettings('vitals');
+    closeStatusPanel();
   }, HOLD_MILLIS);
 }, { passive: true });
 
@@ -1752,11 +1912,21 @@ vitalsBox.addEventListener('touchstart', () => {
   }, { passive: true });
 });
 
+// Mirrors --vitals-purge in pill.css — the sweep has to be over before Device Care takes the screen.
+const VITALS_PURGE = 620;
+
 vitalsBox.addEventListener('click', event => {
   event.stopPropagation();
   if (vitalsHeld) return;
-  bridge.triggerHaptic('tap');
-  // Clearing the RAM has no host call behind it yet — the readouts above it are stubbed for the same reason.
+  bridge.triggerHaptic('expand');
+  vitalsBox.classList.remove('cleaning');
+  void vitalsBox.offsetWidth;
+  vitalsBox.classList.add('cleaning');
+  setTimeout(() => {
+    vitalsBox.classList.remove('cleaning');
+    bridge.openConnectionSettings('vitals');
+    closeStatusPanel();
+  }, VITALS_PURGE);
 });
 
 
@@ -1769,7 +1939,7 @@ export const SOLO_HOLD = 420;
 const SOLO_TRAVEL = 420;
 const SOLO_OUT = 180;
 const SOLO_FROST = 260;
-const SOLO_IN = QUICK_POP + quickBubbles.length * QUICK_STAGGER;
+const SOLO_IN = QUICK_POP + QUICK_RANK_STEPS * QUICK_STAGGER;
 
 let soloTimer = 0;
 let soloBackTimer = 0;
@@ -1784,7 +1954,8 @@ function enterSolo(level) {
   levelsRow.classList.add('merged');
   levels.forEach(other => other.classList.toggle('solo-hidden', other !== level));
   if (level.dataset.level === 'brightness') {
-    const panelBox = quickPanel.getBoundingClientRect();
+    quickPanel.style.setProperty('--pop-step', QUICK_STAGGER + 'ms');
+  const panelBox = quickPanel.getBoundingClientRect();
     const rowBox = levelsRow.getBoundingClientRect();
     const lift = Math.round((panelBox.top + panelBox.height / 2) - (rowBox.top + rowBox.height / 2));
     root.style.setProperty('--solo-lift', lift + 'px');

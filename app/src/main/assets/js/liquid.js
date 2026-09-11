@@ -1,8 +1,6 @@
 import { lockPill } from './lock.js';
 import { clockPill, isClockLit } from './clock.js';
 import { doublePill, isDoubleOut } from './double.js';
-import { noteAt } from './notes.js';
-import { isPadlockShowing, padlockPill } from './padlock.js';
 import { statusPill } from './status.js';
 import { satellites } from './row.js';
 import { CLOSED, MELT_MAX, MELT_MIN, bridge, pill, root, shared } from './state.js';
@@ -51,8 +49,7 @@ const liquidLayers = {
 
 
 const BLUR_PANES = [
-  'main', 'left', 'right', 'lock', 'status', 'clock', 'double', 'padlock',
-  'note0', 'note1', 'note2', 'note3', 'note4',
+  'main', 'left', 'right', 'lock', 'status', 'clock', 'double',
 ];
 
 
@@ -83,9 +80,7 @@ function sourceOf(name) {
   if (name === 'status') return statusPill;
   if (name === 'clock') return clockPill;
   if (name === 'double') return doublePill;
-  if (name === 'padlock') return padlockPill;
   if (name === 'lock') return lockPill;
-  if (name.startsWith('note')) return noteAt(Number(name.slice(4)));
   return satellites[name];
 }
 
@@ -114,13 +109,8 @@ function isSkinned(name) {
   if (name === 'status') return statusPill.classList.contains('lit');
   if (name === 'clock') return isClockLit();
   if (name === 'double') return isDoubleOut();
-  if (name === 'padlock') return isPadlockShowing();
-  
-  
-  if (name.startsWith('note')) return Boolean(noteAt(Number(name.slice(4))));
-  
-  
-  
+
+
   return CLOSED.has(shared.size) && Boolean(satellites[name].dataset.mod);
 }
 
@@ -500,10 +490,12 @@ let liquidUntil = 0;
 let liquidFrame = null;
 
 export function stirLiquid(milliseconds) {
-  
-  
-  
-  
+  /* The mirror is the most expensive loop in the page — a rect off every bubble and a write back to the host, every frame — and behind a hidden stage it was measuring shapes nobody can see: a payload arriving while the screen is off used to buy a second of it. Nothing is mirrored while the stage is hidden, and the reveal stirs it once. */
+  if (shared.isStageHidden) return;
+
+
+
+
   liquidUntil = Math.max(liquidUntil, performance.now() + (milliseconds || 700));
   if (liquidFrame !== null) return;
   

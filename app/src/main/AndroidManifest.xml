@@ -15,7 +15,10 @@
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The dashboard's weather line, off a last known network location fix. Granted over adb like READ_PHONE_STATE — see grant.ps1. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
 
 
 
@@ -67,6 +70,8 @@
 
         <activity
             android:name=".StatusPanelActivity"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:label="VADOS Panel"
             android:exported="true"
             android:excludeFromRecents="true"
@@ -81,6 +86,8 @@
 
         <activity
             android:name=".NotificationsPanelActivity"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:label="VADOS Notifications"
             android:exported="true"
             android:excludeFromRecents="true"

@@ -217,6 +217,8 @@ function runMediaClock(from) {
   shared.mediaTicker = setInterval(() => {
     if (shared.isScrubbing) return;
     position += 500;
+    /* A song outlasts a screen, so this is the one ticker that runs for hours with nothing on screen — twice a second, a width and a reading written into a lock bubble nobody can see. The count goes on, so the bar is right the moment the screen comes back; only the painting sleeps. */
+    if (shared.isStageHidden) return;
     
     
     if (shared.size === 'player') paintProgress(position);

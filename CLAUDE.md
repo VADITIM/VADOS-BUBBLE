@@ -20,7 +20,7 @@ Four rule files in `.claude/rules/`, and each one owns a different question. A c
 2. **One backlog item at a time.** Tick it `[x]` in the vault only once it has been verified on the phone.
 3. **Name the contracts the change touches before editing** — state, motion, window, blur, mirrored constant. The glass is mirrored off the real boxes now rather than told where to go, so what a size change owes it is a `stirLiquid()` long enough to cover the transition.
 4. **Docs change in the same task**, never afterwards.
-5. **The check is the phone.** Build, install over wifi, walk the states, and say plainly what was verified on the device and what was not. Never report an animation as working when only the build succeeded.
+5. **The check is the phone, and the phone is the user's to check.** Build and install over wifi, then say what changed — never poke at the UI with `adb shell input`/screenshots to verify it yourself. A blind tap can land in whatever the user has open (a call, a chat, another app) and that is worse than not verifying at all. Say plainly that it was installed and is unverified on-device, and let the user walk it.
 6. **Fix the cause, not the caller.** A backlog item names one symptom; the same bug is usually live in every sibling that routes through the same function.
 
 ## Commands
@@ -29,7 +29,7 @@ Four rule files in `.claude/rules/`, and each one owns a different question. A c
 - `adb install -r app/build/outputs/apk/debug/app-debug.apk` — reinstalling keeps the accessibility and notification-listener grants, so `grant.ps1` is only needed on a first install or after an uninstall.
 - `adb logcat -s IslandBubble` — every WebView console line from every page lands here, tagged with which page it came from.
 
-`adb` is not on PATH; it lives under the Android SDK's `platform-tools`. The phone is normally on wifi rather than USB — `adb connect <phone>:5555`. The port `adb mdns services` announces refuses the connection; 5555 works without pairing.
+`adb` is not on PATH; it lives under the Android SDK's `platform-tools`. **Always install over wifi after a build, without being asked.** `adb devices` first — if the phone is already listed, install straight away. If it is not, run `adb mdns services` to find it on the network and `adb connect <address>:<port>` before installing; only fall back to asking the user if mdns turns up nothing (phone off the network, wifi off). The phone is normally on wifi rather than USB — `adb connect <phone>:5555`. `adb mdns services` is what finds it: it prints both the address and the `_adb-tls-connect` port, and connecting on that port works once the phone has been paired — which it is. 5555 is only open after a cabled `adb tcpip 5555`, and it closes again when the phone reboots, so a refused `connect` on 5555 means the port is shut rather than the phone being away. Ask mdns before assuming either.
 
 **The address is DHCP and does change**, so a hardcoded one here is a trap rather than a shortcut: it was `192.168.0.83` and is `192.168.0.192` today, and a failed `connect` on the old one reads as the phone being off rather than as the note being stale. With the cable in, `adb shell ip -f inet addr show wlan0` says what it is; `adb tcpip 5555` then opens the port and `adb connect` takes it over wifi, after which the cable can come out. `adb tcpip` restarts the daemon on the phone, so the USB entry leaves the device list — that is the mode switching, not the phone going away.
 

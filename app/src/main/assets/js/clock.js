@@ -1,6 +1,6 @@
 import { stirLiquid } from './liquid.js';
 import { rubberBandPast, toy, untoy } from './motion.js';
-import { HOLD_MILLIS, bridge, root } from './state.js';
+import { HOLD_MILLIS, bridge, root, shared } from './state.js';
 
 
 
@@ -74,6 +74,11 @@ function paintClock() {
 
 
 function tickClock() {
+  /* The tick is the page's only unconditional heartbeat, and behind a hidden stage it was still writing four text nodes a second and stirring the liquid on every minute — style, layout and a frame's worth of measuring for a surface nobody can see. It sleeps with the stage and repaints on the way back. */
+  if (shared.isStageHidden) {
+    setTimeout(tickClock, 1000 - new Date().getMilliseconds() + 20);
+    return;
+  }
   const was = clockFace.textContent;
   paintClock();
   
@@ -105,6 +110,13 @@ function bornClock() {
   });
   setTimeout(fitClockProxy, CLOCK_TRAVEL * CLOCK_LAND);
   stirLiquid(CLOCK_TRAVEL + 300);
+}
+
+
+export function wakeClock() {
+  if (!isBorn) return;
+  paintClock();
+  fitClockProxy();
 }
 
 

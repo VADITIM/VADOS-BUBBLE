@@ -1,13 +1,32 @@
 
 
 
-@font-face { font-family: "Wosker";    src: url('fonts/Wosker.otf')            format('opentype'); }
-@font-face { font-family: "Striker";   src: url('fonts/Striker.otf')           format('opentype'); }
+@font-face { font-family: "Mono"; src: url('fonts/SpaceMono-Regular.ttf') format('truetype'); }
 @font-face { font-family: "Audiowide"; src: url('fonts/Audiowide-Regular.ttf') format('truetype'); }
-@font-face { font-family: "Mono";      src: url('fonts/SpaceMono-Regular.ttf') format('truetype'); }
+@font-face { font-family: "Wosker"; src: url('fonts/Wosker.otf') format('opentype'); }
+@font-face { font-family: "Striker"; src: url('fonts/Striker.otf') format('opentype'); }
 
-@font-face { font-family: "Clash";     src: url('fonts/ClashDisplay-Semibold.otf') format('opentype'); font-weight: 600; }
-@font-face { font-family: "ClashMedium"; src: url('fonts/ClashDisplay-Medium.otf') format('opentype'); font-weight: 500; }
+@font-face { font-family: "ClashDisplay-Extralight"; src: url('fonts/ClashDisplay/ClashDisplay-Extralight.otf') format('opentype'); }
+@font-face { font-family: "ClashDisplay-Light";      src: url('fonts/ClashDisplay/ClashDisplay-Light.otf')      format('opentype'); }
+@font-face { font-family: "ClashDisplay-Regular";    src: url('fonts/ClashDisplay/ClashDisplay-Regular.otf')    format('opentype'); }
+@font-face { font-family: "ClashDisplay-Medium";     src: url('fonts/ClashDisplay/ClashDisplay-Medium.otf')     format('opentype'); }
+@font-face { font-family: "ClashDisplay-Semibold";   src: url('fonts/ClashDisplay/ClashDisplay-Semibold.otf')   format('opentype'); }
+@font-face { font-family: "ClashDisplay-Bold";       src: url('fonts/ClashDisplay/ClashDisplay-Bold.otf')       format('opentype'); }
+
+@font-face { font-family: "GeneralSans-Extralight";       src: url('fonts/GeneralSans/GeneralSans-Extralight.otf')       format('opentype'); }
+@font-face { font-family: "GeneralSans-ExtralightItalic"; src: url('fonts/GeneralSans/GeneralSans-ExtralightItalic.otf') format('opentype'); }
+@font-face { font-family: "GeneralSans-Light";             src: url('fonts/GeneralSans/GeneralSans-Light.otf')             format('opentype'); }
+@font-face { font-family: "GeneralSans-LightItalic";       src: url('fonts/GeneralSans/GeneralSans-LightItalic.otf')       format('opentype'); }
+@font-face { font-family: "GeneralSans-Regular";           src: url('fonts/GeneralSans/GeneralSans-Regular.otf')           format('opentype'); }
+@font-face { font-family: "GeneralSans-Italic";            src: url('fonts/GeneralSans/GeneralSans-Italic.otf')            format('opentype'); }
+@font-face { font-family: "GeneralSans-Medium";            src: url('fonts/GeneralSans/GeneralSans-Medium.otf')            format('opentype'); }
+@font-face { font-family: "GeneralSans-MediumItalic";      src: url('fonts/GeneralSans/GeneralSans-MediumItalic.otf')      format('opentype'); }
+@font-face { font-family: "GeneralSans-Semibold";          src: url('fonts/GeneralSans/GeneralSans-Semibold.otf')          format('opentype'); }
+@font-face { font-family: "GeneralSans-SemiboldItalic";    src: url('fonts/GeneralSans/GeneralSans-SemiboldItalic.otf')    format('opentype'); }
+@font-face { font-family: "GeneralSans-Bold";              src: url('fonts/GeneralSans/GeneralSans-Bold.otf')              format('opentype'); }
+@font-face { font-family: "GeneralSans-BoldItalic";        src: url('fonts/GeneralSans/GeneralSans-BoldItalic.otf')        format('opentype'); }
+
+@font-face { font-family: "Tanker-Regular"; src: url('fonts/Tanker/Tanker-Regular.otf') format('opentype'); }
 
 :root {
   --ground: #181818;
@@ -32,7 +51,47 @@
   --danger: #ff6b6b;
   --danger-hard: #dc143c;
 
-  
+  --font-face-mono: "Mono", monospace;
+  --font-face-system: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-face-audiowide: "Audiowide", sans-serif;
+  --font-face-wosker: "Wosker", sans-serif;
+  --font-face-striker: "Striker", sans-serif;
+
+  --font-face-clash-extralight: "ClashDisplay-Extralight", sans-serif;
+  --font-face-clash-light: "ClashDisplay-Light", sans-serif;
+  --font-face-clash-regular: "ClashDisplay-Regular", sans-serif;
+  --font-face-clash-medium: "ClashDisplay-Medium", sans-serif;
+  --font-face-clash-semibold: "ClashDisplay-Semibold", sans-serif;
+  --font-face-clash-bold: "ClashDisplay-Bold", sans-serif;
+
+  --font-face-general-extralight: "GeneralSans-Extralight", sans-serif;
+  --font-face-general-extralight-italic: "GeneralSans-ExtralightItalic", sans-serif;
+  --font-face-general-light: "GeneralSans-Light", sans-serif;
+  --font-face-general-light-italic: "GeneralSans-LightItalic", sans-serif;
+  --font-face-general-regular: "GeneralSans-Regular", sans-serif;
+  --font-face-general-italic: "GeneralSans-Italic", sans-serif;
+  --font-face-general-medium: "GeneralSans-Medium", sans-serif;
+  --font-face-general-medium-italic: "GeneralSans-MediumItalic", sans-serif;
+  --font-face-general-semibold: "GeneralSans-Semibold", sans-serif;
+  --font-face-general-semibold-italic: "GeneralSans-SemiboldItalic", sans-serif;
+  --font-face-general-bold: "GeneralSans-Bold", sans-serif;
+  --font-face-general-bold-italic: "GeneralSans-BoldItalic", sans-serif;
+
+  --font-face-tanker-regular: "Tanker-Regular", sans-serif;
+
+  --font-clock: var(--font-face-mono);
+  --font-main: var(--font-face-mono);
+  --font-satellite: var(--font-face-mono);
+  --font-status: var(--font-face-mono);
+  --font-overlay: var(--font-face-mono);
+  --font-panel-heading: var(--font-face-mono);
+  --font-panel-label: var(--font-face-mono);
+  --font-panel-value: var(--font-face-mono);
+  --font-battery: var(--font-face-mono);
+  --font-stats: var(--font-face-mono);
+  --font-connectors: var(--font-face-mono);
+  --font-notification-heading: var(--font-face-mono);
+  --font-notification-content: var(--font-face-mono);
 
   --section-color: #5bfd5b;
 
@@ -90,7 +149,7 @@ html::-webkit-scrollbar { display: none; }
   position: absolute;
   top: 0;
   left: 0;
-  font-family: "Mono", monospace;
+  font-family: var(--font-panel-label);
   font-size: 0.63rem;
   font-weight: 500;
   letter-spacing: 0.19rem;

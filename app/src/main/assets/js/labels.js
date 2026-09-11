@@ -31,7 +31,6 @@ const LABELS = [
   '#app-name', '#title', '#call-name',
   '#player-title', '#player-artist',
   '#lock-title', '#lock-artist',
-  '.lock-note-who', '.lock-note-said',
   '#timer-remaining', '#timer-label',
 ].join(', ');
 
@@ -100,7 +99,19 @@ export function fitLabels() {
 
 
 
-new MutationObserver(fitLabels).observe(document.body, {
+/* Watching the whole body for character data meant the clock's own seconds — rewritten once a second, forever, screen off included — re-fitted every label on the page: a `getComputedStyle` and a `scrollWidth` read each, which is a forced style recalc and a forced layout of the document every second for a write that can never change a label. A record now has to actually touch a label before anything is measured. */
+new MutationObserver(records => {
+  for (const record of records) {
+    const node = record.target.nodeType === Node.TEXT_NODE
+      ? record.target.parentElement
+      : record.target;
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) continue;
+    if (node.closest(LABELS) || node.querySelector(LABELS)) {
+      fitLabels();
+      return;
+    }
+  }
+}).observe(document.body, {
   subtree: true,
   childList: true,
   characterData: true,

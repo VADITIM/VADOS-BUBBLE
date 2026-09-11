@@ -19,6 +19,8 @@ $bubble = "$package/$package.BubbleService"
 # device name reads back null and a profile proxy reports nothing connected — a silent empty answer
 # rather than a refusal, which is exactly what "Bluetooth is not recognised" looked like.
 & $adb shell pm grant $package android.permission.BLUETOOTH_CONNECT
+# The dashboard's weather line reads a last known network location fix off this.
+& $adb shell pm grant $package android.permission.ACCESS_COARSE_LOCATION
 & $adb shell cmd notification allow_listener $listener
 
 # The accessibility list is written directly: it is a colon-separated string, and

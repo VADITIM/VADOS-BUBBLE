@@ -293,9 +293,34 @@
 
 
 
+  .field-stack {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .accent {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: fit-content;
+    margin: -2.4rem 0.35rem 1.1rem auto;
+    padding: 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    corner-shape: squircle;
+    background: var(--panel-solid);
+    font-family: "Mono", monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.12rem;
+  }
+  .accent .value { color: var(--text-bright); font-variant-numeric: tabular-nums; }
+
   .field {
-    padding: 0.75rem 0.85rem 0.85rem;
-    margin-bottom: 0.55rem;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 0.5rem 0.6rem 0.55rem;
     border: 1px solid var(--border);
     border-radius: 18px;
     corner-shape: squircle;
@@ -305,14 +330,13 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.63rem;
-    letter-spacing: 0.19rem;
+    gap: 0.4rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.14rem;
     text-transform: uppercase;
-    
 
     color: var(--section-color);
-    margin-bottom: 0.55rem;
+    margin-bottom: 0.3rem;
   }
   .field-head .value {
     color: var(--text-bright);
@@ -322,32 +346,48 @@
   
 
   .field-buttons {
-    display: flex;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
     gap: 0.4rem;
-    margin-top: 0.6rem;
+    margin-top: 0.4rem;
   }
-  
+  .field-buttons .step-row {
+    grid-column: 2;
+    justify-self: center;
+    display: flex;
+    gap: 0.4rem;
+  }
+  .field-buttons .reset-mini {
+    grid-column: 3;
+    justify-self: end;
+  }
+
 
   #accent-picker {
-    flex: 1;
-    height: 2.2rem;
+    width: 2rem;
+    height: 2rem;
+    flex: none;
     padding: 0;
     border: 1px solid var(--border-control);
     border-radius: 14px;
     corner-shape: squircle;
     background: transparent;
   }
-  .field-buttons button {
-    min-width: 3rem;
-    padding: 0.42rem 0.7rem;
+  .field-buttons .step-row button {
+    min-width: 2.3rem;
+    padding: 0.38rem 0.5rem;
     border-radius: 14px;
     corner-shape: squircle;
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+  }
+  .field-buttons .reset-mini {
+    padding: 0.2rem 0.35rem;
+    font-size: 0.56rem;
+    letter-spacing: 0.1rem;
   }
 
-  
 
 
 
@@ -355,40 +395,72 @@
 
   .slider {
     touch-action: pan-y;
-    padding: 0.55rem 0;
+    display: flex;
+    align-items: center;
+    padding: 0.35rem 0;
+    height: 1.6rem;
     cursor: ew-resize;
   }
   .slider-track {
     position: relative;
-    height: 4px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
     border-radius: 999px;
-    background: var(--border-strong);
+    corner-shape: round;
+    background: var(--sunken-deep);
+    border: 2px solid var(--border-control);
   }
   .slider-fill {
     position: absolute;
-    left: 0;
     top: 0;
     bottom: 0;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--section-color) 55%, transparent);
+    left: 0;
+    background: var(--section-color);
   }
-  .slider-thumb {
-    position: absolute;
-    top: 50%;
-    width: 20px;
-    height: 20px;
-    margin: -10px 0 0 -10px;
-    border-radius: 999px;
-    background: var(--ground);
-    border: 1px solid var(--section-color);
-  }
-  
+  .slider.dragging .slider-track { scale: 1.03; }
 
-  .slider:not(.dragging) .slider-fill,
-  .slider:not(.dragging) .slider-thumb {
-    transition: width 0.18s var(--ease-leave), left 0.18s var(--ease-leave);
+
+  .slider:not(.dragging) .slider-fill {
+    transition: width 0.18s var(--ease-leave);
   }
-  .slider.dragging .slider-thumb { scale: 1.15; }
+
+  .group-nav {
+    position: fixed;
+    left: 0.92rem;
+    right: 0.92rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom) + 3.5rem);
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: var(--squircle);
+    background: var(--panel-solid);
+    overflow-x: auto;
+    scrollbar-width: none;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .group-nav::-webkit-scrollbar { display: none; }
+  .group-nav.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .group-nav button {
+    flex: none;
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-icon);
+    font-size: 0.6rem;
+    padding: 0.42rem 0.6rem;
+  }
+  .group-nav button[aria-current="true"] {
+    color: var(--section-color);
+    border-color: color-mix(in srgb, var(--section-color) 30%, var(--border));
+  }
 
   .note {
     font-size: 0.7rem;
@@ -443,6 +515,39 @@
   }
 </style>
 
+<style>
+  .swipe-strip {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.2rem 45% 0.4rem;
+    margin: 0 -1rem;
+    scrollbar-width: none;
+  }
+  .swipe-strip::-webkit-scrollbar { display: none; }
+  .swipe-chip {
+    flex: 0 0 auto;
+    scroll-snap-align: center;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.55rem 0.9rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  }
+  .swipe-chip.current {
+    color: var(--text-bright);
+    border-color: var(--section-color);
+    background: var(--raised);
+  }
+  .field > div + .swipe-strip { margin-top: 0.35rem; }
+  .field > div > .swipe-strip .swipe-chip { padding: 0.4rem 0.75rem; font-size: 0.78rem; }
+
+</style>
+
 <section class="screen" data-screen="system" data-accent="#0040ff" data-side="left">
   <div class="slice"></div>
   <div class="slice front"></div>
@@ -488,15 +593,14 @@
   </section>
 </section>
 
-<section class="screen" data-screen="settings" data-accent="#5bfd5b" data-side="right">
+<section class="screen" data-screen="dashboard" data-accent="#5bfd5b" data-side="right">
   <div class="slice"></div>
   <div class="slice front"></div>
 
   <h1 class="stagger"><span class="reveal"><span class="reveal-text">Dynamic Bubble</span><span class="reveal-bar"></span></span></h1>
   <span class="kicker stagger">Appearance</span>
 
-  
-
+  <div id="accent" class="accent"></div>
 
   <div id="fields"></div>
 </section>
@@ -530,6 +634,8 @@
 
   <div id="states"></div>
 
+  <div id="debug-fields"></div>
+
   <section class="module stagger">
     <span class="module-label">Touch</span>
     <pre class="note" id="trace">—</pre>
@@ -543,53 +649,103 @@
 
 <nav>
   <button data-goto="system">System</button>
-  <button data-goto="settings">Settings</button>
+  <button data-goto="dashboard">Settings</button>
   <button data-goto="debug">Debug</button>
 </nav>
 
+<div id="group-nav" class="group-nav"></div>
+
 <script>
+  // Mirrors FONT_STACKS in js/bridge.js — the index a preference holds has to mean the same face in both places.
+  const FONT_STACKS = [
+    'var(--font-face-mono)',
+    'var(--font-face-system)',
+    'var(--font-face-audiowide)',
+    'var(--font-face-wosker)',
+    'var(--font-face-striker)',
+    'var(--font-face-clash-extralight)',
+    'var(--font-face-clash-light)',
+    'var(--font-face-clash-regular)',
+    'var(--font-face-clash-medium)',
+    'var(--font-face-clash-semibold)',
+    'var(--font-face-clash-bold)',
+    'var(--font-face-general-extralight)',
+    'var(--font-face-general-extralight-italic)',
+    'var(--font-face-general-light)',
+    'var(--font-face-general-light-italic)',
+    'var(--font-face-general-regular)',
+    'var(--font-face-general-italic)',
+    'var(--font-face-general-medium)',
+    'var(--font-face-general-medium-italic)',
+    'var(--font-face-general-semibold)',
+    'var(--font-face-general-semibold-italic)',
+    'var(--font-face-general-bold)',
+    'var(--font-face-general-bold-italic)',
+    'var(--font-face-tanker-regular)',
+  ];
+  // Groups FONT_STACKS by physical family so a family with several weights picks its weight separately from the family itself.
+  const FONT_FAMILIES = [
+    { name: 'Mono', variants: ['Regular'] },
+    { name: 'System', variants: ['Regular'] },
+    { name: 'Audiowide', variants: ['Regular'] },
+    { name: 'Wosker', variants: ['Regular'] },
+    { name: 'Striker', variants: ['Regular'] },
+    { name: 'Clash Display', variants: ['Extralight', 'Light', 'Regular', 'Medium', 'Semibold', 'Bold'] },
+    { name: 'General Sans', variants: ['Extralight', 'Extralight Italic', 'Light', 'Light Italic', 'Regular', 'Italic', 'Medium', 'Medium Italic', 'Semibold', 'Semibold Italic', 'Bold', 'Bold Italic'] },
+    { name: 'Tanker', variants: ['Regular'] },
+  ];
+  (() => {
+    let cursor = 0;
+    FONT_FAMILIES.forEach(family => { family.start = cursor; cursor += family.variants.length; });
+  })();
+  function familyOfIndex(index) {
+    return FONT_FAMILIES.findIndex(family => index >= family.start && index < family.start + family.variants.length);
+  }
+
+  // A percentage of whatever size the stylesheet gives a face, mirrored by setFontSizes in js/bridge.js and the font-size calc() chain in pill.css.
+  const FONT_SIZE_RANGE = { min: 50, max: 200, step: 5 };
+
   const FIELDS = [
-    { group: 'Position', key: 'horizontalOffsetDp', name: 'Horizontal', min: -200, max: 200 },
-    { group: 'Position', key: 'verticalOffsetDp',   name: 'Vertical',   min: 0,    max: 200 },
+    { group: 'Axis', key: 'horizontalOffsetDp', name: 'X-Position', min: -200, max: 200 },
+    { group: 'Axis', key: 'verticalOffsetDp',   name: 'Y-Position', min: 0,    max: 200 },
+    { group: 'Axis', key: 'widthDp',    name: 'Width',     min: 0, max: 400 },
+    { group: 'Axis', key: 'heightDp',   name: 'Height',    min: 0, max: 120 },
+    { group: 'Axis', key: 'modWidthDp', name: 'Mod-Width', min: 0, max: 160 },
 
-    { group: 'Size', key: 'widthDp',    name: 'Width',     min: 60, max: 400 },
-    { group: 'Size', key: 'heightDp',   name: 'Height',    min: 20, max: 120 },
-    { group: 'Size', key: 'modWidthDp', name: 'Mod width', min: 20, max: 160 },
-
-    { group: 'Colour', key: 'accentColor',     name: 'Accent',           color: true },
-    { group: 'Colour', key: 'red',             name: 'Red',              min: 0, max: 255 },
-    { group: 'Colour', key: 'green',           name: 'Green',            min: 0, max: 255 },
-    { group: 'Colour', key: 'blue',            name: 'Blue',             min: 0, max: 255 },
-    { group: 'Colour', key: 'backgroundAlpha', name: 'Background alpha', min: 0, max: 100 },
-
-    { group: 'Glass', key: 'blurRadius',  name: 'Backdrop blur', min: 0, max: 60 },
-    
-    
-    { group: 'Glass', key: 'scrimBlurRadius', name: 'Panel blur', min: 0, max: 150 },
-    { group: 'Glass', key: 'gooStrength', name: 'Goo strength',  min: 0, max: 200 },
-    { group: 'Glass', key: 'edgeMerge',   name: 'Wet the screen edges', min: 0, max: 1,
-      labels: ['No', 'Yes'] },
+    { group: 'Behaviour', key: 'blurRadius',      name: 'Bubble-Blur',   min: 0, max: 60 },
+    { group: 'Behaviour', key: 'backgroundAlpha', name: 'Alpha',         min: 0, max: 100 },
+    { group: 'Behaviour', key: 'gooStrength',     name: 'Goo-Merge',     min: 0, max: 200 },
+    { group: 'Behaviour', key: 'edgeMerge', name: 'Wet-Edges', min: 0, max: 1,
+      labels: ['Off', 'On'] },
+    { group: 'Behaviour', key: 'scrimBlurRadius', name: 'Dashboard-Blur', min: 0, max: 150 },
+    { group: 'Behaviour', key: 'barLocked', name: 'Shade', min: 0, max: 1,
+      labels: ['Off', 'On'] },
 
     { group: 'Alerts', key: 'notificationIdentity', name: 'App identity', min: 0, max: 2,
       labels: ['Icon', 'Name', 'Both'] },
-    
-    
-    { group: 'Alerts', key: 'alertDwellTenths', name: 'Alert stands for', min: 10, max: 200, step: 5,
+    { group: 'Alerts', key: 'alertDwellTenths', name: 'Alert stands for', min: 5, max: 200, step: 5,
       read: tenths => (tenths / 10).toFixed(1) + 's' },
 
-    { group: 'Lock screen', key: 'lockOffsetDp',    name: 'Bubble X', min: -150, max: 150 },
-    { group: 'Lock screen', key: 'padlockOffsetDp', name: 'Lock icon Y', min: -150, max: 150 },
-    { group: 'Lock screen', key: 'notesShown',   name: 'Notes',     min: 0, max: 1, labels: ['No', 'Yes'] },
-    { group: 'Lock screen', key: 'padlockShown', name: 'Lock icon', min: 0, max: 1, labels: ['No', 'Yes'] },
+    { group: 'Other', key: 'quickDividers', name: 'Dashboard dividers', min: 0, max: 1,
+      labels: ['Off', 'On'] },
+    { group: 'Other', key: 'lockOffsetDp', name: 'Bubble X', min: -150, max: 150 },
 
-    { group: 'Behaviour', key: 'nowPushesRow', name: 'Now pushes the row', min: 0, max: 1,
-      labels: ['No', 'Yes'] },
-    
-    
-    
-    { group: 'Behaviour', key: 'barLocked', name: 'Lock the shade out', min: 0, max: 1,
-      labels: ['No', 'Yes'] },
+    { group: 'Font Settings', key: 'fontClock', sizeKey: 'fontSizeClock', name: 'Clock', fontFamily: true },
+    { group: 'Font Settings', key: 'fontMain', sizeKey: 'fontSizeMain', name: 'Main', fontFamily: true },
+    { group: 'Font Settings', key: 'fontSatellite', sizeKey: 'fontSizeSatellite', name: 'Mod', fontFamily: true },
+    { group: 'Font Settings', key: 'fontStatus', sizeKey: 'fontSizeStatus', name: 'Status', fontFamily: true },
+    { group: 'Font Settings', key: 'fontOverlay', sizeKey: 'fontSizeOverlay', name: 'Overlay', fontFamily: true },
+    { group: 'Font Settings', key: 'fontBattery', sizeKey: 'fontSizeBattery', name: 'Battery', fontFamily: true },
+    { group: 'Font Settings', key: 'fontStats', sizeKey: 'fontSizeStats', name: 'Stats Bubble', fontFamily: true },
+    { group: 'Font Settings', key: 'fontConnectors', sizeKey: 'fontSizeConnectors', name: 'Connector Bubbles', fontFamily: true },
+    { group: 'Font Settings', key: 'fontNotificationHeading', sizeKey: 'fontSizeNotificationHeading', name: 'Notification Heading', fontFamily: true },
+    { group: 'Font Settings', key: 'fontNotificationContent', sizeKey: 'fontSizeNotificationContent', name: 'Notification Content', fontFamily: true },
+
+    { group: 'Channels', screen: 'debug', key: 'red',   name: 'Red',   min: 0, max: 255 },
+    { group: 'Channels', screen: 'debug', key: 'green', name: 'Green', min: 0, max: 255 },
+    { group: 'Channels', screen: 'debug', key: 'blue',  name: 'Blue',  min: 0, max: 255 },
   ];
+
 
   
 
@@ -632,24 +788,94 @@
   
 
   
+
+  // The drag-only slider every numeric field wears: dragged along its track, stepped by the buttons beside it, reset by the one at the end.
+  function buildSlider(field, startValue, defaultValue, onChange) {
+    const slider = document.createElement("div");
+    slider.className = "slider";
+    const track = document.createElement("div");
+    track.className = "slider-track";
+    const fill = document.createElement("div");
+    fill.className = "slider-fill";
+    track.append(fill);
+    slider.append(track);
+
+    const buttons = document.createElement("div");
+    buttons.className = "field-buttons";
+    const stepRow = document.createElement("div");
+    stepRow.className = "step-row";
+    const down = document.createElement("button");
+    down.textContent = "−";
+    const up = document.createElement("button");
+    up.textContent = "+";
+    stepRow.append(down, up);
+    const reset = document.createElement("button");
+    reset.className = "quiet reset-mini";
+    reset.textContent = "Reset";
+    buttons.append(stepRow, reset);
+
+    let current = field.min;
+    const clamp = to => Math.min(field.max, Math.max(field.min, Math.round(to)));
+    const apply = written => {
+      current = clamp(Number(written));
+      fill.style.width = ((current - field.min) / (field.max - field.min) * 100) + "%";
+      onChange(current);
+    };
+
+    apply(startValue);
+
+    let from = null;
+    slider.addEventListener("pointerdown", event => {
+      from = { x: event.clientX, value: current, armed: false };
+    });
+    slider.addEventListener("pointermove", event => {
+      if (!from) return;
+      const travelled = event.clientX - from.x;
+      if (!from.armed) {
+        if (Math.abs(travelled) < 8) return;
+        from.armed = true;
+        slider.classList.add("dragging");
+        slider.setPointerCapture(event.pointerId);
+        Panel.triggerHaptic();
+      }
+      apply(from.value + travelled / track.clientWidth * (field.max - field.min));
+    });
+    const release = () => {
+      if (from && from.armed) Panel.triggerHaptic();
+      from = null;
+      slider.classList.remove("dragging");
+    };
+    slider.addEventListener("pointerup", release);
+    slider.addEventListener("pointercancel", release);
+
+    down.addEventListener("click", () => { apply(current - (field.step || 1)); Panel.triggerHaptic(); });
+    up.addEventListener("click", () => { apply(current + (field.step || 1)); Panel.triggerHaptic(); });
+    reset.addEventListener("click", () => { apply(defaultValue); Panel.triggerHaptic(); });
+
+    return { slider, buttons, apply };
+  }
+
   function buildFields(preferences, defaults) {
-    const root = document.getElementById('fields');
+    buildAccent(document.getElementById('accent'), preferences, defaults);
     const modules = new Map();
     for (const field of FIELDS) {
+      const root = document.getElementById(field.screen === 'debug' ? 'debug-fields' : 'fields');
       let container = modules.get(field.group);
       if (!container) {
         const module = document.createElement('section');
         module.className = 'module stagger';
+        module.dataset.group = field.group;
         const label = document.createElement('span');
         label.className = 'module-label';
         label.textContent = field.group;
         container = document.createElement('div');
+        container.className = 'field-stack';
         module.append(label, container);
         root.appendChild(module);
         modules.set(field.group, container);
       }
-      if (field.color) {
-        buildAccent(container, field, preferences, defaults);
+      if (field.fontFamily) {
+        buildFontChoice(container, field, preferences, defaults);
         continue;
       }
       if (field.labels) {
@@ -668,73 +894,12 @@
       value.className = 'value';
       head.append(name, value);
 
-      const slider = document.createElement('div');
-      slider.className = 'slider';
-      const track = document.createElement('div');
-      track.className = 'slider-track';
-      const fill = document.createElement('div');
-      fill.className = 'slider-fill';
-      const thumb = document.createElement('div');
-      thumb.className = 'slider-thumb';
-      track.append(fill, thumb);
-      slider.append(track);
-
-      const buttons = document.createElement('div');
-      buttons.className = 'field-buttons';
-      const down = document.createElement('button');
-      down.textContent = '−';
-      const up = document.createElement('button');
-      up.textContent = '+';
-      const reset = document.createElement('button');
-      reset.textContent = 'Reset';
-      buttons.append(down, up, reset);
-
-      let current = field.min;
-      const clamp = to => Math.min(field.max, Math.max(field.min, Math.round(to)));
-      const apply = written => {
-        current = clamp(Number(written));
-        const share = (current - field.min) / (field.max - field.min);
-        fill.style.width = (share * 100) + '%';
-        thumb.style.left = (share * 100) + '%';
+      const control = buildSlider(field, preferences[field.key], defaults[field.key], current => {
         value.textContent = field.read ? field.read(current) : current;
         Panel.setPreference(field.key, current);
-      };
-
-      apply(preferences[field.key]);
-      const step = by => apply(current + by);
-
-      
-      
-      
-      let from = null;
-      slider.addEventListener('pointerdown', event => {
-        from = { x: event.clientX, value: current, armed: false };
       });
-      slider.addEventListener('pointermove', event => {
-        if (!from) return;
-        const travelled = event.clientX - from.x;
-        
-        
-        if (!from.armed) {
-          if (Math.abs(travelled) < 8) return;
-          from.armed = true;
-          slider.classList.add('dragging');
-          slider.setPointerCapture(event.pointerId);
-        }
-        apply(from.value + travelled / track.clientWidth * (field.max - field.min));
-      });
-      const release = () => {
-        from = null;
-        slider.classList.remove('dragging');
-      };
-      slider.addEventListener('pointerup', release);
-      slider.addEventListener('pointercancel', release);
 
-      down.addEventListener('click', () => step(-(field.step || 1)));
-      up.addEventListener('click', () => step(field.step || 1));
-      reset.addEventListener('click', () => apply(defaults[field.key]));
-
-      wrapper.append(head, slider, buttons);
+      wrapper.append(head, control.slider, control.buttons);
       container.appendChild(wrapper);
     }
   }
@@ -779,6 +944,7 @@
       marker.style.transform = `translateX(${current * 100}%)`;
       buttons.forEach((button, index) =>
         button.setAttribute('aria-pressed', String(index === current)));
+      if (field.cssVar) document.documentElement.style.setProperty(field.cssVar, FONT_STACKS[current]);
       Panel.setPreference(field.key, current);
     };
 
@@ -791,12 +957,58 @@
     container.appendChild(wrapper);
   }
 
-  
+  // A strip of chips too many to lay out as buttons, swiped through instead and snapping to whichever one is centred. Shared by the family strip and the variant strip below it.
+  function buildSwipeStrip(labels, startIndex, onPick, chipStyler) {
+    const strip = document.createElement('div');
+    strip.className = 'swipe-strip';
 
+    const chips = labels.map((label, index) => {
+      const chip = document.createElement('button');
+      chip.className = 'swipe-chip';
+      chip.textContent = label;
+      if (chipStyler) chipStyler(chip, index);
+      chip.addEventListener('click', () => {
+        select(index, true);
+        Panel.triggerHaptic();
+        chip.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      });
+      strip.appendChild(chip);
+      return chip;
+    });
 
+    let settling = false;
+    // A user-driven pick fires onPick; laying out the strip at its starting index must not — that index is already what the preference holds.
+    function select(index, fire) {
+      chips.forEach((chip, chipIndex) => chip.classList.toggle('current', chipIndex === index));
+      if (fire) onPick(index);
+    }
 
+    strip.addEventListener('scroll', () => {
+      if (settling) return;
+      settling = true;
+      requestAnimationFrame(() => {
+        settling = false;
+        const stripBox = strip.getBoundingClientRect();
+        const centre = stripBox.left + stripBox.width / 2;
+        let nearest = 0;
+        let closest = Infinity;
+        chips.forEach((chip, index) => {
+          const box = chip.getBoundingClientRect();
+          const gap = Math.abs((box.left + box.width / 2) - centre);
+          if (gap < closest) { closest = gap; nearest = index; }
+        });
+        select(nearest, true);
+      });
+    });
 
-  function buildAccent(container, field, preferences, defaults) {
+    select(startIndex, false);
+    requestAnimationFrame(() => chips[startIndex]?.scrollIntoView({ inline: 'center', block: 'nearest' }));
+
+    return { strip, jumpTo: index => { select(index, true); chips[index]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } };
+  }
+
+  // A family (Mono, Clash Display, General Sans, …) is picked first, and only a family with more than one weight gets a second strip to pick the weight from.
+  function buildFontChoice(container, field, preferences, defaults) {
     const wrapper = document.createElement('div');
     wrapper.className = 'field';
 
@@ -808,18 +1020,94 @@
     value.className = 'value';
     head.append(name, value);
 
-    const buttons = document.createElement('div');
-    buttons.className = 'field-buttons';
+    const variantHolder = document.createElement('div');
+
+    let variantControl = null;
+    const setValueLabel = index => {
+      const family = FONT_FAMILIES[familyOfIndex(index)];
+      const variant = family.variants[index - family.start];
+      value.textContent = family.variants.length > 1 ? `${family.name} · ${variant}` : family.name;
+    };
+
+    const commit = index => {
+      setValueLabel(index);
+      if (field.cssVar) document.documentElement.style.setProperty(field.cssVar, FONT_STACKS[index]);
+      Panel.setPreference(field.key, index);
+    };
+
+    function showVariants(familyIndex, selectIndex) {
+      variantHolder.replaceChildren();
+      variantControl = null;
+      const family = FONT_FAMILIES[familyIndex];
+      if (family.variants.length <= 1) return;
+      const built = buildSwipeStrip(
+        family.variants,
+        selectIndex - family.start,
+        variantIndex => commit(family.start + variantIndex),
+        (chip, variantIndex) => { chip.style.fontFamily = FONT_STACKS[family.start + variantIndex]; }
+      );
+      variantControl = built;
+      variantHolder.appendChild(built.strip);
+    }
+
+    const startIndex = preferences[field.key];
+    const startFamily = familyOfIndex(startIndex);
+    const familyControl = buildSwipeStrip(
+      FONT_FAMILIES.map(family => family.name),
+      startFamily,
+      familyIndex => {
+        const family = FONT_FAMILIES[familyIndex];
+        showVariants(familyIndex, family.start);
+        commit(family.start);
+      },
+      (chip, familyIndex) => { chip.style.fontFamily = FONT_STACKS[FONT_FAMILIES[familyIndex].start]; }
+    );
+    showVariants(startFamily, startIndex);
+    setValueLabel(startIndex);
+    if (field.cssVar) document.documentElement.style.setProperty(field.cssVar, FONT_STACKS[startIndex]);
+
+    name.addEventListener('dblclick', () => {
+      const defaultIndex = defaults[field.key];
+      const defaultFamily = familyOfIndex(defaultIndex);
+      familyControl.jumpTo(defaultFamily);
+      showVariants(defaultFamily, defaultIndex);
+      commit(defaultIndex);
+    });
+
+    const sizeHead = document.createElement('div');
+    sizeHead.className = 'field-head';
+    const sizeName = document.createElement('span');
+    sizeName.textContent = 'Size';
+    const sizeValue = document.createElement('span');
+    sizeValue.className = 'value';
+    sizeHead.append(sizeName, sizeValue);
+
+    const sizeControl = buildSlider(FONT_SIZE_RANGE, preferences[field.sizeKey], defaults[field.sizeKey], percent => {
+      sizeValue.textContent = percent + '%';
+      if (field.sizeCssVar) document.documentElement.style.setProperty(field.sizeCssVar, percent / 100);
+      Panel.setPreference(field.sizeKey, percent);
+    });
+    sizeName.addEventListener('dblclick', () => sizeControl.apply(defaults[field.sizeKey]));
+
+    wrapper.append(head, familyControl.strip, variantHolder, sizeHead, sizeControl.slider, sizeControl.buttons);
+    container.appendChild(wrapper);
+  }
+
+
+
+
+
+
+  function buildAccent(wrapper, preferences, defaults) {
+    const value = document.createElement('span');
+    value.className = 'value';
+
     const picker = document.createElement('input');
     picker.type = 'color';
     picker.id = 'accent-picker';
-    const reset = document.createElement('button');
-    reset.textContent = 'Reset';
-    buttons.append(picker, reset);
-    wrapper.append(head, buttons);
-    container.appendChild(wrapper);
+    wrapper.append(picker, value);
 
-    const screen = document.querySelector('.screen[data-screen="settings"]');
+    const screen = document.querySelector('.screen[data-screen="dashboard"]');
     const apply = number => {
       const hex = '#' + (number & 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
       picker.value = hex;
@@ -830,9 +1118,8 @@
       }
       Panel.setPreference('accentColor', number & 0xFFFFFF);
     };
-    apply(preferences[field.key]);
+    apply(preferences.accentColor);
     picker.addEventListener('input', () => apply(parseInt(picker.value.slice(1), 16)));
-    reset.addEventListener('click', () => apply(defaults[field.key]));
   }
 
   
@@ -926,6 +1213,32 @@
     }
   }
 
+  let activeGroup = 'All';
+  function applyGroupFilter() {
+    for (const module of document.querySelectorAll('#fields .module')) {
+      module.hidden = activeGroup !== 'All' && module.dataset.group !== activeGroup;
+    }
+  }
+  function buildGroupNav() {
+    const groupNav = document.getElementById('group-nav');
+    const groups = ['All', ...new Set(FIELDS.filter(field => field.screen !== 'debug').map(field => field.group))];
+    for (const group of groups) {
+      const button = document.createElement('button');
+      button.textContent = group;
+      button.dataset.group = group;
+      button.setAttribute('aria-current', String(group === activeGroup));
+      button.addEventListener('click', () => {
+        activeGroup = group;
+        for (const other of groupNav.querySelectorAll('button')) {
+          other.setAttribute('aria-current', String(other.dataset.group === group));
+        }
+        applyGroupFilter();
+        Panel.triggerHaptic();
+      });
+      groupNav.appendChild(button);
+    }
+  }
+
   function paintNav() {
     for (const button of document.querySelectorAll('nav button')) {
       const isCurrent = button.dataset.goto === screens[activeIndex].dataset.screen;
@@ -951,6 +1264,7 @@
       
       document.documentElement.style.setProperty('--section-color', entering.dataset.accent);
       entering.classList.add('active');
+      document.getElementById('group-nav').classList.toggle('visible', entering.dataset.screen === 'dashboard');
       
       
       entering.scrollTop = 0;
@@ -985,6 +1299,8 @@
 
   const initialState = JSON.parse(Panel.readState());
   buildFields(initialState.preferences, initialState.defaults);
+  buildGroupNav();
+  applyGroupFilter();
   buildStates();
   buildReplays();
   window.onStateChanged(initialState);

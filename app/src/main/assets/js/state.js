@@ -19,7 +19,7 @@ export const bridge = window.Android || {
   openNotification() {}, dismissNotification() {}, timerAction() {},
   setTorch() {}, setLockProxy() {}, setStatusProxy() {}, setClockProxy() {},
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
-  requestToggles() {}, setToggle() {}, setLevel() {},
+  requestToggles() {}, setToggle() {}, setLevel() {}, requestVitals() {}, requestWeather() {},
   recordingAction() {}, setNotesProxy() {}, mediaSpeed() {},
   note() {}, wakeFrames() {},
 };
@@ -142,6 +142,10 @@ export const shared = {
   
   isTouchDown: false,
   
+  closedInTouch: false,
+
+  closedOutside: false,
+
 
 
 
@@ -179,6 +183,8 @@ export const shared = {
   nowPushes: true,
   
   modWidth: 56,
+
+  isStageHidden: false,
 };
 
 
@@ -201,4 +207,22 @@ export const mods = new Set();
 export const SWEEP_CYCLE = 12000;
 export function setSweepPhase(element) {
   element.style.setProperty('--sweep-phase', -(Date.now() % SWEEP_CYCLE) + 'ms');
+}
+
+
+// Every drag in the interface was armed by distance alone, and a tap is never perfectly still — so a fingertip that rolled a few pixels across the gate during a tap became a drag, and a drag once begun waits for a threshold the finger has already stopped travelling towards, which is why a tap could leave the bubble stuck out of idle. A drag has to earn it in speed now: DRAG_COMMIT pixels covered inside DRAG_WINDOW, measured against where the finger was a window ago rather than against the down, so a slow deliberate drag still qualifies the moment it actually moves and a tap's drift never does.
+export const DRAG_COMMIT = 10;
+export const DRAG_WINDOW = 110;
+
+export function dragGate() {
+  const trail = [];
+  let committed = false;
+  return (x, y) => {
+    if (committed) return true;
+    const at = performance.now();
+    trail.push({ x, y, at });
+    while (trail.length > 1 && at - trail[0].at > DRAG_WINDOW) trail.shift();
+    committed = Math.hypot(x - trail[0].x, y - trail[0].y) >= DRAG_COMMIT;
+    return committed;
+  };
 }
