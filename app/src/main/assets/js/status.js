@@ -6,6 +6,7 @@ import { closeNowPanel, nowOpen } from './now.js';
 import { closePanelNow, openPanelNow } from './lock.js';
 import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
+import { holdLabel, revealLabel, sweepLabel } from './sweep.js';
 
 
 
@@ -41,6 +42,12 @@ function closedFace() {
   return owner ? CLOSED_FACE[owner] : 'idle';
 }
 
+function setReading(element, text) {
+  if (readingsHeld) holdLabel(element, text);
+  else sweepLabel(element, text);
+}
+
+
 const TRANSFER_COLOUR = { download: '#f09b3a', upload: '#3a8cff' };
 
 export function refreshDock() {
@@ -52,7 +59,7 @@ function paintTransferStrip() {
   transferStrip.classList.toggle('idle', !isLive);
   if (!isLive) {
     transferGlyph.innerHTML = GLYPHS.dataToday;
-    transferReading.textContent = bridge.readDataToday() + ' today';
+    setReading(transferReading, bridge.readDataToday() + ' today');
     return;
   }
   transferGlyph.innerHTML = transfer.isDone ? GLYPHS.transferDone : GLYPHS[transfer.mod];
@@ -831,6 +838,8 @@ let panelSettle = null;
 let quickSettle = null;
 
 let quickEntering = null;
+let readingReveal = null;
+let readingsHeld = false;
 
 export function openStatusPanel() {
   if (statusOpen) return;
@@ -898,8 +907,16 @@ export function openStatusPanel() {
   clearTimeout(quickEntering);
   quickEntering = setTimeout(() => quickPanel.classList.remove('entering'), QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
   
-  
-  
+  // A reading that swept while its bubble was still dropping was a bar moving under a box that was itself moving — the reveal is asked for once the quick panel has landed instead, over the text it is already standing on. Until then the reading is held out of sight and any answer arriving early only writes its text, so a weather reply landing mid-drop no longer plays a reveal of its own before the real one.
+  clearTimeout(readingReveal);
+  readingsHeld = true;
+  weatherReading.classList.add('sweep-hidden');
+  transferReading.classList.add('sweep-hidden');
+  readingReveal = setTimeout(() => {
+    readingsHeld = false;
+    revealLabel(weatherReading);
+    revealLabel(transferReading);
+  }, QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
   
   
   stirLiquid(STATUS_PANEL.ms + QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
@@ -908,6 +925,10 @@ export function openStatusPanel() {
 export function closeStatusPanel() {
   if (!statusOpen) return;
   statusOpen = false;
+  clearTimeout(readingReveal);
+  readingsHeld = false;
+  weatherReading.classList.remove('sweep-hidden');
+  transferReading.classList.remove('sweep-hidden');
   
   
   
@@ -1856,7 +1877,7 @@ const weatherGlyph = document.getElementById('weather-glyph');
 // WeatherWatch answers requestWeather() off the phone's last known location; a miss (no fix, no network) arrives as null and the line stands at its own shape rather than at a number that would be a lie.
 window.onWeather = payload => {
   const known = Boolean(payload);
-  weatherReading.textContent = known ? Math.round(payload.celsius) + '°C' : '--°C';
+  setReading(weatherReading, known ? Math.round(payload.celsius) + '°C' : '--°C');
   weatherGlyph.innerHTML = WEATHER_GLYPHS[(payload && payload.sky) || 'cloud'];
 };
 window.onWeather(null);

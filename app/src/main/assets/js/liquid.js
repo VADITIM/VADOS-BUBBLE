@@ -348,6 +348,69 @@ function scrimRegion() {
   ].join(',');
 }
 
+const HALO_RINGS = 6;
+
+
+const HALO_SPREAD_X = 260;
+export const HALO_SPREAD_Y = 190;
+
+
+const HALO_FALLOFF = 1.6;
+
+
+const HALO_DELAY = 220;
+
+
+const HALO_RAMP = 900;
+
+let haloFrom = 0;
+
+
+
+
+export function startHalo() {
+  haloFrom = performance.now();
+}
+
+
+export const HALO_MILLIS = HALO_DELAY + HALO_RAMP;
+
+
+
+
+
+
+
+
+
+
+function haloRegions() {
+  if (shared.size !== 'alertCentre') return [];
+  const box = pill.getBoundingClientRect();
+  if (!box.width) return [];
+  const since = performance.now() - haloFrom - HALO_DELAY;
+  const strength = Math.max(0, Math.min(1, since / HALO_RAMP));
+  if (strength <= 0) return [];
+  // The rings come up after the bubble has landed rather than with it, and they come up slowly: a blur that arrives on the travel reads as the screen being wiped rather than as the bubble pushing the screen away from itself.
+  const eased = strength * strength * (3 - 2 * strength);
+  const rings = [];
+  for (let ring = HALO_RINGS; ring >= 1; ring -= 1) {
+    const reach = ring / (HALO_RINGS + 1);
+    const width = box.width + reach * HALO_SPREAD_X * 2;
+    const height = box.height + reach * HALO_SPREAD_Y * 2;
+    const share = Math.pow(1 - reach, HALO_FALLOFF) * eased;
+    rings.push([
+      Math.round(box.left + box.width / 2 - width / 2),
+      Math.round(box.top + box.height / 2 - height / 2),
+      Math.round(width),
+      Math.round(height),
+      Math.round(Math.min(width, height) / 2),
+      (Math.round(share * FROST_STEPS) / FROST_STEPS).toFixed(2),
+    ].join(','));
+  }
+  return rings;
+}
+
 function sendBlurFrame(measured) {
   const spec = [scrimRegion()].concat(measured.map(seen => {
     if (!seen || !seen.box.width) return '';
@@ -366,7 +429,8 @@ function sendBlurFrame(measured) {
       
       Math.round(Math.min(parseFloat(seen.radius) || 0, Math.min(width, height) / 2)),
     ].join(',');
-  })).join(';');
+    // The halo stands after the blobs so its rings are added over them, weakest first — a pane added later is drawn on top, and a wide weak ring laid over a narrow strong one would otherwise take the strength back off the middle.
+  })).concat(haloRegions()).join(';');
   if (spec === blurSent) return;
   blurSent = spec;
   bridge.setBlurFrame(spec);

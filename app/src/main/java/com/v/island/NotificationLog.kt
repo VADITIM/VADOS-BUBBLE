@@ -35,7 +35,7 @@ object NotificationLog {
         unread = 0
     }
 
-    fun history(): JSONArray = JSONArray().apply { entries.forEach { put(it.payload) } }
+    fun all(): JSONArray = JSONArray().apply { entries.forEach { put(it.payload) } }
 
     
     fun lastOf(styleKey: String): JSONObject? =

@@ -61,8 +61,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         private const val BLEED = 14
 
-        
+
         private const val SHADE_STRIP = 48
+
+
+
+        private const val ALERT_BAND_SHARE = 0.495f
 
         
         private const val GROWN_CORNER = 26
@@ -252,9 +256,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private lateinit var lockProxy: View
     private lateinit var lockProxyParams: WindowManager.LayoutParams
 
-    
+
     private lateinit var statusProxy: View
     private lateinit var statusProxyParams: WindowManager.LayoutParams
+
+
+    private lateinit var alertOverlay: View
+    private lateinit var alertOverlayParams: WindowManager.LayoutParams
 
     
 
@@ -588,14 +596,40 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         
         
+        alertOverlay = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, alertOverlayParams, "alert")
+                return true
+            }
+        }
+        alertOverlayParams = WindowManager.LayoutParams(
+            0, 0,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
+
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, params)
-        
-        
+
+
         windowManager.addView(touchProxy, proxyParams)
         windowManager.addView(lockProxy, lockProxyParams)
         windowManager.addView(statusProxy, statusProxyParams)
         windowManager.addView(clockProxy, clockProxyParams)
+        windowManager.addView(alertOverlay, alertOverlayParams)
         applyBarLock()
         readBarPolicy()
         
@@ -724,6 +758,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             lockProxy to lockProxyParams,
             statusProxy to statusProxyParams,
             clockProxy to clockProxyParams,
+            alertOverlay to alertOverlayParams,
         ).forEach { (view, viewParams) ->
             runCatching {
                 windowManager.removeView(view)
@@ -775,6 +810,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
             clockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(clockProxy, clockProxyParams) }
+            setAlertBand(0)
         } else {
             push("window.refitProxies()")
         }
@@ -800,6 +836,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             screenWatch = null
             awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
+            runCatching { windowManager.removeView(alertOverlay) }
             runCatching { windowManager.removeView(clockProxy) }
             runCatching { windowManager.removeView(statusProxy) }
             runCatching { windowManager.removeView(lockProxy) }
@@ -930,6 +967,29 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     
     private fun screenWidth(): Int = windowManager.currentWindowMetrics.bounds.width()
+
+    private fun screenHeight(): Int = windowManager.currentWindowMetrics.bounds.height()
+
+
+
+
+
+
+    private fun setAlertBand(heightDp: Int) {
+        if (!this::alertOverlay.isInitialized) return
+        val wanted = heightDp != 0 && !isHidden()
+        val band = (screenHeight() * ALERT_BAND_SHARE).toInt()
+        alertOverlayParams.width = if (wanted) screenWidth() else 0
+        alertOverlayParams.height =
+            if (!wanted) 0
+            else if (heightDp < 0) band
+            else maxOf(band, minOf(dp(heightDp), screenHeight()))
+        alertOverlayParams.flags = proxyFlags(wanted)
+        runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
+
+        proxyParams.flags = proxyFlags(!wanted)
+        runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+    }
 
     
 
@@ -1098,6 +1158,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setAlertDwell(${Preferences.get(preferences, Preferences.ALERT_DWELL)})")
         push("window.setQuickDividers(${Preferences.get(preferences, Preferences.QUICK_DIVIDERS)})")
         push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
+        push("window.setLabelSweep(${Preferences.get(preferences, Preferences.LABEL_SWEEP)})")
         push("window.setFonts(${Preferences.get(preferences, Preferences.FONT_CLOCK)},${Preferences.get(preferences, Preferences.FONT_MAIN)},${Preferences.get(preferences, Preferences.FONT_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_STATUS)},${Preferences.get(preferences, Preferences.FONT_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_BATTERY)},${Preferences.get(preferences, Preferences.FONT_STATS)},${Preferences.get(preferences, Preferences.FONT_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_CONTENT)})")
         push("window.setFontSizes(${Preferences.get(preferences, Preferences.FONT_SIZE_CLOCK)},${Preferences.get(preferences, Preferences.FONT_SIZE_MAIN)},${Preferences.get(preferences, Preferences.FONT_SIZE_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATUS)},${Preferences.get(preferences, Preferences.FONT_SIZE_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_SIZE_BATTERY)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATS)},${Preferences.get(preferences, Preferences.FONT_SIZE_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_CONTENT)})")
         push("window.setLockShift(${Preferences.get(preferences, Preferences.LOCK_X)})")
@@ -1312,6 +1373,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
         @JavascriptInterface
+        fun setAlertOverlay(heightDp: Int) {
+            webView.post { setAlertBand(heightDp) }
+        }
+
+        @JavascriptInterface
         fun setBlurFrame(spec: String) {
             webView.post { placeBlurFrame(spec) }
         }
@@ -1522,7 +1588,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         
         @JavascriptInterface
-        fun readHistory(): String = IslandNotificationListener.shade().toString()
+        fun readNotifications(): String = IslandNotificationListener.shade().toString()
 
         @JavascriptInterface
         fun dismissNotification(key: String) = IslandNotificationListener.dismiss(key)

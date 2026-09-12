@@ -10,12 +10,12 @@ export const faces = {
 
 
   alert: document.getElementById('alert-face'),
-  history: document.getElementById('history-face'),
+  notifications: document.getElementById('notifications-face'),
 };
 export const bridge = window.Android || {
   ready() {}, setWindowSize() {}, setWindowBounds() {}, setBlurFrame() {}, triggerHaptic() {}, onSwipeDismiss() {},
   mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, readDataToday() { return '0 MB'; }, setTorchLit() {},
-  setMicrophoneAccess() {}, readHistory() { return '[]'; }, readUnreadCount() { return 0; },
+  setMicrophoneAccess() {}, readNotifications() { return '[]'; }, readUnreadCount() { return 0; }, setAlertOverlay() {},
   openNotification() {}, dismissNotification() {}, timerAction() {},
   setTorch() {}, setLockProxy() {}, setStatusProxy() {}, setClockProxy() {},
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
@@ -38,13 +38,16 @@ export const SIZES = {
   
   alert:    { width: 300, height: 162 },
   image:    { width: 300, height: 197 },
+
+
+  alertCentre: { width: 300, height: 162 },
   haptic:   { width: 340, height: 150 },
   picture:  { width: 340, height: 320 },
   player:   { width: 340, height: 190 },
   timer:    { width: 340, height: 132 },
   
 
-  history:  { width: 340, height: 320 },
+  notifications: { width: 340, height: 320 },
 };
 
 
@@ -179,6 +182,7 @@ export const shared = {
   dwell: DWELL,
   
   edgeMerge: true,
+  labelSweep: false,
   
   nowPushes: true,
   

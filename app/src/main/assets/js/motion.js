@@ -1,3 +1,4 @@
+import { isDuplicateLive, isDuplicateSwapped, swapDuplicate } from './double.js';
 import { stirLiquid } from './liquid.js';
 import { openPlayer } from './mods/media.js';
 import { openCurrent, openPicture } from './mods/notification.js';
@@ -8,7 +9,7 @@ import { lockPill } from './lock.js';
 import { closeStatusPanel, statusOpen, statusPanelTarget, statusPill } from './status.js';
 import { abandonSwap, becomeExtended, applyClosedWindow, applyWindow, closedTarget, dragSwap, ensureClosedWindow, liveMods, releaseSwap, toClosed } from './row.js';
 import { CLOSED, HOLD_GRACE, HOLD_MILLIS, HOLD_SCALE, bridge, dragGate, pill, root, shared } from './state.js';
-import { MOD_FACES, leaveForMod, openHistory, openMod } from './tabs.js';
+import { MOD_FACES, leaveForMod, openNotifications, openMod } from './tabs.js';
 
 
 
@@ -63,10 +64,10 @@ const DRAG_RADIUS = 40;
 
 
 
-const HISTORY_DRAG_SCALE = 0.15;
+const NOTIFICATIONS_DRAG_SCALE = 0.15;
 
 function dragRadius() {
-  return shared.size === 'history' ? DRAG_RADIUS * HISTORY_DRAG_SCALE : DRAG_RADIUS;
+  return shared.size === 'notifications' ? DRAG_RADIUS * NOTIFICATIONS_DRAG_SCALE : DRAG_RADIUS;
 }
 
 
@@ -379,6 +380,22 @@ pill.addEventListener('touchmove', event => {
   // A grown bubble has nothing to drag — the trade, the pull and the upward dismiss all belong to the closed row — and the band underneath them only leaned a panel that is meant to be read. So a finger that wandered while a mod or the notifications stood open played a gesture instead of the tap it was, and a gesture that has begun waits for a threshold the finger is no longer travelling towards, which is the open-close-open. Grown, the pill answers taps and its own controls answer theirs; its gesture handling is off entirely, and the hold that opens the mod's app keeps its wander.
   if (!CLOSED.has(shared.size) || shared.state === 'extended') {
     grantHoldWander();
+    // The Notifications menu is two bubbles, and which one is on top is the gesture rather than a state: a pull down on the upper one trades their places, and a pull up on the lower one closes the menu from wherever it currently stands. A list long enough to scroll owns the drag that starts inside it, or the menu traded places every time it was read.
+    if (!hasDismissed && shared.size === 'notifications' && isDuplicateLive() &&
+        Math.abs(event.touches[0].clientX - startX) < 40) {
+      const travel = event.touches[0].clientY - startY;
+      const wants = !isDuplicateSwapped() ? travel > PULL_TRIGGER : travel < -PULL_TRIGGER;
+      if (wants && !overScroller(startX, startY)) {
+        hasDismissed = true;
+        hasMoved = true;
+        endHold();
+        if (isDuplicateSwapped()) {
+          bridge.triggerHaptic('dismiss');
+          toClosed();
+        } else swapDuplicate();
+        return;
+      }
+    }
     // The one gesture an expanded mod keeps, because tapping it no longer closes it and a finger on the bubble needs a way out that is not the app behind it. It is the closed row's dismiss read on a grown bubble and it dismisses nothing — a mod is not a notification, so the panel closes and the mod stays in the row. An Alert is grown too and its tap opens the app rather than closing it, so it was the one face with no way out at all until it was named here beside the mods.
     if (!hasDismissed && (MOD_FACES[shared.size] || shared.state === 'alert') &&
         startY - event.touches[0].clientY > PULL_TRIGGER &&
@@ -423,7 +440,7 @@ pill.addEventListener('touchmove', event => {
     endHold();
     untoy(pill, '--drag');
     bridge.triggerHaptic('expand');
-    openHistory();
+    openNotifications();
     return;
   }
   
@@ -473,7 +490,7 @@ pill.addEventListener('touchcancel', () => {
     hasPulled = true;
     endHold();
     bridge.triggerHaptic('expand');
-    openHistory();
+    openNotifications();
     return;
   }
   if (shared.state === 'haptic' && hasGrown) return;
@@ -530,7 +547,7 @@ pill.addEventListener('click', () => {
     toClosed();
     return;
   }
-  openHistory();
+  openNotifications();
 });
 
 
@@ -567,3 +584,10 @@ window.onOutsideTap = (x, y) => {
   if (nowOpen) closeNowPanel();
   if (statusOpen) closeStatusPanel();
 };
+
+
+function overScroller(x, y) {
+  const hit = document.elementFromPoint(x, y);
+  const list = hit && hit.closest('#notifications-list');
+  return Boolean(list) && list.scrollHeight - list.clientHeight > 2;
+}

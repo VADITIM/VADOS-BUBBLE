@@ -1,3 +1,4 @@
+import { isAlertCentred, recentreAlert } from '../alert.js';
 import { setSize, showFace, toClosed } from '../row.js';
 import { PICTURE_MAX_HEIGHT, bridge, pill, shared } from '../state.js';
 
@@ -289,14 +290,18 @@ export function show(notification) {
 
   showFace('alert');
   pill.classList.add('alert');
-  setSize(hasImage ? 'image' : 'alert');
+  // A second message arriving while the Alert is being read at the centre of the screen must not put it back on the bar: it grows where it stands and it keeps standing there.
+  if (isAlertCentred()) recentreAlert();
+  else setSize(hasImage ? 'image' : 'alert');
   
   
   
   bridge.triggerHaptic('notification');
+  // The gesture that answers an Alert is made anywhere across the top band rather than on the bubble alone, so the band is asked for while the Alert stands and given straight back at the close.
+  bridge.setAlertOverlay(-1);
 
   
-  shared.dwellTimer = setTimeout(toClosed, shared.dwell);
+  if (!isAlertCentred()) shared.dwellTimer = setTimeout(toClosed, shared.dwell);
 }
 
 
@@ -309,6 +314,7 @@ window.onNotificationGone = key => {
   if (shared.state !== 'alert' || !shared.current || shared.current.key !== key) return;
   
   clearTimeout(goneTimer);
+  if (isAlertCentred()) return;
   goneTimer = setTimeout(toClosed, GONE_GRACE);
 };
 

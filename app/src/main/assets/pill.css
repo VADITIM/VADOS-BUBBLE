@@ -69,6 +69,11 @@
 
   /* The four bubbles that move as objects — Main, Status, Clock and Now — take their size and their place on the bubble family's own curve rather than on the panel's gentler one; a bubble arriving on an ease-out is a box being positioned. Everything that is not one of the four keeps --ease-grow. */
   --ease-bubble: cubic-bezier(0.2, 1.7, 0.35, 1);
+
+
+
+
+  --ease-reach: cubic-bezier(0.2, 1.24, 0.35, 1);
   
 
 
@@ -110,7 +115,7 @@ html, body {
 
 #text, .message, #app-name, #title, #unread,
 #player-title, #player-artist, #player-position, #player-duration,
-#history-label, #history-count, #history-empty, .history-name, .history-text,
+#notifications-label, #notifications-count, #notifications-empty, .notification-name, .notification-text,
 #timer-remaining, #timer-label, #timer-clock {
   border-radius: 0;
 }
@@ -147,15 +152,16 @@ html, body {
 
     width var(--width-ms, var(--grow-ms)) var(--width-ease, var(--ease-bubble))
       var(--width-delay, 0ms),
-    height var(--grow-ms) var(--ease-bubble),
+    height var(--grow-ms) var(--height-ease, var(--ease-bubble)),
     
 
     border-radius var(--grow-ms) ease-out,
-    top var(--grow-ms) var(--ease-bubble),
+    top var(--grow-ms) var(--ease-reach),
     padding-right var(--grow-ms) var(--ease-bubble),
     padding-bottom var(--grow-ms) var(--ease-bubble),
 
-    translate var(--carry-ms, var(--shift-ms, var(--grow-ms))) var(--ease-split) var(--shift-delay, 0ms),
+    translate var(--carry-ms, var(--shift-ms, var(--grow-ms)))
+      var(--carry-ease, var(--ease-split)) var(--shift-delay, 0ms),
     scale 350ms linear,
     border-color 220ms ease;
   transition: var(--pill-transition);
@@ -167,7 +173,7 @@ html, body {
   
 
 
-  translate: var(--shift, 0px);
+  translate: var(--shift, 0px) calc(var(--alert-drop, 0px) + var(--swap-drop, 0px));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -205,7 +211,19 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 #pill.alerting.with-image { height: 190px; }
 #pill.expanded { width: 340px; height: 150px; border-radius: 30px; }
 #pill.picture { width: 340px; height: var(--picture-height, 320px); border-radius: 26px; }
-#pill.history { width: 340px; height: var(--history-height, 320px); border-radius: 26px; }
+#pill.notifications { width: 340px; height: var(--notifications-height, 320px); border-radius: 26px; }
+
+
+
+#pill.alert-centred {
+  /* Everything about this journey is one timeline: the travel to the middle and the box growing under it share a clock, and `--shift-delay` is zeroed because the row leaves 120ms standing on it after a shift, so the bubble began travelling long after it had begun growing. */
+  --grow-ms: 460ms;
+  --carry-ms: var(--grow-ms);
+  --shift-delay: 0ms;
+  width: 300px;
+  height: var(--alert-height, 162px);
+  border-radius: 28px;
+}
 
 
 
@@ -556,6 +574,26 @@ html.double-live #liquid { height: 100%; }
 
 
 html.grown #liquid { height: 100%; }
+
+
+html.alert-homing #liquid { height: 100%; }
+html.alert-homing #pill {
+  --carry-ms: 460ms;
+  --shift-delay: 0ms;
+  --carry-ease: var(--ease-reach);
+}
+
+/* The bubble leaving the Notifications menu found the same wall the Alert did: 340x320 collapsing on the bubble family's 1.7 overshoot undershoots the idle pill hard enough to leave the top of the screen, and above the bar there is nothing to overshoot into. */
+html.notifications-homing #liquid { height: 100%; }
+/* Closed out of a trade, the bubble is the lower of the two and the long climb home is its own, carried on `translate` — and `clearSwap` takes `html.swapping` away at that exact moment, so the one rule holding that channel to the reach curve and to no delay was gone for the longest carry in the state: the row wrote its own 120ms back and the climb set off an eighth of a second after the box had begun collapsing, on the 1.7 overshoot the line above exists to avoid. The carry is named here beside the width and the height it travels with. */
+html.notifications-homing #pill {
+  --grow-ms: 460ms;
+  --width-ease: var(--ease-reach);
+  --height-ease: var(--ease-reach);
+  --carry-ms: 460ms;
+  --carry-ease: var(--ease-reach);
+  --shift-delay: 0ms;
+}
 
 
 
@@ -1026,9 +1064,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #pill.player, #pill.timer,
-#pill.history, #pill.expanded, #pill.picture { --grow-ms: 460ms; }
+#pill.notifications, #pill.expanded, #pill.picture { --grow-ms: 460ms; }
 #pill.player .face.showing, #pill.timer .face.showing,
-#pill.history .face.showing, #pill.expanded .face.showing { transition-duration: 280ms; }
+#pill.notifications .face.showing, #pill.expanded .face.showing { transition-duration: 280ms; }
 
 
 
@@ -1492,7 +1530,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-#history-face {
+#notifications-face {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
@@ -1514,39 +1552,39 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-#history-head {
+#notifications-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   padding: 0 0.7rem 0.5rem;
   flex: none;
 }
-#history-label {
+#notifications-label {
   font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.19rem;
   text-transform: uppercase;
   color: var(--text-label);
 }
-#history-count {
+#notifications-count {
   font-size: calc((0.6rem) * var(--font-scale, 1));
   letter-spacing: 0.08rem;
   color: var(--text-label);
   font-variant-numeric: tabular-nums;
 }
 
-#history-list {
+#notifications-list {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
   flex: 1 1 auto;
 }
-#history-list::-webkit-scrollbar { display: none; }
+#notifications-list::-webkit-scrollbar { display: none; }
 
 
 
 
 
-.history-row {
+.notification-row {
   display: grid;
   grid-template-columns: 3px minmax(0, 1fr);
   gap: 0.6rem;
@@ -1554,29 +1592,40 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   padding: 0.5rem 0.7rem;
   border-bottom: 1px solid var(--border);
 }
-.history-row:last-child { border-bottom: 0; }
+.notification-row:last-child { border-bottom: 0; }
 
 
 
 
 
-.history-row[data-gradient] .history-mark { background-image: var(--row-gradient); }
-.history-row[data-gradient] .history-name {
+.notification-row[data-gradient] .notification-mark { background-image: var(--row-gradient); }
+.notification-row[data-gradient] .notification-name {
   background-image: var(--row-gradient);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
 }
 
-.history-mark { align-self: stretch; border-radius: 999px; }
-.history-copy { min-width: 0; }
-.history-name {
+.notification-row:has(.notification-icon) {
+  grid-template-columns: 3px 20px minmax(0, 1fr);
+}
+.notification-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  margin-top: 0.1rem;
+  object-fit: cover;
+}
+
+.notification-mark { align-self: stretch; border-radius: 999px; }
+.notification-copy { min-width: 0; }
+.notification-name {
   font-size: calc((0.58rem) * var(--font-scale, 1));
   letter-spacing: 0.16rem;
   text-transform: uppercase;
 }
 
-.history-head-row {
+.notification-head-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -1584,7 +1633,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 
-.history-tally {
+.notification-tally {
   font-size: calc((0.56rem) * var(--font-scale, 1));
   letter-spacing: 0.06rem;
   color: var(--text-muted);
@@ -1594,7 +1643,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-.history-when {
+.notification-when {
   font-size: calc((0.56rem) * var(--font-scale, 1));
   letter-spacing: 0.04rem;
   color: var(--text-muted);
@@ -1604,14 +1653,15 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   flex: none;
 }
 
-.history-who {
-  font-size: calc((0.72rem) * var(--font-scale, 1));
-  margin-top: 0.15rem;
+.notification-who {
+  font-size: calc((0.76rem) * var(--font-scale, 1));
+  line-height: 1.35;
+  margin-top: 0.2rem;
   overflow-wrap: anywhere;
 }
-.history-text {
-  font-size: calc((0.72rem) * var(--font-scale, 1));
-  line-height: 1.4;
+.notification-text {
+  font-size: calc((0.74rem) * var(--font-scale, 1));
+  line-height: 1.5;
   color: var(--text-muted);
   
 
@@ -1620,12 +1670,12 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-.history-text.divided {
+.notification-text.divided {
   margin-top: 0.35rem;
   padding-top: 0.35rem;
   border-top: 1px solid var(--border);
 }
-#history-empty {
+#notifications-empty {
   font-size: calc((0.72rem) * var(--font-scale, 1));
   color: var(--text-muted);
   padding: 0.6rem 0.7rem;
@@ -2179,7 +2229,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #status-actions {
-  gap: 0.9rem;
+  gap: 0.7rem;
 }
 #status.open #status-closed { display: none; }
 
@@ -3310,6 +3360,36 @@ html:not(.grown) #pill.panel-top {
 
 
 
+#double.duplicate #double-glyph { display: none; }
+
+#double.duplicate {
+  --double-pop: 1;
+  justify-content: center;
+  opacity: 1;
+  width: var(--duplicate-width, 340px);
+  height: var(--duplicate-height, 320px);
+  border-radius: 26px;
+  transition:
+    transform 460ms var(--ease-reach),
+    width 460ms var(--ease-reach),
+    height 460ms var(--ease-reach),
+    border-radius 460ms ease-out,
+    opacity 200ms ease;
+}
+
+/* The duplicate is born standing exactly on the bubble, and a transition across that first frame flew it there from the Double's own seat instead — the birth frame carries no transition and the travel begins on the next one. */
+#double.duplicate.born { transition: none; }
+
+/* It is the same body as the bubble, so it goes home the way the bubble does: to the idle box at the idle place, arriving as the bubble arrives. The reading goes first, because a 320px box carrying text shrinking into a 26px pill is text riding a box down. */
+#double.duplicate.merging {
+  width: var(--pill-width);
+  height: var(--pill-height);
+  border-radius: calc(var(--pill-height) / 2);
+}
+#double.duplicate.merging #double-reading { opacity: 0; transition: opacity 160ms ease; }
+
+
+
 
 #double-glyph {
   position: relative;
@@ -3564,3 +3644,71 @@ html:not(.grown) #pill.panel-top {
 
 /* Main's own reading leaves while the shot is in the air, so what the shape lands on is a bare bubble rather than a face the arrival has to replace. It is a class of this file's own rather than the row's `leaving`, which is owned by the mod hand-over and time-boxed by a timer of its own — two callers on one class is the race, not the ordering. */
 html.lock-incoming .face.showing > * { opacity: 0; transition: opacity 160ms ease; }
+
+/* The Labelset reveal from PORTFOLIO25: the bar grows across the label, the label is shown in the one frame the bar is full, and the bar retracts off the far edge. The two halves are separate classes rather than one animation because the reveal and the origin flip have to land on the same frame — given a duration, either one lets the reveal be caught mid-state and the text tears. */
+/* The bar belongs to the label's parent, not to the label: the label carries opacity 0 for the whole growth, and a bar that was the label's own pseudo-element went invisible along with it. The glyph beside the reading is left alone — the bar never covered it, so hiding it made the reveal look like it was uncovering something already there. */
+html.label-sweep .sweep-host {
+  position: relative;
+}
+html.label-sweep .sweep-host::after {
+  content: '';
+  position: absolute;
+  left: var(--sweep-left, 0);
+  top: var(--sweep-top, 0);
+  width: var(--sweep-width, 100%);
+  height: var(--sweep-height, 100%);
+  background: var(--section-color);
+  border-radius: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+}
+html.label-sweep .sweep-host.sweeping::after {
+  transform: scaleX(1);
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+html.label-sweep .sweep-host.swept::after {
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 340ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+html.label-sweep .sweep-hidden { opacity: 0; }
+#label-ruler {
+
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  white-space: pre;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+
+/* The two bubbles trade places by travelling through one another rather than around: they are the same body split in two, the goo necks them as they pass, and contents carried through the crossing would read as two boxes sliding past each other with their text still on. */
+html.swapping #pill {
+  --carry-ms: 460ms;
+  --shift-delay: 0ms;
+  --carry-ease: var(--ease-reach);
+}
+html.swapping #pill .face.showing,
+html.swapping #double-reading {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+
+/* Two bare 26px glyphs on a dark bubble read as decoration rather than as the only two controls the Status bubble has, and the power one was missed most — so each stands on its own chip, and the chip carries the accent the glyph already had. */
+.status-action {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border);
+}
+.status-action svg { width: 56%; height: 56%; }
+#status-settings { color: var(--text-bright); }
+#status-power {
+  color: #ff5a50;
+  background: rgba(229, 52, 43, 0.18);
+  border-color: rgba(229, 52, 43, 0.55);
+}

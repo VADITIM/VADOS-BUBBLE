@@ -1,3 +1,5 @@
+import { retireDuplicate } from './double.js';
+import { leaveAlertCentre } from './alert.js';
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
 import { isStolen } from './lock.js';
 import { paintAvatar, paintCall } from './mods/call.js';
@@ -108,9 +110,10 @@ function afterRelayout(work) {
 
 function paintSize() {
   pill.classList.toggle('alerting', shared.size === 'alert' || shared.size === 'image');
+  pill.classList.toggle('alert-centred', shared.size === 'alertCentre');
   pill.classList.toggle('expanded', shared.size === 'haptic');
   pill.classList.toggle('picture', shared.size === 'picture');
-  pill.classList.toggle('history', shared.size === 'history');
+  pill.classList.toggle('notifications', shared.size === 'notifications');
   pill.classList.toggle('playing', shared.size === 'playing');
   pill.classList.toggle('player', shared.size === 'player');
   pill.classList.toggle('timing', shared.size === 'timing');
@@ -1384,6 +1387,8 @@ export function toClosed() {
   shared.state = 'idle';
   shared.current = null;
   pill.classList.remove('alert', 'with-image', 'charging');
+  leaveAlertCentre();
+  retireDuplicate();
 
   const live = liveMods();
   const owner = live[0] || null;

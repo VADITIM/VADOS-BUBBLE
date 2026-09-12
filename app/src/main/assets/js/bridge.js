@@ -1,3 +1,5 @@
+import { alertTouch, isAlertLive } from './alert.js';
+import { duplicateHolds, duplicateTouch } from './double.js';
 import { fitLabels } from './labels.js';
 import { stirLiquid } from './liquid.js';
 import { mediaWindow } from './mods/media.js';
@@ -10,7 +12,7 @@ import { lockHolds, lockPill } from './lock.js';
 import { pillHolds } from './motion.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize, toClosed } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
-import { openHistory } from './tabs.js';
+import { openNotifications } from './tabs.js';
 
 
 
@@ -33,13 +35,15 @@ let nowOwnsTouch = false;
 let statusOwnsTouch = false;
 let clockOwnsTouch = false;
 let mainOwnsTouch = false;
+let alertOwnsTouch = false;
+let doubleOwnsTouch = false;
 
 
 export const PROXY_TAP_SLOP = 22;
 
 
 const PILL_GRACE = 22;
-const PILL_CONTROLS = '.transport, #player-timeline, .timer-button, .history-row';
+const PILL_CONTROLS = '.transport, #player-timeline, .timer-button, .notification-row';
 
 
 function describe(element) {
@@ -77,9 +81,7 @@ function proxyPoint(x, y, source) {
   const hit = document.elementFromPoint(x, y);
   // A grown Main is drawn over the panel, and the Status proxy spans the panel from the screen's top edge down — so a touch on an Alert that arrived while the panel stood open was handed to the panel's own routing, which answered with the nearest quick toggle inside its grace radius or with the scrim. The bubble could be seen and not touched. Whatever the grown bubble covers is the grown bubble's, ahead of every panel that is open underneath it.
   if (mainHolds(x, y)) return pillTarget(x, y, hit);
-  if (statusOpen && statusHolds(x, y)) {
-    return hit && statusPill.contains(hit) ? hit : statusPill;
-  }
+  if (statusOpen && statusHolds(x, y)) return statusTarget(x, y, hit);
   // The Now bubble stands at the panel's foot but is not in the panel, so a touch on it arrived through the Status proxy and was handed to `statusPanelTarget`, which knows only the panel's own controls — it answered with the nearest toggle inside its grace radius, or with the scrim. It owns its own box wherever it stands, which is why this outranks the panel's own routing.
   if (lockHolds(x, y)) {
     return hit && lockPill.contains(hit) ? hit : lockPill;
@@ -113,7 +115,7 @@ function pillTarget(x, y, hit) {
   let closest = PILL_GRACE;
   for (const control of face.querySelectorAll(PILL_CONTROLS)) {
     const box = control.getBoundingClientRect();
-    // A history row scrolled past the list's edge is still in the document, so without this a tap near the bubble's rim opened a notification nobody can see.
+    // A notification row scrolled past the list's edge is still in the document, so without this a tap near the bubble's rim opened a notification nobody can see.
     if (!box.width || box.bottom < room.top || box.top > room.bottom) continue;
     const across = Math.max(box.left - x, 0, x - box.right);
     const down = Math.max(box.top - y, 0, y - box.bottom);
@@ -125,6 +127,26 @@ function pillTarget(x, y, hit) {
   return nearest || fallback;
 }
 
+
+// The same near miss `pillTarget` answers for the grown bubble, and the Status bubble's two actions are the worst case of it: a 30px chip inside a 40px bubble whose own tap closes the panel, so a press two pixels off the settings glyph read as a tap to dismiss. The nearest action inside the grace radius takes the touch; a point genuinely away from both still closes.
+function statusTarget(x, y, hit) {
+  const within = hit && statusPill.contains(hit) ? hit : null;
+  const under = within ? within.closest('.status-action') : null;
+  if (under) return under;
+  let nearest = null;
+  let closest = PILL_GRACE;
+  for (const action of statusPill.querySelectorAll('.status-action')) {
+    const box = action.getBoundingClientRect();
+    if (!box.width) continue;
+    const across = Math.max(box.left - x, 0, x - box.right);
+    const down = Math.max(box.top - y, 0, y - box.bottom);
+    const gap = Math.hypot(across, down);
+    if (gap >= closest) continue;
+    closest = gap;
+    nearest = action;
+  }
+  return nearest || within || statusPill;
+}
 window.onProxyTouch = (action, x, y, source) => {
   
   
@@ -149,6 +171,22 @@ window.onProxyTouch = (action, x, y, source) => {
   
   
   
+  // The Alert's own band spans the top of the screen while an Alert stands, and it outranks every panel open underneath it for the same reason a grown Main does: what arrived is what the finger is answering.
+  if (action === 'down') alertOwnsTouch = source === 'alert' && isAlertLive();
+  if (alertOwnsTouch) {
+    alertTouch(action, x, y);
+    if (action === 'up' || action === 'cancel') alertOwnsTouch = false;
+    return;
+  }
+
+  // The Notifications duplicate is drawn inside the row's own proxy but is no part of the bubble, so every touch on it was handed to the pill by `pillTarget`'s fallback and answered as a touch on the menu above it.
+  if (action === 'down') doubleOwnsTouch = duplicateHolds(x, y);
+  if (doubleOwnsTouch) {
+    duplicateTouch(action, x, y);
+    if (action === 'up' || action === 'cancel') doubleOwnsTouch = false;
+    return;
+  }
+
   if (action === 'down') {
     // The panel's push is read off every touch its proxy hears, so a swipe on an Alert standing over the panel leaned and closed the panel underneath it as well as dismissing the Alert. The bubble owns the whole touch it started, not only the point it began at.
     mainOwnsTouch = mainHolds(x, y);
@@ -339,6 +377,11 @@ window.setEdgeMerge = value => {
   stirLiquid(240);
 };
 
+window.setLabelSweep = value => {
+  shared.labelSweep = Number(value) !== 0;
+  root.classList.toggle('label-sweep', shared.labelSweep);
+};
+
 window.setNowPushes = value => {
   shared.nowPushes = Number(value) !== 0;
   paintShift();
@@ -368,6 +411,6 @@ window.onToggleStatusPanel = () => {
 };
 
 window.onToggleNotifications = () => {
-  if (shared.state === 'extended' && shared.size === 'history') toClosed();
-  else openHistory();
+  if (shared.state === 'extended' && shared.size === 'notifications') toClosed();
+  else openNotifications();
 };

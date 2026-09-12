@@ -71,6 +71,8 @@ object Preferences {
 
     const val EDGE_MERGE = "edgeMerge"
 
+    const val LABEL_SWEEP = "labelSweep"
+
     
 
 
@@ -157,6 +159,7 @@ object Preferences {
         NOW_PUSHES to 0,
         ALERT_DWELL to 5,
         EDGE_MERGE to 0,
+        LABEL_SWEEP to 0,
         LOCK_X to 0,
         BAR_LOCKED to 0,
         QUICK_DIVIDERS to 1,

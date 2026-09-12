@@ -321,6 +321,7 @@ class IslandNotificationListener : NotificationListenerService() {
             .put("text", extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty())
             .put("lines", messages(statusBarNotification.notification))
             .put("iconBase64", encodeIcon(statusBarNotification.notification))
+            .put("appIconBase64", encodeAppIcon(statusBarNotification.packageName))
             
             
             
@@ -414,6 +415,15 @@ class IslandNotificationListener : NotificationListenerService() {
     }.getOrDefault(packageName)
 
     
+
+    private val appIcons = HashMap<String, Any>()
+
+
+    private fun encodeAppIcon(packageName: String): Any = appIcons.getOrPut(packageName) {
+        runCatching { dataUri(toBitmap(packageManager.getApplicationIcon(packageName))) }
+            .getOrDefault(JSONObject.NULL)
+    }
+
     private fun encodeIcon(notification: Notification): Any {
         val drawable = notification.getLargeIcon()?.loadDrawable(this)
             ?: notification.smallIcon?.loadDrawable(this)
