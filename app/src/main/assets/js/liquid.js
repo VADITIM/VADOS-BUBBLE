@@ -68,7 +68,10 @@ const blobs = BLUR_PANES.map(name => ({
   edge: liquidLayers.edge.appendChild(document.createElement('div')),
   fill: liquidLayers.fill.appendChild(document.createElement('div')),
 }));
-blobs.forEach(blob => { blob.edge.className = 'blob'; blob.fill.className = 'blob'; });
+blobs.forEach(blob => {
+  blob.edge.className = 'blob'; blob.fill.className = 'blob';
+  blob.edge.written = {}; blob.fill.written = {};
+});
 
 
 const liquidBlur = document.getElementById('bubble-melt');
@@ -197,21 +200,21 @@ function mirrorFrame() {
     
     
     if (!seen || !seen.box.width || (!isNaN(seen.alpha) && seen.alpha < 0.01)) {
-      blob.edge.style.display = 'none';
-      blob.fill.style.display = 'none';
+      hide(blob.edge);
+      hide(blob.fill);
       return;
     }
-    blob.edge.style.display = '';
-    blob.fill.style.display = '';
-    
-    
-    
+    show(blob.edge);
+    show(blob.fill);
+
+
+
     write(blob.edge, seen.box, 0, seen);
     write(blob.fill, seen.box, -1, seen);
-    blob.edge.style.background = seen.colour;
-    
-    
-    blob.fill.style.background = isTinted(seen.fill) ? seen.fill : '';
+    paint(blob.edge, seen.colour);
+
+
+    paint(blob.fill, isTinted(seen.fill) ? seen.fill : '');
   });
 
   paintWalls(measured);
@@ -324,8 +327,11 @@ export function resendBlur() {
 
 const FROST_STEPS = 12;
 
+/* `getComputedStyle` hands back a live declaration and allocating one per frame is a per-frame allocation for a value that is read once — the blobs already cache theirs against the element they belong to, and the scrim is the one that did not. */
+const scrimStyle = getComputedStyle(scrim);
+
 function scrimRegion() {
-  const frost = parseFloat(getComputedStyle(scrim).getPropertyValue('--scrim-frost'));
+  const frost = parseFloat(scrimStyle.getPropertyValue('--scrim-frost'));
   if (!frost || frost < 0.01) return '';
   const box = scrim.getBoundingClientRect();
   return [
@@ -351,17 +357,16 @@ function scrimRegion() {
 const HALO_RINGS = 6;
 
 
-const HALO_SPREAD_X = 260;
-export const HALO_SPREAD_Y = 190;
+const HALO_BASE = 0.55;
 
 
 const HALO_FALLOFF = 1.6;
 
 
-const HALO_DELAY = 220;
+const HALO_DELAY = 0;
 
 
-const HALO_RAMP = 900;
+const HALO_RAMP = 240;
 
 let haloFrom = 0;
 
@@ -391,20 +396,26 @@ function haloRegions() {
   const since = performance.now() - haloFrom - HALO_DELAY;
   const strength = Math.max(0, Math.min(1, since / HALO_RAMP));
   if (strength <= 0) return [];
-  // The rings come up after the bubble has landed rather than with it, and they come up slowly: a blur that arrives on the travel reads as the screen being wiped rather than as the bubble pushing the screen away from itself.
   const eased = strength * strength * (3 - 2 * strength);
+  // The rings reach the screen's own edges rather than stopping a few hundred pixels out: a halo that falls away to nothing mid-screen reads as a patch of frost around the bubble, and the thing being asked for is the whole screen going back while the notification stands in front of it. What is left of the falloff is the middle being a little stronger than the edges.
+  const screenWidth = root.clientWidth;
+  const screenHeight = root.clientHeight;
+  const centreX = box.left + box.width / 2;
+  const centreY = box.top + box.height / 2;
   const rings = [];
   for (let ring = HALO_RINGS; ring >= 1; ring -= 1) {
-    const reach = ring / (HALO_RINGS + 1);
-    const width = box.width + reach * HALO_SPREAD_X * 2;
-    const height = box.height + reach * HALO_SPREAD_Y * 2;
-    const share = Math.pow(1 - reach, HALO_FALLOFF) * eased;
+    const reach = ring / HALO_RINGS;
+    const width = box.width + reach * (screenWidth * 2 - box.width);
+    const height = box.height + reach * (screenHeight * 2 - box.height);
+    const share = (HALO_BASE + (1 - HALO_BASE) * Math.pow(1 - reach, HALO_FALLOFF)) * eased;
+    // The outermost ring is the screen itself rather than a stadium large enough to contain it — a stadium's own corner radius is read off its width, so one drawn twice the screen's size rounds its corners by a screen's width and leaves the four corners of the display unblurred.
+    const isScreen = ring === HALO_RINGS;
     rings.push([
-      Math.round(box.left + box.width / 2 - width / 2),
-      Math.round(box.top + box.height / 2 - height / 2),
-      Math.round(width),
-      Math.round(height),
-      Math.round(Math.min(width, height) / 2),
+      isScreen ? 0 : Math.round(centreX - width / 2),
+      isScreen ? 0 : Math.round(centreY - height / 2),
+      isScreen ? screenWidth : Math.round(width),
+      isScreen ? screenHeight : Math.round(height),
+      isScreen ? 0 : Math.round(Math.min(width, height) / 2),
       (Math.round(share * FROST_STEPS) / FROST_STEPS).toFixed(2),
     ].join(','));
   }
@@ -456,7 +467,10 @@ const walls = ['left', 'right'].map(side => ({
   edge: liquidLayers.edge.appendChild(document.createElement('div')),
   fill: liquidLayers.fill.appendChild(document.createElement('div')),
 }));
-walls.forEach(wall => { wall.edge.className = 'blob'; wall.fill.className = 'blob'; });
+walls.forEach(wall => {
+  wall.edge.className = 'blob'; wall.fill.className = 'blob';
+  wall.edge.written = {}; wall.fill.written = {};
+});
 
 
 const WALL_REACH = 44;
@@ -479,8 +493,8 @@ function paintWalls(measured) {
       : grown ? withinReach(measured[0], wall.side)
       : nearestTo(wall.side, measured);
     if (!near) {
-      wall.edge.style.display = 'none';
-      wall.fill.style.display = 'none';
+      hide(wall.edge);
+      hide(wall.fill);
       return;
     }
     const waist = near.box.height * WALL_WAIST;
@@ -495,12 +509,12 @@ function paintWalls(measured) {
     };
     box.right = box.left + box.width;
     box.bottom = box.top + box.height;
-    wall.edge.style.display = '';
-    wall.fill.style.display = '';
+    show(wall.edge);
+    show(wall.fill);
     const seen = { radius: (waist / 2) + 'px', corner: near.corner, colour: near.colour };
     write(wall.edge, box, 0, seen);
     write(wall.fill, box, -1, seen);
-    wall.edge.style.background = near.colour;
+    paint(wall.edge, near.colour);
   });
 }
 
@@ -529,13 +543,37 @@ function nearestTo(side, measured) {
 
 const isTinted = fill => Boolean(fill) && !fill.startsWith('rgba(0, 0, 0, 0)');
 
+function hide(shape) {
+  if (shape.written.shown === false) return;
+  shape.written.shown = false;
+  shape.style.display = 'none';
+}
+
+function show(shape) {
+  if (shape.written.shown === true) return;
+  shape.written.shown = true;
+  shape.style.display = '';
+}
+
+function paint(shape, colour) {
+  if (shape.written.background === colour) return;
+  shape.written.background = colour;
+  shape.style.background = colour;
+}
+
+
+/* Every blob was written five properties deep on every frame whether or not it had moved, so a transition that touches one bubble dirtied the style of all of them — and `corner-shape`, which is the newest and most expensive of the five to resolve, was rewritten sixty times a second with the same value. A shape that has not changed is not touched at all now, which on a typical frame is most of them. */
 function write(shape, box, grow, seen) {
-  shape.style.width = (box.width + grow * 2) + 'px';
-  shape.style.height = (box.height + grow * 2) + 'px';
-  shape.style.transform =
+  const width = (box.width + grow * 2) + 'px';
+  const height = (box.height + grow * 2) + 'px';
+  const transform =
     'translate(' + (box.left - grow) + 'px,' + (box.top - grow) + 'px)';
-  shape.style.borderRadius = seen.radius;
-  shape.style.cornerShape = seen.corner;
+  const written = shape.written;
+  if (written.width !== width) { shape.style.width = width; written.width = width; }
+  if (written.height !== height) { shape.style.height = height; written.height = height; }
+  if (written.transform !== transform) { shape.style.transform = transform; written.transform = transform; }
+  if (written.radius !== seen.radius) { shape.style.borderRadius = seen.radius; written.radius = seen.radius; }
+  if (written.corner !== seen.corner) { shape.style.cornerShape = seen.corner; written.corner = seen.corner; }
 }
 
 
@@ -567,26 +605,39 @@ export function stirLiquid(milliseconds) {
   
   
   bridge.wakeFrames();
-  wokeAt = performance.now();
   framesSinceWake = 0;
+  lastFrameAt = 0;
   liquidFrame = requestAnimationFrame(flowLiquid);
 }
 
 
-let wokeAt = 0;
 let framesSinceWake = 0;
+
+/* A stutter reported as "somewhere in the bubbles" is not a thing that can be fixed, so the mirror says where: a frame that took longer than a frame to paint, or a gap longer than one, is logged with the state that was on screen when it happened. It is on all the time deliberately — a jank that only shows up under normal use is exactly the one a tracing session never catches — and it costs one subtraction on a frame that was fine. */
+const FRAME_BUDGET = 8;
+const FRAME_GAP = 24;
+const JANK_QUIET = 400;
+
+let lastFrameAt = 0;
+let lastJankAt = 0;
 
 function flowLiquid() {
   const before = performance.now();
   paintLiquidFrame();
-  if (TRACE_MERGES && framesSinceWake < 8) {
-    framesSinceWake += 1;
-    traceEvent(
-      'frame ' + framesSinceWake + ' at +' + Math.round(before - wokeAt) +
-      'ms, paint ' + Math.round(performance.now() - before) + 'ms'
+  const after = performance.now();
+  const paint = after - before;
+  const gap = lastFrameAt ? before - lastFrameAt : 0;
+  lastFrameAt = before;
+  if ((paint > FRAME_BUDGET || gap > FRAME_GAP) && after - lastJankAt > JANK_QUIET) {
+    lastJankAt = after;
+    console.log(
+      '[jank] ' + shared.size + '/' + shared.state +
+      ' paint ' + Math.round(paint) + 'ms, gap ' + Math.round(gap) +
+      'ms, frame ' + (framesSinceWake + 1) + ' since wake'
     );
   }
-  liquidFrame = performance.now() < liquidUntil
+  framesSinceWake += 1;
+  liquidFrame = after < liquidUntil
     ? requestAnimationFrame(flowLiquid)
     : null;
 }

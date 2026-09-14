@@ -73,6 +73,12 @@ object Preferences {
 
     const val LABEL_SWEEP = "labelSweep"
 
+    const val STATUS_BATTERY_PERCENT = "statusBatteryPercent"
+
+    const val STATUS_BATTERY_PERCENT_LIGHT = "statusBatteryPercentLight"
+
+    const val STATUS_BATTERY_ICONS = "statusBatteryIcons"
+
     
 
 
@@ -160,6 +166,9 @@ object Preferences {
         ALERT_DWELL to 5,
         EDGE_MERGE to 0,
         LABEL_SWEEP to 0,
+        STATUS_BATTERY_PERCENT to 1,
+        STATUS_BATTERY_PERCENT_LIGHT to 1,
+        STATUS_BATTERY_ICONS to 0,
         LOCK_X to 0,
         BAR_LOCKED to 0,
         QUICK_DIVIDERS to 1,

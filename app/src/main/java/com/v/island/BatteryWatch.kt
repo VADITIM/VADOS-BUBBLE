@@ -17,10 +17,10 @@ import org.json.JSONObject
 object BatteryWatch {
 
     // Mirrors BATTERY_LOW in status.js, where the same mark turns the battery colour yellow.
-    private const val LOW = 40
+    private const val LOW = 39
 
     // Mirrors BATTERY_CRITICAL in status.js, where the same mark turns the battery colour red.
-    private const val CRITICAL = 15
+    private const val CRITICAL = 19
 
     
     private var announced = Int.MAX_VALUE

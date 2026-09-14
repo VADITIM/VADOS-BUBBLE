@@ -58,11 +58,16 @@ object ConnectivityWatch {
 
     private var receiver: BroadcastReceiver? = null
     private var networks: ConnectivityManager.NetworkCallback? = null
+    private var wifiNetworks: ConnectivityManager.NetworkCallback? = null
     private var zenWatch: android.database.ContentObserver? = null
     private var report: ((JSONObject) -> Unit)? = null
 
     private var link = "none"
     private var level = -1
+    private var isOnline = true
+    private var isWifiUp = false
+    private var wifiLevel = -1
+    private var isWifiOnline = true
     private var generation = ""
     private var ssid = ""
     private var isUsbConnected = false
@@ -134,6 +139,32 @@ object ConnectivityWatch {
         
         
         runCatching { manager.registerDefaultNetworkCallback(callback) }
+
+        val wifiCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onCapabilitiesChanged(network: Network, seen: NetworkCapabilities) {
+                isWifiUp = true
+                wifiLevel = strengthOf(context, seen)
+                isWifiOnline = seen.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                publish()
+            }
+
+            override fun onLost(network: Network) {
+                isWifiUp = false
+                wifiLevel = -1
+                isWifiOnline = true
+                ssid = ""
+                publish()
+            }
+        }
+        wifiNetworks = wifiCallback
+        runCatching {
+            manager.registerNetworkCallback(
+                android.net.NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                    .build(),
+                wifiCallback
+            )
+        }
     }
 
     fun stop(context: Context) {
@@ -143,6 +174,14 @@ object ConnectivityWatch {
             runCatching { context.getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(callback) }
         }
         networks = null
+        wifiNetworks?.let { callback ->
+            runCatching { context.getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(callback) }
+        }
+        wifiNetworks = null
+        isWifiUp = false
+        wifiLevel = -1
+        isWifiOnline = true
+        isOnline = true
         zenWatch?.let { runCatching { context.contentResolver.unregisterContentObserver(it) } }
         zenWatch = null
         report = null
@@ -331,14 +370,18 @@ object ConnectivityWatch {
         
         
         ssid = if (link == "wifi") ssid.ifEmpty { readSsid() } else ""
-        level = if (link == "wifi") {
-            val rssi = seen.signalStrength
-            val wifi = context.getSystemService(WifiManager::class.java)
-            if (rssi == NetworkCapabilities.SIGNAL_STRENGTH_UNSPECIFIED) -1
-            else wifi.calculateSignalLevel(rssi).coerceIn(0, wifi.maxSignalLevel)
-        } else {
-            -1
-        }
+        level = if (link == "wifi") strengthOf(context, seen) else -1
+        isOnline = seen.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    /* calculateSignalLevel answers on the platform's own scale, five rungs on this phone, while the glyph ladder has four — an un-normalised reading of 4 fell past the end of the ladder and drew the weakest icon on the strongest signal. */
+    private fun strengthOf(context: Context, seen: NetworkCapabilities): Int {
+        val rssi = seen.signalStrength
+        if (rssi == NetworkCapabilities.SIGNAL_STRENGTH_UNSPECIFIED) return -1
+        val wifi = context.getSystemService(WifiManager::class.java)
+        val top = wifi.maxSignalLevel
+        if (top <= 0) return -1
+        return wifi.calculateSignalLevel(rssi).coerceIn(0, top) * 3 / top
     }
 
     private fun publish() {
@@ -349,6 +392,12 @@ object ConnectivityWatch {
         
         
         
+        /* A wifi network that does not reach the internet loses the default route to mobile data, so the default-network callback stopped calling the link wifi at exactly the moment the warning was worth drawing — the bar swapped to 4G and the join went unmentioned. Wifi is watched on its own request as well, and while it is up it is what the bar reports, validated or not. */
+        if (isWifiUp) {
+            link = "wifi"
+            level = wifiLevel
+            isOnline = isWifiOnline
+        }
         if (link == "wifi" && ssid.isEmpty()) ssid = readSsid()
         if (isZen && zenName.isEmpty()) zenName = readZenName()
         val paired = pairedName?.let {
@@ -361,6 +410,7 @@ object ConnectivityWatch {
         val payload = JSONObject()
                 .put("link", link)
                 .put("level", level)
+                .put("online", isOnline)
                 .put("generation", generation)
                 .put("ssid", ssid)
                 .put("usb", isUsbConnected)

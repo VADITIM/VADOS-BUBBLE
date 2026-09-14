@@ -1,6 +1,7 @@
-import { isAlertCentred, recentreAlert } from '../alert.js';
+import { dashAlert, homeDashAlert, isAlertCentred, isAlertDashed, recentreAlert } from '../alert.js';
 import { setSize, showFace, toClosed } from '../row.js';
 import { PICTURE_MAX_HEIGHT, bridge, pill, shared } from '../state.js';
+import { statusOpen } from '../status.js';
 
 
 
@@ -292,16 +293,26 @@ export function show(notification) {
   pill.classList.add('alert');
   // A second message arriving while the Alert is being read at the centre of the screen must not put it back on the bar: it grows where it stands and it keeps standing there.
   if (isAlertCentred()) recentreAlert();
+  // The dashboard is a screen the user asked for and an Alert is not, so the Alert goes where that screen has room to give rather than standing over it: slung into the stats section, on the same spawn and merge whether it is the first or the fifth.
+  // A message appended to a conversation already standing there is not a fresh arrival — replaying the sling for it is what "the entry animation plays twice" was: the box is fixed to the stats section regardless of content, so an appended line just needs its dwell renewed.
+  else if (statusOpen) {
+    if (appending && isAlertDashed()) {
+      clearTimeout(shared.dwellTimer);
+      shared.dwellTimer = setTimeout(homeDashAlert, shared.dwell);
+    } else {
+      dashAlert();
+    }
+  }
   else setSize(hasImage ? 'image' : 'alert');
   
   
   
   bridge.triggerHaptic('notification');
-  // The gesture that answers an Alert is made anywhere across the top band rather than on the bubble alone, so the band is asked for while the Alert stands and given straight back at the close.
-  bridge.setAlertOverlay(-1);
+  // The gesture that answers an Alert is made anywhere across the top band rather than on the bubble alone, so the band is asked for while the Alert stands and given straight back at the close. Slung into the dashboard it is not asked for at all: the panel's own proxy already covers every pixel the Alert is standing on, and a band over the top of the screen would take the corner bubbles' touches with it.
+  if (!isAlertDashed()) bridge.setAlertOverlay(-1);
 
-  
-  if (!isAlertCentred()) shared.dwellTimer = setTimeout(toClosed, shared.dwell);
+  // The slung Alert's dwell is its own — it ends by flying home rather than by collapsing where it stands — and `dashAlert` has already set it.
+  if (!isAlertCentred() && !isAlertDashed()) shared.dwellTimer = setTimeout(toClosed, shared.dwell);
 }
 
 
@@ -315,7 +326,7 @@ window.onNotificationGone = key => {
   
   clearTimeout(goneTimer);
   if (isAlertCentred()) return;
-  goneTimer = setTimeout(toClosed, GONE_GRACE);
+  goneTimer = setTimeout(isAlertDashed() ? homeDashAlert : toClosed, GONE_GRACE);
 };
 
 

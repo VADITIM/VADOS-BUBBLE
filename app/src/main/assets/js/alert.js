@@ -1,8 +1,9 @@
 import { openCurrent } from './mods/notification.js';
 import { HOLD_BLOCK, pillHolds, toy, untoy } from './motion.js';
 import { setSize, toClosed } from './row.js';
-import { HALO_MILLIS, HALO_SPREAD_Y, startHalo, stirLiquid } from './liquid.js';
-import { SIZES, bridge, dragGate, pill, root, shared } from './state.js';
+import { HALO_MILLIS, startHalo, stirLiquid } from './liquid.js';
+import { statsBox, statsIn, statsOut } from './status.js';
+import { SIZES, bridge, dragGate, faces, pill, root, shared } from './state.js';
 
 
 const ALERT_PULL = 22;
@@ -20,9 +21,6 @@ const CENTRE_TRAVEL = 520;
 const CENTRE_CEILING = 0.6;
 
 
-const CENTRE_GRAB = 24;
-
-
 const CENTRE_LIFT = 0.1;
 
 
@@ -35,7 +33,7 @@ let startY = 0;
 let pullDrop = 0;
 let hasActed = false;
 let alertDrag = null;
-let wantedBand = 0;
+let isBandWanted = false;
 
 
 export function isAlertLive() {
@@ -53,6 +51,16 @@ export function alertTouch(action, x, y) {
   }
   if (!isAlertLive()) return;
 
+  // Slung into the dashboard the Alert answers one gesture and not the row's three: it is standing in a section of the panel rather than on the bar, so a pull downwards has nowhere to go and a sideways throw would be read against the panel underneath it. Up is the way back to the bubble it came from.
+  if (isAlertDashed()) {
+    if (action !== 'move' || hasActed) return;
+    if (y - startY < -ALERT_PULL && startY - y > Math.abs(x - startX)) {
+      hasActed = true;
+      homeDashAlert();
+    }
+    return;
+  }
+
   if (action === 'move') {
     const down = y - startY;
     const across = Math.abs(x - startX);
@@ -61,7 +69,8 @@ export function alertTouch(action, x, y) {
     if (Math.hypot(across, down) <= HOLD_BLOCK) return;
     if (!alertDrag(x, y)) return;
     toy(pill, '--drag', 0, down);
-    if (down < -ALERT_PULL && across < 40) {
+    // The window is the whole screen now, so a pull begun out at the edge of it is as far across as it is down and a fixed sideways cap read every one of those as no gesture at all. Which direction a travel is, is which axis it has covered more of.
+    if (down < -ALERT_PULL && -down > across) {
       hasActed = true;
       dismissAlert();
       return;
@@ -77,7 +86,7 @@ export function alertTouch(action, x, y) {
   }
 
   untoy(pill, '--drag');
-  if (isAlertCentred() && wantedBand) bridge.setAlertOverlay(wantedBand);
+  if (isAlertCentred() && isBandWanted) bridge.setAlertOverlay(1);
   // The shade takes this strip's pointer partway down and the page sees a cancel with the finger still moving, so a pull that was stolen is stronger evidence of the ask than a lift is and commits at a lower bar.
   if (action === 'cancel' && !hasActed && !isAlertCentred() && pullDrop > ALERT_STOLEN) {
     hasActed = true;
@@ -87,6 +96,8 @@ export function alertTouch(action, x, y) {
   if (action !== 'up' || hasActed) return;
   if (Math.hypot(x - startX, y - startY) > ALERT_TAP_SLOP) return;
   if (pillHolds(x, y)) openCurrent();
+  // The window an Alert takes covers the screen so the pull can be made anywhere, and a window that hears a press is the only window that hears it — a tap nowhere near the bubble would simply be eaten by an Alert that has nothing to do with what the finger was aiming at. The host hands it back to whatever is underneath.
+  else bridge.passAlertTap();
 }
 
 
@@ -139,11 +150,9 @@ function layOutCentre() {
   const drop = Math.round((root.clientHeight - height) / 2 - root.clientHeight * CENTRE_LIFT);
   root.style.setProperty('--alert-drop', drop + 'px');
   setSize('alertCentre', { width: SIZES.alert.width, height });
-  // The overlay is a band across the top of the screen and the centred bubble stands below it, so the room the gesture needs is asked for while the bubble is down there and given straight back at the close.
-  // Resizing the window the finger is standing on pulls the surface out from under it and the system answers with a cancel, so the band is asked for at the lift — the same deferral `setSize` makes for the touch proxy, and for the same reason.
-  // The halo is part of the shape here, not decoration around it: the hand reaches for the blurred region as readily as for the bubble, so the band covers everything the rings reach rather than stopping at the box.
-  wantedBand = drop + height + HALO_SPREAD_Y + CENTRE_GRAB;
-  if (!shared.isTouchDown) bridge.setAlertOverlay(wantedBand);
+  // Resizing the window the finger is standing on pulls the surface out from under it and the system answers with a cancel, so the window is asked for at the lift — the same deferral `setSize` makes for the touch proxy, and for the same reason.
+  isBandWanted = true;
+  if (!shared.isTouchDown) bridge.setAlertOverlay(1);
 }
 
 
@@ -154,7 +163,7 @@ function layOutCentre() {
 
 export function leaveAlertCentre() {
   const wasCentred = isAlertCentred();
-  wantedBand = 0;
+  isBandWanted = false;
 
   untoy(pill, '--drag');
   root.style.removeProperty('--alert-drop');
@@ -167,4 +176,82 @@ export function leaveAlertCentre() {
     stirLiquid(HOME_TRAVEL + 200);
   }
   bridge.setAlertOverlay(0);
+}
+
+
+// Mirrors --dash-ms in pill.css: the sling out and the sling home take the same clock.
+const DASH_TRAVEL = 300;
+
+const DASH_INSET = 4;
+
+const dash = document.getElementById('dash');
+
+export function isAlertDashed() {
+  return shared.size === 'alertDash';
+}
+
+export function dashHolds(x, y) {
+  if (!dash.classList.contains('live')) return false;
+  const box = dash.getBoundingClientRect();
+  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+}
+
+// The reading is moved rather than copied: one Alert face is painted by `notification.js` wherever it stands, and a second copy in this bubble would be a second set of ids for the same notification.
+function carryAlert() {
+  if (faces.alert.parentElement === dash) return;
+  dash.appendChild(faces.alert);
+  faces.alert.classList.add('showing');
+  faces.idle.classList.add('showing');
+}
+
+function returnAlert() {
+  if (faces.alert.parentElement === pill) return;
+  pill.appendChild(faces.alert);
+}
+
+// An Alert arriving over the open dashboard does not grow at the cutout: Main stands where it stands and spawns a drop, which is slung along an arc into the stats section and pops out into the room that section's own modules have just left. Grown at the cutout it stood over the dashboard's own bubbles and read as two interfaces in one place; flown as Main itself it moved the one shape the whole row is measured from.
+export function dashAlert() {
+  clearTimeout(shared.dwellTimer);
+  layOutDash();
+  statsOut();
+  carryAlert();
+  // A second Alert landing on one already slung takes the same journey rather than appearing where the first stands, and an animation already running has to be taken off the element before it can be given back or the restart is a no-op.
+  dash.classList.remove('slinging', 'home');
+  void dash.offsetWidth;
+  setSize('alertDash');
+  dash.classList.add('live', 'slinging');
+  shared.dwellTimer = setTimeout(homeDashAlert, shared.dwell);
+}
+
+function layOutDash() {
+  const box = statsBox();
+  const width = Math.round(box.width - DASH_INSET * 2);
+  const height = Math.round(box.height - DASH_INSET * 2);
+  const grab = parseFloat(getComputedStyle(root).getPropertyValue('--grab')) || 0;
+  root.style.setProperty('--dash-width', width + 'px');
+  root.style.setProperty('--dash-height', height + 'px');
+  // The bubble is centred on the canvas and stands at the grab inset, so where it has to go is the difference between that resting box and the section's own.
+  root.style.setProperty('--dash-x', Math.round(box.left + DASH_INSET - (root.clientWidth - width) / 2) + 'px');
+  root.style.setProperty('--dash-y', Math.round(box.top + DASH_INSET - grab) + 'px');
+}
+
+export function homeDashAlert() {
+  if (!isAlertDashed() || dash.classList.contains('home')) return;
+  clearTimeout(shared.dwellTimer);
+  bridge.triggerHaptic('dismiss');
+  dash.classList.remove('slinging');
+  dash.classList.add('home');
+  statsIn();
+  setTimeout(toClosed, DASH_TRAVEL);
+}
+
+export function leaveAlertDash() {
+  if (!dash.classList.contains('live')) return;
+  dash.classList.remove('live', 'slinging', 'home');
+  returnAlert();
+  root.style.removeProperty('--dash-width');
+  root.style.removeProperty('--dash-height');
+  root.style.removeProperty('--dash-x');
+  root.style.removeProperty('--dash-y');
+  statsIn();
 }

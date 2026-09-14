@@ -1,4 +1,4 @@
-import { alertTouch, isAlertLive } from './alert.js';
+import { alertTouch, dashHolds, isAlertDashed, isAlertLive } from './alert.js';
 import { duplicateHolds, duplicateTouch } from './double.js';
 import { fitLabels } from './labels.js';
 import { stirLiquid } from './liquid.js';
@@ -178,7 +178,11 @@ window.onProxyTouch = (action, x, y, source) => {
   
   
   // The Alert's own band spans the top of the screen while an Alert stands, and it outranks every panel open underneath it for the same reason a grown Main does: what arrived is what the finger is answering.
-  if (action === 'down') alertOwnsTouch = source === 'alert' && isAlertLive();
+  // Slung into the dashboard the Alert takes no band of its own — the panel's proxy is what hears it — so the touch is claimed off the bubble's own box instead of off the window it arrived through.
+  if (action === 'down') {
+    alertOwnsTouch = isAlertLive() &&
+      (source === 'alert' || (isAlertDashed() && dashHolds(x, y)));
+  }
   if (alertOwnsTouch) {
     alertTouch(action, x, y);
     if (action === 'up' || action === 'cancel') alertOwnsTouch = false;

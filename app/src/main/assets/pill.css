@@ -3,7 +3,7 @@
 #satellite-left, #satellite-right { font-family: var(--font-satellite); --font-scale: var(--font-size-satellite, 1); }
 #status, #quick-panel { font-family: var(--font-status); --font-scale: var(--font-size-status, 1); }
 #double, #lock-now { font-family: var(--font-overlay); --font-scale: var(--font-size-overlay, 1); }
-#quick-battery, #status-charge { font-family: var(--font-battery); --font-scale: var(--font-size-battery, 1); }
+#quick-battery { font-family: var(--font-battery); --font-scale: var(--font-size-battery, 1); }
 #stats-section { font-family: var(--font-stats); --font-scale: var(--font-size-stats, 1); }
 #quick-grid { font-family: var(--font-connectors); --font-scale: var(--font-size-connectors, 1); }
 #alert-head { font-family: var(--font-notification-heading); --font-scale: var(--font-size-notification-heading, 1); }
@@ -67,6 +67,9 @@
 
   --ease-sling: cubic-bezier(0.1, 1.45, 0.3, 1);
 
+  /* Mirrors DASH_TRAVEL in js/alert.js — the Alert's sling into the dashboard and its sling home take the same clock. */
+  --dash-ms: 300ms;
+
   /* The four bubbles that move as objects — Main, Status, Clock and Now — take their size and their place on the bubble family's own curve rather than on the panel's gentler one; a bubble arriving on an ease-out is a box being positioned. Everything that is not one of the four keeps --ease-grow. */
   --ease-bubble: cubic-bezier(0.2, 1.7, 0.35, 1);
 
@@ -125,6 +128,7 @@ html, body {
 
 #pill {
   position: absolute;
+  box-sizing: border-box;
   
   top: var(--grab, 0px);
   left: 0;
@@ -1963,9 +1967,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   position: absolute;
   z-index: 3;
   
-  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2);
+  top: var(--grab, 0px);
   right: var(--status-right, 14px);
-  height: calc(var(--pill-height) - var(--status-short, 4px));
+  height: var(--pill-height);
   box-sizing: border-box;
   border-radius: calc(var(--pill-height) / 2);
   background: var(--pill-background);
@@ -2039,6 +2043,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     scale 300ms var(--ease-split);
 }
 .status-face.showing { opacity: 1; scale: 1; pointer-events: auto; }
+.status-face.popping-away { opacity: 1; scale: 1; transition: none; }
 
 .status-face > * {
   rotate: -26deg;
@@ -2094,15 +2099,17 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   grid-template-columns: 0fr;
   opacity: 0;
   margin-left: 0;
-  transition-delay: calc(var(--pop-at, 0ms) + 150ms);
+  transition-delay: var(--pop-shut, 0ms);
 }
 
 
 
-.status-slot.popping .status-slot-inner {
-  animation: slot-shake 150ms var(--ease-grow) var(--pop-at, 0ms) both;
+/* The shake and the turn are the one handover in the interface, so they are written against any element carrying the class rather than against the mod slots they were first built for: the dashboard's buttons and the Clock's seconds and date play the same pair as the charge announce's mods. A mod slot is the one indirection — the slot has to give its width back as well, so the class goes on the slot and the motion on what is standing in it. */
+.status-slot.popping .status-slot-inner,
+.popping:not(.status-slot) {
+  animation: pop-out 150ms var(--ease-grow) var(--pop-at, 0ms) both;
 }
-@keyframes slot-shake {
+@keyframes pop-out {
   0%   { translate: 0; scale: 1; }
   30%  { translate: -1px; scale: 0.94; }
   60%  { translate: 1px; scale: 0.7; }
@@ -2111,10 +2118,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-.status-slot.popping-in .status-slot-inner {
-  animation: slot-pop-in 460ms var(--ease-split) var(--pop-at, 0ms) both;
+.status-slot.popping-in .status-slot-inner,
+.popping-in:not(.status-slot) {
+  animation: pop-in 460ms var(--ease-split) var(--pop-at, 0ms) both;
 }
-@keyframes slot-pop-in {
+@keyframes pop-in {
   0%   { scale: 0; rotate: var(--pop-tilt, 8deg); }
   55%  { scale: 1.14; rotate: calc(var(--pop-tilt, 8deg) * -0.3); }
   100% { scale: 1; rotate: 0deg; }
@@ -2123,30 +2131,17 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-#status.announcing {
-  width: var(--status-charge-width);
-  
-
-
-  --blob-fill: color-mix(in srgb, var(--status-announce) 16%, var(--pill-solid, #000));
+/* The white icon set: the cell drawn as an outline with a bar per fifth of the charge, standing in the slot the coloured fill would otherwise take. The announcement is the same mark in its own colour, which is why it needs no face and no width of its own. */
+.battery-mark {
+  display: grid;
+  place-items: center;
+  width: calc(var(--mod-glyph) + 1px);
+  height: calc(var(--mod-glyph) + 1px);
+  color: #ffffff;
 }
-
-
-#status-charge {
-  justify-content: center;
-  color: var(--status-announce, #5bfd5b);
-}
-
-
-#status-charge svg {
-  width: calc(var(--mod-glyph) + 3px);
-  height: calc(var(--mod-glyph) + 3px);
-  animation: charge-land 300ms var(--ease-split) 40ms both;
-}
-@keyframes charge-land {
-  from { opacity: 0; scale: 0.4; translate: 0 6px; }
-  to   { opacity: 1; scale: 1; translate: 0 0; }
-}
+.battery-mark.charging { color: #5bfd5b; }
+.battery-mark.announcing { color: var(--status-announce, #5bfd5b); }
+.battery-mark svg { width: 100%; height: 100%; }
 
 
 
@@ -2177,23 +2172,60 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .status-slot[data-slot="modus"] .status-slot-inner { color: var(--status-accent); }
 
 
-.status-slot-inner[data-level="0"] { opacity: 0.35; }
-.status-slot-inner[data-level="1"] { opacity: 0.5; }
-.status-slot-inner[data-level="2"] { opacity: 0.7; }
-.status-slot-inner[data-level="3"] { opacity: 0.85; }
 
 
-#status.plugged .status-slot[data-slot="battery"] .status-slot-inner { color: #5bfd5b; }
+/* The Status bubble's battery is a small copy of the dashboard's cell/fill/pin, reading the same --charge-width and --charge-color the dashboard's own icon reads — set on #status itself in paintBattery() so both inherit off one paint. */
+.status-slot[data-slot="battery"] .status-slot-inner {
+  width: auto;
+  height: auto;
+}
+.mini-battery {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: calc(var(--mod-glyph) * 0.72);
+}
+.mini-battery.bare { height: calc(var(--mod-glyph) * 0.60); }
+.mini-battery.bare .mini-battery-cell { width: calc(var(--mod-glyph) * 1.14); }
+.mini-battery-cell {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  width: calc(var(--mod-glyph) * 1.24);
+  height: 100%;
+  border-radius: 0;
+  background: rgba(42, 40, 50, 0.85);
+}
+.mini-battery-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--charge-width, 0%);
+  border-radius: 0;
+  background: var(--charge-color, var(--text-faint));
+  transition: background 500ms ease, width 500ms ease;
+}
+.mini-battery-reading {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-battery);
+  font-size: calc(0.6rem * var(--font-scale, 1));
+  font-weight: 700;
+  line-height: 1;
+  color: #000000;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.6);
+}
+html.battery-percent-light .mini-battery-reading {
+  color: #ffffff;
+  text-shadow: none;
+  -webkit-text-stroke: 1px #000;
+  paint-order: stroke fill;
+}
 
 
 
-
-
-.own-charge { transition: color 400ms ease; }
-.own-charge[data-charge="low"] { color: #b99a34; }
-.own-charge[data-charge="critical"] { color: #b8544c; }
-
-#status.plugged .own-charge { color: inherit; }
 
 
 
@@ -2613,6 +2645,8 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   line-height: 1;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 2px #000;
+  paint-order: stroke fill;
 }
 #battery-remaining {
   position: absolute;
@@ -2624,6 +2658,8 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   line-height: 1;
   color: rgba(255, 255, 255, 0.82);
   font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 2px #000;
+  paint-order: stroke fill;
 }
 
 
@@ -3087,14 +3123,14 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 #clock {
   position: absolute;
   z-index: 3;
-  top: calc(var(--grab, 0px) + var(--status-short, 4px) / 2);
+  top: var(--grab, 0px);
   left: var(--clock-left, 14px);
   
 
 
 
   width: var(--clock-width, auto);
-  height: calc(var(--pill-height) - var(--status-short, 4px));
+  height: var(--pill-height);
   box-sizing: border-box;
   border-radius: calc(var(--pill-height) / 2);
   background: var(--pill-background);
@@ -3229,12 +3265,14 @@ html:not(.grown) #pill.panel-top {
 
 #clock.ticking { scale: 1.04; }
 #clock-face {
-  
+
   font-size: calc((0.68rem) * var(--font-scale, 1));
   font-weight: 500;
-  
+
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  /* The corner's larger type arrived in one frame, which is the hours and minutes changing size for something that is not about them. Grown over the same stretch the box takes, the growth also re-centres the row continuously, so the only travel left for `clock.js` to give back is the discrete part. */
+  transition: font-size var(--grow-ms) var(--ease-split);
 }
 
 
@@ -3279,14 +3317,22 @@ html:not(.grown) #pill.panel-top {
     max-width var(--grow-ms) var(--ease-grow),
     margin-left var(--grow-ms) var(--ease-grow);
 }
-/* Held at the place it already stood while the bubble retracts out from under it: in flow it gave its max-width and margin back at the same time and slid on the way out. */
-/* The Status bubble's contents turn as they are handed over; the Clock's have no second face to be handed to, so the same turn is an animation on the class change rather than a state. */
-/* The Clock's turn is the pill's own, not its contents': it has one set of contents rather than two faces to hand between, so a time and a date rotating inside it read as the type being crooked rather than as the bubble arriving. `rotate` is free on the Clock — `transform` holds the drag, `scale` the pop, `translate` the flight — so the turn composes with all three. */
-@keyframes corner-turn-in {
-  from { rotate: -12deg; }
-  to { rotate: 0deg; }
+/* Grown, the seconds stand in line with the hours and minutes at their size, with a colon of their own before them, so the corner reads as one whole time rather than as a time with a footnote clinging to it. */
+#clock.corner-seconds #clock-seconds {
+  flex-direction: row;
+  font-size: calc((calc(0.68rem * var(--corner-grow-scale, 1.15))) * var(--font-scale, 1));
+  line-height: normal;
+  margin-left: 0;
+  opacity: 1;
 }
-#clock.corner-grow { animation: corner-turn-in 300ms var(--ease-split); }
+/* On the bar the seconds are stacked and have nothing to be separated from, so the colon is collapsed away rather than absent: it is one of the parts the handover pops, and it is only ever shown or hidden on the frame all three of them are standing at nothing. */
+/* Taken out of the flow for the length of their own pop-out and pinned to the Clock's top-left, which is the one point the corner's growth leaves where it is — so the digits stand still while the row reflows around the width their box is still holding. */
+#clock-seconds > .standing-still { position: absolute; }
+
+#clock-colon { display: none; }
+#clock.corner-seconds #clock-colon { display: block; }
+
+/* The whole pill used to turn -12deg into the corner, on the argument that the Clock had no parts to hand between and so had to carry the handover itself. It has two now — the seconds and the date — and they play the interface's one pop, which leaves the hours and minutes as the thing that must not move: they are the same reading at both sizes, nothing has happened to them, and a pill-level turn was rotating them for something that was not about them. */
 
 /* Held where it already stood while the box retracts out from under it: in flow it gave its max-width and its margin back at the same time and slid on the way out. What the shrinking box does not cover any more is cut, which is what `overflow: hidden` on the Clock is for and why it is worn only while this is running. */
 #clock.corner-leaving { overflow: hidden; }
@@ -3648,7 +3694,7 @@ html:not(.grown) #pill.panel-top {
 html.lock-incoming .face.showing > * { opacity: 0; transition: opacity 160ms ease; }
 
 /* The Labelset reveal from PORTFOLIO25: the bar grows across the label, the label is shown in the one frame the bar is full, and the bar retracts off the far edge. The two halves are separate classes rather than one animation because the reveal and the origin flip have to land on the same frame — given a duration, either one lets the reveal be caught mid-state and the text tears. */
-/* The bar belongs to the label's parent, not to the label: the label carries opacity 0 for the whole growth, and a bar that was the label's own pseudo-element went invisible along with it. The glyph beside the reading is left alone — the bar never covered it, so hiding it made the reveal look like it was uncovering something already there. */
+/* The bar belongs to the label's parent, not to the label: the label carries opacity 0 for the whole growth, and a bar that was the label's own pseudo-element went invisible along with it. The glyph beside the reading is part of the label: the bar starts at its left edge and both are uncovered on the same frame. */
 html.label-sweep .sweep-host {
   position: relative;
 }
@@ -3713,4 +3759,113 @@ html.swapping #double-reading {
   color: #ff5a50;
   background: rgba(229, 52, 43, 0.18);
   border-color: rgba(229, 52, 43, 0.55);
+}
+
+
+/* The Alert slung into the open dashboard is a bubble of its own rather than Main flying. Main pinching to a drop, crossing the screen and growing into the stats section moved the one shape the row is anchored on — 300x200 of width/height relaid every frame while the goo mirrored it — and that is what read as the lag. The bubble it lands in stands outside the goo layer for the same reason the quick modules do: the panel has already frosted the whole screen behind it. Its box is the stats section's, measured by `alert.js` and written here as four numbers; the journey is a drop born at the cutout, the arc across and down at circle size, and a pop out into the section's room on the bubble family's own overshoot. Mirrors DASH_TRAVEL in alert.js. */
+#dash {
+  position: absolute;
+  z-index: 31;
+  box-sizing: border-box;
+  top: var(--grab, 0px);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: var(--dash-width, 300px);
+  height: var(--dash-height, 200px);
+  border-radius: 30px;
+  background: var(--pill-background);
+  border: 1px solid var(--app-accent, var(--border));
+  translate: var(--dash-x, 0px) var(--dash-y, 0px);
+  overflow: visible;
+}
+
+#dash:not(.live) { display: none; }
+
+#dash.slinging { animation: dash-sling var(--dash-ms, 420ms) both; }
+
+@keyframes dash-sling {
+  0% {
+    translate: 0 0;
+    width: var(--pill-height);
+    height: var(--pill-height);
+    border-radius: 50%;
+    scale: 0.45;
+    animation-timing-function: var(--ease-sling);
+  }
+  48% {
+    translate: var(--dash-x, 0px) calc(var(--dash-y, 0px) * 0.22);
+    width: var(--pill-height);
+    height: var(--pill-height);
+    border-radius: 50%;
+    scale: 1.08;
+    animation-timing-function: var(--ease-bubble);
+  }
+  64% {
+    translate: var(--dash-x, 0px) var(--dash-y, 0px);
+    width: var(--pill-height);
+    height: var(--pill-height);
+    border-radius: 50%;
+    scale: 1;
+    animation-timing-function: var(--ease-sling);
+  }
+  100% {
+    translate: var(--dash-x, 0px) var(--dash-y, 0px);
+    width: var(--dash-width, 300px);
+    height: var(--dash-height, 200px);
+    border-radius: 30px;
+    scale: 1;
+  }
+}
+
+#dash.slinging #alert-face {
+  animation: quick-contents-in 180ms ease calc(var(--dash-ms, 420ms) * 0.64) backwards;
+}
+
+#dash.home { animation: dash-sling-home var(--dash-ms, 420ms) both; }
+
+@keyframes dash-sling-home {
+  0% {
+    translate: var(--dash-x, 0px) var(--dash-y, 0px);
+    width: var(--dash-width, 300px);
+    height: var(--dash-height, 200px);
+    border-radius: 30px;
+    scale: 1;
+    animation-timing-function: var(--ease-leave);
+  }
+  36% {
+    translate: var(--dash-x, 0px) var(--dash-y, 0px);
+    width: var(--pill-height);
+    height: var(--pill-height);
+    border-radius: 50%;
+    scale: 1;
+    animation-timing-function: var(--ease-reach);
+  }
+  100% {
+    translate: 0 0;
+    width: var(--pill-height);
+    height: var(--pill-height);
+    border-radius: 50%;
+    scale: 0.45;
+  }
+}
+
+/* The contents go before the box does: a notification's text riding a 300px box down to a drop is the box shrinking around it. */
+#dash.home #alert-face { opacity: 0; transition: opacity 120ms var(--ease-leave); }
+
+/* The stats section clears the room the Alert is being slung into, on the panel's own collapse and the panel's own grow — the same pair `solo-out` / `solo-in` play for the held brightness bar, scoped to the one section that is giving way. */
+#quick-panel.stats-out #stats-section .quick-bubble {
+  animation: bubble-collapse 95ms var(--ease-leave) calc(var(--drop-rank, 0) * 20ms) both;
+  pointer-events: none;
+}
+#quick-panel.stats-out #quick-weather,
+#quick-panel.stats-out #quick-transfer {
+  opacity: 0;
+  transition: opacity 110ms var(--ease-leave);
+}
+#quick-panel.stats-in #stats-section .quick-bubble {
+  animation: bubble-grow var(--quick-pop) var(--ease-sling) calc(var(--pop-rank, 0) * var(--pop-step, 42ms)) backwards;
+}
+#quick-panel.stats-in #stats-section .quick-bubble > * {
+  animation: quick-contents-in 190ms ease calc(var(--pop-rank, 0) * var(--pop-step, 42ms)) backwards;
 }

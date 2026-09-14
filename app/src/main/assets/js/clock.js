@@ -1,5 +1,5 @@
 import { stirLiquid } from './liquid.js';
-import { rubberBandPast, toy, untoy } from './motion.js';
+import { POP_IN, popIn, popOut, rubberBandPast, toy, untoy } from './motion.js';
 import { HOLD_MILLIS, bridge, root, shared } from './state.js';
 
 
@@ -53,11 +53,15 @@ function paintClock() {
   
   
   const digits = (seconds < 10 ? '0' : '') + seconds;
-  if (clockSeconds.children.length !== 2) {
-    clockSeconds.replaceChildren(document.createElement('span'), document.createElement('span'));
+  /* The colon is a part of the seconds rather than a pseudo-element on them, so it turns in with the digits it belongs to instead of appearing beside them. Collapsed away on the bar, where the seconds are stacked and have nothing to be separated from. */
+  if (clockSeconds.children.length !== 3) {
+    const parts = [document.createElement('span'), document.createElement('span'), document.createElement('span')];
+    parts[0].id = 'clock-colon';
+    parts[0].textContent = ':';
+    clockSeconds.replaceChildren(...parts);
   }
-  clockSeconds.children[0].textContent = digits[0];
-  clockSeconds.children[1].textContent = digits[1];
+  clockSeconds.children[1].textContent = digits[0];
+  clockSeconds.children[2].textContent = digits[1];
   
   
   
@@ -110,6 +114,96 @@ function bornClock() {
   });
   setTimeout(fitClockProxy, CLOCK_TRAVEL * CLOCK_LAND);
   stirLiquid(CLOCK_TRAVEL + 300);
+}
+
+
+/* The Clock's own handover into the dashboard corner and back, on the interface's one pop. The hours and minutes are deliberately not in it: they are the same reading at both sizes, so the only parts handed over are the seconds — which change form, colon and all — and the date, which is arriving. The seconds shake out, take their grown form while they are standing at nothing, and turn back in at it, because the form change is exactly what the empty frame is for. */
+const CORNER_LEAVE = 260;
+
+/* Mirrors --ease-split and --grow-ms in pill.css. */
+const CORNER_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
+const CORNER_TRAVEL = 340;
+
+let secondsHandover = 0;
+let facePutBack = null;
+let pinnedSeconds = [];
+
+function releaseSeconds() {
+  pinnedSeconds.forEach((part) => {
+    part.classList.remove('standing-still');
+    part.style.removeProperty('left');
+    part.style.removeProperty('top');
+  });
+  pinnedSeconds = [];
+  clockSeconds.style.removeProperty('height');
+}
+
+/* Held where it already stood while the box retracts out from under it: in flow it gave its max-width and its margin back at the same time and slid on the way out. What the shrinking box does not cover any more is cut, which is what `overflow: hidden` on the Clock is for and why it is worn only while this is running. */
+function pinCornerDate() {
+  const box = clockDate.getBoundingClientRect();
+  if (!box.width) return;
+  const around = clockPill.getBoundingClientRect();
+  clockDate.style.left = Math.round(box.left - around.left) + 'px';
+  clockDate.style.top = Math.round(box.top - around.top) + 'px';
+  clockDate.classList.add('handed-over');
+  clockPill.classList.add('corner-leaving');
+  setTimeout(() => {
+    clockPill.classList.remove('corner-leaving');
+    clockDate.classList.remove('handed-over');
+    clockDate.style.removeProperty('left');
+    clockDate.style.removeProperty('top');
+  }, CORNER_LEAVE + 60);
+}
+
+function handOverClock(isGrown) {
+  releaseSeconds();
+  const was = clockFace.getBoundingClientRect();
+  const around = clockPill.getBoundingClientRect();
+  const standing = [...clockSeconds.children].map((part) => {
+    const box = part.getBoundingClientRect();
+    return { part, left: box.left - around.left, top: box.top - around.top };
+  });
+  const tall = clockSeconds.offsetHeight;
+  if (!isGrown) pinCornerDate();
+  clockPill.classList.toggle('corner-grow', isGrown);
+  /* The seconds are the width the layout will need before they are wearing it, so the row reflows once — here — rather than a second time when the form arrives in the middle of the pop. */
+  clockSeconds.style.removeProperty('width');
+  clockPill.classList.toggle('corner-seconds', isGrown);
+  const wide = clockSeconds.offsetWidth;
+  clockPill.classList.toggle('corner-seconds', !isGrown);
+  clockSeconds.style.width = wide + 'px';
+  /* The column the corner stacks, the size the digits take and the room the seconds ask for all land in one frame, and the hours and minutes were wherever that left them — a reading teleporting for a change that is not about it. The difference is measured and given back as one additive travel, so the time is carried to its new place over the same stretch the box takes to grow. Additive because `transform` is the drag's and the pop's as well. */
+  const now = clockFace.getBoundingClientRect();
+  facePutBack?.cancel();
+  facePutBack = clockFace.animate(
+    { transform: ['translate(' + (was.left - now.left) + 'px, ' + (was.top - now.top) + 'px)', 'translate(0px, 0px)'] },
+    { duration: CORNER_TRAVEL, easing: CORNER_EASE, composite: 'add' }
+  );
+
+  /* The seconds were shaking out over the same frames the corner's reflow was carrying them across, so they were seen sliding to their grown place before they left it. Holding the measured difference on them was not enough: the box grows for the whole of the travel, so a constant offset cancels the jump and then rides the rest of it. Each digit is taken out of the flow and pinned to the Clock's own top-left corner instead — the one point in this transition that does not move — and what is left standing in the row is the width and nothing else. */
+  clockSeconds.style.height = tall + 'px';
+  standing.forEach(({ part, left, top }) => {
+    part.style.left = left + 'px';
+    part.style.top = top + 'px';
+    part.classList.add('standing-still');
+  });
+  pinnedSeconds = standing.map(({ part }) => part);
+  popOut([...clockSeconds.children]);
+  clearTimeout(secondsHandover);
+  secondsHandover = setTimeout(() => {
+    releaseSeconds();
+    clockPill.classList.toggle('corner-seconds', isGrown);
+    popIn([...clockSeconds.children]);
+  }, CORNER_TRAVEL);
+  return Math.max(CORNER_TRAVEL + POP_IN, isGrown ? popIn([clockDate]) : popOut([clockDate]));
+}
+
+export function enterCornerClock() {
+  return handOverClock(true);
+}
+
+export function leaveCornerClock() {
+  return handOverClock(false);
 }
 
 

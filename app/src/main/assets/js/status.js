@@ -1,12 +1,13 @@
 import { PROXY_TAP_SLOP } from './bridge.js';
-import { clockPill } from './clock.js';
+import { isAlertDashed } from './alert.js';
+import { clockPill, enterCornerClock, leaveCornerClock } from './clock.js';
 import { stirLiquid } from './liquid.js';
-import { rubberBandPast, toy, untoy } from './motion.js';
+import { popIn, popOut, rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
 import { closePanelNow, openPanelNow } from './lock.js';
 import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
-import { holdLabel, revealLabel, sweepLabel } from './sweep.js';
+import { holdLabel, revealLabel, sweepLabel, hideLabel, showLabel } from './sweep.js';
 import { refreshEdgeProxy } from './edge.js';
 
 
@@ -28,7 +29,6 @@ export const statusPill = document.getElementById('status');
 const statusClosed = document.getElementById('status-closed');
 const statusFaces = {
   closed: statusClosed,
-  charge: document.getElementById('status-charge'),
   actions: document.getElementById('status-actions'),
 };
 
@@ -182,6 +182,11 @@ const SLOTS = { usb: 0, transfer: 1, modus: 7, link: 8, battery: 9 };
 
 const GLYPHS = {
   wifi: '<svg viewBox="0 0 24 24"><path d="M1.33309 8.07433C0.92156 8.44266 0.886539 9.07485 1.25487 9.48638C1.62319 9.89791 2.25539 9.93293 2.66691 9.5646L1.33309 8.07433ZM21.3331 9.5646C21.7446 9.93293 22.3768 9.89791 22.7451 9.48638C23.1135 9.07485 23.0784 8.44266 22.6669 8.07433L21.3331 9.5646ZM12 19C11.4477 19 11 19.4477 11 20C11 20.5523 11.4477 21 12 21V19ZM12.01 21C12.5623 21 13.01 20.5523 13.01 20C13.01 19.4477 12.5623 19 12.01 19V21ZM14.6905 17.04C15.099 17.4116 15.7315 17.3817 16.1031 16.9732C16.4748 16.5646 16.4448 15.9322 16.0363 15.5605L14.6905 17.04ZM18.0539 13.3403C18.4624 13.7119 19.0949 13.682 19.4665 13.2734C19.8381 12.8649 19.8082 12.2324 19.3997 11.8608L18.0539 13.3403ZM7.96372 15.5605C7.55517 15.9322 7.52524 16.5646 7.89687 16.9732C8.2685 17.3817 8.90095 17.4116 9.3095 17.04L7.96372 15.5605ZM4.60034 11.8608C4.19179 12.2324 4.16185 12.8649 4.53348 13.2734C4.90511 13.682 5.53756 13.7119 5.94611 13.3403L4.60034 11.8608ZM2.66691 9.5646C5.14444 7.34716 8.41371 6 12 6V4C7.90275 4 4.16312 5.54138 1.33309 8.07433L2.66691 9.5646ZM12 6C15.5863 6 18.8556 7.34716 21.3331 9.5646L22.6669 8.07433C19.8369 5.54138 16.0972 4 12 4V6ZM12 21H12.01V19H12V21ZM12 16C13.0367 16 13.9793 16.3931 14.6905 17.04L16.0363 15.5605C14.9713 14.5918 13.5536 14 12 14V16ZM12 11C14.3319 11 16.4546 11.8855 18.0539 13.3403L19.3997 11.8608C17.4466 10.0842 14.8487 9 12 9V11ZM9.3095 17.04C10.0207 16.3931 10.9633 16 12 16V14C10.4464 14 9.02872 14.5918 7.96372 15.5605L9.3095 17.04ZM5.94611 13.3403C7.54544 11.8855 9.66815 11 12 11V9C9.15127 9 6.55344 10.0842 4.60034 11.8608L5.94611 13.3403Z" fill="currentColor"/></svg>',
+  wifiGood: '<svg viewBox="0 0 24 24"><path d="M12.0002 19C11.4479 19 11.0002 19.4477 11.0002 20C11.0002 20.5523 11.4479 21 12.0002 21V19ZM12.0102 21C12.5625 21 13.0102 20.5523 13.0102 20C13.0102 19.4477 12.5625 19 12.0102 19V21ZM14.6907 17.04C15.0993 17.4116 15.7317 17.3817 16.1033 16.9732C16.475 16.5646 16.445 15.9322 16.0365 15.5605L14.6907 17.04ZM18.0541 13.3403C18.4626 13.7119 19.0951 13.682 19.4667 13.2734C19.8384 12.8649 19.8084 12.2324 19.3999 11.8608L18.0541 13.3403ZM7.96394 15.5605C7.55539 15.9322 7.52546 16.5646 7.89708 16.9732C8.26871 17.3817 8.90117 17.4116 9.30971 17.04L7.96394 15.5605ZM4.60055 11.8608C4.192 12.2324 4.16207 12.8649 4.53369 13.2734C4.90532 13.682 5.53778 13.7119 5.94633 13.3403L4.60055 11.8608ZM12.0002 21H12.0102V19H12.0002V21ZM12.0002 16C13.0369 16 13.9795 16.3931 14.6907 17.04L16.0365 15.5605C14.9715 14.5918 13.5538 14 12.0002 14V16ZM12.0002 11C14.3321 11 16.4548 11.8855 18.0541 13.3403L19.3999 11.8608C17.4468 10.0842 14.8489 9 12.0002 9V11ZM9.30971 17.04C10.0209 16.3931 10.9635 16 12.0002 16V14C10.4466 14 9.02893 14.5918 7.96394 15.5605L9.30971 17.04ZM5.94633 13.3403C7.54565 11.8855 9.66836 11 12.0002 11V9C9.15148 9 6.55365 10.0842 4.60055 11.8608L5.94633 13.3403Z" fill="currentColor"/></svg>',
+  wifiFair: '<svg viewBox="0 0 24 24" fill="none"><path fill="none" d="M12.0001 20H12.0101M15.3635 16.3003C14.4754 15.4924 13.2953 15 12.0001 15C10.705 15 9.52483 15.4924 8.63672 16.3003" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  wifiWeak: '<svg viewBox="0 0 24 24" fill="none"><path fill="none" d="M12 20H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  wifiAlert: '<svg viewBox="0 0 24 24" fill="none"><path fill="none" d="M12 19.5001H12.01M2 8.81954C3.69692 7.30075 5.74166 6.1626 8 5.5393M5 12.8586C5.86251 12.0131 6.87754 11.3226 8 10.8322M16 5.5393C18.2583 6.1626 20.3031 7.30075 22 8.81954M16 10.8322C17.1225 11.3226 18.1375 12.0131 19 12.8586M12 4.50024V15.5001" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  wifiOff: '<svg viewBox="0 0 24 24"><path d="M1.33309 8.07433C0.92156 8.44266 0.886539 9.07485 1.25487 9.48638C1.62319 9.89791 2.25539 9.93293 2.66691 9.5646L1.33309 8.07433ZM21.3331 9.5646C21.7446 9.93293 22.3768 9.89791 22.7451 9.48638C23.1135 9.07485 23.0784 8.44266 22.6669 8.07433L21.3331 9.5646ZM12 19C11.4477 19 11 19.4477 11 20C11 20.5523 11.4477 21 12 21V19ZM12.01 21C12.5623 21 13.01 20.5523 13.01 20C13.01 19.4477 12.5623 19 12.01 19V21ZM14.6905 17.04C15.099 17.4116 15.7315 17.3817 16.1031 16.9732C16.4748 16.5646 16.4448 15.9322 16.0363 15.5605L14.6905 17.04ZM18.0539 13.3403C18.4624 13.7119 19.0949 13.682 19.4665 13.2734C19.8381 12.8649 19.8082 12.2324 19.3997 11.8608L18.0539 13.3403ZM7.96372 15.5605C7.55517 15.9322 7.52524 16.5646 7.89687 16.9732C8.2685 17.3817 8.90095 17.4116 9.3095 17.04L7.96372 15.5605ZM4.60034 11.8608C4.19179 12.2324 4.16185 12.8649 4.53348 13.2734C4.90511 13.682 5.53756 13.7119 5.94611 13.3403L4.60034 11.8608ZM10.5705 4.06305C10.0204 4.1118 9.61391 4.59729 9.66266 5.14741C9.71141 5.69754 10.1969 6.10399 10.747 6.05525L10.5705 4.06305ZM17.3393 10.3798C16.8567 10.1114 16.2478 10.285 15.9794 10.7677C15.711 11.2504 15.8847 11.8593 16.3673 12.1277L17.3393 10.3798ZM3.70711 2.29289C3.31658 1.90237 2.68342 1.90237 2.29289 2.29289C1.90237 2.68342 1.90237 3.31658 2.29289 3.70711L3.70711 2.29289ZM20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L20.2929 21.7071ZM12 6C15.5863 6 18.8556 7.34716 21.3331 9.5646L22.6669 8.07433C19.8369 5.54138 16.0972 4 12 4V6ZM12 21H12.01V19H12V21ZM12 16C13.0367 16 13.9793 16.3931 14.6905 17.04L16.0363 15.5605C14.9713 14.5918 13.5536 14 12 14V16ZM9.3095 17.04C10.0207 16.3931 10.9633 16 12 16V14C10.4464 14 9.02872 14.5918 7.96372 15.5605L9.3095 17.04ZM10.747 6.05525C11.1596 6.01869 11.5775 6 12 6V4C11.5185 4 11.0417 4.0213 10.5705 4.06305L10.747 6.05525ZM16.3673 12.1277C16.9757 12.466 17.5412 12.874 18.0539 13.3403L19.3997 11.8608C18.7751 11.2927 18.0844 10.7941 17.3393 10.3798L16.3673 12.1277ZM2.29289 3.70711L5.46648 6.8807L6.8807 5.46648L3.70711 2.29289L2.29289 3.70711ZM2.66691 9.5646C3.81213 8.53961 5.12648 7.70074 6.56232 7.09494L5.78486 5.25224C4.14251 5.94517 2.64069 6.904 1.33309 8.07433L2.66691 9.5646ZM5.46648 6.8807L9.46042 10.8746L10.8746 9.46042L6.8807 5.46648L5.46648 6.8807ZM9.46042 10.8746L20.2929 21.7071L21.7071 20.2929L10.8746 9.46042L9.46042 10.8746ZM5.94611 13.3403C7.15939 12.2367 8.67355 11.4612 10.3496 11.1508L9.98543 9.18424C7.93271 9.5644 6.08108 10.5139 4.60034 11.8608L5.94611 13.3403Z" fill="currentColor"/></svg>',
   ethernet: '<svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v5h-3v3h-2v-3h-4v3H8v-3H5V5a2 2 0 0 1 2-2zm-2 12h14v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/></svg>',
   bluetooth: '<svg viewBox="0 0 24 24"><path fill="none" d="M7 17L17 7L12 2V22L17 17L7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   usb: '<svg viewBox="0 0 24 24"><path d="M11 2h2l1.5 2.5h-5zM11 5h2v10.2l3-2.4V10h-1.5V7.5h4V10H17v3.4l-4.8 3.8V19a2 2 0 1 1-2 0v-3.6l-3.4-2.6V10.9a2 2 0 1 1 2 0v.9l1.4 1.1z"/></svg>',
@@ -243,7 +248,17 @@ const GLYPHS_OFF = {
 };
 
 
-const glyphFor = (name, isOn) => (isOn ? GLYPHS[name] : GLYPHS_OFF[name] || GLYPHS[name]) || '';
+const glyphFor = (name, isOn) => (name === 'wifi' ? (isOn ? wifiGlyph() : GLYPHS.wifiOff) : (isOn ? GLYPHS[name] : GLYPHS_OFF[name] || GLYPHS[name])) || '';
+
+/* Wifi is the one glyph that says more than on/off: strength is a four-rung ladder and "joined but the link does not reach the internet" is its own rung above all of them, because a bar showing full arcs while nothing loads is the state that wastes the most time. */
+function wifiGlyph() {
+  if (!attached || attached.link !== 'wifi') return GLYPHS.wifiOff;
+  if (attached.online === false) return GLYPHS.wifiAlert;
+  if (attached.level < 0 || attached.level >= 3) return GLYPHS.wifi;
+  if (attached.level === 2) return GLYPHS.wifiGood;
+  if (attached.level === 1) return GLYPHS.wifiFair;
+  return GLYPHS.wifiWeak;
+}
 
 
 
@@ -262,35 +277,66 @@ const BATTERY_GLYPHS = {
 
 
 
-const ANNOUNCE_CELL = 'M21 13V11M7.7 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.0799 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.0799 18 6.2 18H6.5M16.5 6H16.8C17.9201 6 18.4802 6 18.908 6.21799C19.2843 6.40973 19.5903 6.71569 19.782 7.09202C20 7.51984 20 8.0799 20 9.2V14.8C20 15.9201 20 16.4802 19.782 16.908C19.5903 17.2843 19.2843 17.5903 18.908 17.782C18.4802 18 17.9201 18 16.8 18H15.31';
-const announceGlyph = mark =>
-  '<svg viewBox="0 0 24 24"><path fill="none" d="' + mark + ANNOUNCE_CELL +
-  '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-const ANNOUNCE_GLYPHS = {
-  charging: BATTERY_GLYPHS.charging,
-  low: announceGlyph('M12 9.2V14.8'),
-  critical: announceGlyph('M12 8.4V13M12 16.3V16.4'),
-};
-
-
 const ANNOUNCE_COLOURS = {
   charging: '#5bfd5b',
   low: '#ffb300',
   critical: '#ff3b30',
 };
 
-// Mirrors BatteryWatch.LOW and BatteryWatch.CRITICAL in BatteryWatch.kt, which fire the low/critical alerts at the same two marks this bubble changes colour at.
-const BATTERY_LOW = 40;
-const BATTERY_CRITICAL = 15;
+// Mirrors BatteryWatch.LOW and BatteryWatch.CRITICAL in BatteryWatch.kt, which fire the low/critical alerts at the same two marks this bubble changes colour at. Each is the highest level that counts as that band, so the alert and the colour change on the same percent rather than a percent apart.
+const BATTERY_LOW = 39;
+const BATTERY_CRITICAL = 19;
 
 function batteryBand(level) {
-  if (level >= BATTERY_LOW) return 'ok';
-  if (level >= BATTERY_CRITICAL) return 'low';
+  if (level > BATTERY_LOW) return 'ok';
+  if (level > BATTERY_CRITICAL) return 'low';
   return 'critical';
 }
 
-const BATTERY_COLOURS = { ok: ANNOUNCE_COLOURS.charging, low: ANNOUNCE_COLOURS.low, critical: ANNOUNCE_COLOURS.critical };
+// The white icon set, drawn as the cell's outline with a bar per fifth of the charge — the alternative to the coloured fill, under `statusBatteryIcons`. One file each in app/svg, restated here because there is no build step joining the two.
+const batteryMark = marks =>
+  '<svg viewBox="0 0 24 24"><path fill="none" d="' + marks +
+  '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const BATTERY_CELL = 'M21 13V11M6.2 18H16.8C17.9201 18 18.4802 18 18.908 17.782C19.2843 17.5903 19.5903 17.2843 19.782 16.908C20 16.4802 20 15.9201 20 14.8V9.2C20 8.0799 20 7.51984 19.782 7.09202C19.5903 6.71569 19.2843 6.40973 18.908 6.21799C18.4802 6 17.9201 6 16.8 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.07989 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.07989 18 6.2 18Z';
+
+const BATTERY_MARKS = {
+  full: batteryMark('M7.5 10V14M11.5 10V14M15.5 10V14' + BATTERY_CELL),
+  mid: batteryMark('M7.5 10V14M11.5 10V14' + BATTERY_CELL),
+  bar: batteryMark('M7.5 10V14' + BATTERY_CELL),
+  empty: batteryMark(BATTERY_CELL),
+  critical: batteryMark('M7.5 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.0799 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.0799 18 6.2 18H7.5M15.5 6H16.8C17.9201 6 18.4802 6 18.908 6.21799C19.2843 6.40973 19.5903 6.71569 19.782 7.09202C20 7.51984 20 8.0799 20 9.2V14.8C20 15.9201 20 16.4802 19.782 16.908C19.5903 17.2843 19.2843 17.5903 18.908 17.782C18.4802 18 17.9201 18 16.8 18H15.5M11.5 6V15M11.5 18H11.51M21 13V11'),
+};
+
+// The announcement is the same drawing as the reading it is news about — the bar that is left, the exclamation once there is too little of it to be a bar, the bolt on a cable — so what it says is recognised as the battery before it is read.
+const ANNOUNCE_GLYPHS = {
+  charging: BATTERY_GLYPHS.charging,
+  low: BATTERY_MARKS.bar,
+  critical: BATTERY_MARKS.critical,
+};
+
+function batteryLevelMark(level) {
+  if (level >= 70) return BATTERY_MARKS.full;
+  if (level >= 40) return BATTERY_MARKS.mid;
+  if (level >= 20) return BATTERY_MARKS.bar;
+  if (level >= 10) return BATTERY_MARKS.empty;
+  return BATTERY_MARKS.critical;
+}
+
+// The ten-step gradient the battery fill reads its colour off, on the dashboard and on the Status bubble's own icon alike — one function, one set of stops, named by their floor.
+const BATTERY_GRADIENT = [
+  { floor: 90, colour: '#16f551' },
+  { floor: 80, colour: '#1ed950' },
+  { floor: 70, colour: '#21bf4b' },
+  { floor: 60, colour: '#63a822' },
+  { floor: 50, colour: '#98ab2e' },
+  { floor: 40, colour: '#b9cf2b' },
+  { floor: 30, colour: '#d9c22e' },
+  { floor: 20, colour: '#d98c2e' },
+  { floor: 10, colour: '#d95b2e' },
+  { floor: 0, colour: '#d93f2e' },
+];
+const BATTERY_CHARGING_COLOUR = '#3bfa1e';
 
 
 
@@ -342,6 +388,8 @@ let charge = -1;
 let isPlugged = false;
 let remainingMinutes = -1;
 let isBorn = false;
+let showBatteryPercent = true;
+let useBatteryMarks = false;
 
 
 function subject() {
@@ -377,7 +425,7 @@ function wanted() {
   const modus = MODUS_ORDER.find(kind => hasModus(kind));
   if (modus) shown.push({ name: 'modus', html: modus === 'zen' ? zenGlyph() : GLYPHS[modus] });
   if (attached && attached.link === 'wifi') {
-    shown.push({ name: 'link', html: GLYPHS.wifi, level: attached.level });
+    shown.push({ name: 'link', html: wifiGlyph() });
   } else if (attached && attached.link === 'ethernet') {
     shown.push({ name: 'link', html: GLYPHS.ethernet });
   } else if (attached && attached.link === 'mobile') {
@@ -390,10 +438,7 @@ function wanted() {
   
   
   
-  const reading = charge >= 0
-    ? '<span class="own-charge" data-charge="' + chargeBand() + '">' + charge + '%</span>'
-    : '';
-  if (reading) shown.push({ name: 'battery', html: reading, isText: true });
+  if (charge >= 0) shown.push({ name: 'battery', html: batteryIcon() });
   return shown.sort((one, two) => SLOTS[one.name] - SLOTS[two.name]);
 }
 
@@ -456,8 +501,6 @@ function paintStatus() {
       else inner.innerHTML = want.html;
     }
     inner.classList.toggle('is-text', Boolean(want.text) || Boolean(want.isText));
-    if (want.level >= 0) inner.dataset.level = want.level;
-    else delete inner.dataset.level;
   });
 
   if (hasLeft && isBorn) {
@@ -486,71 +529,45 @@ function paintStatus() {
 
 
 
-const CHARGE_POP_STAGGER = 34;
-const CHARGE_POP_SHAKE = 150;
-const CHARGE_POP_COLLAPSE = 190;
 
+/* The faces here hand over a whole row at a time, so they wrap the shared pair rather than owning a copy of it. */
+function popFaceOut(face) {
+  const emptyAt = popOut([...face.children]);
+  // A face handed over loses its `showing` in the same frame the pop starts, and the 160ms opacity fade cut the stagger off before the last part had shaken: the face is held lit for exactly as long as its own pop runs instead, so every part gets to leave.
+  face.classList.add('popping-away');
+  setTimeout(() => face.classList.remove('popping-away'), emptyAt);
+  return emptyAt;
+}
 
-const CHARGE_POP_IN_STAGGER = 42;
-const CHARGE_POP_IN = 460;
-const CHARGE_POP_IN_TILT = 14;
+function popFaceIn(face) {
+  return popIn([...face.children]);
+}
 
 
 const CHARGE_DWELL = 2600;
 
-
-const CHARGE_WIDTH = 86;
-root.style.setProperty('--status-charge-width', CHARGE_WIDTH + 'px');
 
 let chargeDwell = null;
 let isAnnouncing = false;
 
 let announcingState = null;
 
+/* The announcement stands in the battery slot it is news about rather than taking the bubble over. The takeover — every reading shaken out, the box closed down onto one glyph and opened again after — was a second of motion for a fact that is already drawn in one slot, and the shake out of it was the one animation on this bar that reliably dropped frames. Nothing about the bubble moves now: the slot's own mark is swapped for the announcement's and turned in out of nothing. */
+function popBatteryMark() {
+  const inner = statusClosed.querySelector('[data-slot="battery"] .status-slot-inner');
+  if (inner) popIn([inner]);
+}
+
 export function announceCharge(state = 'charging') {
-  
-  
   if (!isBorn || statusOpen) return;
   clearTimeout(chargeDwell);
-  
-  
   root.style.setProperty('--status-announce', ANNOUNCE_COLOURS[state] || ANNOUNCE_COLOURS.charging);
-  
-  
-  if (!isAnnouncing) {
+
+  if (!isAnnouncing || state !== announcingState) {
     isAnnouncing = true;
     announcingState = state;
-    const slots = [...statusClosed.children];
-    slots.forEach((slot, index) => {
-      slot.style.setProperty('--pop-at', index * CHARGE_POP_STAGGER + 'ms');
-      slot.classList.add('popping');
-    });
-    const emptyAt = slots.length * CHARGE_POP_STAGGER + CHARGE_POP_SHAKE;
-    setTimeout(() => {
-      if (!isAnnouncing) return;
-      
-      
-      statusFaces.charge.innerHTML =
-        ANNOUNCE_GLYPHS[announcingState] || ANNOUNCE_GLYPHS.charging;
-      statusPill.classList.add('announcing');
-      showStatusFace('charge');
-      bridge.triggerHaptic('notification');
-      fitStatusProxy();
-      stirLiquid(CHARGE_POP_COLLAPSE + 400);
-    }, emptyAt);
-    stirLiquid(emptyAt + CHARGE_POP_COLLAPSE + 400);
-    chargeDwell = setTimeout(retireCharge, emptyAt + CHARGE_DWELL);
-    return;
-  }
-  
-  
-  
-  
-  
-  
-  if (state !== announcingState) {
-    announcingState = state;
-    statusFaces.charge.innerHTML = ANNOUNCE_GLYPHS[state] || ANNOUNCE_GLYPHS.charging;
+    paintStatus();
+    popBatteryMark();
     bridge.triggerHaptic('notification');
   }
   chargeDwell = setTimeout(retireCharge, CHARGE_DWELL);
@@ -566,20 +583,8 @@ function retireCharge() {
   if (!isAnnouncing) return;
   isAnnouncing = false;
   announcingState = null;
-  statusPill.classList.remove('announcing');
-  showStatusFace('closed');
-  statusClosed.replaceChildren();
   paintStatus();
-  
-  
-  [...statusClosed.children].forEach((slot, index) => {
-    const tilt = (Math.random() * 0.6 + 0.4) * CHARGE_POP_IN_TILT * (Math.random() < 0.5 ? -1 : 1);
-    slot.style.setProperty('--pop-at', index * CHARGE_POP_IN_STAGGER + 'ms');
-    slot.style.setProperty('--pop-tilt', tilt + 'deg');
-    slot.classList.add('popping-in');
-    setTimeout(() => slot.classList.remove('popping-in'), index * CHARGE_POP_IN_STAGGER + CHARGE_POP_IN);
-  });
-  stirLiquid(statusClosed.children.length * CHARGE_POP_IN_STAGGER + CHARGE_POP_IN + 200);
+  popBatteryMark();
 }
 
 
@@ -665,8 +670,6 @@ export let statusOpen = false;
 
 /* The actions face is absolutely positioned and so contributes no width of its own: the open size is a number rather than something the contents can be asked for. */
 const STATUS_CORNER_WIDE = 96;
-const CLOCK_CORNER_LEAVE = 260;
-const clockDate = document.getElementById('clock-date');
 
 let cornerIdleWide = 0;
 let clockIdleWide = 0;
@@ -683,12 +686,12 @@ function pinCornerWidths() {
   root.style.setProperty('--status-width', cornerIdleWide + 'px');
   if (!ownsClockWidth()) return;
   clockIdleWide = Math.round(clockPill.getBoundingClientRect().width);
-  /* The corner width was the idle one plus a fixed allowance, which the date at its corner size ran straight out of. It is asked of the grown box itself instead, with the class on and the width back at auto for one uncommitted layout. */
-  clockPill.classList.add('corner-grow');
+  /* The corner width was the idle one plus a fixed allowance, which the date at its corner size ran straight out of. It is asked of the grown box itself instead, with the classes on — the seconds' grown form included, since that is the shape it lands in — and the width back at auto for one uncommitted layout. */
+  clockPill.classList.add('corner-grow', 'corner-seconds');
   root.style.setProperty('--clock-width', 'auto');
   /* Floored at the Status bubble's own corner width: the two stand at opposite ends of the same line and one of them being narrower reads as the pair not matching rather than as one holding less. */
   clockCornerWide = Math.max(STATUS_CORNER_WIDE, Math.ceil(clockPill.getBoundingClientRect().width));
-  clockPill.classList.remove('corner-grow');
+  clockPill.classList.remove('corner-grow', 'corner-seconds');
   root.style.setProperty('--clock-width-ms', '0ms');
   root.style.setProperty('--clock-width', clockIdleWide + 'px');
 }
@@ -717,23 +720,6 @@ function releaseCornerWidths() {
   root.style.removeProperty('--clock-width-ms');
 }
 
-/* Left in flow the date collapsed its own max-width and its margin as the box retracted around it, so it travelled twice on the way out. It is held at the offset it already stood at inside the Clock and only fades; the Clock wears `overflow: hidden` for the same stretch, so whatever the shrinking box stops covering is cut rather than pushed. */
-function pinCornerDate() {
-  const box = clockDate.getBoundingClientRect();
-  if (!box.width) return;
-  const around = clockPill.getBoundingClientRect();
-  clockDate.style.left = Math.round(box.left - around.left) + 'px';
-  clockDate.style.top = Math.round(box.top - around.top) + 'px';
-  clockDate.classList.add('handed-over');
-  clockPill.classList.add('corner-leaving');
-  setTimeout(() => {
-    clockPill.classList.remove('corner-leaving');
-    clockDate.classList.remove('handed-over');
-    clockDate.style.removeProperty('left');
-    clockDate.style.removeProperty('top');
-  }, CLOCK_CORNER_LEAVE + 60);
-}
-
 function showStatusFace(name) {
   Object.entries(statusFaces).forEach(([key, face]) => {
     face.classList.toggle('showing', key === name);
@@ -752,6 +738,7 @@ function statusPanelLeft() {
 
 
 const quickPanel = document.getElementById('quick-panel');
+const statsSection = document.getElementById('stats-section');
 
 // The row runs on forever, and what makes it run is three copies of the nine standing end to end: the shift wraps by one copy's width, so a flick never reaches an end and never has to be told it has. The copies are made here, before quickBubbles is captured below, so every copy is ranked and staggered like the original rather than reading --pop-rank and --pop-from as unset.
 const KNOB_COPIES = 3;
@@ -897,7 +884,9 @@ export function openStatusPanel() {
   pinCornerWidths();
   statusPill.classList.add('open');
   showStatusFace('actions');
-  clockPill.classList.add('corner-grow');
+  popFaceOut(statusClosed);
+  popFaceIn(statusFaces.actions);
+  enterCornerClock();
   requestAnimationFrame(growCornerWidths);
 
   quickPanel.classList.remove('leaving');
@@ -914,8 +903,8 @@ export function openStatusPanel() {
   // A reading that swept while its bubble was still dropping was a bar moving under a box that was itself moving — the reveal is asked for once the quick panel has landed instead, over the text it is already standing on. Until then the reading is held out of sight and any answer arriving early only writes its text, so a weather reply landing mid-drop no longer plays a reveal of its own before the real one.
   clearTimeout(readingReveal);
   readingsHeld = true;
-  weatherReading.classList.add('sweep-hidden');
-  transferReading.classList.add('sweep-hidden');
+  hideLabel(weatherReading);
+  hideLabel(transferReading);
   readingReveal = setTimeout(() => {
     readingsHeld = false;
     revealLabel(weatherReading);
@@ -928,18 +917,22 @@ export function openStatusPanel() {
 
 export function closeStatusPanel() {
   if (!statusOpen) return;
+  // An Alert slung into the stats section has nowhere to stand once the section goes, so the panel closing takes it with it rather than leaving a notification hanging where the dashboard was.
+  if (isAlertDashed()) toClosed();
   statusOpen = false;
   refreshEdgeProxy();
   clearTimeout(readingReveal);
   readingsHeld = false;
-  weatherReading.classList.remove('sweep-hidden');
-  transferReading.classList.remove('sweep-hidden');
+  showLabel(weatherReading);
+  showLabel(transferReading);
   
   
   
   
   statusPill.classList.add('panel-closing');
   showStatusFace('closed');
+  popFaceOut(statusFaces.actions);
+  popFaceIn(statusClosed);
   
   
   quickPanel.classList.remove('showing');
@@ -948,9 +941,8 @@ export function closeStatusPanel() {
   quickPanel.classList.add('leaving');
   
   
-  pinCornerDate();
   statusPill.classList.remove('open');
-  clockPill.classList.remove('corner-grow');
+  leaveCornerClock();
   shrinkCornerWidths();
   pill.classList.remove('panel-top');
   quickPanel.classList.remove('level-solo');
@@ -1178,6 +1170,10 @@ function paintModeLabels() {
   };
   quickModes.forEach(button => {
     const name = button.dataset.toggle;
+    if (name === 'wifi') {
+      const glyph = glyphFor('wifi', button.classList.contains('on'));
+      if (faceOf(button).innerHTML !== glyph) faceOf(button).innerHTML = glyph;
+    }
 
 
     const ring = button.querySelector('.quick-ring');
@@ -1246,8 +1242,9 @@ const batteryRemaining = document.getElementById('battery-remaining');
 
 
 function chargeColour() {
-  if (isPlugged) return ANNOUNCE_COLOURS.charging;
-  return BATTERY_COLOURS[batteryBand(charge)];
+  if (isPlugged) return BATTERY_CHARGING_COLOUR;
+  if (charge < 0) return 'var(--text-faint)';
+  return (BATTERY_GRADIENT.find(band => charge >= band.floor) || BATTERY_GRADIENT[BATTERY_GRADIENT.length - 1]).colour;
 }
 
 
@@ -1266,6 +1263,24 @@ function formatRemaining(minutes) {
   return hours > 0 ? hours + 'h ' + mins + 'm' : mins + 'm';
 }
 
+// The Status bubble's own battery icon reuses this exact layout — cell, fill, pin — mirroring the dashboard's, at bubble scale. It reads its colour and its width off the same two custom properties rather than a second paint function.
+function batteryIcon() {
+  if (isAnnouncing) {
+    return '<span class="battery-mark announcing">' +
+      (ANNOUNCE_GLYPHS[announcingState] || ANNOUNCE_GLYPHS.charging) + '</span>';
+  }
+  if (useBatteryMarks) {
+    return isPlugged
+      ? '<span class="battery-mark charging">' + BATTERY_GLYPHS.charging + '</span>'
+      : '<span class="battery-mark">' + batteryLevelMark(charge) + '</span>';
+  }
+  const readingHtml = showBatteryPercent
+    ? '<span class="mini-battery-reading">' + charge + '%</span>'
+    : '';
+  return '<span class="mini-battery' + (showBatteryPercent ? '' : ' bare') + '"><span class="mini-battery-cell"><span class="mini-battery-fill"></span>' +
+    readingHtml + '</span></span>';
+}
+
 function paintBattery() {
 
 
@@ -1274,10 +1289,26 @@ function paintBattery() {
   batteryRemaining.textContent = isPlugged ? formatRemaining(remainingMinutes) : '';
   batteryBox.style.setProperty('--charge-width', Math.max(0, charge) + '%');
   batteryBox.style.setProperty('--charge-color', chargeColour());
-  
+  statusPill.style.setProperty('--charge-width', Math.max(0, charge) + '%');
+  statusPill.style.setProperty('--charge-color', chargeColour());
+
   batteryBox.classList.toggle('low', !isPlugged && charge >= 0 && batteryBand(charge) === 'critical');
   batteryBox.classList.toggle('charging', isPlugged);
 }
+
+window.setStatusBatteryPercent = value => {
+  showBatteryPercent = Number(value) !== 0;
+  paintStatus();
+};
+
+window.setStatusBatteryIcons = value => {
+  useBatteryMarks = Number(value) !== 0;
+  paintStatus();
+};
+
+window.setStatusBatteryPercentLight = value => {
+  root.classList.toggle('battery-percent-light', Number(value) !== 0);
+};
 
 
 const saverSwitch = () => document.querySelector('.quick-knob[data-toggle=saver]');
@@ -1514,7 +1545,9 @@ quickModes.forEach(control => {
 [...quickModes, ...quickKnobs].forEach(control => {
   control.addEventListener('click', event => {
     event.stopPropagation();
-    if (control.classList.contains('unavailable') || knobSwiped || modeHeld) return;
+    // `knobSwiped` is one latch for the whole panel and is cleared only by the next touch on the knob row, so a drag of that row left every connection button dead until the row had been touched again — the latch belongs to the row that was dragged, not to the controls standing beside it.
+    if (control.classList.contains('unavailable') || modeHeld) return;
+    if (knobSwiped && knobRow.contains(control)) return;
     if (control.dataset.open) {
       bridge.triggerHaptic('tap');
       bridge.openApp(control.dataset.open);
@@ -1674,10 +1707,19 @@ export function statusPanelTarget(x, y) {
 
 let panelPushFrom = null;
 let panelPushed = false;
+let panelPushFromControl = false;
 
 
 // The Now bubble is thrown home along the flick that dismissed the panel, so how far across that flick had gone when it crossed has to survive the two calls between here and the throw. It is reported in pixels rather than as a ratio: what those pixels are worth as an angle is the throw's business and not this one's. Every other way the panel closes has no hand behind it and leaves this at nothing.
 let panelPushLean = 0;
+
+function releasePanelHolds() {
+  releaseModeHold();
+  clearTimeout(batteryHoldTimer);
+  batteryBox.classList.remove('pressing');
+  clearTimeout(vitalsHoldTimer);
+  vitalsBox.classList.remove('pressing');
+}
 
 export function statusPanelPush(action, x, y) {
   if (action === 'down') {
@@ -1691,16 +1733,21 @@ export function statusPanelPush(action, x, y) {
     
     
     
-    panelPushFrom = statusPanelTarget(x, y) ? null : { x, y };
+    const under = statusPanelTarget(x, y);
+    panelPushFrom = under && under.classList.contains('level') ? null : { x, y };
+    panelPushFromControl = Boolean(under);
     panelPushed = false;
     return;
   }
   if (action !== 'move' || !panelPushFrom || panelPushed) return;
+  // Every hold in the panel is armed on the same touch-down the dismiss swipe starts from, and the battery and vitals boxes never cancelled theirs on movement at all — so a swipe begun over a control fired that control's hold at 350ms: a vibration, and Settings taking the screen, under a gesture that only meant to close the panel.
+  if (Math.hypot(x - panelPushFrom.x, y - panelPushFrom.y) > KNOB_DRAG_SLOP) releasePanelHolds();
   if (y - panelPushFrom.y < -24 && Math.abs(x - panelPushFrom.x) < 40) {
     panelPushed = true;
     panelPushLean = x - panelPushFrom.x;
     panelPushFrom = null;
-    bridge.triggerHaptic('dismiss');
+    // A swipe that starts on a control is the same finger that would have pressed it, and answering it with the dismiss buzz reads as the control having fired. Only a swipe begun on the panel's own ground is confirmed.
+    if (!panelPushFromControl) bridge.triggerHaptic('dismiss');
     closeStatusPanel();
   }
 }
@@ -2028,4 +2075,29 @@ function leavePanelNow() {
   const lean = panelPushLean;
   panelPushLean = 0;
   closePanelNow(lean);
+}
+
+
+// The stats section gives up its room to an Alert slung into it while the dashboard stands open: its modules leave on the panel's own collapse and come back on the panel's own grow, because a set of bubbles clearing a space is the same motion as that set closing.
+const STATS_BACK = QUICK_POP + QUICK_RANK_STEPS * QUICK_STAGGER;
+let statsBackTimer = 0;
+
+export function statsOut() {
+  clearTimeout(statsBackTimer);
+  quickPanel.classList.remove('stats-in');
+  quickPanel.classList.add('stats-out');
+  stirLiquid(STATS_BACK);
+}
+
+export function statsIn() {
+  clearTimeout(statsBackTimer);
+  if (!quickPanel.classList.contains('stats-out')) return;
+  quickPanel.classList.remove('stats-out');
+  quickPanel.classList.add('stats-in');
+  statsBackTimer = setTimeout(() => quickPanel.classList.remove('stats-in'), STATS_BACK);
+  stirLiquid(STATS_BACK);
+}
+
+export function statsBox() {
+  return statsSection.getBoundingClientRect();
 }

@@ -2,6 +2,8 @@ package com.v.island
 
 import android.app.KeyguardManager
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -66,7 +68,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
-        private const val ALERT_BAND_SHARE = 0.495f
+        private const val TAP_MILLIS = 40L
 
         
         private const val GROWN_CORNER = 26
@@ -273,6 +275,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private lateinit var alertOverlay: View
     private lateinit var alertOverlayParams: WindowManager.LayoutParams
+
+    private var alertTapX = 0f
+    private var alertTapY = 0f
 
     
 
@@ -635,6 +640,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                     reportOutside(event)
                     return false
                 }
+                alertTapX = event.rawX
+                alertTapY = event.rawY
                 forwardTouch(event, alertOverlayParams, "alert")
                 return true
             }
@@ -971,10 +978,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         
         
-        if (!resized && paneBlurRadius[index] == radius && paneBlurCorner[index] == corner) return
-        if (SamsungBlur.apply(view, dp(radius), corner)) {
+        /* The guard compared a corner that arrives as a fraction of a pixel, so it never matched twice running and every frame of a transition re-applied a blur identical to the one already on the pane. A corner is compared at whole-pixel grain, which is the grain the blur is built at. */
+        val edge = Math.round(corner).toFloat()
+        if (!resized && paneBlurRadius[index] == radius && paneBlurCorner[index] == edge) return
+        if (SamsungBlur.apply(view, dp(radius), edge)) {
             paneBlurRadius[index] = radius
-            paneBlurCorner[index] = corner
+            paneBlurCorner[index] = edge
             return
         }
 
@@ -1050,17 +1059,43 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private fun setAlertBand(heightDp: Int) {
         if (!this::alertOverlay.isInitialized) return
         val wanted = heightDp != 0 && !isHidden()
-        val band = (screenHeight() * ALERT_BAND_SHARE).toInt()
+        // A pull on an Alert is answered from wherever the hand already is rather than from the strip the bubble happens to stand in, so the window an Alert asks for is the whole screen. The tap that is not a pull is handed back to whatever is underneath by `replayAlertTap`, so covering everything costs the app below nothing.
         alertOverlayParams.width = if (wanted) screenWidth() else 0
-        alertOverlayParams.height =
-            if (!wanted) 0
-            else if (heightDp < 0) band
-            else maxOf(band, minOf(dp(heightDp), screenHeight()))
+        alertOverlayParams.height = if (wanted) screenHeight() else 0
         alertOverlayParams.flags = proxyFlags(wanted)
         runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
 
         proxyParams.flags = proxyFlags(!wanted)
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+    }
+
+    // The Alert's window covers the screen while it stands, and a window that hears a press is the only window that hears it — a tap the page has decided is not for the bubble would simply be eaten. It is handed on instead: the overlay goes untouchable for as long as the replay takes, the tap is dispatched where the finger actually was, and the window is touchable again on the way out.
+    private fun replayAlertTap() {
+        if (!this::alertOverlay.isInitialized || alertOverlayParams.width == 0) return
+        val x = alertTapX
+        val y = alertTapY
+        alertOverlayParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
+
+        val restore = {
+            if (alertOverlayParams.width != 0) {
+                alertOverlayParams.flags = proxyFlags(true)
+                runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
+            }
+        }
+        val path = Path().apply { moveTo(x, y) }
+        val stroke = GestureDescription.StrokeDescription(path, 0, TAP_MILLIS)
+        val sent = runCatching {
+            dispatchGesture(
+                GestureDescription.Builder().addStroke(stroke).build(),
+                object : GestureResultCallback() {
+                    override fun onCompleted(description: GestureDescription?) = restore()
+                    override fun onCancelled(description: GestureDescription?) = restore()
+                },
+                null
+            )
+        }.getOrDefault(false)
+        if (!sent) restore()
     }
 
     
@@ -1169,6 +1204,23 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
+    /* Splitting each region on its commas and mapping it to a list of boxed floats allocated some ninety short-lived objects per frame across the panes, all of it on the UI thread at the display's full rate — garbage a frame budget cannot afford and a cost that grew with every pane added. The numbers are scanned straight out of the string into one array that is reused for the life of the service. */
+    private val regionNumbers = FloatArray(8)
+
+    private fun readRegion(region: String): Int {
+        var count = 0
+        var from = 0
+        while (from <= region.length && count < regionNumbers.size) {
+            var to = region.indexOf(',', from)
+            if (to < 0) to = region.length
+            val value = region.substring(from, to).toFloatOrNull() ?: return count
+            regionNumbers[count] = value
+            count += 1
+            from = to + 1
+        }
+        return count
+    }
+
     private fun placeBlurFrame(spec: String) {
         val density = resources.displayMetrics.density
         val regions = spec.split(';')
@@ -1182,10 +1234,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             
             if (paneSpec[index] == region) return@forEachIndexed
             paneSpec[index] = region
-            val numbers = region
-                .split(',')
-                .mapNotNull { it.toFloatOrNull() }
-            if (numbers.size < 5 || numbers[2] < 1f || numbers[3] < 1f) {
+            val count = readRegion(region)
+            val numbers = regionNumbers
+            if (count < 5 || numbers[2] < 1f || numbers[3] < 1f) {
                 if (pane.visibility != View.GONE) {
                     pane.visibility = View.GONE
                     clearBlur(index, pane)
@@ -1195,13 +1246,15 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             val bounds = pane.layoutParams as FrameLayout.LayoutParams
             val width = (numbers[2] * density).toInt()
             val height = (numbers[3] * density).toInt()
-            
-            
+
+
+            /* Assigning `layoutParams` calls `requestLayout`, and a pane resizes on every frame of every growth — so each of those frames scheduled a full traversal of the stage, remeasuring the WebView beside the panes to arrive at the size it already had. `right` and `bottom` set the same box without a traversal; the params are still mutated in place so a real layout, when one finally comes, lands where the pane already is. */
             val resized = bounds.width != width || bounds.height != height
             if (resized) {
                 bounds.width = width
                 bounds.height = height
-                pane.layoutParams = bounds
+                pane.right = pane.left + width
+                pane.bottom = pane.top + height
             }
             pane.translationX = numbers[0] * density
             pane.translationY = numbers[1] * density
@@ -1213,7 +1266,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             
             
             
-            paneShares[index] = numbers.getOrNull(5) ?: 1f
+            paneShares[index] = if (count > 5) numbers[5] else 1f
             applyBlur(index, pane, paneCorners[index], resized)
         }
     }
@@ -1231,6 +1284,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setQuickDividers(${Preferences.get(preferences, Preferences.QUICK_DIVIDERS)})")
         push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
         push("window.setLabelSweep(${Preferences.get(preferences, Preferences.LABEL_SWEEP)})")
+        push("window.setStatusBatteryPercent(${Preferences.get(preferences, Preferences.STATUS_BATTERY_PERCENT)})")
+        push("window.setStatusBatteryPercentLight(${Preferences.get(preferences, Preferences.STATUS_BATTERY_PERCENT_LIGHT)})")
+        push("window.setStatusBatteryIcons(${Preferences.get(preferences, Preferences.STATUS_BATTERY_ICONS)})")
         push("window.setFonts(${Preferences.get(preferences, Preferences.FONT_CLOCK)},${Preferences.get(preferences, Preferences.FONT_MAIN)},${Preferences.get(preferences, Preferences.FONT_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_STATUS)},${Preferences.get(preferences, Preferences.FONT_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_BATTERY)},${Preferences.get(preferences, Preferences.FONT_STATS)},${Preferences.get(preferences, Preferences.FONT_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_CONTENT)})")
         push("window.setFontSizes(${Preferences.get(preferences, Preferences.FONT_SIZE_CLOCK)},${Preferences.get(preferences, Preferences.FONT_SIZE_MAIN)},${Preferences.get(preferences, Preferences.FONT_SIZE_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATUS)},${Preferences.get(preferences, Preferences.FONT_SIZE_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_SIZE_BATTERY)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATS)},${Preferences.get(preferences, Preferences.FONT_SIZE_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_CONTENT)})")
         push("window.setLockShift(${Preferences.get(preferences, Preferences.LOCK_X)})")
@@ -1447,6 +1503,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun setAlertOverlay(heightDp: Int) {
             webView.post { setAlertBand(heightDp) }
+        }
+
+        @JavascriptInterface
+        fun passAlertTap() {
+            webView.post { replayAlertTap() }
         }
 
         @JavascriptInterface

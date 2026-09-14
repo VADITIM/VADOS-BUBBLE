@@ -32,6 +32,39 @@ import { MOD_FACES, leaveForMod, openNotifications, openMod } from './tabs.js';
 
 
 
+/* The one handover in the interface: whatever is standing somewhere shakes down to nothing in turn, and whatever replaces it turns up out of nothing in turn. Written for the charge announce, it is now what every bubble's contents are handed over with — see motion.md. It lives here rather than in status.js because the Clock hands its own parts over too, and the two must play the same motion to the millisecond. */
+export const POP_STAGGER = 34;
+export const POP_OUT = 150;
+export const POP_IN_STAGGER = 42;
+// Mirrors the `grid-template-columns` duration in `.status-slot` in pill.css — a slot's width has to be shut for exactly as long as it takes to shut.
+const POP_SHUT = 260;
+export const POP_IN = 460;
+const POP_IN_TILT = 14;
+
+// A part's own shake is staggered and its slot's width is not: a per-part delay on the width gave every frame of the whole pop a grid track of its own to interpolate, so the bubble was relaid continuously for half a second and the shake dropped frames while the way back in — where the widths come back on one clock, under a scale the compositor owns — stayed smooth. Every slot closes together, ending on the frame the face is empty.
+export function popOut(parts) {
+  const emptyAt = parts.length * POP_STAGGER + POP_OUT;
+  parts.forEach((part, index) => {
+    part.classList.remove('popping-in');
+    part.style.setProperty('--pop-at', index * POP_STAGGER + 'ms');
+    part.style.setProperty('--pop-shut', Math.max(0, emptyAt - POP_SHUT) + 'ms');
+    part.classList.add('popping');
+  });
+  return emptyAt;
+}
+
+export function popIn(parts, after = 0) {
+  parts.forEach((part, index) => {
+    const tilt = (Math.random() * 0.6 + 0.4) * POP_IN_TILT * (Math.random() < 0.5 ? -1 : 1);
+    part.classList.remove('popping');
+    part.style.setProperty('--pop-at', after + index * POP_IN_STAGGER + 'ms');
+    part.style.setProperty('--pop-tilt', tilt + 'deg');
+    part.classList.add('popping-in');
+    setTimeout(() => part.classList.remove('popping-in'), after + index * POP_IN_STAGGER + POP_IN);
+  });
+  return after + parts.length * POP_IN_STAGGER + POP_IN;
+}
+
 export const HOLD_BLOCK = 18;
 
 

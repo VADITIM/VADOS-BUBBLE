@@ -71,13 +71,21 @@ object SamsungBlur {
 
 
 
+    /* A pane is re-applied on every frame it changes size, so a growing bubble built one SemBlurInfo per pane per frame — five reflective invocations and a builder allocation each, fourteen panes deep, at the display's full rate. That is the UI thread doing reflection instead of drawing, and it is what a growth stuttered on. The info is immutable once built and depends on nothing but the radius and the corner, so it is built once per pair and the frame costs one invoke. */
+    private val built = HashMap<Long, Any>()
+
     fun apply(view: View, radius: Int, cornerRadius: Float): Boolean {
         val api = api() ?: return false
+        val corner = Math.round(cornerRadius)
+        val key = radius.toLong() shl 32 or (corner.toLong() and 0xffffffffL)
         return runCatching {
-            val builder = api.builder.newInstance(api.mode)
-            api.setRadius.invoke(builder, radius)
-            api.setCorner?.invoke(builder, cornerRadius)
-            api.setInfo.invoke(view, api.build.invoke(builder))
+            val info = built.getOrPut(key) {
+                val builder = api.builder.newInstance(api.mode)
+                api.setRadius.invoke(builder, radius)
+                api.setCorner?.invoke(builder, corner.toFloat())
+                api.build.invoke(builder)
+            }
+            api.setInfo.invoke(view, info)
         }.isSuccess
     }
 

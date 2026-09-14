@@ -10,6 +10,18 @@ const SWEEP_PAD = 5;
 const sweeping = new WeakMap();
 let ruler = null;
 
+export function hideLabel(element) {
+  element.classList.add('sweep-hidden');
+  const glyph = labelGlyph(element);
+  if (glyph) glyph.classList.add('sweep-hidden');
+}
+
+export function showLabel(element) {
+  element.classList.remove('sweep-hidden');
+  const glyph = labelGlyph(element);
+  if (glyph) glyph.classList.remove('sweep-hidden');
+}
+
 function labelWidth(element, text) {
   if (!ruler) {
     ruler = document.createElement('span');
@@ -17,11 +29,22 @@ function labelWidth(element, text) {
     document.body.appendChild(ruler);
   }
   const style = getComputedStyle(element);
-  ruler.style.font = style.font;
-  ruler.style.letterSpacing = style.letterSpacing;
-  ruler.style.textTransform = style.textTransform;
+  // The `font` shorthand computes to an empty string whenever a longhand it cannot express is set — `font-variant-numeric: tabular-nums` on the transfer head was enough — so the ruler measured in the body's default face and the data-used reading got a bar several times its own width. The longhands are copied one by one instead.
+  for (const name of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontStretch', 'fontVariantNumeric', 'letterSpacing', 'wordSpacing', 'textTransform']) {
+    ruler.style[name] = style[name];
+  }
   ruler.textContent = text;
   return Math.ceil(ruler.getBoundingClientRect().width);
+}
+
+// A glyph standing beside a reading is part of that label, so the bar starts at the glyph's left edge and the two are uncovered on the same frame.
+function labelGlyph(element) {
+  for (const sibling of [element.previousElementSibling, element.nextElementSibling]) {
+    if (!sibling) continue;
+    const name = sibling.id + ' ' + (typeof sibling.className === 'string' ? sibling.className : '');
+    if (/glyph|icon/.test(name)) return sibling;
+  }
+  return null;
 }
 
 // The bar is drawn by the label's parent rather than by the label itself: the label has to be invisible for the whole growth and appear on the frame the bar is full, and a bar that is the label's own pseudo-element goes invisible with it.
@@ -32,11 +55,22 @@ function placeBar(element, host, wanted) {
   const box = element.getBoundingClientRect();
   const hostBox = host.getBoundingClientRect();
   const width = Math.max(text.width, labelWidth(element, wanted));
-  const left = (text.width ? text.left : box.left) - hostBox.left - SWEEP_PAD;
-  const height = (text.height || box.height);
-  const top = (text.height ? text.top : box.top) - hostBox.top;
+  let left = (text.width ? text.left : box.left) - hostBox.left - SWEEP_PAD;
+  let right = left + width + SWEEP_PAD * 2;
+  let top = (text.height ? text.top : box.top) - hostBox.top;
+  let height = (text.height || box.height);
 
-  host.style.setProperty('--sweep-width', Math.ceil(width + SWEEP_PAD * 2) + 'px');
+  const glyph = labelGlyph(element);
+  if (glyph) {
+    const glyphBox = glyph.getBoundingClientRect();
+    const bottom = Math.max(top + height, glyphBox.bottom - hostBox.top);
+    left = Math.min(left, glyphBox.left - hostBox.left - SWEEP_PAD);
+    right = Math.max(right, glyphBox.right - hostBox.left + SWEEP_PAD);
+    top = Math.min(top, glyphBox.top - hostBox.top);
+    height = bottom - top;
+  }
+
+  host.style.setProperty('--sweep-width', Math.ceil(right - left) + 'px');
   host.style.setProperty('--sweep-left', Math.round(left) + 'px');
   host.style.setProperty('--sweep-top', Math.round(top - height * 0.06) + 'px');
   host.style.setProperty('--sweep-height', Math.ceil(height * 1.12) + 'px');
@@ -44,7 +78,7 @@ function placeBar(element, host, wanted) {
 
 function clearBar(element, host) {
   host.classList.remove('sweep-host', 'sweeping', 'swept');
-  element.classList.remove('sweep-hidden');
+  showLabel(element);
   for (const name of ['--sweep-width', '--sweep-left', '--sweep-top', '--sweep-height']) {
     host.style.removeProperty(name);
   }
@@ -64,7 +98,7 @@ export function sweepInto(element, next, force) {
 
   host.classList.add('sweep-host');
   placeBar(element, host, wanted);
-  element.classList.add('sweep-hidden');
+  hideLabel(element);
   host.classList.remove('swept');
   host.classList.add('sweeping');
   const state = { wanted, host, cover: 0, clear: 0 };
@@ -72,7 +106,7 @@ export function sweepInto(element, next, force) {
 
   state.cover = setTimeout(() => {
     element.textContent = wanted;
-    element.classList.remove('sweep-hidden');
+    showLabel(element);
     host.classList.add('swept');
   }, SWEEP_IN);
   state.clear = setTimeout(() => {
@@ -94,5 +128,5 @@ export function revealLabel(element) {
 // A reading that changes while its reveal is still pending must not sweep on its own: the settle reveal is the one animation, and a weather answer landing first played a second one before it.
 export function holdLabel(element, next) {
   element.textContent = next || '';
-  if (shared.labelSweep) element.classList.add('sweep-hidden');
+  if (shared.labelSweep) hideLabel(element);
 }

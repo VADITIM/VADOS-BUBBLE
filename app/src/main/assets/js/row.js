@@ -1,6 +1,6 @@
 import { refreshEdgeProxy } from './edge.js';
 import { retireDuplicate } from './double.js';
-import { leaveAlertCentre } from './alert.js';
+import { leaveAlertCentre, leaveAlertDash } from './alert.js';
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
 import { isStolen } from './lock.js';
 import { paintAvatar, paintCall } from './mods/call.js';
@@ -1390,6 +1390,7 @@ export function toClosed() {
   refreshEdgeProxy();
   pill.classList.remove('alert', 'with-image', 'charging');
   leaveAlertCentre();
+  leaveAlertDash();
   retireDuplicate();
 
   const live = liveMods();

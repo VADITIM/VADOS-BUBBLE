@@ -15,7 +15,7 @@ export const faces = {
 export const bridge = window.Android || {
   ready() {}, setWindowSize() {}, setWindowBounds() {}, setBlurFrame() {}, triggerHaptic() {}, onSwipeDismiss() {},
   mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, readDataToday() { return '0 MB'; }, setTorchLit() {},
-  setMicrophoneAccess() {}, readNotifications() { return '[]'; }, readUnreadCount() { return 0; }, setAlertOverlay() {},
+  setMicrophoneAccess() {}, readNotifications() { return '[]'; }, readUnreadCount() { return 0; }, setAlertOverlay() {}, passAlertTap() {},
   openNotification() {}, dismissNotification() {}, timerAction() {},
   setTorch() {}, setLockProxy() {}, setEdgeProxy() {}, setStatusProxy() {}, setClockProxy() {},
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
@@ -41,6 +41,8 @@ export const SIZES = {
 
 
   alertCentre: { width: 300, height: 162 },
+  // The slung Alert draws where the dashboard's own proxy already hears every touch, so it asks for no window of its own: a main proxy grown to the stats section's box would sit at the screen's top edge — the proxy's y is always 0 — and swallow the panel's own corner controls.
+  alertDash: { width: -1, height: -1 },
   haptic:   { width: 340, height: 150 },
   picture:  { width: 340, height: 320 },
   player:   { width: 340, height: 190 },
@@ -111,7 +113,7 @@ export const SWAP_STILL = 90;
 export const HOLD_GRACE = 140;
 document.documentElement.style.setProperty('--hold-scale', HOLD_SCALE);
 export const PICTURE_MAX_HEIGHT = 460;
-export const CLOSED = new Set(['idle', 'playing', 'timing', 'calling']);
+export const CLOSED = new Set(['idle', 'playing', 'timing', 'calling', 'alertDash']);
 
 
 export const root = document.documentElement;
