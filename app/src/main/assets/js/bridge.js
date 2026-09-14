@@ -12,6 +12,7 @@ import { lockHolds, lockPill } from './lock.js';
 import { pillHolds } from './motion.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize, toClosed } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
+import { edgeTouch, refreshEdgeProxy } from './edge.js';
 import { openNotifications } from './tabs.js';
 
 
@@ -157,6 +158,11 @@ window.onProxyTouch = (action, x, y, source) => {
     shared.closedInTouch = shared.closedOutside;
   }
   else if (action === 'up' || action === 'cancel') shared.isTouchDown = false;
+
+  if (source === 'edge-left' || source === 'edge-right') {
+    edgeTouch(action, x, y, source);
+    return;
+  }
   if (action !== 'move') {
     const box = clockPill.getBoundingClientRect();
     bridge.note(

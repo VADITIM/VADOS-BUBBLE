@@ -193,13 +193,13 @@ object SystemToggles {
             
             
             
-            "hotspot" -> "cmd statusbar click-tile " +
-                "com.android.systemui/com.android.systemui.qs.tiles.HotspotTile"
+            "hotspot" -> return ShizukuShell.setHotspot(isOn)
             
             
+            // The recorder tile was addressed as smartcapture.screenrecorder.ScreenRecorderTileService, a class this build does not have, and `cmd statusbar click-tile` answers an unknown component with silence and a zero exit — so the button did nothing while reporting success. The component One UI 8 registers is the one `settings get secure sysui_qs_tiles` lists.
             "recording" -> "cmd statusbar click-tile " +
                 "com.samsung.android.app.smartcapture/" +
-                "com.samsung.android.app.smartcapture.screenrecorder.ScreenRecorderTileService"
+                "com.samsung.android.app.screenrecorder.view.RecordScreenTile"
             "mic" -> return MicrophoneAccess.set(isOn)
             else -> return false
         }

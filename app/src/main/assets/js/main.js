@@ -27,6 +27,7 @@ import './double.js';
 
 
 import './labels.js';
+import './edge.js';
 import './bridge.js';
 
 bridge.ready();

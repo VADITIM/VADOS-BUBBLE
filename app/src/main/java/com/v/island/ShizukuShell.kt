@@ -51,11 +51,16 @@ object ShizukuShell {
         )
             .daemon(false)
             .processNameSuffix("shell")
-            .version(1)
+            // Shizuku keeps a running user service of the same version alive across a reinstall, and a stale one has no setHotspot to answer — so the version moves whenever IShellService gains a method.
+            .version(2)
         runCatching { Shizuku.bindUserService(arguments, connection) }
     }
 
     
     fun run(command: String): String? =
         service?.let { runCatching { it.execute(command) }.getOrNull() }
+
+
+    fun setHotspot(isOn: Boolean): Boolean =
+        service?.let { runCatching { it.setHotspot(isOn) }.getOrDefault(false) } ?: false
 }

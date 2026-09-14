@@ -1,3 +1,4 @@
+import { refreshEdgeProxy } from './edge.js';
 import { retireDuplicate } from './double.js';
 import { leaveAlertCentre } from './alert.js';
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
@@ -1386,6 +1387,7 @@ export function toClosed() {
   if (wasOpen) shared.closedInTouch = shared.isTouchDown;
   shared.state = 'idle';
   shared.current = null;
+  refreshEdgeProxy();
   pill.classList.remove('alert', 'with-image', 'charging');
   leaveAlertCentre();
   retireDuplicate();

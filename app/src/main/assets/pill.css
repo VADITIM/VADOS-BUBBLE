@@ -2275,6 +2275,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   --quick-divider-room: 34px;
   --quick-divider-shift: -18px;
   --quick-knob-gap: 5px;
+  --quick-knob-row-gap: 12px;
   --quick-levels-inset: 14px;
   --solo-ms: 420ms;
   /* Mirrors SOLO_OUT and SOLO_FROST in status.js. */
@@ -2320,10 +2321,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   --scrim-frost: 0;
   transition: opacity 180ms var(--ease-split), --scrim-frost 450ms var(--ease-sweep);
 }
+/* The frost ramped in over 260ms while it ramps out over 450: quantised to twelve steps that is a blur re-applied every 22ms, landing on exactly the frames the modules are popping, which is why entering stuttered and leaving never did. The ramp is spread across the pop instead. */
 #quick-panel.showing #quick-scrim {
   opacity: 1;
   --scrim-frost: 1;
-  transition-duration: 150ms, 260ms;
+  transition-duration: 150ms, 620ms;
   pointer-events: auto;
 }
 #quick-panel.leaving #quick-scrim { opacity: 0; transition-duration: 140ms, 450ms; }
@@ -2933,7 +2935,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 #quick-row-knobs {
   display: flex;
   align-items: center;
-  gap: var(--quick-knob-gap);
+  gap: var(--quick-knob-row-gap);
   width: max-content;
   height: 100%;
   translate: var(--knob-shift, 0px) 0;

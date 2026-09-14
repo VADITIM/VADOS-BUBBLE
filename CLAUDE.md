@@ -54,8 +54,7 @@ Nothing about open work belongs in this repository.
 
 ## Style
 
-The interface follows the VADITIM Style DNA — the `vados-dna` skill in the global config repo (`~/.agent-config/skills/vados-dna/`). Its typography and motion rules bind here; where a rule in `.claude/rules/` is more specific, the more specific one wins.
-import
+The interface follows VAS — VADOS APPLICATION SYSTEMS, cloned into `.claude/skills/vas/`. Read its `SKILL.md` first; it is the source of truth for how this looks, moves and reads. Where a rule in `.claude/rules/` is more specific, the more specific one wins.
 
 ## Don'ts
 

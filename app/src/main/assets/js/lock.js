@@ -6,6 +6,7 @@ import { fitStatusProxy, setPanelNowOpen } from './status.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 import { leaveForMod } from './tabs.js';
+import { refreshEdgeProxy } from './edge.js';
 
 
 let lockShift = 0;
@@ -663,6 +664,7 @@ window.onLock = next => {
   
   
   root.classList.toggle('locked', next);
+  refreshEdgeProxy();
 
   
   

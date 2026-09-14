@@ -99,7 +99,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
+        private const val EDGE_WIDTH = 18
+        private const val EDGE_TOP = 0.14f
+        private const val EDGE_BOTTOM = 0.78f
         private const val SCRIM_PANE = 0
+
+        const val PANEL_BROADCAST = "com.v.island.TOGGLE_STATUS_PANEL"
+        const val NOTIFICATIONS_BROADCAST = "com.v.island.TOGGLE_NOTIFICATIONS"
 
         
         private const val LOCK_AWAKE = 15_000L
@@ -255,6 +261,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     
     private lateinit var lockProxy: View
     private lateinit var lockProxyParams: WindowManager.LayoutParams
+    private lateinit var edgeLeftProxy: View
+    private lateinit var edgeLeftParams: WindowManager.LayoutParams
+    private lateinit var edgeRightProxy: View
+    private lateinit var edgeRightParams: WindowManager.LayoutParams
 
 
     private lateinit var statusProxy: View
@@ -340,6 +350,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private var isScreenOff = false
     private var screenWatch: BroadcastReceiver? = null
+    private var panelWatch: BroadcastReceiver? = null
 
     
 
@@ -596,6 +607,28 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         
         
+        edgeLeftProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, edgeLeftParams, "edge-left")
+                return true
+            }
+        }
+        edgeLeftParams = edgeParams()
+        edgeRightProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, edgeRightParams, "edge-right")
+                return true
+            }
+        }
+        edgeRightParams = edgeParams()
         alertOverlay = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
@@ -629,6 +662,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         windowManager.addView(lockProxy, lockProxyParams)
         windowManager.addView(statusProxy, statusProxyParams)
         windowManager.addView(clockProxy, clockProxyParams)
+        windowManager.addView(edgeLeftProxy, edgeLeftParams)
+        windowManager.addView(edgeRightProxy, edgeRightParams)
         windowManager.addView(alertOverlay, alertOverlayParams)
         applyBarLock()
         readBarPolicy()
@@ -696,6 +731,20 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 }
             )
         }
+        /* A gesture host asked to "open an app" refuses to launch one over a secure keyguard, so both panel activities were unreachable on the lock screen even though the service drawing the panels was running and visible there the whole time. The panels answer a broadcast as well, which keyguard has no say over: am broadcast -a com.v.island.TOGGLE_STATUS_PANEL, and TOGGLE_NOTIFICATIONS beside it. */
+        panelWatch = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == PANEL_BROADCAST) toggleStatusPanel()
+                if (intent.action == NOTIFICATIONS_BROADCAST) toggleNotifications()
+            }
+        }.also {
+            registerReceiver(
+                it,
+                IntentFilter(PANEL_BROADCAST).apply { addAction(NOTIFICATIONS_BROADCAST) },
+                Context.RECEIVER_EXPORTED
+            )
+        }
+
         reportLock()
     }
 
@@ -758,6 +807,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             lockProxy to lockProxyParams,
             statusProxy to statusProxyParams,
             clockProxy to clockProxyParams,
+            edgeLeftProxy to edgeLeftParams,
+            edgeRightProxy to edgeRightParams,
             alertOverlay to alertOverlayParams,
         ).forEach { (view, viewParams) ->
             runCatching {
@@ -765,6 +816,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 windowManager.addView(view, viewParams)
             }
         }
+    }
+
+    private fun edgeParams() = WindowManager.LayoutParams(
+        0, 0,
+        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+        BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+        PixelFormat.TRANSLUCENT
+    ).apply {
+        gravity = Gravity.TOP or Gravity.START
+        layoutInDisplayCutoutMode =
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        windowAnimations = 0
+        setCanPlayMoveAnimation(false)
     }
 
     private fun proxyFlags(isLive: Boolean) =
@@ -810,6 +874,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
             clockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(clockProxy, clockProxyParams) }
+            edgeLeftParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(edgeLeftProxy, edgeLeftParams) }
+            edgeRightParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(edgeRightProxy, edgeRightParams) }
             setAlertBand(0)
         } else {
             push("window.refitProxies()")
@@ -834,8 +902,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             TorchWatch.stop()
             screenWatch?.let { runCatching { unregisterReceiver(it) } }
             screenWatch = null
+            panelWatch?.let { runCatching { unregisterReceiver(it) } }
+            panelWatch = null
             awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
+            runCatching { windowManager.removeView(edgeRightProxy) }
+            runCatching { windowManager.removeView(edgeLeftProxy) }
             runCatching { windowManager.removeView(alertOverlay) }
             runCatching { windowManager.removeView(clockProxy) }
             runCatching { windowManager.removeView(statusProxy) }
@@ -1407,6 +1479,28 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
+
+                @JavascriptInterface
+        fun setEdgeProxy(isLive: Boolean) {
+            webView.post {
+                val height = screenHeight()
+                val width = if (isLive) dp(EDGE_WIDTH) else 0
+                val top = (height * EDGE_TOP).toInt()
+                val span = (height * EDGE_BOTTOM).toInt() - top
+                edgeLeftParams.width = width
+                edgeLeftParams.height = if (isLive) span else 0
+                edgeLeftParams.x = 0
+                edgeLeftParams.y = top
+                edgeLeftParams.flags = proxyFlags(isLive)
+                edgeRightParams.width = width
+                edgeRightParams.height = if (isLive) span else 0
+                edgeRightParams.x = screenWidth() - width
+                edgeRightParams.y = top
+                edgeRightParams.flags = proxyFlags(isLive)
+                runCatching { windowManager.updateViewLayout(edgeLeftProxy, edgeLeftParams) }
+                runCatching { windowManager.updateViewLayout(edgeRightProxy, edgeRightParams) }
+            }
+        }
 
         @JavascriptInterface
         fun setLockProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {

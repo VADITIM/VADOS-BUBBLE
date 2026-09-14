@@ -17,7 +17,7 @@ export const bridge = window.Android || {
   mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, readDataToday() { return '0 MB'; }, setTorchLit() {},
   setMicrophoneAccess() {}, readNotifications() { return '[]'; }, readUnreadCount() { return 0; }, setAlertOverlay() {},
   openNotification() {}, dismissNotification() {}, timerAction() {},
-  setTorch() {}, setLockProxy() {}, setStatusProxy() {}, setClockProxy() {},
+  setTorch() {}, setLockProxy() {}, setEdgeProxy() {}, setStatusProxy() {}, setClockProxy() {},
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
   requestToggles() {}, setToggle() {}, setLevel() {}, requestVitals() {}, requestWeather() {},
   recordingAction() {}, setNotesProxy() {}, mediaSpeed() {},

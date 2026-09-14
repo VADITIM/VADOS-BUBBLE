@@ -18,7 +18,7 @@ upstream files and no local edit should be made in place.
 | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `09506a9` | 1 | Frontend design quality — audit, critique, polish, animate. v4.1.2. |
 | [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master) | `2bd9251` | 1 | Prompt engineering, with a credential-safety rule. |
 
-`vados-dna`, `ui-ux-pro-max` and `stop-slop` are not vendored — they are this
+`ui-ux-pro-max` and `stop-slop` are not vendored — they are this
 repository's own and predate this file.
 
 ## Skills, not plugins

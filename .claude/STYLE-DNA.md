@@ -1,16 +1,16 @@
-# Style DNA
+# Style
 
-The VADITIM Style DNA is global. It lives in the `vados-dna` skill, in the global config repo:
+The style is VAS — VADOS APPLICATION SYSTEMS, VADITIM's cross-project design and application
+system. It lives in its own repository and is cloned into `.claude/skills/vas/`:
 
-- `agent-config/skills/vados-dna/` — vendored into this repository, so it is here whether or
-  not the global config has been fetched. Upstream is
-  <https://github.com/VADITIM/claude-config>, branch `global`, which is the root of
-  `~/agent-config`. The repository was called `.claude` until a leading dot turned out to be
-  unattachable on Claude Code on the web; that old URL is dead.
-- `dna/` holds the modules (palette, typography, motion, …).
-- `map/` indexes every project; `platforms/` holds the per-engine pitfalls.
+- <https://github.com/VADITIM/VADOS-APPLICATION-SYSTEMS> — `SKILL.md` sits at the repository
+  root, so the clone is the skill directory. It used to be a `vados-dna` skill inside the
+  global config repo; that copy is dead.
+- `dna/` holds the foundations (palette, typography, motion, …); `components/` the pieces
+  already built; `pro/` the professional register; `map/` indexes every project;
+  `platforms/` holds the per-engine pitfalls.
 
-Say **"use VADOS DNA"** to load it.
+Check it for changes before relying on it — `git -C .claude/skills/vas fetch` and pull.
 
 Two of its rules are broken most often here, so they are repeated: text that runs out of room
 **fades out, never ellipsis**, and a size is never faked with `transform: scale()` — the layout box

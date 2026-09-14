@@ -7,6 +7,7 @@ import { closePanelNow, openPanelNow } from './lock.js';
 import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
 import { holdLabel, revealLabel, sweepLabel } from './sweep.js';
+import { refreshEdgeProxy } from './edge.js';
 
 
 
@@ -813,12 +814,14 @@ const SCRIM_FROST_MS = 450;
 
 
 function rankQuickBubbles() {
-  quickPanel.style.setProperty('--pop-step', QUICK_STAGGER + 'ms');
   const panelBox = quickPanel.getBoundingClientRect();
   const panelCenter = panelBox.top + panelBox.height / 2;
   const reach = panelBox.height / 2 || 1;
-  for (const bubble of quickBubbles) {
-    const box = bubble.getBoundingClientRect();
+  /* Every bubble was measured and then written to before the next one was measured, so each write invalidated layout and each read forced it again — thirty full relayouts of the panel in the frame the entrance starts, which is the frame that stuttered. All the reads happen first now. */
+  const boxes = quickBubbles.map(bubble => bubble.getBoundingClientRect());
+  quickPanel.style.setProperty('--pop-step', QUICK_STAGGER + 'ms');
+  quickBubbles.forEach((bubble, index) => {
+    const box = boxes[index];
     const fromCenter = Math.max(-1, Math.min(1, (box.top + box.height / 2 - panelCenter) / reach));
     const edgeness = Math.abs(fromCenter);
     const rank = Math.round((1 - edgeness) * QUICK_RANK_STEPS);
@@ -826,7 +829,7 @@ function rankQuickBubbles() {
     bubble.style.setProperty('--drop-rank', QUICK_RANK_STEPS - rank);
     const side = fromCenter < 0 ? -1 : 1;
     bubble.style.setProperty('--pop-from', Math.round(fromCenter * QUICK_PULL + side * QUICK_PULL_FLOOR) + 'px');
-  }
+  });
   for (const connector of quickPanel.querySelectorAll('.quick-mode')) {
     connector.style.setProperty('--pop-jitter', Math.round(Math.random() * QUICK_JITTER) + 'ms');
   }
@@ -865,6 +868,7 @@ export function openStatusPanel() {
 
 
   statusOpen = true;
+  refreshEdgeProxy();
   // The steal has to be on before Main is repainted: raiseMain asks closedFace(), which asks liveMods(), and with the Now bubble not yet holding the mod that answer was the mod's own face — so Main rose still wearing the thing that was being taken off it.
   enterPanelNow();
   raiseMain();
@@ -925,6 +929,7 @@ export function openStatusPanel() {
 export function closeStatusPanel() {
   if (!statusOpen) return;
   statusOpen = false;
+  refreshEdgeProxy();
   clearTimeout(readingReveal);
   readingsHeld = false;
   weatherReading.classList.remove('sweep-hidden');
@@ -1640,7 +1645,7 @@ let statusDrop = 0;
 
 
 // Every tap inside the open panel used to close it: the proxy resolves a touch against the Status bubble's box, and nothing in the panel is a descendant of that bubble, so each control's press fell back to the bubble itself, which reads a press as "close". The panel resolves its own targets now, and answers with nothing where a tap really is meant to close.
-const QUICK_GRACE = 26;
+const QUICK_GRACE = 12;
 
 const QUICK_CONTROLS = '.quick-mode, .quick-knob, .level, #quick-battery, #quick-vitals';
 
