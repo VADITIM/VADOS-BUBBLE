@@ -7,7 +7,8 @@ import { closeNowPanel, nowOpen } from './now.js';
 import { closePanelNow, openPanelNow } from './lock.js';
 import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
-import { holdLabel, revealLabel, sweepLabel, hideLabel, showLabel } from './sweep.js';
+import { holdLabel, revealLabel, sweepInto, sweepLabel, hideLabel, showLabel } from './sweep.js';
+import { channelHolds, closeChannel, collapseSpread, dropChannel, isChannelLive, isSpreadOpen, openChannel, stepChannel } from './channel.js';
 import { refreshEdgeProxy } from './edge.js';
 
 
@@ -325,16 +326,16 @@ function batteryLevelMark(level) {
 
 // The ten-step gradient the battery fill reads its colour off, on the dashboard and on the Status bubble's own icon alike — one function, one set of stops, named by their floor.
 const BATTERY_GRADIENT = [
-  { floor: 90, colour: '#16f551' },
-  { floor: 80, colour: '#1ed950' },
-  { floor: 70, colour: '#21bf4b' },
-  { floor: 60, colour: '#63a822' },
-  { floor: 50, colour: '#98ab2e' },
-  { floor: 40, colour: '#b9cf2b' },
-  { floor: 30, colour: '#d9c22e' },
-  { floor: 20, colour: '#d98c2e' },
-  { floor: 10, colour: '#d95b2e' },
-  { floor: 0, colour: '#d93f2e' },
+  { floor: 90, colour: '#00e676' },
+  { floor: 80, colour: '#10e000' },
+  { floor: 70, colour: '#76ff03' },
+  { floor: 60, colour: '#b2ff59' },
+  { floor: 50, colour: '#ccff00' },
+  { floor: 40, colour: '#ffee00' },
+  { floor: 30, colour: '#ffc400' },
+  { floor: 20, colour: '#ff9100' },
+  { floor: 10, colour: '#ff3d00' },
+  { floor: 0, colour: '#ff1744' },
 ];
 const BATTERY_CHARGING_COLOUR = '#3bfa1e';
 
@@ -371,7 +372,7 @@ function zenGlyph() {
   return GLYPHS[found ? found.glyph : 'zen'];
 }
 const MODUS_COLOUR = {
-  bluetooth: '#3d8bff',
+  bluetooth: '#6fb0ff',
   hotspot: '#ff9b3d',
   zen: '#a07dff',
 };
@@ -413,6 +414,15 @@ function hasModus(kind) {
 
 
 
+// The paired device's charge is the one reading in the Status bubble that is not the phone's own, so it stands with the thing it belongs to — left of the bluetooth glyph, smaller, on the glyph's own centre line — rather than beside the phone's battery at the other end of the row.
+function bluetoothMark() {
+  const paired = attached && attached.bluetooth;
+  const level = paired && paired.charge >= 0 ? paired.charge : -1;
+  if (level < 0) return GLYPHS.bluetooth;
+  return '<span class="modus-paired"><span class="paired-charge">' + level +
+    '</span><span class="paired-glyph">' + GLYPHS.bluetooth + '</span></span>';
+}
+
 function wanted() {
   const shown = [];
   if (attached && attached.usb) shown.push({ name: 'usb', html: GLYPHS.usb });
@@ -423,7 +433,14 @@ function wanted() {
     });
   }
   const modus = MODUS_ORDER.find(kind => hasModus(kind));
-  if (modus) shown.push({ name: 'modus', html: modus === 'zen' ? zenGlyph() : GLYPHS[modus] });
+  if (modus) {
+    shown.push({
+      name: 'modus',
+      html: modus === 'zen' ? zenGlyph()
+        : modus === 'bluetooth' ? bluetoothMark()
+        : GLYPHS[modus],
+    });
+  }
   if (attached && attached.link === 'wifi') {
     shown.push({ name: 'link', html: wifiGlyph() });
   } else if (attached && attached.link === 'ethernet') {
@@ -919,6 +936,8 @@ export function closeStatusPanel() {
   if (!statusOpen) return;
   // An Alert slung into the stats section has nowhere to stand once the section goes, so the panel closing takes it with it rather than leaving a notification hanging where the dashboard was.
   if (isAlertDashed()) toClosed();
+  // The channel stands in the stats section and nowhere else, so the section going takes it: there is nothing left for the card to be standing in, and its own flight home would be a journey out of a panel that had already gone.
+  dropChannel();
   statusOpen = false;
   refreshEdgeProxy();
   clearTimeout(readingReveal);
@@ -1386,6 +1405,7 @@ levels.forEach(level => {
   let from = null;
   let share = 0;
   let sent = -1;
+  let tall = 0;
   let levelDrag = dragGate();
 
   level.addEventListener('touchstart', event => {
@@ -1393,6 +1413,8 @@ levels.forEach(level => {
     from = event.touches[0].clientY;
     levelDrag = dragGate();
     level.classList.add('holding');
+    // The bar's height was read on every move, and a getBoundingClientRect in a touchmove forces the layout the whole panel's transitions are mid-way through — the drag only got as many frames as that recalc left it. The box cannot change under the finger, so it is read once.
+    tall = level.getBoundingClientRect().height;
     share = parseFloat(level.style.getPropertyValue('--level')) || 0;
     sent = share;
     clearTimeout(soloTimer);
@@ -1413,7 +1435,7 @@ levels.forEach(level => {
     }
     
     
-    const next = Math.round(share + (travelled / level.getBoundingClientRect().height) * 100);
+    const next = Math.round(share + (travelled / tall) * 100);
     const clamped = Math.max(0, Math.min(100, next));
     paintLevel(level, clamped);
     if (Math.abs(clamped - sent) < LEVEL_STEP && clamped !== 0 && clamped !== 100) return;
@@ -1685,12 +1707,15 @@ const QUICK_CONTROLS = '.quick-mode, .quick-knob, .level, #quick-battery, #quick
 export function statusPanelTarget(x, y) {
   if (!statusOpen) return null;
   const hit = document.elementFromPoint(x, y);
+  // The stats section's own controls are still in the document while the channel stands over them, collapsed and untouchable but with boxes the grace radius can still reach — so a tap on the notification card was answered by the vitals bubble underneath it.
+  if (channelHolds(x, y) || isSpreadOpen()) return hit;
   const under = hit && quickPanel.contains(hit) ? hit.closest(QUICK_CONTROLS) : null;
   if (under) return under;
   let nearest = null;
   let closest = QUICK_GRACE;
   const knobs = knobWindow.getBoundingClientRect();
   for (const control of quickPanel.querySelectorAll(QUICK_CONTROLS)) {
+    if (isChannelLive() && statsSection.contains(control)) continue;
     const box = control.getBoundingClientRect();
     // A toggle scrolled past the window's edge is still in the document and still a candidate for the grace radius, so a tap near the edge would answer with a switch nobody can see.
     if (control.classList.contains('quick-knob') && (box.left < knobs.left - 1 || box.right > knobs.right + 1)) continue;
@@ -1708,6 +1733,41 @@ export function statusPanelTarget(x, y) {
 let panelPushFrom = null;
 let panelPushed = false;
 let panelPushFromControl = false;
+let panelPushFromStats = false;
+
+
+// How far a swipe inside the stats section has to travel before it means one of the channel's four things. The same 24 the panel's own dismiss asks for, so neither gesture can fire before the other has had its chance at the travel.
+const CHANNEL_SWIPE = 24;
+const CHANNEL_STEP = 40;
+
+function statsHolds(x, y) {
+  const box = statsBox();
+  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+}
+
+function turnChannel(across, down) {
+  if (isSpreadOpen()) {
+    if (down >= -CHANNEL_SWIPE || Math.abs(across) > Math.abs(down)) return false;
+    collapseSpread();
+    return true;
+  }
+  if (isChannelLive()) {
+    if (Math.abs(across) > CHANNEL_STEP && Math.abs(across) > Math.abs(down)) {
+      stepChannel(across > 0 ? -1 : 1);
+      return true;
+    }
+    if (down < -CHANNEL_SWIPE && -down > Math.abs(across)) {
+      closeChannel();
+      return true;
+    }
+    return false;
+  }
+  if (down > CHANNEL_SWIPE && down > Math.abs(across)) {
+    openChannel();
+    return true;
+  }
+  return false;
+}
 
 
 // The Now bubble is thrown home along the flick that dismissed the panel, so how far across that flick had gone when it crossed has to survive the two calls between here and the throw. It is reported in pixels rather than as a ratio: what those pixels are worth as an angle is the throw's business and not this one's. Every other way the panel closes has no hand behind it and leaves this at nothing.
@@ -1736,10 +1796,19 @@ export function statusPanelPush(action, x, y) {
     const under = statusPanelTarget(x, y);
     panelPushFrom = under && under.classList.contains('level') ? null : { x, y };
     panelPushFromControl = Boolean(under);
+    // An open stack covers the whole screen, so the swipe that closes it is made anywhere rather than over the section it grew out of.
+    panelPushFromStats = isSpreadOpen() || statsHolds(x, y) || channelHolds(x, y);
     panelPushed = false;
     return;
   }
   if (action !== 'move' || !panelPushFrom || panelPushed) return;
+  // The stats section answers the swipe before the panel does, and only a swipe that began inside it: up out of an open stack, up out of the channel, down into the channel, and sideways between its entries. Everywhere else on the panel an upward swipe is still the panel's own dismiss.
+  if (panelPushFromStats && turnChannel(x - panelPushFrom.x, y - panelPushFrom.y)) {
+    panelPushed = true;
+    panelPushFrom = null;
+    releasePanelHolds();
+    return;
+  }
   // Every hold in the panel is armed on the same touch-down the dismiss swipe starts from, and the battery and vitals boxes never cancelled theirs on movement at all — so a swipe begun over a control fired that control's hold at 350ms: a vibration, and Settings taking the screen, under a gesture that only meant to close the panel.
   if (Math.hypot(x - panelPushFrom.x, y - panelPushFrom.y) > KNOB_DRAG_SLOP) releasePanelHolds();
   if (y - panelPushFrom.y < -24 && Math.abs(x - panelPushFrom.x) < 40) {
@@ -1985,21 +2054,12 @@ vitalsBox.addEventListener('touchstart', () => {
   }, { passive: true });
 });
 
-// Mirrors --vitals-purge in pill.css — the sweep has to be over before Device Care takes the screen.
-const VITALS_PURGE = 620;
-
 vitalsBox.addEventListener('click', event => {
   event.stopPropagation();
   if (vitalsHeld) return;
   bridge.triggerHaptic('expand');
-  vitalsBox.classList.remove('cleaning');
-  void vitalsBox.offsetWidth;
-  vitalsBox.classList.add('cleaning');
-  setTimeout(() => {
-    vitalsBox.classList.remove('cleaning');
-    bridge.openConnectionSettings('vitals');
-    closeStatusPanel();
-  }, VITALS_PURGE);
+  bridge.openConnectionSettings('vitals');
+  closeStatusPanel();
 });
 
 
@@ -2064,7 +2124,8 @@ let panelNowOpen = false;
 
 export function setPanelNowOpen(open) {
   panelNowOpen = open;
-  quickPanel.classList.toggle('now-open', open);
+  // The class is on the root rather than on the panel: the Now bubble's stack stands outside the panel and is anchored off the knob row's height, so the row shrinking under an expanded bubble is what carries the bubble down with it — and a token scoped to the panel could not be read from out there.
+  root.classList.toggle('now-open', open);
 }
 
 function enterPanelNow() {
@@ -2082,10 +2143,27 @@ function leavePanelNow() {
 const STATS_BACK = QUICK_POP + QUICK_RANK_STEPS * QUICK_STAGGER;
 let statsBackTimer = 0;
 
+// The two readings in this section have no bubble to collapse — they are text standing on the panel's own ground — so what takes them away is the bar that already writes every reading here: it grows over the words and retracts over nothing. What they said has to be kept, because the sweep back is the same bar played over text that is being put back rather than replaced.
+const sweptReadings = new Map();
+
+function sweepSectionAway(element) {
+  if (!sweptReadings.has(element)) sweptReadings.set(element, element.textContent);
+  sweepInto(element, '', true);
+}
+
+function sweepSectionBack(element) {
+  if (!sweptReadings.has(element)) return;
+  const text = sweptReadings.get(element);
+  sweptReadings.delete(element);
+  sweepInto(element, text, true);
+}
+
 export function statsOut() {
   clearTimeout(statsBackTimer);
   quickPanel.classList.remove('stats-in');
   quickPanel.classList.add('stats-out');
+  sweepSectionAway(weatherReading);
+  sweepSectionAway(transferReading);
   stirLiquid(STATS_BACK);
 }
 
@@ -2094,6 +2172,8 @@ export function statsIn() {
   if (!quickPanel.classList.contains('stats-out')) return;
   quickPanel.classList.remove('stats-out');
   quickPanel.classList.add('stats-in');
+  sweepSectionBack(weatherReading);
+  sweepSectionBack(transferReading);
   statsBackTimer = setTimeout(() => quickPanel.classList.remove('stats-in'), STATS_BACK);
   stirLiquid(STATS_BACK);
 }

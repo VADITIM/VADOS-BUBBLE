@@ -44,7 +44,7 @@ export const PROXY_TAP_SLOP = 22;
 
 
 const PILL_GRACE = 22;
-const PILL_CONTROLS = '.transport, #player-timeline, .timer-button, .notification-row';
+const PILL_CONTROLS = '.transport, .timer-button, .notification-row';
 
 
 function describe(element) {

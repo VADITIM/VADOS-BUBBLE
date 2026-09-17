@@ -1421,6 +1421,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private val togglesQueued = java.util.concurrent.atomic.AtomicInteger(0)
     private val levelTargets = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
+    // A level the phone has just been given reads back at whatever it stood at a moment ago — the same lag the switches have — so a report landing right after a drag painted the bar back to where the drag started. What was asked is held over the read the same way, until the phone answers with it or the settle runs out.
+    private val levelIntents = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Long>>()
+
+    // How far the phone's own answer may sit from what was asked and still count as agreement: brightness and volume are both stored in steps of their own and come back rounded to a percent.
+    private val LEVEL_SETTLE_SLACK = 3
+
     // `svc wifi enable` and its siblings hand the ask to a system service and return before it has landed, so the read taken straight afterwards still says what the switch was a moment ago — which is the switch turning on, falling back off under the read, and coming on again at the next one. What was asked for is held over the read until the phone agrees with it.
     private val toggleIntents = java.util.concurrent.ConcurrentHashMap<String, Pair<Boolean, Long>>()
 
@@ -1839,6 +1845,16 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 state.put(name, wanted)
                 isWaiting = true
             }
+            for ((name, intent) in levelIntents) {
+                val (wanted, deadline) = intent
+                val answer = if (state.has(name)) state.optInt(name) else wanted
+                if (kotlin.math.abs(answer - wanted) <= LEVEL_SETTLE_SLACK || now > deadline) {
+                    levelIntents.remove(name)
+                    continue
+                }
+                state.put(name, wanted)
+                isWaiting = true
+            }
             push("window.onTogglesChanged($state)")
             // Nothing else asks again, so a switch still standing for an unconfirmed ask has to bring the next read with it — otherwise it holds that ask until someone reopens the panel.
             if (isWaiting) {
@@ -1864,6 +1880,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun setLevel(name: String, percent: Int) {
             levelTargets[name] = percent
+            levelIntents[name] = percent to
+                (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
             togglesWorker.execute {
                 val target = levelTargets.remove(name) ?: return@execute
                 SystemToggles.setLevel(name, target)

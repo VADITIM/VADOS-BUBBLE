@@ -2,6 +2,7 @@ import { openCurrent } from './mods/notification.js';
 import { HOLD_BLOCK, pillHolds, toy, untoy } from './motion.js';
 import { setSize, toClosed } from './row.js';
 import { HALO_MILLIS, startHalo, stirLiquid } from './liquid.js';
+import { slingInto } from './sling.js';
 import { statsBox, statsIn, statsOut } from './status.js';
 import { SIZES, bridge, dragGate, faces, pill, root, shared } from './state.js';
 
@@ -179,12 +180,22 @@ export function leaveAlertCentre() {
 }
 
 
-// Mirrors --dash-ms in pill.css: the sling out and the sling home take the same clock.
+// Mirrors --dash-ms in pill.css: the sling home takes this clock. The sling *out* is the slingshot in sling.js and draws its own length per shot, which is the whole point of it — the arrival is the Now bubble's arrival, not a second motion that resembles it.
 const DASH_TRAVEL = 300;
 
 const DASH_INSET = 4;
 
+// How much of the older Alert is left on screen once the new one has taken its place: enough for the app's icon and the padding around it, and not a pixel of the reading — what a card pushed aside has to say is which app it was.
+const DASH_PEEK = 46;
+
+// Mirrors --dash-peel-ms in pill.css.
+const DASH_PEEL = 320;
+
 const dash = document.getElementById('dash');
+const dashPeek = document.getElementById('dash-peek');
+
+let dashFlight = null;
+let peelTimer = null;
 
 export function isAlertDashed() {
   return shared.size === 'alertDash';
@@ -212,46 +223,95 @@ function returnAlert() {
 // An Alert arriving over the open dashboard does not grow at the cutout: Main stands where it stands and spawns a drop, which is slung along an arc into the stats section and pops out into the room that section's own modules have just left. Grown at the cutout it stood over the dashboard's own bubbles and read as two interfaces in one place; flown as Main itself it moved the one shape the whole row is measured from.
 export function dashAlert() {
   clearTimeout(shared.dwellTimer);
-  layOutDash();
+  const wasLive = dash.classList.contains('live');
+  const rest = layOutDash();
   statsOut();
+  // The older card is taken as a copy *before* the face is moved on, because the face is moved rather than duplicated — one Alert face is painted wherever it stands — and a card peeled after the move would be peeling the new notification.
+  if (wasLive) peelDash();
   carryAlert();
-  // A second Alert landing on one already slung takes the same journey rather than appearing where the first stands, and an animation already running has to be taken off the element before it can be given back or the restart is a no-op.
-  dash.classList.remove('slinging', 'home');
-  void dash.offsetWidth;
+
+  if (dashFlight) dashFlight.stop();
+  dash.classList.remove('home');
+  dash.classList.add('live');
   setSize('alertDash');
-  dash.classList.add('live', 'slinging');
+
+  const from = pill.getBoundingClientRect();
+  dashFlight = slingInto(dash, from, rest, {
+    ball: from.height,
+    // The drop is born a little under half the bubble it comes out of, which is what a drop is: the bubble does not travel, it sheds one.
+    born: from.height * 0.45,
+    restRadius: getComputedStyle(dash).borderTopLeftRadius,
+  });
+  // The reading appears on the frame the ball starts opening out, and how long the ball was in the air is drawn fresh per shot — so the delay is handed to the stylesheet rather than written into it.
+  dash.style.setProperty('--dash-open-delay', dashFlight.millis + 'ms');
+  dash.classList.add('opening');
+  setTimeout(() => dash.classList.remove('opening'), dashFlight.total);
+  stirLiquid(dashFlight.total + 200);
   shared.dwellTimer = setTimeout(homeDashAlert, shared.dwell);
 }
 
+
+// The card that was standing there is pushed out past the right edge and held with its icon showing. It is a copy rather than the bubble itself: the Alert face is one element moved from bubble to bubble, so what stays behind has to be a still of what it looked like.
+function peelDash() {
+  clearTimeout(peelTimer);
+  dashPeek.replaceChildren(...[...dash.children].map(child => child.cloneNode(true)));
+  dashPeek.classList.remove('peeling');
+  void dashPeek.offsetWidth;
+  dashPeek.classList.add('live', 'peeling');
+  const left = parseFloat(getComputedStyle(root).getPropertyValue('--dash-left')) || 0;
+  dashPeek.style.setProperty('--peel-x', Math.round(root.clientWidth - DASH_PEEK - left) + 'px');
+  peelTimer = setTimeout(() => dashPeek.classList.remove('peeling'), DASH_PEEL);
+}
+
+function dropPeek() {
+  clearTimeout(peelTimer);
+  dashPeek.classList.remove('live', 'peeling');
+  dashPeek.replaceChildren();
+  dashPeek.style.removeProperty('--peel-x');
+}
+
+// The box the Alert lands in is the stats section's own, less the inset that keeps it off the section's edges. It is written as a left and a top rather than as a translate because every frame of the flight *is* a translate away from where it rests — the two cannot both own that property.
 function layOutDash() {
   const box = statsBox();
   const width = Math.round(box.width - DASH_INSET * 2);
   const height = Math.round(box.height - DASH_INSET * 2);
-  const grab = parseFloat(getComputedStyle(root).getPropertyValue('--grab')) || 0;
+  const left = Math.round(box.left + DASH_INSET);
+  const top = Math.round(box.top + DASH_INSET);
   root.style.setProperty('--dash-width', width + 'px');
   root.style.setProperty('--dash-height', height + 'px');
-  // The bubble is centred on the canvas and stands at the grab inset, so where it has to go is the difference between that resting box and the section's own.
-  root.style.setProperty('--dash-x', Math.round(box.left + DASH_INSET - (root.clientWidth - width) / 2) + 'px');
-  root.style.setProperty('--dash-y', Math.round(box.top + DASH_INSET - grab) + 'px');
+  root.style.setProperty('--dash-left', left + 'px');
+  root.style.setProperty('--dash-top', top + 'px');
+
+  // The home is still the CSS animation's, and it needs the same journey the other way: where Main is standing, as a travel off this resting box.
+  const main = pill.getBoundingClientRect();
+  root.style.setProperty('--dash-home-x', Math.round(main.left + main.width / 2 - (left + width / 2)) + 'px');
+  root.style.setProperty('--dash-home-y', Math.round(main.top + main.height / 2 - (top + height / 2)) + 'px');
+  return { left, top, width, height };
 }
 
 export function homeDashAlert() {
   if (!isAlertDashed() || dash.classList.contains('home')) return;
   clearTimeout(shared.dwellTimer);
   bridge.triggerHaptic('dismiss');
-  dash.classList.remove('slinging');
+  // The flight is forwards-filled, so a card sent home while it is still landing would fly out of the values that flight had left on it rather than out of the box it is standing in.
+  if (dashFlight) dashFlight.stop();
+  dashFlight = null;
+  dash.classList.remove('opening');
   dash.classList.add('home');
+  dropPeek();
   statsIn();
   setTimeout(toClosed, DASH_TRAVEL);
 }
 
 export function leaveAlertDash() {
   if (!dash.classList.contains('live')) return;
-  dash.classList.remove('live', 'slinging', 'home');
+  if (dashFlight) dashFlight.stop();
+  dashFlight = null;
+  dash.classList.remove('live', 'home', 'opening');
+  dropPeek();
   returnAlert();
-  root.style.removeProperty('--dash-width');
-  root.style.removeProperty('--dash-height');
-  root.style.removeProperty('--dash-x');
-  root.style.removeProperty('--dash-y');
+  for (const name of ['--dash-width', '--dash-height', '--dash-left', '--dash-top', '--dash-home-x', '--dash-home-y']) {
+    root.style.removeProperty(name);
+  }
   statsIn();
 }

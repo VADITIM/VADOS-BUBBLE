@@ -86,6 +86,10 @@
 
   --grow-ms: 340ms;
   --mod-glyph: calc(var(--pill-height) - 10px);
+
+
+
+  --status-glyph: calc(var(--mod-glyph) - 4px);
   
 
 
@@ -104,10 +108,12 @@
   --ease-split: cubic-bezier(0.2, 1.7, 0.35, 1);
 }
 
+/* The return from a grown state overshoots above the bubble's idle top, and `overflow: hidden` cut that overshoot off at the document's top edge — an invisible line short of the screen's own, so the bounce read as the bubble being sliced instead of pressing into the edge. Sideways stays clipped: a face running past the screen has nothing to show there. */
 html, body {
   height: 100%;
   background: transparent;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 
@@ -142,7 +148,8 @@ html, body {
   border-radius: calc(var(--pill-height) / 2);
   background: var(--pill-background);
   border: 1px solid var(--border);
-  contain: layout paint;
+  /* Paint containment is an `overflow: hidden` wearing a performance hint's clothes — it clipped everything the bubble draws to its own box, which is the one thing a bubble may never do, and on an overshoot it cut the shape at an edge nothing on screen explains. Layout containment is the half that costs nothing to keep. */
+  contain: layout;
   will-change: width, height;
   
 
@@ -266,12 +273,35 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 
 
 
+:root {
+  /* Mirrors STATUS_MARGIN_FOOT in js/status.js — where the dashboard's own column stops above the bottom edge. */
+  --quick-foot: 10px;
+  /* One number for both sides of the Now bubble in the dashboard: the room under it to the toggle row, and the room over it to the system section. Equal is the whole point — the bubble stands between the two sections rather than in one of them. */
+  --quick-now-gap: 16px;
+  --lock-bottom: 70px;
+  /* The toggle band is a share of the panel's own height, so it is a bare number multiplied by the px the host measured rather than a percentage: the knob row's lift off the foot has to be worked out from it, and a percentage padding resolves against width. */
+  --quick-toggle-band: calc(var(--quick-height, 0px) * var(--quick-toggle-share));
+  /* How far the knob row stands off the panel's foot. At rest it is exactly what centring the row in its band gave it, so the row does not move for a bubble arriving above it; expanded, the row gives that room up and travels down to the foot. */
+  --quick-toggle-lift: max(0px, calc((var(--quick-toggle-band) - var(--quick-knob-size)) / 2));
+  /* Mirrors LOCK_HEIGHT and LOCK_COMPACT_HEIGHT in js/lock.js — the dashboard's toggle section is sized off the bubble standing over it, so both sides have to read one number. */
+  --lock-height: 124px;
+  --lock-compact-height: 44px;
+}
+
+/* In the dashboard the bubble is no longer at the panel's foot: the toggles are, and the bubble stands one gap above them. The number is the knob row's own height rather than a constant agreeing with it by hand, so a knob that grows or shrinks carries the bubble with it. */
+#lock-stack:has(> #lock-now.in-panel) {
+  --lock-bottom: calc(
+    var(--quick-foot) + var(--quick-knob-size) + var(--quick-toggle-lift) + var(--quick-now-gap)
+  );
+}
+
 #lock-stack {
   position: absolute;
   left: calc(var(--lock-inset, 16px) + var(--lock-x, 0px));
   right: calc(var(--lock-inset, 16px) - var(--lock-x, 0px));
   bottom: var(--lock-bottom, 20px);
-  
+  transition: bottom var(--grow-ms) var(--ease-grow);
+
 
   height: var(--lock-stack-height, 60vh);
   display: flex;
@@ -443,19 +473,6 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
   mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 
-#lock-buttons {
-  flex: 1;
-  min-height: 0;
-  
-
-  margin-top: 0.55rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 1.1rem;
-  transition: padding var(--grow-ms) var(--ease-split);
-}
-#lock-play { width: 48px; height: 48px; color: var(--app-accent); }
 
 
 
@@ -481,15 +498,10 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 #lock-now.open #lock-artist {
   mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
 }
-#lock-now.open #lock-buttons { padding: 0 2rem; }
-#lock-now.open .transport { width: 46px; height: 46px; }
-#lock-now.open #lock-play { width: 66px; height: 66px; }
-
-
-
-
+/* The transport stood between the song and the timeline and the swipes are the transport now, so the band it held is left as room rather than being closed up: the gesture is made across the bubble, and a bubble with nothing spare in it is a bubble with nowhere to make it. The timeline is pushed to the foot by that room instead of by a sibling that has to exist to hold it there. */
 #lock-timeline {
   flex: none;
+  margin-top: auto;
   padding: 0 1.1rem 0.9rem;
   transition: padding var(--grow-ms) var(--ease-split);
 }
@@ -504,21 +516,14 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 }
 #lock-position, #lock-duration { border-radius: 0; }
 
-#lock-track {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--border-strong);
-  position: relative;
+/* The same wave the media tab draws, standing where the track was: one beat, one seeded shape per song, two surfaces reading it. The band grows for the length of a drag so what is being aimed at can be seen, exactly as it does up there. */
+#lock-wave {
+  height: var(--lock-wave-tall, 28px);
   transition: height 140ms ease-out;
 }
-#lock-now.open #lock-track { height: 6px; }
-#lock-elapsed {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0%;
-  border-radius: 999px;
-  background: var(--app-accent);
-}
+#lock-now.open #lock-wave { --lock-wave-tall: 44px; }
+#lock-now #lock-wave.scrubbing { --lock-wave-tall: 52px; }
+#lock-wave canvas { display: block; width: 100%; height: 100%; }
 
 
 
@@ -578,6 +583,17 @@ html.double-live #liquid { height: 100%; }
 
 
 html.grown #liquid { height: 100%; }
+
+/* Worn for the length of the return home from any grown state. The goo region snapped back to the short idle band the instant `grown` came off, so a bubble still tall and still travelling was drawn outside the region and had its skin dropped — the cut `alert-homing` and `notifications-homing` below each stop for their own state, held here for every other one. */
+html.returning #liquid { height: 100%; }
+
+/* The same wall `--ease-reach` exists for on `top`, met on `height`: a 155px box collapsing to 26 on the bubble family's 1.7 overshoot undershoots to a few pixels tall, so the bubble read as shooting up and being cut off rather than as landing. Every return home takes the reach curve on all four channels, which is what `notifications-homing` below had written for its own state alone. */
+html.returning #pill {
+  --width-ease: var(--ease-reach);
+  --height-ease: var(--ease-reach);
+  --carry-ease: var(--ease-reach);
+  --shift-delay: 0ms;
+}
 
 
 html.alert-homing #liquid { height: 100%; }
@@ -1064,7 +1080,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   width: var(--main-width);
   height: var(--pill-height);
 }
-#pill.player { width: 340px; height: 190px; border-radius: 26px; }
+#pill.player { width: 340px; height: 304px; border-radius: 34px; }
 
 
 #pill.player, #pill.timer,
@@ -1134,9 +1150,9 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-#media-art-slot, #player-cover {
+#media-art-slot {
   mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
-  
+
 
   mask-repeat: no-repeat;
 }
@@ -1374,59 +1390,71 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 #player-face {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  
-
-  grid-template-rows: auto 1fr;
-  gap: 0.6rem 0.9rem;
-  align-items: center;
-  
-
-  padding: 1.15rem 1rem;
+  --wave-band: 52px;
+  --wave-band-open: 110px;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border-radius: inherit;
 }
 
-#player-cover { min-width: 0; grid-column: 1; grid-row: 1 / -1; align-self: stretch; }
 
 
+
+
+
+
+
+/* The blur is a backdrop of its own rather than the strip's own filter: a mask that softens the strip's inner edge also fades everything drawn in it, so the names went translucent along with the glass they stand on. */
 #player-meta {
-  min-width: 0;
-  grid-column: 2;
-  grid-row: 1;
-  overflow: hidden;
-  
-
-
-  padding: 0 0.5rem 0 0.2rem;
-  margin-left: -0.2rem;
-  mask-image: linear-gradient(90deg, #000 calc(100% - 1.6rem), transparent);
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  padding: 0.85rem 1.05rem 2.6rem;
+}
+#player-meta::before, #player-clock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: blur(22px) saturate(1.35);
+}
+#player-meta::before {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.08));
+  mask-image: linear-gradient(to bottom, #000 52%, transparent 100%);
 }
 #player-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  width: auto;
-  aspect-ratio: 1;
-  border-radius: 0.75rem;
+  border-radius: 0;
   object-fit: cover;
   background: var(--sunken);
   display: block;
+  mask-image:
+    linear-gradient(to right, transparent 0, #000 13%, #000 87%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
+  mask-composite: intersect;
 }
 
 
 
 #player-title, #player-artist {
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.25;
-  
+
   min-height: 1lh;
 }
 #player-title {
-  font-size: calc((0.8rem) * var(--font-scale, 1));
+  font-size: calc((1.02rem) * var(--font-scale, 1));
   color: var(--text-bright);
 }
 #player-artist {
   margin-top: 0.25rem;
-  font-size: calc((0.68rem) * var(--font-scale, 1));
+  font-size: calc((0.8rem) * var(--font-scale, 1));
   letter-spacing: 0.1rem;
   text-transform: uppercase;
   color: var(--app-accent);
@@ -1450,20 +1478,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 @keyframes caret-blink { 50% { opacity: 0; } }
 
 
-#player-transport {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  min-width: 0;
-  grid-column: 2;
-  grid-row: 2;
-}
-#player-buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.1rem;
-}
 .transport {
   width: 34px;
   height: 34px;
@@ -1483,52 +1497,44 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     height var(--grow-ms) var(--ease-split);
 }
 .transport.knocked { scale: 0.82; transition: scale 90ms ease-out; }
-#player-play { width: 44px; height: 44px; color: var(--app-accent); }
 
 
 
-#player-timeline { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.25rem 0; }
-#player-track {
-  height: 4px;
-  transition: height 140ms ease-out, margin 140ms ease-out;
-  border-radius: 999px;
-  background: var(--border-strong);
-  position: relative;
-  
 
-  overflow: visible;
-}
-#player-elapsed {
+#player-wave {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 0%;
-  background: var(--app-accent);
-  border-radius: 999px;
+  /* Anchored by its own centre rather than by an edge: with the box pinned at the bottom instead, the open band grew upward only and the playhead climbed out from under the finger mid-drag. */
+  inset: auto 0 52px 0;
+  z-index: 3;
+  height: var(--wave-band);
+  translate: 0 50%;
+  transition: height 220ms var(--ease-grow);
 }
-
-
-
-#player-dot {
-  position: absolute;
-  top: 50%;
-  left: 100%;
-  width: 7px;
-  height: 7px;
-  margin: -3.5px 0 0 -3.5px;
-  border-radius: 50%;
-  background: var(--app-accent);
-}
-
-#player-timeline.scrubbing #player-dot { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
-#player-timeline.scrubbing #player-track { height: 16px; margin: -6px 0; }
+#player-wave canvas { display: block; width: 100%; height: 100%; }
+#player-wave.scrubbing { height: var(--wave-band-open); }
 
 #player-clock {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-size: calc((0.6rem) * var(--font-scale, 1));
-  letter-spacing: 0.1rem;
+  gap: 0.35rem;
+  padding: 2rem 1.05rem 0.6rem;
+  font-size: calc((0.7rem) * var(--font-scale, 1));
+  letter-spacing: 0.08rem;
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
+#player-clock::before {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.08));
+  mask-image: linear-gradient(to top, #000 52%, transparent 100%);
+}
+
+
+
+
 
 
 
@@ -2150,8 +2156,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   min-width: 0;
   display: grid;
   place-items: center;
-  width: calc(var(--mod-glyph) - 8px);
-  height: calc(var(--mod-glyph) - 8px);
+  width: var(--status-glyph);
+  height: var(--status-glyph);
   color: currentColor;
 }
 .status-slot-inner svg { width: 100%; height: 100%; fill: currentColor; }
@@ -2170,6 +2176,32 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 
 .status-slot[data-slot="modus"] .status-slot-inner { color: var(--status-accent); }
+
+
+
+
+.status-slot[data-slot="modus"]:has(.modus-paired) .status-slot-inner {
+  width: auto;
+  height: auto;
+}
+.modus-paired {
+  display: flex;
+  align-items: center;
+  gap: 0.14rem;
+}
+.modus-paired .paired-charge {
+  font-size: calc(0.56rem * var(--font-scale, 1));
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.modus-paired .paired-glyph {
+  display: grid;
+  place-items: center;
+  width: var(--status-glyph);
+  height: var(--status-glyph);
+}
+.modus-paired .paired-glyph svg { width: 100%; height: 100%; fill: currentColor; }
 
 
 
@@ -2290,7 +2322,6 @@ html.battery-percent-light .mini-battery-reading {
   --quick-pop: 360ms;
 
   --quick-stats-share: 27%;
-  --quick-toggle-share: 27.5%;
   --quick-transfer-tall: 26px;
 
   --quick-vitals-tall: 80px;
@@ -2302,6 +2333,8 @@ html.battery-percent-light .mini-battery-reading {
   --quick-levels-tall: 285px;
   --quick-knob-size: 56px;
   --quick-knob-icon: 27px;
+  /* Bare, not a percentage: --quick-toggle-lift multiplies it by the panel's measured height to work the knob row's place out in pixels, and a percentage padding would resolve against the width. */
+  --quick-toggle-share: 0.275;
   --quick-stats-drop: 12px;
   --quick-stats-inset: 10px;
   --quick-divider-room: 34px;
@@ -2388,17 +2421,21 @@ html.battery-percent-light .mini-battery-reading {
   justify-content: center;
 }
 
-/* The Now bubble's room is this section's padding rather than the panel's: on the panel it came off the height every section's share is a percentage of, so a mod arriving down there resized the stats and the system sections too — which is exactly what those two are not allowed to do. Here it costs the one section that is meant to give way. */
+/* The Now bubble's room is this section's, never the panel's: on the panel it came off the height every section's share is a percentage of, so a mod arriving down there resized the stats and the system sections too — which is exactly what those two are not allowed to do.
+
+   The bubble stands *above* the toggles now rather than below them, and the row's place is the fixed thing: the section keeps its band and the row is packed against the foot with `--quick-toggle-lift` holding it exactly where centring used to leave it, so a bubble arriving over it moves nothing. Expanded, the lift goes to nothing and the row travels down to the panel's own foot — that travel *is* the room the big bubble opens into, which is why the lift and the bubble's own anchor are one number read twice. */
 #toggle-section {
   position: relative;
   z-index: 1;
-  flex: 0 0 var(--quick-toggle-share);
+  flex: 0 0 var(--quick-toggle-band);
   min-height: 0;
   box-sizing: border-box;
+  padding-bottom: var(--quick-toggle-lift);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-end;
   gap: var(--quick-gap);
+  transition: padding-bottom var(--grow-ms) var(--ease-grow);
 }
 
 .quick-divider {
@@ -2414,6 +2451,16 @@ html.battery-percent-light .mini-battery-reading {
 /* Growing the shared margin moved nothing: the middle section is `flex: 1`, so every pixel added to a divider's margin came straight back out of the section between them and both lines stayed where they were. The outward move has to be a pull past the section boundary, which is what the negative side is. */
 #stats-section + .quick-divider { margin-top: var(--quick-divider-shift); }
 #system-section + .quick-divider { margin-bottom: var(--quick-divider-shift); }
+/* With a bubble standing between the two sections the lower divider is what says how much room is over it, and the fixed pull that put the line inside the toggle section would put it inside the bubble instead. What is left of the band above the bubble is the band less everything under its top edge, so the line is dropped to a gap off that — the room over the bubble and the room under it are then one measurement, in both of the bubble's heights and without the toggle row having moved for either. */
+html.lock-live #system-section + .quick-divider {
+  margin-bottom: calc(
+    var(--quick-now-gap) * 2 + var(--quick-now-tall) +
+    var(--quick-toggle-lift) + var(--quick-knob-size) - var(--quick-toggle-band)
+  );
+  transition: opacity 220ms ease, margin-bottom var(--grow-ms) var(--ease-grow);
+}
+html.lock-live { --quick-now-tall: var(--lock-compact-height); }
+html.lock-live.now-open { --quick-now-tall: var(--lock-height); }
 #quick-panel.showing .quick-divider { opacity: 0.5; transition-delay: 180ms; }
 
 /* The line is hidden rather than taken out of the column: its margins are what hold the three sections apart, so removing the element would collapse the spacing the panel is laid out on. */
@@ -2480,29 +2527,6 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 #quick-vitals {
   position: relative;
   overflow: hidden;
-  --vitals-purge: 620ms;
-}
-#quick-vitals.cleaning::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  translate: -100% 0;
-  pointer-events: none;
-  background: linear-gradient(100deg, transparent 38%, color-mix(in srgb, var(--section-color) 30%, transparent) 50%, transparent 62%);
-  animation: vitals-sweep var(--vitals-purge) var(--ease-grow);
-}
-#quick-vitals.cleaning .vital-gauge-fill { animation: vitals-purge var(--vitals-purge) var(--ease-grow); }
-#quick-vitals.cleaning .vital-glyph { animation: vitals-glyph-pulse var(--vitals-purge) var(--ease-bubble); }
-
-@keyframes vitals-sweep {
-  from { translate: -100% 0; }
-  to { translate: 100% 0; }
-}
-@keyframes vitals-purge {
-  55% { width: 8%; }
-}
-@keyframes vitals-glyph-pulse {
-  45% { scale: 1.2; }
 }
 
 #vitals-list {
@@ -2936,11 +2960,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   bottom: 0;
   height: var(--level, 0%);
   background: var(--section-color);
-  transition: height 220ms var(--ease-leave);
 }
-.level.dragging .level-fill { transition: none; }
-/* A level re-delivered while the panel was still arriving slid the fill from its old height to the new one under the pour, which read as the bar recalculating itself on screen. The fill keeps the height it last stood at, and any correction lands in one frame while the panel enters. */
-#quick-panel.entering .level-fill { transition: none; }
 
 .level-icon {
   position: absolute;
@@ -3024,15 +3044,14 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 
 
 
-/* Expanded, the Now bubble is what is being read, so the toggles give it the room rather than the two fighting over a section that has lost half its height: the row shrinks and the window with it, and the same nine stay reachable because the window scrolls either way. */
-#quick-panel.now-open {
+/* Expanded, the Now bubble is what is being read, so the toggles give it the room rather than the two fighting over a section that has lost half its height: the row shrinks and travels down to the panel's own foot, and the same nine stay reachable because the window scrolls either way. The mini bubble takes none of it — the lift is what the row was already standing at, so nothing moves until the bubble is opened.
+
+   The tokens are on the root rather than on the panel: the Now bubble's stack stands outside the panel and is anchored off the knob row, so it has to be able to read both of these. */
+html.now-open {
   --quick-knob-size: 40px;
   --quick-knob-icon: 20px;
-  /* Mirrors LOCK_HEIGHT (124px) plus the stack's --lock-bottom (20px) in lock.js, less the panel's own STATUS_MARGIN_FOOT (10px), plus a gap: the room the expanded card stands in. */
-  --quick-now-room: 146px;
+  --quick-toggle-lift: 0px;
 }
-/* The card's room has to be padding on the side it stands on. `padding-top` moved the row down into the card instead — the section centres its row, so only a bottom pad lifts that centre clear of it. */
-#quick-panel.now-open #toggle-section { padding-bottom: var(--quick-now-room); }
 
 
 
@@ -3071,13 +3090,6 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   --pop-turn-out: 180deg;
 }
 
-#quick-panel.showing .level-fill {
-  animation: liquid-pour 110ms ease-out calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + 200ms) backwards;
-}
-@keyframes liquid-pour {
-  from { translate: 0 100%; }
-  to   { translate: 0 0; }
-}
 
 
 
@@ -3546,14 +3558,6 @@ html:not(.grown) #pill.panel-top {
 
 
 
-#player-buttons .transport {
-  border-radius: 34%;
-  corner-shape: squircle;
-}
-#player-play {
-  border-radius: 34%;
-  corner-shape: squircle;
-}
 
 
 
@@ -3570,12 +3574,12 @@ html:not(.grown) #pill.panel-top {
 
 
 #player-speed {
-  width: 34px;
-  height: 34px;
-  border-radius: 34%;
-  corner-shape: squircle;
+  width: auto;
+  height: auto;
+  padding: 0.05rem 0.34rem;
+  border-radius: 999px;
   border: 1px solid var(--border-strong);
-  font-size: calc((0.62rem) * var(--font-scale, 1));
+  font-size: calc((0.56rem) * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-body);
   font-variant-numeric: tabular-nums;
@@ -3600,7 +3604,6 @@ html:not(.grown) #pill.panel-top {
 #timer-label:not(.runs-out) { mask-image: none; }
 
 
-#player-meta:not(:has(.runs-out)) { mask-image: none; }
 
 
 
@@ -3612,13 +3615,18 @@ html:not(.grown) #pill.panel-top {
 
 
 
+/* A copy of the label stands ahead of the real one and the pair is carried rightwards by exactly the copy's width, so the frame the loop restarts on renders what the frame before it rendered — the text leaves by the right edge while the same text arrives at the start, with no return sweep and no jump. */
+.runs-out::before {
+  content: attr(data-loop);
+  padding-right: var(--label-gap);
+}
 @keyframes label-scroll {
-  0%, 18% { text-indent: 0; }
-  55%, 73% { text-indent: var(--label-shift, 0); }
-  100% { text-indent: 0; }
+  from { text-indent: calc(var(--label-shift, 0px) * -1); }
+  to   { text-indent: 0; }
 }
 .runs-out {
-  
+  /* Mirrors LABEL_GAP in js/labels.js, which measures the loop's travel off it. */
+  --label-gap: 40px;
   animation: label-scroll var(--label-scroll-ms, 6000ms) linear 700ms infinite;
 }
 
@@ -3763,70 +3771,34 @@ html.swapping #double-reading {
 
 
 /* The Alert slung into the open dashboard is a bubble of its own rather than Main flying. Main pinching to a drop, crossing the screen and growing into the stats section moved the one shape the row is anchored on — 300x200 of width/height relaid every frame while the goo mirrored it — and that is what read as the lag. The bubble it lands in stands outside the goo layer for the same reason the quick modules do: the panel has already frosted the whole screen behind it. Its box is the stats section's, measured by `alert.js` and written here as four numbers; the journey is a drop born at the cutout, the arc across and down at circle size, and a pop out into the section's room on the bubble family's own overshoot. Mirrors DASH_TRAVEL in alert.js. */
-#dash {
+#dash,
+#dash-peek {
   position: absolute;
   z-index: 31;
   box-sizing: border-box;
-  top: var(--grab, 0px);
-  left: 0;
-  right: 0;
-  margin-inline: auto;
+  left: var(--dash-left, 0px);
+  top: var(--dash-top, 0px);
   width: var(--dash-width, 300px);
   height: var(--dash-height, 200px);
   border-radius: 30px;
   background: var(--pill-background);
   border: 1px solid var(--app-accent, var(--border));
-  translate: var(--dash-x, 0px) var(--dash-y, 0px);
   overflow: visible;
 }
 
-#dash:not(.live) { display: none; }
+#dash:not(.live),
+#dash-peek:not(.live) { display: none; }
 
-#dash.slinging { animation: dash-sling var(--dash-ms, 420ms) both; }
-
-@keyframes dash-sling {
-  0% {
-    translate: 0 0;
-    width: var(--pill-height);
-    height: var(--pill-height);
-    border-radius: 50%;
-    scale: 0.45;
-    animation-timing-function: var(--ease-sling);
-  }
-  48% {
-    translate: var(--dash-x, 0px) calc(var(--dash-y, 0px) * 0.22);
-    width: var(--pill-height);
-    height: var(--pill-height);
-    border-radius: 50%;
-    scale: 1.08;
-    animation-timing-function: var(--ease-bubble);
-  }
-  64% {
-    translate: var(--dash-x, 0px) var(--dash-y, 0px);
-    width: var(--pill-height);
-    height: var(--pill-height);
-    border-radius: 50%;
-    scale: 1;
-    animation-timing-function: var(--ease-sling);
-  }
-  100% {
-    translate: var(--dash-x, 0px) var(--dash-y, 0px);
-    width: var(--dash-width, 300px);
-    height: var(--dash-height, 200px);
-    border-radius: 30px;
-    scale: 1;
-  }
-}
-
-#dash.slinging #alert-face {
-  animation: quick-contents-in 180ms ease calc(var(--dash-ms, 420ms) * 0.64) backwards;
+/* The arrival is no longer written here at all. It is the slingshot in js/sling.js — the same draw, arc and opening the Now bubble takes into this same panel — and every frame of it is a WAAPI translate away from the resting box above, which is why that box is a left and a top rather than a translate of its own. All this rule owes it is the reading, which appears on the frame the ball begins to open. */
+#dash.opening #alert-face {
+  animation: quick-contents-in 180ms ease var(--dash-open-delay, 0ms) backwards;
 }
 
 #dash.home { animation: dash-sling-home var(--dash-ms, 420ms) both; }
 
 @keyframes dash-sling-home {
   0% {
-    translate: var(--dash-x, 0px) var(--dash-y, 0px);
+    translate: 0 0;
     width: var(--dash-width, 300px);
     height: var(--dash-height, 200px);
     border-radius: 30px;
@@ -3834,7 +3806,7 @@ html.swapping #double-reading {
     animation-timing-function: var(--ease-leave);
   }
   36% {
-    translate: var(--dash-x, 0px) var(--dash-y, 0px);
+    translate: 0 0;
     width: var(--pill-height);
     height: var(--pill-height);
     border-radius: 50%;
@@ -3842,13 +3814,218 @@ html.swapping #double-reading {
     animation-timing-function: var(--ease-reach);
   }
   100% {
-    translate: 0 0;
+    translate: var(--dash-home-x, 0px) var(--dash-home-y, 0px);
     width: var(--pill-height);
     height: var(--pill-height);
     border-radius: 50%;
     scale: 0.45;
   }
 }
+
+/* The card a new Alert landed on top of. The two merge where they stand and the older is then pushed out past the right edge, held with just its icon on screen: a notification pushed aside still has to say which app it was, and nothing more than that would be readable at this width anyway. Mirrors DASH_PEEL in js/alert.js. */
+#dash-peek {
+  --dash-peel-ms: 320ms;
+  z-index: 30;
+  translate: var(--peel-x, 0px) 0;
+  opacity: 0.72;
+}
+#dash-peek.peeling {
+  animation: dash-peel var(--dash-peel-ms) var(--ease-split) both;
+}
+/* The copy keeps the Alert face's own ids so it keeps the Alert face's own layout, and it is the last of the three places that face can stand, so `getElementById` always answers with the live one rather than with this still. What is left showing is the icon: the rest is dropped one level at a time rather than by hiding the head, because an ancestor at zero opacity takes the icon with it. */
+#dash-peek #title,
+#dash-peek #app-name,
+#dash-peek #text,
+#dash-peek #picture { opacity: 0; transition: opacity 140ms var(--ease-leave); }
+
+@keyframes dash-peel {
+  0% { translate: 0 0; opacity: 1; scale: 1; }
+  30% { scale: 0.97; }
+  100% { translate: var(--peel-x, 0px) 0; opacity: 0.72; scale: 1; }
+}
+
+
+/* The stats section's second channel. It stands in exactly the room the vitals, the charge and the two readings give up, it arrives on the slingshot every bubble born at the punch hole takes, and it is one card at a time: what is waiting, one app to a card, swiped between. Mirrors --channel-left/top/width/height, written by js/channel.js off the section's own box. */
+#channel,
+#channel-under {
+  position: absolute;
+  z-index: 31;
+  box-sizing: border-box;
+  left: var(--channel-left, 0px);
+  top: var(--channel-top, 0px);
+  width: var(--channel-width, 300px);
+  height: var(--channel-height, 200px);
+  border-radius: 30px;
+  background: var(--pill-background);
+  border: 1px solid var(--channel-accent, var(--border));
+  overflow: visible;
+}
+
+#channel:not(.live),
+#channel-under:not(.live) { display: none; }
+
+#channel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  transition: opacity 160ms var(--ease-grow);
+}
+
+#channel > * { min-width: 0; }
+
+#channel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+#channel-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: none;
+}
+#channel-icon.present { display: block; }
+#channel-app {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--channel-accent, var(--text-bright));
+  white-space: nowrap;
+  overflow: hidden;
+}
+#channel-when {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+#channel-who {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+}
+#channel-text {
+  flex: 1;
+  min-height: 0;
+  font-size: 0.76rem;
+  line-height: 1.32;
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* The count sits on the bubble's own bottom edge rather than in its corner: it is a reading about the whole stack, and the layer showing underneath it is the other half of the same sentence. */
+#channel-tally {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  translate: -50% 0;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--channel-accent, var(--text-bright));
+  color: #000;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-align: center;
+}
+#channel-tally:empty { display: none; }
+
+/* One layer under the card and never a second: the stack has to say there is more, and a pile drawn accurately is a list drawn badly. */
+#channel-under {
+  z-index: 30;
+  margin-top: var(--channel-under-drop, 7px);
+  margin-left: var(--channel-under-inset, 14px);
+  width: calc(var(--channel-width, 300px) - var(--channel-under-inset, 14px) * 2);
+  opacity: 0;
+  scale: 0.98;
+  transition: opacity 200ms var(--ease-grow), scale 200ms var(--ease-split);
+}
+#channel-under.live.showing { opacity: 0.5; scale: 1; }
+
+/* The reading appears on the frame the ball begins to open, exactly as the slung Alert's does, and how long the ball was in the air is drawn per shot — so the delay is handed over rather than written here. */
+#channel.opening > * {
+  animation: quick-contents-in 180ms ease var(--channel-open-delay, 0ms) backwards;
+}
+
+/* Mirrors CHANNEL_HOME in js/channel.js. */
+#channel.home {
+  --channel-home-ms: 300ms;
+  animation: channel-home var(--channel-home-ms) both;
+}
+
+@keyframes channel-home {
+  0% {
+    translate: 0 0;
+    width: var(--channel-width, 300px);
+    height: var(--channel-height, 200px);
+    border-radius: 30px;
+    scale: 1;
+    animation-timing-function: var(--ease-leave);
+  }
+  36% {
+    translate: 0 0;
+    width: var(--pill-height);
+    height: var(--pill-height);
+    border-radius: 50%;
+    scale: 1;
+    animation-timing-function: var(--ease-reach);
+  }
+  100% {
+    translate: var(--channel-home-x, 0px) var(--channel-home-y, 0px);
+    width: var(--pill-height);
+    height: var(--pill-height);
+    border-radius: 50%;
+    scale: 0.45;
+  }
+}
+#channel.home > * { opacity: 0; transition: opacity 120ms var(--ease-leave); }
+
+
+/* The stack opened out. Every card comes out of the one box the stack was standing in and separates onto the whole height, and the dashboard underneath leaves rather than being covered — what is being read is the stack, so nothing else on the screen has any business still being there. Mirrors SPREAD_MILLIS in js/channel.js. */
+#channel-spread {
+  --spread-ms: 420ms;
+  position: absolute;
+  inset: 0;
+  z-index: 33;
+}
+#channel-spread:not(.live) { display: none; }
+
+.spread-card {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 18px;
+  border-radius: 28px;
+  background: var(--pill-background);
+  border: 1px solid var(--spread-accent, var(--border));
+  overflow: hidden;
+}
+.spread-head { display: flex; align-items: center; gap: 8px; }
+.spread-icon { width: 18px; height: 18px; border-radius: 5px; }
+.spread-app {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--spread-accent, var(--text-bright));
+}
+.spread-when { margin-left: auto; font-size: 0.7rem; color: var(--text-muted); }
+.spread-who { font-size: 0.82rem; font-weight: 600; color: var(--text-bright); }
+.spread-text { font-size: 0.78rem; line-height: 1.34; color: var(--text); overflow: hidden; }
+
+html.spread-open #quick-panel .quick-bubble {
+  animation: bubble-collapse 110ms var(--ease-leave) calc(var(--drop-rank, 0) * 18ms) both;
+  pointer-events: none;
+}
+html.spread-open #quick-panel .quick-divider { opacity: 0; }
+/* The card stays away for the whole of the collapse as well as the whole of the open: the cards flying back land on exactly its box, so it may only be given back once they have arrived — handed back on the open's clock it would be standing under the pile that is still coming down. */
+html.spread-open #channel,
+html.spread-open #channel-under,
+html.spread-landing #channel,
+html.spread-landing #channel-under { opacity: 0; }
 
 /* The contents go before the box does: a notification's text riding a 300px box down to a drop is the box shrinking around it. */
 #dash.home #alert-face { opacity: 0; transition: opacity 120ms var(--ease-leave); }
@@ -3858,14 +4035,29 @@ html.swapping #double-reading {
   animation: bubble-collapse 95ms var(--ease-leave) calc(var(--drop-rank, 0) * 20ms) both;
   pointer-events: none;
 }
-#quick-panel.stats-out #quick-weather,
-#quick-panel.stats-out #quick-transfer {
-  opacity: 0;
-  transition: opacity 110ms var(--ease-leave);
-}
 #quick-panel.stats-in #stats-section .quick-bubble {
   animation: bubble-grow var(--quick-pop) var(--ease-sling) calc(var(--pop-rank, 0) * var(--pop-step, 42ms)) backwards;
 }
 #quick-panel.stats-in #stats-section .quick-bubble > * {
   animation: quick-contents-in 190ms ease calc(var(--pop-rank, 0) * var(--pop-step, 42ms)) backwards;
 }
+
+
+#player-art.dragged { transition: none; }
+
+#player-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+}
+#player-hint svg {
+  width: 72px;
+  height: 72px;
+  fill: var(--text-bright);
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55));
+}
+#player-hint.settling { transition: opacity 200ms ease, scale 200ms var(--ease-grow); }

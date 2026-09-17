@@ -29,7 +29,6 @@
 
 const LABELS = [
   '#app-name', '#title', '#call-name',
-  '#player-title', '#player-artist',
   '#lock-title', '#lock-artist',
   '#timer-remaining', '#timer-label',
 ].join(', ');
@@ -38,28 +37,28 @@ const LABELS = [
 const RUNS_OUT_SLACK = 2;
 
 
-const SCROLL_SPEED = 34;
+const SCROLL_SPEED = 22;
 
 
-const SCROLL_HOLD = 0.18;
-const SCROLL_TRAVEL = 0.37;
+// The blank the copy holds ahead of the real label, in pixels. Mirrors --label-gap in pill.css.
+const LABEL_GAP = 40;
 
 function measure(label) {
-  const over = label.scrollWidth - label.clientWidth;
-  if (over <= RUNS_OUT_SLACK) {
-    label.classList.remove('runs-out');
+  // The copy the loop is drawn from is part of the label's own width once the class is on, so every re-fit would have found the label wider than the last one did and stretched the loop further each time. The class comes off before anything is read.
+  label.classList.remove('runs-out');
+  const width = label.scrollWidth;
+  if (width - label.clientWidth <= RUNS_OUT_SLACK) {
     label.style.removeProperty('--label-shift');
     label.style.removeProperty('--label-scroll-ms');
+    label.removeAttribute('data-loop');
     return;
   }
   
   
-  const isRightSet = getComputedStyle(label).textAlign === 'right';
-  label.style.setProperty('--label-shift', (isRightSet ? over : -over) + 'px');
-  
-  
-  const crossing = (over / SCROLL_SPEED) * 1000;
-  label.style.setProperty('--label-scroll-ms', Math.round(crossing / SCROLL_TRAVEL) + 'ms');
+  const shift = width + LABEL_GAP;
+  label.dataset.loop = label.textContent;
+  label.style.setProperty('--label-shift', shift + 'px');
+  label.style.setProperty('--label-scroll-ms', Math.round((shift / SCROLL_SPEED) * 1000) + 'ms');
   label.classList.add('runs-out');
 }
 

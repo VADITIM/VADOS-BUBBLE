@@ -45,7 +45,7 @@ export const SIZES = {
   alertDash: { width: -1, height: -1 },
   haptic:   { width: 340, height: 150 },
   picture:  { width: 340, height: 320 },
-  player:   { width: 340, height: 190 },
+  player:   { width: 340, height: 304 },
   timer:    { width: 340, height: 132 },
   
 

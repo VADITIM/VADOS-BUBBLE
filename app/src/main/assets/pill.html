@@ -68,37 +68,20 @@
     <div id="timer-actions"></div>
   </div>
 
+
   <div class="face" id="player-face">
-    <div id="player-cover">
-      <img id="player-art" data-morph="art" data-morph-scale alt="">
-    </div>
+    <img id="player-art" data-morph="art" data-morph-scale alt="">
     <div id="player-meta">
       <div id="player-title"></div>
       <div id="player-artist"></div>
     </div>
-
-    <div id="player-transport">
-      <div id="player-buttons">
-        <div class="transport" id="player-previous">
-          <svg viewBox="0 0 24 24"><path d="M7 6h2v12H7zm3 6 8-6v12z"/></svg>
-        </div>
-        <div class="transport" id="player-play">
-          <svg viewBox="0 0 24 24"><path id="player-play-path" d="M8 5v14l11-7z"/></svg>
-        </div>
-        <div class="transport" id="player-next">
-          <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg>
-        </div>
-        
-
-        <div class="transport" id="player-speed">1×</div>
-      </div>
-
-      <div id="player-timeline">
-        <div id="player-track"><div id="player-elapsed"><div id="player-dot"></div></div></div>
-        <div id="player-clock"><span id="player-position">0:00</span><span id="player-duration">0:00</span></div>
-      </div>
+    <div id="player-hint"><svg viewBox="0 0 24 24"><path id="player-hint-path" d=""></path></svg></div>
+    <div id="player-wave"><canvas id="player-wave-canvas"></canvas></div>
+    <div id="player-clock">
+      <span id="player-position">0:00</span>
+      <div class="transport" id="player-speed">1×</div>
+      <span id="player-duration">0:00</span>
     </div>
-
   </div>
 
   <div class="face" id="notifications-face">
@@ -121,6 +104,26 @@
 
 
 <div id="dash"></div>
+
+
+
+<div id="channel-under"></div>
+<div id="channel">
+  <div id="channel-head">
+    <img id="channel-icon" alt="">
+    <span id="channel-app"></span>
+    <span id="channel-when"></span>
+  </div>
+  <div id="channel-who"></div>
+  <div id="channel-text"></div>
+  <span id="channel-tally"></span>
+</div>
+<div id="channel-spread"></div>
+
+
+
+
+<div id="dash-peek"></div>
 
 
 
@@ -275,23 +278,9 @@
         <div id="lock-artist"></div>
       </div>
     </div>
-    <div id="lock-buttons">
-      <div class="transport" id="lock-previous">
-        <svg viewBox="0 0 24 24"><path d="M7 6h2v12H7zm3 6 8-6v12z"/></svg>
-      </div>
-      <div class="transport" id="lock-play">
-        <svg viewBox="0 0 24 24"><path id="lock-play-path" d="M8 5v14l11-7z"/></svg>
-      </div>
-      <div class="transport" id="lock-next">
-        <svg viewBox="0 0 24 24"><path d="M15 6h2v12h-2zM6 6l8 6-8 6z"/></svg>
-      </div>
-    </div>
-    
-
-
     <div id="lock-timeline">
       <div id="lock-clock"><span id="lock-position">0:00</span><span id="lock-duration">0:00</span></div>
-      <div id="lock-track"><div id="lock-elapsed"><div id="lock-dot"></div></div></div>
+      <div id="lock-wave"><canvas id="lock-wave-canvas"></canvas></div>
     </div>
   </div>
 </div>

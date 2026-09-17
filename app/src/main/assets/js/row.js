@@ -109,6 +109,10 @@ function afterRelayout(work) {
   requestAnimationFrame(work);
 }
 
+// Mirrors --grow-ms in pill.css, with room for the overshoot at the end of it.
+const HOME_TRAVEL = 420;
+let returningTimer = null;
+
 function paintSize() {
   pill.classList.toggle('alerting', shared.size === 'alert' || shared.size === 'image');
   pill.classList.toggle('alert-centred', shared.size === 'alertCentre');
@@ -126,7 +130,17 @@ function paintSize() {
   
   
   
+  const wasGrown = root.classList.contains('grown');
   root.classList.toggle('grown', !CLOSED.has(shared.size));
+  if (wasGrown && CLOSED.has(shared.size)) {
+    // The growth writes --width-ease and its clock as inline properties on the root, and an inline property beats any class rule on that same element — so the return's own curve was set in the stylesheet and never once applied. The growth's values are given back before the class that replaces them goes on.
+    root.style.removeProperty('--width-ease');
+    root.style.removeProperty('--width-ms');
+    root.style.removeProperty('--width-delay');
+    root.classList.add('returning');
+    clearTimeout(returningTimer);
+    returningTimer = setTimeout(() => root.classList.remove('returning'), HOME_TRAVEL);
+  }
   if (!CLOSED.has(shared.size)) {
     
     

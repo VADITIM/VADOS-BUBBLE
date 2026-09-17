@@ -1,6 +1,7 @@
 import { dashAlert, homeDashAlert, isAlertCentred, isAlertDashed, recentreAlert } from '../alert.js';
 import { setSize, showFace, toClosed } from '../row.js';
 import { PICTURE_MAX_HEIGHT, bridge, pill, shared } from '../state.js';
+import { isChannelLive, refreshChannel } from '../channel.js';
 import { statusOpen } from '../status.js';
 
 
@@ -296,7 +297,9 @@ export function show(notification) {
   // The dashboard is a screen the user asked for and an Alert is not, so the Alert goes where that screen has room to give rather than standing over it: slung into the stats section, on the same spawn and merge whether it is the first or the fifth.
   // A message appended to a conversation already standing there is not a fresh arrival — replaying the sling for it is what "the entry animation plays twice" was: the box is fixed to the stats section regardless of content, so an appended line just needs its dwell renewed.
   else if (statusOpen) {
-    if (appending && isAlertDashed()) {
+    // The channel is already standing in the room a slung Alert would be flown into, and it is the same notification list: what arrives is a repaint of what it is showing rather than a second card landing on top of it.
+    if (isChannelLive()) refreshChannel();
+    else if (appending && isAlertDashed()) {
       clearTimeout(shared.dwellTimer);
       shared.dwellTimer = setTimeout(homeDashAlert, shared.dwell);
     } else {

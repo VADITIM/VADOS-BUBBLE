@@ -501,6 +501,13 @@
     animation: panel-enter 0.34s var(--ease-enter) var(--enter-at, 0.06s) both;
     transform-origin: center center;
   }
+  /* The enter dropped frames because every staggered element on the screen was composited at once, including the several viewports of scroll strips nobody can see yet, and their positional delay ran well past a second so they were still arriving after the user had scrolled down to them. Anything starting below the fold is left at its settled state instead. */
+  .screen.active .stagger.settled { animation: none; }
+  /* The whole screen rasterizes on the frame it becomes visible, and Settings is several viewports of chips and sliders. A module out of view is skipped until it is scrolled to; the class is added a frame after the build so the strips have already centred themselves on their current chip while they still had layout. */
+  .module.deferred {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 12rem;
+  }
   .screen.leaving .stagger {
     animation: panel-leave 0.16s var(--ease-leave) both;
     transform-origin: center center;
@@ -754,9 +761,6 @@
     { group: 'Channels', screen: 'debug', key: 'blue',  name: 'Blue',  min: 0, max: 255 },
   ];
 
-
-  
-
   const STATES = [
     { group: 'Base', states: [['idle', 'Idle'], ['clear', 'Clear'], ['locked', 'Lock screen']] },
     { group: 'Mods', states: [
@@ -913,6 +917,12 @@
   }
 
   
+
+
+
+
+
+
 
 
 
@@ -1213,12 +1223,29 @@
   
   
   function applyPositionalStagger(screen) {
-    for (const element of screen.querySelectorAll('.stagger')) {
-      const box = element.getBoundingClientRect();
-      const delay = 0.06 + (box.top / window.innerHeight) * 0.28 + (box.left / window.innerWidth) * 0.1;
+    // Reading a box and writing a delay in the same loop forced a fresh layout of the entire screen once per staggered element, on the one frame that screen was already paying to rasterize itself. Every box is read first, then every delay written.
+    const elements = [...screen.querySelectorAll('.stagger')];
+    const boxes = elements.map(element => element.getBoundingClientRect());
+    const fold = window.innerHeight;
+    elements.forEach((element, index) => {
+      const box = boxes[index];
+      const isBelowFold = box.top >= fold;
+      element.classList.toggle('settled', isBelowFold);
+      if (isBelowFold) {
+        element.style.willChange = '';
+        return;
+      }
+      const delay = 0.06 + (box.top / fold) * 0.28 + (box.left / window.innerWidth) * 0.1;
       element.style.setProperty('--enter-at', delay.toFixed(2) + 's');
       element.style.setProperty('--reveal-delay', (delay + 0.1).toFixed(2) + 's');
-    }
+      // Promoting before the delay elapses keeps the layer allocation out of the animation's own first frame, and it is handed back at the end so the screen is not left sitting on a pile of layers while it is scrolled.
+      element.style.willChange = 'transform, opacity';
+      element.addEventListener('animationend', function release(event) {
+        if (event.target !== element) return;
+        element.style.willChange = '';
+        element.removeEventListener('animationend', release);
+      });
+    });
   }
 
   let activeGroup = 'All';
@@ -1229,7 +1256,9 @@
   }
   function buildGroupNav() {
     const groupNav = document.getElementById('group-nav');
-    const groups = ['All', ...new Set(FIELDS.filter(field => field.screen !== 'debug').map(field => field.group))];
+    const groups = ['All', ...new Set(
+      FIELDS.filter(field => field.screen !== 'debug').map(field => field.group)
+    )];
     for (const group of groups) {
       const button = document.createElement('button');
       button.textContent = group;
@@ -1316,6 +1345,9 @@
   screens[0].classList.add('active');
   applyPositionalStagger(screens[0]);
   paintNav();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    for (const module of document.querySelectorAll('.module')) module.classList.add('deferred');
+  }));
 
   
   

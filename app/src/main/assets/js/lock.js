@@ -1,12 +1,13 @@
 import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
-import { blankLockLabels, clock, flipPlaying, paintProgress, playPath, livePosition, shownPosition, songSwapping, typeLabels } from './mods/media.js';
+import { blankLockLabels, clock, flipPlaying, joinWave, livePosition, setWaveRatio, songSwapping, typeLabels } from './mods/media.js';
 import { cancelSpring, HOLD_BLOCK, rubberBandPast, toy, untoy } from './motion.js';
 import { fitClockProxy } from './clock.js';
-import { fitStatusProxy, setPanelNowOpen } from './status.js';
+import { closeStatusPanel, fitStatusProxy, setPanelNowOpen } from './status.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 import { leaveForMod } from './tabs.js';
 import { refreshEdgeProxy } from './edge.js';
+import { SLING_DRAW_BACK, SLING_DRAW_EASE, SLING_DRAW_MILLIS, SLING_DRAW_SQUEEZE, SLING_POP_EASE, SLING_SHOT_ANGLE, SLING_SHOT_EASE, SLING_SHOT_LEAD, SLING_SHOT_MILLIS, SLING_SHOT_OVER, between, slingFrames } from './sling.js';
 
 
 let lockShift = 0;
@@ -33,57 +34,13 @@ const LOCK_OPEN_HEIGHT = 546;
 const LOCK_SWIPE = 24;
 
 
-// The leave is the one journey here written as **two** timelines, and the seam between them is the point of it rather than the bug the rest of this file spends its comments avoiding: a slingshot is a draw and then a release, and those are two events with a discontinuity between them. What made the single timeline read as lame is that it was one curve every time — same draw, same shares, same distance — so the eye learnt it after two goes.
-const LOCK_DRAW_MILLIS = [180, 240];
-const LOCK_DRAW_BACK = [26, 44];
-const LOCK_DRAW_SQUEEZE = 0.94;
-
-
-// The shot's speed and overshoot are drawn fresh per shot and bounded on purpose: weaker than this and the arc is a drift, stronger and the whole thing is over before it can be seen. The *angle* is not drawn — it is aimed, off the flick that dismissed the panel.
-const LOCK_SHOT_MILLIS = [300, 420];
-const LOCK_SHOT_ANGLE = [10, 34];
-const LOCK_SHOT_OVER = [14, 30];
-const LOCK_SHOT_PUNCH = 1.16;
-
-
-// How hard the release lets go, as the initial velocity of one damped spring, and how far along the launch line the arc is aimed before it bends onto the target.
-const LOCK_SHOT_DECAY = 5.2;
 const LOCK_LEAN_REACH = 18;
-const LOCK_SHOT_LEAD = 0.62;
 
 
-// The arc is one curve read at this many points. Over a shot of ~350ms that is a sample every 13ms — closer together than the frames that will draw them — so the straight lines between them are what the eye never sees and the curve is what it does.
-const LOCK_SHOT_SAMPLES = 26;
 
 
-// The punch is keyed to the clock and not to the distance: the release covers a third of the journey in its first sixth, so a stretch keyed to how far it had got would be over before it could be seen.
-const LOCK_PUNCH_SHARE = 0.34;
 
 
-// Where the spring stops being a spring. Past this the overshoot it is still carrying is wound down to nothing on a curve that is flat at both ends, so the shape arrives at a standstill instead of arriving with the velocity a cut-off oscillation still has — that leftover velocity is what a bounce is.
-const LOCK_SETTLE_FROM = 0.78;
-
-
-// How far past the mark the spring's first crest lands, as a share of the journey. It has no closed form — the crest is where the spring's own velocity turns, not where its cosine bottoms out, and solving it as though the two were the same put the overshoot at nearly twice what was asked for. The excess climbs with the swing, so a bisection settles it in a handful of steps and the number that comes out is the one the shot was aimed at.
-function crestOf(swing) {
-  return (swing / Math.hypot(LOCK_SHOT_DECAY, swing)) *
-    Math.exp(-LOCK_SHOT_DECAY * (Math.PI - Math.atan(LOCK_SHOT_DECAY / swing)) / swing);
-}
-
-function smoothly(step) {
-  return step * step * (3 - 2 * step);
-}
-
-function swingFor(share) {
-  let low = 0.1;
-  let high = 40;
-  for (let step = 0; step < 24; step += 1) {
-    const middle = (low + high) / 2;
-    if (crestOf(middle) < share) low = middle;
-    else high = middle;
-  }
-  return (low + high) / 2;
-}
 
 
 // The reading falls away from under the cover, one block after another, while the cover itself stays where it is: it is the mod, and the mod is the thing being carried home, so it rides the bubble's own close rather than leaving separately.
@@ -96,13 +53,7 @@ const LOCK_LEAVE_DROP = 20;
 const LOCK_MERGE_FADE = 200;
 
 
-const LOCK_DRAW_EASE = 'cubic-bezier(0.5, 0, 0.75, 0.2)';
-const LOCK_POP_EASE = 'cubic-bezier(0.2, 1.9, 0.4, 1)';
-const LOCK_SHOT_EASE = 'cubic-bezier(0.3, 0, 0.2, 1)';
 
-function between([low, high]) {
-  return low + Math.random() * (high - low);
-}
 
 
 const LOCK_FLY_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
@@ -124,7 +75,8 @@ export const lockPill = document.getElementById('lock-now');
 // Where the shot is aimed. Not the middle of Main — the slot the mod's own artwork will stand in once the row has it back, so the cover the ball is carrying lands on the spot it is about to occupy rather than near it. The face it sits in is hidden while the mod is stolen and is still laid out, which is what makes it measurable at all.
 const mediaArtSlot = document.getElementById('media-art-slot');
 export const lockArt = document.getElementById('lock-art');
-const lockElapsed = document.getElementById('lock-elapsed');
+const lockWave = document.getElementById('lock-wave');
+const lockWaveCanvas = document.getElementById('lock-wave-canvas');
 
 
 
@@ -134,7 +86,6 @@ const lockElapsed = document.getElementById('lock-elapsed');
 const lockMovers = [
   { element: document.getElementById('lock-art-slot'), resizes: true, travels: true },
   { element: document.getElementById('lock-meta'), resizes: false },
-  { element: document.getElementById('lock-buttons'), resizes: false },
   { element: document.getElementById('lock-timeline'), resizes: false },
 ];
 
@@ -236,7 +187,7 @@ export function paintLock() {
   
   if (!songSwapping) typeLabels();
   document.getElementById('lock-duration').textContent = clock(shared.media.duration || 0);
-  document.getElementById('lock-play-path').setAttribute('d', playPath());
+  joinWave(lockWaveCanvas, lockWaveWanted);
   paintLockProgress(livePosition());
 }
 
@@ -298,6 +249,8 @@ function settleLock(change) {
       mover.element.style.transform = '';
     });
   });
+  // The wave drops itself the moment the retracted pill takes its timeline out of the layout, so the size change that puts the timeline back is what has to ask for it again — every one of them comes through here.
+  joinWave(lockWaveCanvas, lockWaveWanted);
   stirLiquid(900);
 }
 
@@ -331,10 +284,16 @@ function closeLock() {
 
 
 export function paintLockProgress(position) {
-  const duration = (shared.media && shared.media.duration) || 0;
-  const ratio = duration > 0 ? Math.min(1, position / duration) : 0;
-  lockElapsed.style.width = (ratio * 100) + '%';
+  setWaveRatio(position);
   document.getElementById('lock-position').textContent = clock(position);
+}
+
+
+// The wave costs a frame each, so it is only drawn while the timeline it is standing in is laid out at all: `.compact` takes the timeline out of the panel's retracted pill, and an idle bubble is carrying no song for it to be the shape of.
+function lockWaveWanted() {
+  return lockPill.classList.contains('showing') &&
+    !lockPill.classList.contains('compact') &&
+    !lockPill.classList.contains('idle');
 }
 
 
@@ -445,13 +404,13 @@ function drawLockBack() {
   // The throw is aimed by the hand. The flick that dismissed the panel fires the moment it has gone 24px up, so what it has done sideways by then is a handful of pixels rather than a whole gesture — LOCK_LEAN_REACH is what a full lean is worth, and it is small for exactly that reason. A close with no flick behind it leaves it at nothing and the shot takes a side of its own, since straight up the middle is the one shape this journey may not be.
   const lean = Math.max(-1, Math.min(1, lockLean / LOCK_LEAN_REACH));
   const side = lean === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(lean);
-  const degrees = LOCK_SHOT_ANGLE[0] + Math.abs(lean) * (LOCK_SHOT_ANGLE[1] - LOCK_SHOT_ANGLE[0]);
+  const degrees = SLING_SHOT_ANGLE[0] + Math.abs(lean) * (SLING_SHOT_ANGLE[1] - SLING_SHOT_ANGLE[0]);
   const angle = (side * degrees * Math.PI) / 180;
 
   // The launch line is the direct line turned by the angle. The draw is straight back along that line: the pull and the release are one line, and the bow is what bends off it afterwards.
   const launchX = (Math.cos(angle) * dx - Math.sin(angle) * dy) / reach;
   const launchY = (Math.sin(angle) * dx + Math.cos(angle) * dy) / reach;
-  const back = between(LOCK_DRAW_BACK);
+  const back = between(SLING_DRAW_BACK);
 
   lockShot = {
     dx,
@@ -462,11 +421,11 @@ function drawLockBack() {
     backX: -launchX * back,
     backY: -launchY * back,
     drop: (Math.min(to.width, mainRestHeight()) / ball) * 0.9,
-    over: between(LOCK_SHOT_OVER),
-    millis: Math.round(between(LOCK_SHOT_MILLIS)),
+    over: between(SLING_SHOT_OVER),
+    millis: Math.round(between(SLING_SHOT_MILLIS)),
   };
 
-  const millis = Math.round(between(LOCK_DRAW_MILLIS));
+  const millis = Math.round(between(SLING_DRAW_MILLIS));
 
   // Nothing may read layout between here and the width animation below: centring takes the bubble off cross-axis stretch, and until the keyframes are in effect the box it would resolve to is its own content's width rather than the one just measured.
   lockPill.classList.add('circling');
@@ -476,10 +435,10 @@ function drawLockBack() {
       { translate: '0px 0px', scale: 1 },
       {
         translate: lockShot.backX.toFixed(1) + 'px ' + lockShot.backY.toFixed(1) + 'px',
-        scale: LOCK_DRAW_SQUEEZE,
+        scale: SLING_DRAW_SQUEEZE,
       },
     ],
-    { duration: millis, easing: LOCK_DRAW_EASE, fill: 'forwards' }
+    { duration: millis, easing: SLING_DRAW_EASE, fill: 'forwards' }
   );
 
   lockFlight = [
@@ -489,7 +448,7 @@ function drawLockBack() {
         { width: Math.round(from.width) + 'px', borderRadius: '34px' },
         { width: Math.round(ball) + 'px', borderRadius: Math.round(ball / 2) + 'px' },
       ],
-      { duration: millis, easing: LOCK_SHOT_EASE, fill: 'forwards' }
+      { duration: millis, easing: SLING_SHOT_EASE, fill: 'forwards' }
     ),
     // The cover is centred in the box by .circling rather than being carried there by hand, so it holds the middle for every width the box passes through instead of chasing a layout that is moving underneath it — an offset worked out once against the starting width is only correct at the starting width. What is animated is the jump that centring it caused: from exactly where the flex row had it, back to nothing. Its size travels on the same clock, from the square it was in the row up to the ball, so the drop that sets off is the artwork at full size rather than the artwork parked in the middle of a blank circle. It is grown as a box rather than scaled because `object-fit` crops against the box it is given: scaled, the cover would carry the pill's wide crop squeezed into a square, and the picture would stretch back out over the draw.
     lockMovers[0].element.animate(
@@ -507,14 +466,14 @@ function drawLockBack() {
           height: Math.round(ball) + 'px',
         },
       ],
-      { duration: millis, easing: LOCK_SHOT_EASE, fill: 'forwards' }
+      { duration: millis, easing: SLING_SHOT_EASE, fill: 'forwards' }
     ),
     ...lockMovers.filter(mover => !mover.travels).map((mover, index) => {
       const goes = index * LOCK_LEAVE_STAGGER;
       return mover.element.animate(
         [
           { opacity: 1, translate: '0px 0px', offset: 0 },
-          { opacity: 1, translate: '0px 0px', offset: goes, easing: LOCK_SHOT_EASE },
+          { opacity: 1, translate: '0px 0px', offset: goes, easing: SLING_SHOT_EASE },
           {
             opacity: 0,
             translate: '0px ' + LOCK_LEAVE_DROP + 'px',
@@ -540,32 +499,22 @@ function shootLockHome() {
   // One quadratic curve from the draw point to Main, with its control point set along the launch line: a quadratic's tangent at its start is exactly the line to that control point, so the shape provably leaves at the angle it was aimed at and provably arrives at the target, without either end being a keyframe that has to be tuned into agreement with the other.
   const fromX = shot.backX;
   const fromY = shot.backY;
-  const holdX = fromX + shot.launchX * shot.reach * LOCK_SHOT_LEAD;
-  const holdY = fromY + shot.launchY * shot.reach * LOCK_SHOT_LEAD;
+  const holdX = fromX + shot.launchX * shot.reach * SLING_SHOT_LEAD;
+  const holdY = fromY + shot.launchY * shot.reach * SLING_SHOT_LEAD;
 
   // How far along that curve the shape has got is one damped spring, so the release is a single continuous velocity: fastest the instant it lets go, easing off, carrying past the target and settling onto it. It was three keyframes with an easing each, and every one of those easings ends at a standstill — which is what read as the shot stopping in the middle and starting again.
-  const swing = swingFor(Math.min(0.35, Math.max(0.004, shot.over / shot.reach)));
-
-  const frames = [];
-  for (let index = 0; index < LOCK_SHOT_SAMPLES; index += 1) {
-    const step = index / (LOCK_SHOT_SAMPLES - 1);
-    const wound = step <= LOCK_SETTLE_FROM
-      ? 1
-      : 1 - smoothly((step - LOCK_SETTLE_FROM) / (1 - LOCK_SETTLE_FROM));
-    const travel = 1 - Math.exp(-LOCK_SHOT_DECAY * step) * Math.cos(swing * step) * wound;
-    const back = 1 - travel;
-    const punch = Math.sin(Math.min(1, step / LOCK_PUNCH_SHARE) * Math.PI) ** 2;
-    const closing = LOCK_DRAW_SQUEEZE + (shot.drop - LOCK_DRAW_SQUEEZE) * (1 - back * back);
-    frames.push({
-      offset: step,
-      translate:
-        (back * back * fromX + 2 * back * travel * holdX + travel * travel * shot.dx).toFixed(1) +
-        'px ' +
-        (back * back * fromY + 2 * back * travel * holdY + travel * travel * shot.dy).toFixed(1) +
-        'px',
-      scale: closing * (1 + (LOCK_SHOT_PUNCH - 1) * punch),
-    });
-  }
+  const frames = slingFrames({
+    startX: fromX,
+    startY: fromY,
+    holdX,
+    holdY,
+    endX: shot.dx,
+    endY: shot.dy,
+    scaleStart: SLING_DRAW_SQUEEZE,
+    scaleEnd: shot.drop,
+    over: shot.over,
+    reach: shot.reach,
+  });
 
   root.classList.add('lock-incoming');
 
@@ -729,6 +678,8 @@ lockPill.addEventListener('touchstart', event => {
     untoy(lockPill, '--lock-drag');
     bridge.triggerHaptic('expand');
     leaveForMod('media');
+    // The hold is the way out to the app, and the dashboard is what was being left: held in the panel it stood open behind the player and was still there on the way back. Closing it is the same close the flick makes, so the bubble flies home rather than being left standing over a panel that has gone.
+    if (panelHeld) closeStatusPanel();
   }, HOLD_MILLIS);
 }, { passive: true });
 
@@ -741,14 +692,35 @@ lockPill.addEventListener('touchmove', event => {
   
   
   
+  // The transport buttons are gone, so the swipes are the transport: sideways is the song either way, exactly as the media tab already reads it.
+  if (!lockSwiped && Math.abs(dx) > LOCK_SWIPE && Math.abs(dx) > Math.abs(dy)) {
+    lockSwiped = true;
+    clearTimeout(lockHoldTimer);
+    lockPill.classList.remove('pressed');
+    bridge.triggerHaptic('expand');
+    untoy(lockPill, '--lock-drag');
+    bridge.mediaControl(dx > 0 ? 'next' : 'previous');
+    return;
+  }
   if (!lockSwiped && Math.abs(dy) > LOCK_SWIPE && Math.abs(dy) > Math.abs(dx)) {
     lockSwiped = true;
     clearTimeout(lockHoldTimer);
     lockPill.classList.remove('pressed');
-    bridge.triggerHaptic('tap');
     untoy(lockPill, '--lock-drag');
-    if (dy < 0) openLock();
-    else closeLock();
+    // In the dashboard an upward flick is the panel's own dismiss and the panel hears the same touch through its own proxy, so the bubble answers nothing: it played the expand on a panel that was already leaving, and the card grew into a screen going away underneath it.
+    if (panelHeld && dy < 0) return;
+    const isBig = panelHeld ? panelExpanded : lockOpen;
+    // Where the play button stood, down is what plays and pauses. Retracted there is nothing to pause onto, so down is still the close.
+    if (isBig && dy > 0) {
+      bridge.triggerHaptic('expand');
+      const wanted = shared.media && shared.media.isPlaying ? 'pause' : 'play';
+      flipPlaying();
+      bridge.mediaControl(wanted);
+      return;
+    }
+    bridge.triggerHaptic('tap');
+    if (isBig || dy > 0) closeLock();
+    else openLock();
     return;
   }
   if (lockSwiped) return;
@@ -796,28 +768,6 @@ lockPill.addEventListener('click', () => {
 
 
 
-function knock(element) {
-  element.classList.add('knocked');
-  
-  
-  
-  clearTimeout(knocking.get(element));
-  knocking.set(element, setTimeout(() => element.classList.remove('knocked'), KNOCK_MILLIS));
-}
-
-const KNOCK_MILLIS = 90;
-const knocking = new WeakMap();
-
-
-
-
-
-
-
-
-
-
-
 function ownsTouch(element) {
   for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'click']) {
     element.addEventListener(type, event => event.stopPropagation(), { passive: true });
@@ -828,12 +778,11 @@ function ownsTouch(element) {
 
 
 
-document.querySelectorAll('#lock-buttons .transport').forEach(ownsTouch);
 ownsTouch(document.getElementById('lock-timeline'));
 
 
 
-document.querySelectorAll('#player-buttons .transport').forEach(ownsTouch);
+ownsTouch(document.getElementById('player-speed'));
 
 
 
@@ -845,39 +794,39 @@ document.querySelectorAll('#player-buttons .transport').forEach(ownsTouch);
 
 
 
-const lockTrack = document.getElementById('lock-track');
-let lockScrubOrigin = 0;
-let lockScrubStart = 0;
+// The wave is seeked where the finger lands rather than relative to where it started, which is what the media tab's own wave already does — one drawing, one way of being worked.
+function lockWaveSeek(clientX) {
+  const box = lockWaveCanvas.getBoundingClientRect();
+  const share = Math.min(1, Math.max(0, (clientX - box.left) / box.width));
+  return Math.round(share * (shared.media.duration || 0));
+}
 
 document.getElementById('lock-timeline').addEventListener('touchstart', event => {
   if (!shared.media || !shared.media.duration) return;
   shared.isScrubbing = true;
-  lockScrubOrigin = event.touches[0].clientX;
-  lockScrubStart = shownPosition;
-  shared.scrubPosition = shownPosition;
+  lockWave.classList.add('scrubbing');
+  shared.scrubPosition = lockWaveSeek(event.touches[0].clientX);
+  paintLockProgress(shared.scrubPosition);
 }, { passive: true });
 
 document.getElementById('lock-timeline').addEventListener('touchmove', event => {
   if (!shared.isScrubbing) return;
-  const box = lockTrack.getBoundingClientRect();
-  const travelled =
-    ((event.touches[0].clientX - lockScrubOrigin) / box.width) * shared.media.duration;
-  shared.scrubPosition = Math.min(
-    shared.media.duration, Math.max(0, Math.round(lockScrubStart + travelled))
-  );
+  shared.scrubPosition = lockWaveSeek(event.touches[0].clientX);
   paintLockProgress(shared.scrubPosition);
 }, { passive: true });
 
-function releaseLockScrub() {
+function releaseLockScrub(seeks) {
   if (!shared.isScrubbing) return;
   shared.isScrubbing = false;
+  lockWave.classList.remove('scrubbing');
+  if (!seeks) return;
   bridge.triggerHaptic('tap');
   bridge.mediaSeek(String(shared.scrubPosition));
 }
 document.getElementById('lock-timeline')
-  .addEventListener('touchend', releaseLockScrub, { passive: true });
+  .addEventListener('touchend', () => releaseLockScrub(true), { passive: true });
 document.getElementById('lock-timeline')
-  .addEventListener('touchcancel', () => { shared.isScrubbing = false; }, { passive: true });
+  .addEventListener('touchcancel', () => releaseLockScrub(false), { passive: true });
 
 
 
@@ -888,114 +837,6 @@ document.getElementById('lock-timeline')
 
 
 
-
-
-
-
-
-function transport(id, action) {
-  const button = document.getElementById(id);
-  button.addEventListener('touchstart', () => {
-    knock(button);
-    bridge.triggerHaptic('tap');
-  }, { passive: true });
-  button.addEventListener('click', event => {
-    event.stopPropagation();
-    bridge.mediaControl(typeof action === 'function' ? action() : action);
-  });
-}
-
-
-function pressPlay() {
-  const wanted = shared.media && shared.media.isPlaying ? 'pause' : 'play';
-  flipPlaying();
-  return wanted;
-}
-
-transport('lock-previous', 'previous');
-transport('lock-next', 'next');
-transport('lock-play', pressPlay);
-transport('player-previous', 'previous');
-transport('player-next', 'next');
-transport('player-play', pressPlay);
-
-
-
-
-
-
-
-const playerTimeline = document.getElementById('player-timeline');
-const playerTrack = document.getElementById('player-track');
-
-
-
-
-
-
-
-let scrubOrigin = 0;
-let scrubStart = 0;
-
-function scrubBy(clientX) {
-  const box = playerTrack.getBoundingClientRect();
-  const travelled = ((clientX - scrubOrigin) / box.width) * shared.media.duration;
-  return Math.min(shared.media.duration, Math.max(0, Math.round(scrubStart + travelled)));
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-playerTimeline.addEventListener('touchstart', event => {
-  if (!shared.media || !shared.media.duration) return;
-  event.stopPropagation();
-  shared.isScrubbing = true;
-  playerTimeline.classList.add('scrubbing');
-  scrubOrigin = event.touches[0].clientX;
-  scrubStart = shownPosition;
-  shared.scrubPosition = shownPosition;
-}, { passive: true });
-
-playerTimeline.addEventListener('touchmove', event => {
-  if (!shared.isScrubbing) return;
-  event.stopPropagation();
-  shared.scrubPosition = scrubBy(event.touches[0].clientX);
-  paintProgress(shared.scrubPosition);
-}, { passive: true });
-
-playerTimeline.addEventListener('touchend', event => {
-  if (!shared.isScrubbing) return;
-  event.stopPropagation();
-  shared.isScrubbing = false;
-  playerTimeline.classList.remove('scrubbing');
-  bridge.triggerHaptic('tap');
-  bridge.mediaSeek(String(shared.scrubPosition));
-}, { passive: true });
-
-
-
-playerTimeline.addEventListener('click', event => event.stopPropagation());
-
-
-
-playerTimeline.addEventListener('touchcancel', () => {
-  shared.isScrubbing = false;
-  playerTimeline.classList.remove('scrubbing');
-}, { passive: true });
-
-
-playerTimeline.addEventListener('click', event => event.stopPropagation());
 
 
 
@@ -1080,41 +921,31 @@ function playNowEnter() {
 
   // Nothing threw this one, so the arc takes a side of its own: straight down the middle is the one shape this journey may not be, whichever way it is travelled.
   const side = Math.random() < 0.5 ? -1 : 1;
-  const angle = (side * LOCK_SHOT_ANGLE[0] * Math.PI) / 180;
+  const angle = (side * SLING_SHOT_ANGLE[0] * Math.PI) / 180;
   const launchX = (Math.cos(angle) * -dx - Math.sin(angle) * -dy) / reach;
   const launchY = (Math.sin(angle) * -dx + Math.cos(angle) * -dy) / reach;
 
-  const back = between(LOCK_DRAW_BACK);
+  const back = between(SLING_DRAW_BACK);
   const backX = -launchX * back;
   const backY = -launchY * back;
-  const holdX = dx + launchX * reach * LOCK_SHOT_LEAD;
-  const holdY = dy + launchY * reach * LOCK_SHOT_LEAD;
+  const holdX = dx + launchX * reach * SLING_SHOT_LEAD;
+  const holdY = dy + launchY * reach * SLING_SHOT_LEAD;
 
-  const over = between(LOCK_SHOT_OVER);
-  const swing = swingFor(Math.min(0.35, Math.max(0.004, over / reach)));
-  const millis = Math.round(between(LOCK_SHOT_MILLIS));
-  const opening = Math.round(between(LOCK_DRAW_MILLIS));
+  const millis = Math.round(between(SLING_SHOT_MILLIS));
+  const opening = Math.round(between(SLING_DRAW_MILLIS));
 
-  const frames = [];
-  for (let index = 0; index < LOCK_SHOT_SAMPLES; index += 1) {
-    const step = index / (LOCK_SHOT_SAMPLES - 1);
-    const wound = step <= LOCK_SETTLE_FROM
-      ? 1
-      : 1 - smoothly((step - LOCK_SETTLE_FROM) / (1 - LOCK_SETTLE_FROM));
-    const travel = 1 - Math.exp(-LOCK_SHOT_DECAY * step) * Math.cos(swing * step) * wound;
-    const rest = 1 - travel;
-    const punch = Math.sin(Math.min(1, step / LOCK_PUNCH_SHARE) * Math.PI) ** 2;
-    const growing = drop + (LOCK_DRAW_SQUEEZE - drop) * (1 - rest * rest);
-    frames.push({
-      offset: step,
-      translate:
-        (rest * rest * dx + 2 * rest * travel * holdX + travel * travel * backX).toFixed(1) +
-        'px ' +
-        (rest * rest * dy + 2 * rest * travel * holdY + travel * travel * backY).toFixed(1) +
-        'px',
-      scale: growing * (1 + (LOCK_SHOT_PUNCH - 1) * punch),
-    });
-  }
+  const frames = slingFrames({
+    startX: dx,
+    startY: dy,
+    holdX,
+    holdY,
+    endX: backX,
+    endY: backY,
+    scaleStart: drop,
+    scaleEnd: SLING_DRAW_SQUEEZE,
+    over: between(SLING_SHOT_OVER),
+    reach,
+  });
 
   // The class goes on in the same breath as the animation pinning the width, exactly as the leave's does: .circling takes the bubble off cross-axis stretch, so a frame between the two is a frame at its own content's width.
   lockPill.classList.add('circling');
@@ -1153,16 +984,16 @@ function openNowBall(to, art, ball, restRadius, backX, backY, millis) {
       { width: Math.round(ball) + 'px', borderRadius: Math.round(ball / 2) + 'px' },
       { width: Math.round(to.width) + 'px', borderRadius: restRadius },
     ],
-    { duration: millis, easing: LOCK_SHOT_EASE, fill: 'forwards' }
+    { duration: millis, easing: SLING_SHOT_EASE, fill: 'forwards' }
   );
 
   lockShape.push(
     lockPill.animate(
       [
-        { translate: backX.toFixed(1) + 'px ' + backY.toFixed(1) + 'px', scale: LOCK_DRAW_SQUEEZE },
+        { translate: backX.toFixed(1) + 'px ' + backY.toFixed(1) + 'px', scale: SLING_DRAW_SQUEEZE },
         { translate: '0px 0px', scale: 1 },
       ],
-      { duration: millis, easing: LOCK_POP_EASE, fill: 'forwards' }
+      { duration: millis, easing: SLING_POP_EASE, fill: 'forwards' }
     ),
     opening,
     lockMovers[0].element.animate(
@@ -1176,7 +1007,7 @@ function openNowBall(to, art, ball, restRadius, backX, backY, millis) {
           height: Math.round(art.height) + 'px',
         },
       ],
-      { duration: millis, easing: LOCK_SHOT_EASE, fill: 'forwards' }
+      { duration: millis, easing: SLING_SHOT_EASE, fill: 'forwards' }
     )
   );
 
@@ -1191,7 +1022,7 @@ function openNowBall(to, art, ball, restRadius, backX, backY, millis) {
       {
         duration: LOCK_SPRIG_MS,
         delay: millis + index * LOCK_SPRIG_STAGGER,
-        easing: LOCK_POP_EASE,
+        easing: SLING_POP_EASE,
         fill: 'backwards',
       }
     ));
@@ -1218,5 +1049,11 @@ function landNowEnter() {
 lockPill.addEventListener('transitionend', event => {
   if (event.target !== lockPill) return;
   if (event.propertyName !== 'width' && event.propertyName !== 'height') return;
+  fitLockProxy();
+});
+
+// The bubble is anchored off the dashboard's toggle row now, so the stack's own `bottom` is a second thing that moves it — and the window was placed off a box that was still travelling. Same reading as the width and the height above it: the box says when it has stopped.
+lockPill.parentElement.addEventListener('transitionend', event => {
+  if (event.target !== lockPill.parentElement || event.propertyName !== 'bottom') return;
   fitLockProxy();
 });

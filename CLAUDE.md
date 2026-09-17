@@ -37,10 +37,11 @@ The JDK and the SDK exist only on the machine the phone is flashed from. A check
 
 ## Where the work is tracked
 
-Two notes in the user's Obsidian vault, which is a configured working directory for this session:
+The folder `DYNAMIC BUBBLE/` in the user's Obsidian vault, which is a configured working directory for this session. The two notes this section used to name — `Dynamic Bubble.md` and `Dynamic Bubble Stability & Improvements.md` — no longer exist; the folder replaced them.
 
-- `Dynamic Bubble.md` — the live backlog. The user edits it directly; tick an item `[x]` there when it ships.
-- `Dynamic Bubble Stability & Improvements.md` — the system overhaul: the model every bubble is meant to obey, and the current issue list. Its contents are being moved into `.claude/rules/` as they become binding.
+- `Improvements Working.md` — **the ledger, and the only file a session ticks.** It is `Improvements.md` regrouped into batches that each fit one session: every batch names its files, the contracts it touches and a recommended model. Take one batch, `/compact` after it, and tick `[x]` only once the user has walked it on the phone. Items the user has added to `Improvements.md` since get folded into the right batch when that batch is next picked up.
+- `Improvements.md` — the raw braindump the user writes into directly. Never edited by a session, and never worked top-to-bottom; read it only to fold new items into the ledger.
+- `Battery overhaul.md`, `Screen Off Alerts - AOD.md`, `Unlock to Access - One Hand Operations +.md` — feature notes, each its own piece of work, outside the ledger.
 
 Nothing about open work belongs in this repository.
 

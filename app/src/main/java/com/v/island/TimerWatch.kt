@@ -28,15 +28,18 @@ object TimerWatch {
 
     private val endsAtPattern = Regex("""(\d{1,2}):(\d{2})\s*$""")
 
+    // A stopwatch posts the same ongoing chronometer notification a timer does, counting up rather than down — the clock app's own count-down flag is the only thing that tells the two apart, since neither the summary field nor the notification's shape names which one is running. Answering yes to both is what put a mod on the bubble with no remaining time to show: a stopwatch has none.
     fun isTimer(statusBarNotification: StatusBarNotification): Boolean {
         if (AppStyles.of(statusBarNotification.packageName).key != "clock") return false
         val notification = statusBarNotification.notification
         if (notification.flags and Notification.FLAG_ONGOING_EVENT == 0) return false
-        
-        
+
+
         if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return false
-        return notification.extras.containsKey(CHRONOMETER) ||
-            notification.extras.containsKey(SUMMARY)
+        val summary = notification.extras.getString(SUMMARY).orEmpty()
+        return endsAtByChronometer(notification) != null ||
+            remaining(summary) != null ||
+            endsAtByClock(summary) != null
     }
 
     fun describe(statusBarNotification: StatusBarNotification): JSONObject {

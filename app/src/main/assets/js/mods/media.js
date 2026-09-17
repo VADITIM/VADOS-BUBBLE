@@ -1,9 +1,8 @@
 import { lockArt, lockPill, paintLock, paintLockProgress } from '../lock.js';
 import { becomeExtended, closedTarget, setSize, showFace, toClosed } from '../row.js';
 import { refreshDock } from '../status.js';
-import { bridge, mods, pill, shared } from '../state.js';
+import { bridge, mods, pill, root, shared } from '../state.js';
 
-const playerElapsed = document.getElementById('player-elapsed');
 const playerPosition = document.getElementById('player-position');
 
 
@@ -177,8 +176,8 @@ export function paintMedia() {
   
   if (!songSwapping) typeLabels();
   document.getElementById('player-duration').textContent = clock(shared.media.duration || 0);
-  document.getElementById('player-play-path').setAttribute('d', playPath());
-  
+  buildWaveShape();
+
   
   const talks = TALKERS.includes(shared.media.app);
   if (!talks && speedAt !== 0) {
@@ -191,19 +190,18 @@ export function paintMedia() {
 }
 
 
-export function playPath() {
-  return shared.media && shared.media.isPlaying ? 'M7 5h3v14H7zm7 0h3v14h-3z' : 'M8 5v14l11-7z';
-}
-
-
 export let shownPosition = 0;
 
 export function paintProgress(position) {
   shownPosition = position;
-  const duration = (shared.media && shared.media.duration) || 0;
-  const ratio = duration > 0 ? Math.min(1, position / duration) : 0;
-  playerElapsed.style.width = (ratio * 100) + '%';
+  setWaveRatio(position);
   playerPosition.textContent = clock(position);
+}
+
+// The wave is one drawing read by two surfaces, so how far through the song it is has one owner rather than a copy per place it is painted.
+export function setWaveRatio(position) {
+  const duration = (shared.media && shared.media.duration) || 0;
+  waveRatio = duration > 0 ? Math.min(1, position / duration) : 0;
 }
 
 
@@ -339,6 +337,261 @@ export function runBars() {
   });
 }
 
+
+
+
+
+
+const waveBox = document.getElementById('player-wave');
+const waveCanvas = document.getElementById('player-wave-canvas');
+
+const WAVE_BARS = 54;
+const WAVE_BEAT_MILLIS = 480;
+const WAVE_REST = 0.12;
+
+let waveRatio = 0;
+let waveFrame = 0;
+let waveEnergy = WAVE_REST;
+let waveShape = [];
+let waveShapeFor = null;
+
+
+
+
+
+
+
+function buildWaveShape() {
+  const song = shared.media
+    ? (shared.media.title || '') + '|' + (shared.media.artist || '')
+    : '';
+  if (song === waveShapeFor && waveShape.length) return;
+  waveShapeFor = song;
+  let seed = 2166136261;
+  for (let index = 0; index < song.length; index += 1) {
+    seed = Math.imul(seed ^ song.charCodeAt(index), 16777619);
+  }
+  waveShape = [];
+  let level = 0.5;
+  for (let index = 0; index < WAVE_BARS; index += 1) {
+    seed = Math.imul(seed ^ (seed >>> 15), 2246822519);
+    level = level * 0.5 + (((seed >>> 8) & 0xffff) / 0xffff) * 0.5;
+    waveShape.push(0.24 + level * 0.76);
+  }
+}
+
+function fitWave(canvas) {
+  const box = canvas.getBoundingClientRect();
+  if (!box.width || !box.height) return;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.round(box.width * ratio);
+  canvas.height = Math.round(box.height * ratio);
+}
+
+const waveWatch = new ResizeObserver(entries => entries.forEach(entry => fitWave(entry.target)));
+
+
+
+
+
+
+// The beat is the song's, not the surface's, so the two places it is drawn are two surfaces reading one energy rather than two waves that happen to look alike. A surface says what keeps it alive instead of the loop testing for the player's own size, since the same loop now paints a canvas that stands at the foot of a panel the player face is never open behind.
+const waveSurfaces = new Map();
+
+export function joinWave(canvas, isWanted) {
+  if (waveSurfaces.has(canvas)) return;
+  waveSurfaces.set(canvas, { ink: canvas.getContext('2d'), isWanted });
+  waveWatch.observe(canvas);
+  fitWave(canvas);
+  runWave();
+}
+
+function leaveWave(canvas) {
+  waveSurfaces.delete(canvas);
+  waveWatch.unobserve(canvas);
+}
+
+
+
+
+
+
+
+function beatWave(now) {
+  const isPlaying = Boolean(shared.media && shared.media.isPlaying);
+  const beat = isPlaying
+    ? Math.pow(1 - ((now % WAVE_BEAT_MILLIS) / WAVE_BEAT_MILLIS), 2.4)
+    : 0;
+  const wanted = isPlaying ? 0.42 + beat * 0.58 : WAVE_REST;
+  waveEnergy += (wanted - waveEnergy) * 0.24;
+  return isPlaying;
+}
+
+function drawWave(canvas, waveInk, now, isPlaying) {
+  const width = canvas.width;
+  const height = canvas.height;
+  if (!width || !height) return;
+  const accent = getComputedStyle(canvas).getPropertyValue('--app-accent').trim() || '#ffffff';
+  const middle = height / 2;
+  const step = width / WAVE_BARS;
+  const thickness = Math.max(2, step * 0.44);
+  waveInk.clearRect(0, 0, width, height);
+  for (let index = 0; index < WAVE_BARS; index += 1) {
+    const share = (index + 0.5) / WAVE_BARS;
+    const shimmer = isPlaying ? 0.76 + 0.24 * Math.sin(now / 180 + index * 0.9) : 1;
+    const reach = Math.max(1, waveShape[index] * waveEnergy * shimmer * (middle - 2));
+    waveInk.fillStyle = share <= waveRatio ? accent : 'rgba(255, 255, 255, 0.32)';
+    waveInk.fillRect(index * step + (step - thickness) / 2, middle - reach, thickness, reach * 2);
+  }
+  const head = waveRatio * width;
+  waveInk.fillStyle = accent;
+  waveInk.fillRect(head - 1, 0, shared.isScrubbing ? 3 : 2, height);
+}
+
+function runWave() {
+  cancelAnimationFrame(waveFrame);
+  const step = now => {
+    for (const [canvas, surface] of waveSurfaces) {
+      if (!surface.isWanted()) leaveWave(canvas);
+    }
+    if (!waveSurfaces.size) return;
+    if (!shared.isStageHidden) {
+      const isPlaying = beatWave(now);
+      for (const [canvas, surface] of waveSurfaces) drawWave(canvas, surface.ink, now, isPlaying);
+    }
+    waveFrame = requestAnimationFrame(step);
+  };
+  waveFrame = requestAnimationFrame(step);
+}
+
+
+
+
+
+
+
+function waveSeek(clientX) {
+  const box = waveCanvas.getBoundingClientRect();
+  const share = Math.min(1, Math.max(0, (clientX - box.left) / box.width));
+  return Math.round(share * (shared.media.duration || 0));
+}
+
+waveBox.addEventListener('touchstart', event => {
+  if (!shared.media || !shared.media.duration) return;
+  event.stopPropagation();
+  shared.isScrubbing = true;
+  waveBox.classList.add('scrubbing');
+  shared.scrubPosition = waveSeek(event.touches[0].clientX);
+  paintProgress(shared.scrubPosition);
+}, { passive: true });
+
+waveBox.addEventListener('touchmove', event => {
+  if (!shared.isScrubbing) return;
+  event.stopPropagation();
+  shared.scrubPosition = waveSeek(event.touches[0].clientX);
+  paintProgress(shared.scrubPosition);
+}, { passive: true });
+
+function releaseWave(seeks) {
+  if (!shared.isScrubbing) return;
+  shared.isScrubbing = false;
+  waveBox.classList.remove('scrubbing');
+  if (!seeks) return;
+  bridge.triggerHaptic('tap');
+  bridge.mediaSeek(String(shared.scrubPosition));
+}
+
+waveBox.addEventListener('touchend', event => {
+  event.stopPropagation();
+  releaseWave(true);
+}, { passive: true });
+
+waveBox.addEventListener('touchcancel', () => releaseWave(false), { passive: true });
+waveBox.addEventListener('click', event => event.stopPropagation());
+
+
+
+
+
+
+
+
+
+
+
+
+const PLAYER_SWIPE = 52;
+const PLAYER_DRAG_FOLLOW = 0.55;
+const PLAY_GLYPH = 'M8 5l11 7-11 7z';
+const PAUSE_GLYPH = 'M7 5h4v14H7Zm6 0h4v14h-4Z';
+const playerFace = document.getElementById('player-face');
+const playerHint = document.getElementById('player-hint');
+const playerHintPath = document.getElementById('player-hint-path');
+let swipeFrom = null;
+
+function dragArt(across) {
+  playerArt.classList.add('dragged');
+  playerArt.style.translate = Math.round(across * PLAYER_DRAG_FOLLOW) + 'px';
+}
+
+function releaseArt(thrown) {
+  playerArt.classList.remove('dragged');
+  playerArt.style.transitionDuration = PLAYER_ART_MS + 'ms';
+  playerArt.style.translate = thrown ? Math.sign(thrown) * 140 + 'px' : '';
+  if (thrown) setTimeout(() => { playerArt.style.translate = ''; }, PLAYER_ART_MS);
+}
+
+function showHint(share) {
+  playerHintPath.setAttribute('d', shared.media && shared.media.isPlaying ? PAUSE_GLYPH : PLAY_GLYPH);
+  playerHint.classList.remove('settling');
+  playerHint.style.opacity = Math.min(1, share);
+  playerHint.style.scale = 0.55 + 0.45 * Math.min(1, share);
+}
+
+function releaseHint(struck) {
+  if (!playerHint.style.opacity) return;
+  playerHint.classList.add('settling');
+  playerHint.style.opacity = '0';
+  playerHint.style.scale = struck ? 1.35 : 0.55;
+}
+
+playerFace.addEventListener('touchstart', event => {
+  swipeFrom = shared.isScrubbing
+    ? null
+    : { x: event.touches[0].clientX, y: event.touches[0].clientY, isSpent: false };
+}, { passive: true });
+
+playerFace.addEventListener('touchmove', event => {
+  if (!swipeFrom || swipeFrom.isSpent || shared.isScrubbing) return;
+  const across = event.touches[0].clientX - swipeFrom.x;
+  const down = event.touches[0].clientY - swipeFrom.y;
+  if (Math.abs(across) > Math.abs(down)) {
+    dragArt(across);
+    if (Math.abs(across) < PLAYER_SWIPE) return;
+    swipeFrom.isSpent = true;
+    bridge.triggerHaptic('expand');
+    bridge.mediaControl(across > 0 ? 'previous' : 'next');
+    releaseArt(across);
+    return;
+  }
+  if (down > 0) showHint(down / PLAYER_SWIPE);
+  if (down < PLAYER_SWIPE) return;
+  swipeFrom.isSpent = true;
+  bridge.triggerHaptic('expand');
+  const wanted = shared.media && shared.media.isPlaying ? 'pause' : 'play';
+  releaseHint(true);
+  flipPlaying();
+  bridge.mediaControl(wanted);
+}, { passive: true });
+
+for (const type of ['touchend', 'touchcancel']) {
+  playerFace.addEventListener(type, () => {
+    swipeFrom = null;
+    releaseArt(0);
+    releaseHint(false);
+  }, { passive: true });
+}
+
 export function openPlayer() {
   becomeExtended();
   paintMedia();
@@ -348,6 +601,7 @@ export function openPlayer() {
   paintProgress(position);
   runMediaClock(position);
   playEntrance();
+  joinWave(waveCanvas, () => shared.size === 'player');
 }
 
 
@@ -391,9 +645,6 @@ export function flipPlaying() {
   if (!shared.media) return;
   shared.media.isPlaying = !shared.media.isPlaying;
   pill.classList.toggle('sounding', Boolean(shared.media.isPlaying));
-  const path = playPath();
-  document.getElementById('player-play-path').setAttribute('d', path);
-  document.getElementById('lock-play-path').setAttribute('d', path);
 }
 
 
