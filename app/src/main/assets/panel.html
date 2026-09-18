@@ -737,6 +737,8 @@
 
     { group: 'Other', key: 'quickDividers', name: 'Dashboard dividers', min: 0, max: 1,
       labels: ['Off', 'On'] },
+    { group: 'Other', key: 'dashAlertsDisabled', name: 'Disable Alerts in Dashboard', min: 0, max: 1,
+      labels: ['Off', 'On'] },
     { group: 'Other', key: 'statusBatteryPercent', name: 'Status battery %', min: 0, max: 1,
       labels: ['Hidden', 'Shown'] },
     { group: 'Other', key: 'statusBatteryPercentLight', name: 'Status battery % colour', min: 0, max: 1,
@@ -756,6 +758,8 @@
     { group: 'Font Settings', key: 'fontNotificationHeading', sizeKey: 'fontSizeNotificationHeading', name: 'Notification Heading', fontFamily: true },
     { group: 'Font Settings', key: 'fontNotificationContent', sizeKey: 'fontSizeNotificationContent', name: 'Notification Content', fontFamily: true },
 
+    { group: 'Zones', screen: 'debug', key: 'alertZoneShown', name: 'Alert pull zone', min: 0, max: 1,
+      labels: ['Hidden', 'Shown'] },
     { group: 'Channels', screen: 'debug', key: 'red',   name: 'Red',   min: 0, max: 255 },
     { group: 'Channels', screen: 'debug', key: 'green', name: 'Green', min: 0, max: 255 },
     { group: 'Channels', screen: 'debug', key: 'blue',  name: 'Blue',  min: 0, max: 255 },
@@ -783,6 +787,8 @@
       ['connectivity', 'Wifi'],
       ['connectivity-bluetooth', 'Bluetooth, with charge', true],
       ['connectivity-hotspot', 'Hotspot on mobile', true],
+      ['call-volume', 'Call volume bar', true],
+      ['call-volume-off', 'Call volume bar off', true],
     ] },
     { group: 'Transitions', states: [
       ['mod-closing', 'A mod closing, one left', true],

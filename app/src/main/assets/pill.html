@@ -16,6 +16,11 @@
 <div id="satellite-left" class="satellite"></div>
 <div id="satellite-right" class="satellite"></div>
 
+<div id="alert-zone" aria-hidden="true">
+  <div id="alert-zone-glow"></div>
+  <svg id="alert-zone-arrow" viewBox="0 0 24 14"><path d="M2 2 L12 12 L22 2"></path></svg>
+</div>
+
 <div id="pill" data-identity="2">
   <div class="face showing" id="idle-face">
     <span id="unread"></span>
@@ -56,7 +61,6 @@
   <div class="face" id="call-face">
     <div id="call-avatar" class="avatar glyph"></div>
     <div id="call-reading">
-      <span id="call-name"></span>
       <span id="call-time"></span>
     </div>
   </div>
@@ -128,9 +132,6 @@
 
 
 <div id="double">
-  <div id="double-glyph">
-    <div id="double-fill"></div>
-  </div>
   <span id="double-reading"></span>
 </div>
 
@@ -211,8 +212,13 @@
     <div id="transfer-head">
       <span id="transfer-glyph"></span>
       <span id="transfer-reading"></span>
+      <span id="transfer-name"></span>
     </div>
     <div id="transfer-track"><div id="transfer-fill"></div></div>
+    <div id="transfer-actions">
+      <span class="transfer-action" id="transfer-hold"></span>
+      <span class="transfer-action" id="transfer-stop"></span>
+    </div>
   </div>
 
   </div>
@@ -231,6 +237,10 @@
     </div>
 
     <div id="quick-row-levels">
+      <div class="quick-bubble level" data-level="callVolume">
+        <div class="level-fill"></div>
+        <span class="level-icon"></span>
+      </div>
       <div class="quick-bubble level" data-level="brightness">
         <div class="level-fill"></div>
         <span class="level-icon"></span>
@@ -262,6 +272,8 @@
   </div>
 
   </div>
+
+  <span id="quick-mark">V/AS</span>
 </div>
 
 

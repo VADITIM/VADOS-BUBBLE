@@ -487,6 +487,7 @@ export function nowOwnsClock() {
 let nowHeld = false;
 let nowHoldTimer = null;
 let nowDownAt = null;
+let startedUnderPanel = false;
 
 
 
@@ -501,7 +502,6 @@ function dismissNowMod() {
   if (!owner) return;
   nowDismissed[owner] = true;
   nowOrder = nowOrder.filter(mod => mod !== owner);
-  bridge.triggerHaptic('dismiss');
   if (nowOrder.length) {
     
     
@@ -516,6 +516,8 @@ export function nowTouch(action, x, y) {
   if (action === 'down') {
     nowHeld = false;
     nowDownAt = { x, y };
+    // The panel hears this flick too and closes on the move that crosses its own threshold, so by the lift `statusOpen` already says no — whether the Dashboard owned this touch is the down's answer, not the up's.
+    startedUnderPanel = statusOpen;
     clockPill.classList.add('pressing');
     clearTimeout(nowHoldTimer);
     nowHoldTimer = setTimeout(() => {
@@ -545,7 +547,7 @@ export function nowTouch(action, x, y) {
   nowDownAt = null;
   
   
-  if (action === 'up' && !nowOpen && lifted > NOW_SWIPE) {
+  if (action === 'up' && !nowOpen && !startedUnderPanel && lifted > NOW_SWIPE) {
     dismissNowMod();
     return;
   }

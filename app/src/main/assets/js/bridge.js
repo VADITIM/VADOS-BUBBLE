@@ -1,4 +1,4 @@
-import { alertTouch, dashHolds, isAlertDashed, isAlertLive } from './alert.js';
+import { alertTouch, dashHolds, isAlertCentred, isAlertDashed, isAlertLive, layOutZone } from './alert.js';
 import { duplicateHolds, duplicateTouch } from './double.js';
 import { fitLabels } from './labels.js';
 import { stirLiquid } from './liquid.js';
@@ -177,11 +177,11 @@ window.onProxyTouch = (action, x, y, source) => {
   
   
   
-  // The Alert's own band spans the top of the screen while an Alert stands, and it outranks every panel open underneath it for the same reason a grown Main does: what arrived is what the finger is answering.
+  // The Alert's own band stands at the right edge while an Alert stands, and it outranks every panel open underneath it for the same reason a grown Main does: what arrived is what the finger is answering. The band is no longer the whole screen, so the bubble's own box is claimed here as well — the main proxy stays live underneath it and would otherwise answer a pull on the Alert as a pull on the row.
   // Slung into the dashboard the Alert takes no band of its own — the panel's proxy is what hears it — so the touch is claimed off the bubble's own box instead of off the window it arrived through.
   if (action === 'down') {
     alertOwnsTouch = isAlertLive() &&
-      (source === 'alert' || (isAlertDashed() && dashHolds(x, y)));
+      (source === 'alert' || (isAlertDashed() ? dashHolds(x, y) : mainHolds(x, y)));
   }
   if (alertOwnsTouch) {
     alertTouch(action, x, y);
@@ -206,7 +206,9 @@ window.onProxyTouch = (action, x, y, source) => {
   
   
   
-  if (statusOpen && !mainOwnsTouch && (source === 'status' || statusHolds(x, y))) statusPanelPush(action, x, y);
+  // The Now bubble stands inside the open dashboard, so every swipe on it was read a second time as a push on the panel underneath and closed it — the swipe-up the bubble is not allowed to answer there was still answered, by the panel. The bubble owns the whole touch it started, the same way a grown Main does.
+  if (action === 'down') clockOwnsTouch = !nowOpen && (source === 'clock' || clockHolds(x, y));
+  if (statusOpen && !mainOwnsTouch && !clockOwnsTouch && (source === 'status' || statusHolds(x, y))) statusPanelPush(action, x, y);
   if (mainOwnsTouch && (action === 'up' || action === 'cancel')) mainOwnsTouch = false;
   if (statusOwnsTouch) {
     statusTouch(action, x, y);
@@ -218,10 +220,7 @@ window.onProxyTouch = (action, x, y, source) => {
   
   
   
-  if (action === 'down') {
-    clockOwnsTouch = !nowOpen && (source === 'clock' || clockHolds(x, y));
-    nowOwnsTouch = clockOwnsTouch && nowOwnsClock();
-  }
+  if (action === 'down') nowOwnsTouch = clockOwnsTouch && nowOwnsClock();
   if (nowOwnsTouch) {
     nowTouch(action, x, y);
     if (action === 'up' || action === 'cancel') nowOwnsTouch = false;
@@ -278,7 +277,12 @@ window.setStageHidden = hidden => {
   const isHidden = Boolean(hidden);
   if (isHidden === shared.isStageHidden) return;
   shared.isStageHidden = isHidden;
-  if (isHidden) return;
+  if (isHidden) {
+    /* A hidden stage takes its touch proxies NOT_TOUCHABLE with it, so a focused Alert, the Dashboard or the Notifications Menu left standing over a screen-off came back visible but deaf to every tap and stayed that way until the app restarted. */
+    if (statusOpen) closeStatusPanel();
+    if (isAlertCentred() || isAlertDashed() || (shared.state === 'extended' && shared.size === 'notifications')) toClosed();
+    return;
+  }
   wakeClock();
   fitLabels();
   stirLiquid(240);
@@ -380,6 +384,15 @@ window.setAlertDwell = tenths => {
 
 window.setQuickDividers = value => {
   root.classList.toggle('no-dividers', Number(value) === 0);
+};
+
+window.setDashAlertsDisabled = value => {
+  shared.isDashAlertDisabled = Number(value) !== 0;
+};
+
+window.setAlertZoneShown = value => {
+  layOutZone();
+  root.classList.toggle('alert-zone-debug', Number(value) !== 0);
 };
 
 window.setEdgeMerge = value => {

@@ -20,7 +20,7 @@ export const bridge = window.Android || {
   setTorch() {}, setLockProxy() {}, setEdgeProxy() {}, setStatusProxy() {}, setClockProxy() {},
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
   requestToggles() {}, setToggle() {}, setLevel() {}, requestVitals() {}, requestWeather() {},
-  recordingAction() {}, setNotesProxy() {}, mediaSpeed() {},
+  recordingAction() {}, transferAction() {}, setNotesProxy() {}, mediaSpeed() {},
   note() {}, wakeFrames() {},
 };
 
@@ -187,6 +187,8 @@ export const shared = {
   labelSweep: false,
   
   nowPushes: true,
+
+  isDashAlertDisabled: false,
   
   modWidth: 56,
 

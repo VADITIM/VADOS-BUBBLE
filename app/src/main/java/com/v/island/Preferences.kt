@@ -113,6 +113,10 @@ object Preferences {
 
     const val QUICK_DIVIDERS = "quickDividers"
 
+    const val DASH_ALERTS_DISABLED = "dashAlertsDisabled"
+
+    const val ALERT_ZONE_SHOWN = "alertZoneShown"
+
     const val FONT_CLOCK = "fontClock"
     const val FONT_MAIN = "fontMain"
     const val FONT_SATELLITE = "fontSatellite"
@@ -172,6 +176,8 @@ object Preferences {
         LOCK_X to 0,
         BAR_LOCKED to 0,
         QUICK_DIVIDERS to 1,
+        DASH_ALERTS_DISABLED to 0,
+        ALERT_ZONE_SHOWN to 0,
 
         FONT_CLOCK to 0,
         FONT_MAIN to 0,

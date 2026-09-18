@@ -380,7 +380,7 @@ let lockShot = null;
 let lockLean = 0;
 
 
-// The drop is sized against the bubble it is flying into, so that has to be the bubble which will be standing there and not the one measurable on the way out of the panel. Closing the panel takes `panel-top` off Main and its height eases from `--pill-height` plus `--edge-over` back down to `--pill-height` across the whole of the flight, so the first frame of that transition — the frame the shot is worked out on — reported 46px where the target is 26. The drop was thrown at nearly twice the size of what it was landing in, its overlap topped out around 0.57 against a `CATCH_ENTERED` of 0.8, and the touch could then only fire on the catch's stall fallback: that fallback is what read as the merge lagging out of the panel but not off the lock screen, where Main is already at rest and the measurement happens to agree. Only the height was ever wrong — the width is Main's own and is not mid-flight, and the shot is aimed at the artwork slot rather than at this box, which `panel-top` leaves exactly where it is by paying its extra height back as `padding-top`.
+// The drop is sized against the bubble it is flying into, so that has to be the bubble which will be standing there and not the one measurable on the way out of the panel. Closing the panel takes `panel-top` off Main and its height eases from `--pill-height` plus `--edge-over` back down to `--pill-height` across the whole of the flight, so the first frame of that transition — the frame the shot is worked out on — reported 46px where the target is 26. The drop was thrown at nearly twice the size of what it was landing in, its overlap topped out around 0.57 against a `CATCH_ENTERED` of 0.8, and the touch could then only fire on the catch's stall fallback: that fallback is what read as the merge lagging out of the panel but not off the lock screen, where Main is already at rest and the measurement happens to agree. Only the height was ever wrong — the width is Main's own and is not mid-flight, and the shot is aimed at the artwork slot rather than at this box, which `panel-top` leaves exactly where it is by pushing the contents down by the rise.
 function mainRestHeight() {
   return parseFloat(getComputedStyle(pill).getPropertyValue('--pill-height'));
 }
@@ -657,10 +657,14 @@ let lockHeld = false;
 
 let lockSwiped = false;
 
+// Whose touch this is has to be decided at the down. The panel hears the same flick through its own proxy and `statusPanelPush` runs ahead of the dispatch to this bubble, so by the move that crosses the threshold the panel has already closed and cleared `panelHeld` — the guard below then read the bubble as a lock-screen one and opened it on top of a shape already flying home to Main, which is what left its size values standing at the flight's.
+let startedInPanel = false;
+
 lockPill.addEventListener('touchstart', event => {
   lockStart = { x: event.touches[0].clientX, y: event.touches[0].clientY };
   lockHeld = false;
   lockSwiped = false;
+  startedInPanel = panelHeld;
   lockPill.classList.add('pressed');
   
   
@@ -708,8 +712,8 @@ lockPill.addEventListener('touchmove', event => {
     lockPill.classList.remove('pressed');
     untoy(lockPill, '--lock-drag');
     // In the dashboard an upward flick is the panel's own dismiss and the panel hears the same touch through its own proxy, so the bubble answers nothing: it played the expand on a panel that was already leaving, and the card grew into a screen going away underneath it.
-    if (panelHeld && dy < 0) return;
-    const isBig = panelHeld ? panelExpanded : lockOpen;
+    if (startedInPanel && dy < 0) return;
+    const isBig = startedInPanel ? panelExpanded : lockOpen;
     // Where the play button stood, down is what plays and pauses. Retracted there is nothing to pause onto, so down is still the close.
     if (isBig && dy > 0) {
       bridge.triggerHaptic('expand');

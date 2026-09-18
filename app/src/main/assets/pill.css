@@ -17,6 +17,8 @@
   --pill-solid: rgb(0, 0, 0);
   --pill-alpha: 1;
   --pill-width: 76px;
+  /* Mirrors SIZES.alert.width in js/state.js — the Alert's box, and the width its contents are laid out against for the whole of the arrival. */
+  --alert-width: 300px;
   --pill-height: 26px;
   
 
@@ -85,11 +87,13 @@
 
 
   --grow-ms: 340ms;
+  /* How long the closed bubble's contents take to align themselves into the rise, apart from the rise itself — shorter than --grow-ms so that leaving, where it runs first, it reads as the contents leading the bubble rather than as a second bubble-length move. */
+  --content-drop-ms: 200ms;
   --mod-glyph: calc(var(--pill-height) - 10px);
 
 
 
-  --status-glyph: calc(var(--mod-glyph) - 4px);
+  --status-glyph: calc(var(--mod-glyph) - 7px);
   
 
 
@@ -204,12 +208,12 @@ html, body {
 
 
 #pill.alerting {
-  width: 300px;
+  width: var(--alert-width);
   
 
 
 
-  height: 155px;
+  height: var(--alert-height, 155px);
   border-radius: 24px;
   
 
@@ -231,7 +235,7 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
   --grow-ms: 460ms;
   --carry-ms: var(--grow-ms);
   --shift-delay: 0ms;
-  width: 300px;
+  width: var(--alert-width);
   height: var(--alert-height, 162px);
   border-radius: 28px;
 }
@@ -706,7 +710,8 @@ html.dragging #pill { transition: scale 350ms linear; }
   padding: 0 0.75rem;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease;
+  /* The rise's offset is set and unset by a class while the box it is measured from eases over --grow-ms, so on leaving the dashboard the contents snapped up the moment the class dropped and were then carried back down by the height — the offset travels on its own clock instead, and the two clocks are ordered rather than run together: this one is the leave, where the contents lift out of the foot first and the bubble follows them home. */
+  transition: opacity 160ms ease, top var(--content-drop-ms) var(--ease-grow);
 }
 .face.showing { opacity: 1; pointer-events: auto; }
 
@@ -726,7 +731,7 @@ html.dragging #pill { transition: scale 350ms linear; }
 #media-face, #timer-face, #call-face {
   transition: opacity var(--face-fade, 0ms) ease var(--face-delay, 0ms);
 }
-#equalizer, #timer-remaining, #call-name, #call-time {
+#equalizer, #timer-remaining, #call-time {
   transition: opacity 380ms ease, transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
   transition-delay: var(--face-delay, 0ms);
 }
@@ -738,7 +743,7 @@ html.dragging #pill { transition: scale 350ms linear; }
 
 
 .face:not(.showing) #equalizer, .face:not(.showing) #timer-remaining,
-.face:not(.showing) #call-name, .face:not(.showing) #call-time {
+.face:not(.showing) #call-time {
   opacity: 0;
   transform: translateX(30px);
   transition: none;
@@ -839,7 +844,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 #alert-face {
   flex-direction: column;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 0.4rem;
   padding: 0.62rem 0.95rem;
 }
@@ -873,10 +878,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
-  flex: 1 1 50%;
-  max-width: 50%;
-  background: var(--raised);
-  border-radius: calc(var(--alert-radius) - var(--alert-inset));
+  flex: 0 1 auto;
   padding: 0.15rem 0.45rem;
   box-sizing: border-box;
 }
@@ -924,8 +926,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   font-size: calc((0.68rem) * var(--font-scale, 1));
   letter-spacing: 0.04rem;
   color: var(--text-muted);
-  flex: 1 1 50%;
-  max-width: 50%;
+  flex: 1 1 auto;
   
   mask-image: linear-gradient(90deg, transparent, #000 1.4rem);
 }
@@ -1057,6 +1058,72 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
+
+
+@keyframes message-arrive {
+  from { opacity: 0; translate: 0 0.9rem; }
+}
+.message.arriving { animation: message-arrive 280ms var(--ease-enter) both; }
+
+
+
+
+
+
+
+
+/* Mirrors ALERT_ZONE_WIDTH and ALERT_ZONE_HEIGHT_PART in BubbleService.kt. */
+#alert-zone {
+  position: absolute;
+  right: 0;
+  /* Placed from documentElement.clientHeight in alert.js rather than from vh: the layout viewport this WebView hands out is taller than the surface it is drawn on, so a zone written in vh does not agree with the window the host put underneath it. */
+  top: var(--alert-zone-top, 0px);
+  width: 96px;
+  height: var(--alert-zone-height, 0px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms var(--ease-enter);
+}
+html.alert-zone-live #alert-zone, html.alert-zone-debug #alert-zone { opacity: 1; }
+html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-accent) 22%, transparent); }
+
+#alert-zone-glow {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  filter: blur(16px);
+  animation: alert-zone-hint 2200ms var(--ease-sweep) infinite;
+}
+
+/* Every inline svg here is given both axes: with a viewBox and a width alone Chromium resolves the height to nothing inside a centred flex box, which is what drew no arrow at all. */
+#alert-zone-arrow {
+  position: relative;
+  width: 30px;
+  height: 17px;
+  display: block;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: alert-zone-mark 2200ms var(--ease-sweep) infinite;
+}
+@keyframes alert-zone-hint {
+  0%, 100% { translate: 0 -3px; opacity: 0.55; }
+  50% { translate: 0 3px; opacity: 1; }
+}
+@keyframes alert-zone-mark {
+  0%, 100% { translate: 0 -3px; opacity: 0.8; }
+  50% { translate: 0 3px; opacity: 1; }
+}
+
+
+
 #picture {
   display: none;
   width: 100%;
@@ -1149,13 +1216,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-
-#media-art-slot {
-  mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
-
-
-  mask-repeat: no-repeat;
-}
 
 
 
@@ -1320,6 +1380,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 }
 .avatar svg { width: 62%; height: 62%; display: block; fill: var(--app-accent); }
 
+#call-avatar { border: none; }
+
 
 
 
@@ -1332,27 +1394,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   gap: 0.35rem;
   min-width: 0;
   justify-content: flex-end;
-}
-
-#call-name {
-  font-size: calc((0.62rem) * var(--font-scale, 1));
-  letter-spacing: 0.02rem;
-  color: var(--text-bright);
-  overflow: hidden;
-  white-space: nowrap;
-  
-
-
-  text-align: right;
-  min-width: 0;
-  
-  padding: 0 0.4rem 0 0.2rem;
-  margin-left: -0.2rem;
-  
-
-
-
-  mask-image: linear-gradient(90deg, transparent, #000 1.2rem);
 }
 
 
@@ -1372,17 +1413,6 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-
-#pill.phone-call #call-reading { flex: 1 1 0; justify-content: space-between; }
-#pill.phone-call #call-name {
-  
-
-  flex: 1 1 0;
-  text-align: left;
-  min-width: 0;
-  
-  mask-image: linear-gradient(90deg, #000 calc(100% - 1.2rem), transparent);
-}
 
 
 
@@ -1700,6 +1730,7 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   display: flex;
   gap: 4px;
   z-index: 2;
+  transition: top var(--content-drop-ms) var(--ease-grow);
 }
 .indicator {
   width: 7px;
@@ -2084,9 +2115,11 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
     opacity 200ms ease,
     transform 260ms var(--ease-split),
     margin 260ms var(--ease-grow);
-  margin-left: 0.35rem;
+  margin-left: 0.12rem;
 }
 .status-slot:first-child { margin-left: 0; }
+/* The battery is the one slot that is a box rather than a glyph, so the gap the connection marks need between them reads as no gap at all beside it — it stands off the mark before it by its own number. */
+.status-slot[data-slot="battery"] { margin-left: 0.34rem; }
 
 
 .status-slot.arriving, .status-slot.leaving {
@@ -2187,19 +2220,23 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 .modus-paired {
   display: flex;
   align-items: center;
-  gap: 0.14rem;
+  gap: 0;
 }
 .modus-paired .paired-charge {
   font-size: calc(0.56rem * var(--font-scale, 1));
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
+  color: #ffffff;
 }
+.modus-paired .paired-charge.charge-critical { color: #b33a3a; }
+/* The bluetooth path occupies the middle 10 of its 24-unit viewBox, so the number stood a third of a glyph box away from a mark that starts nowhere near its own left edge — the gap being closed here is the glyph's own inset rather than spacing anyone wrote. */
 .modus-paired .paired-glyph {
   display: grid;
   place-items: center;
   width: var(--status-glyph);
   height: var(--status-glyph);
+  margin-left: calc(var(--status-glyph) * -0.14);
 }
 .modus-paired .paired-glyph svg { width: 100%; height: 100%; fill: currentColor; }
 
@@ -2255,6 +2292,27 @@ html.battery-percent-light .mini-battery-reading {
   -webkit-text-stroke: 1px #000;
   paint-order: stroke fill;
 }
+.mini-battery-reading.charge-critical,
+html.battery-percent-light .mini-battery-reading.charge-critical {
+  color: #b33a3a;
+}
+
+/* The bolt stands where the reading stands, over the fill rather than beside it, and carries a contrasting halo because the colour behind it runs the whole gradient from red to green. */
+/* Sized as a grid item it took its box from the cell's grid area, which the reading and the fill share and which is not the cell — the mark ended up low in the fill rather than on its middle line. It is an inset box on the cell itself now, symmetric about both centre lines, so the artwork lands on them whatever else is standing in there. */
+.mini-battery-bolt {
+  position: absolute;
+  inset: 16%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  color: #000000;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.7));
+}
+html.battery-percent-light .mini-battery-bolt {
+  color: #ffffff;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.85));
+}
+.mini-battery-bolt svg { width: 100%; height: 100%; display: block; }
 
 
 
@@ -2322,7 +2380,7 @@ html.battery-percent-light .mini-battery-reading {
   --quick-pop: 360ms;
 
   --quick-stats-share: 27%;
-  --quick-transfer-tall: 26px;
+  --quick-transfer-tall: 50px;
 
   --quick-vitals-tall: 80px;
   --quick-grid-tall: 233px;
@@ -2340,11 +2398,15 @@ html.battery-percent-light .mini-battery-reading {
   --quick-divider-room: 34px;
   --quick-divider-shift: -18px;
   --quick-knob-gap: 5px;
+  --quick-level-split: 10px;
   --quick-knob-row-gap: 12px;
   --quick-levels-inset: 14px;
   --solo-ms: 420ms;
-  /* Mirrors SOLO_OUT and SOLO_FROST in status.js. */
-  --solo-out: 180ms;
+  /* Mirrors SOLO_SHRINK, SOLO_SHRINK_STEP, SOLO_SWELL, SOLO_SWELL_STEP and SOLO_FROST in status.js. */
+  --solo-shrink: 130ms;
+  --solo-shrink-step: 14ms;
+  --solo-swell: 300ms;
+  --solo-swell-step: 16ms;
   --solo-frost: 260ms;
   --battery-well: rgba(10, 9, 13, 0.85);
 }
@@ -2384,16 +2446,31 @@ html.battery-percent-light .mini-battery-reading {
   background: rgba(6, 6, 8, 0.42);
   opacity: 0;
   --scrim-frost: 0;
-  transition: opacity 180ms var(--ease-split), --scrim-frost 450ms var(--ease-sweep);
+  transition: opacity 108ms var(--ease-split), --scrim-frost 270ms var(--ease-sweep);
 }
-/* The frost ramped in over 260ms while it ramps out over 450: quantised to twelve steps that is a blur re-applied every 22ms, landing on exactly the frames the modules are popping, which is why entering stuttered and leaving never did. The ramp is spread across the pop instead. */
+/* The frost was spread over 620ms in and 450ms out to keep its quantised blur steps off the frames the modules pop on — entering stuttered at 260ms and leaving never did — and the enter is back to a tenth of that because a dashboard whose background arrives after its contents reads as the background being late; the leave is at 60% of its own, since a frost that is still there has less to be late for. The stutter the long enter was hiding is answered at its cause on `bubble-grow` below. */
 #quick-panel.showing #quick-scrim {
   opacity: 1;
   --scrim-frost: 1;
-  transition-duration: 150ms, 620ms;
+  transition-duration: 15ms, 62ms;
   pointer-events: auto;
 }
-#quick-panel.leaving #quick-scrim { opacity: 0; transition-duration: 140ms, 450ms; }
+#quick-panel.leaving #quick-scrim { opacity: 0; transition-duration: 84ms, 270ms; }
+
+#quick-mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  z-index: 1;
+  text-align: center;
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.07);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+#quick-panel.showing #quick-mark { opacity: 1; transition-delay: 220ms; }
 
 
 
@@ -2564,7 +2641,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   fill: currentColor;
 }
 .vital-reading {
-  color: var(--text-faint);
+  color: var(--text-bright);
   font-variant-numeric: tabular-nums;
 }
 .vital-gauge {
@@ -2652,9 +2729,11 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   background: var(--charge-color, var(--text-faint));
   transition: background 500ms ease;
 }
+/* The top was a hand-guessed 7px against a cell whose height is the row's, so the mark sat low in the fill rather than on its middle line — it is centred off the box now instead of measured into it. */
 #battery-glyph {
   position: absolute;
-  top: 7px;
+  top: 50%;
+  translate: 0 -50%;
   left: 9px;
   width: 20px;
   height: 20px;
@@ -2689,8 +2768,10 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 
 
 
-/* The strip keeps its room whether or not a file is in flight: drawn with display:none it took its height back and every module above it slid, so a transfer starting was the whole stats column moving rather than one bar appearing. */
-#quick-transfer.idle #transfer-track { display: none; }
+/* The strip keeps its room whether or not a file is in flight: drawn with display:none it took its height back and every module above it slid, so a transfer starting was the whole stats column moving rather than one bar appearing. The room it holds is the tall one, the name and the two buttons included — reserving only the head row would have made a transfer arriving push the vitals and the charge up the column, which is the same bug one step larger. */
+#quick-transfer.idle #transfer-track,
+#quick-transfer.idle #transfer-actions { display: none; }
+#quick-transfer.idle #transfer-name { opacity: 0; }
 #quick-transfer {
   flex: none;
   height: var(--quick-transfer-tall);
@@ -2716,6 +2797,37 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   font-variant-numeric: tabular-nums;
 }
 #transfer-glyph svg { width: 15px; height: 15px; fill: currentColor; }
+
+/* The name is anchored against the right edge, so it grows leftwards and fades on the left — the end that runs out is never the end that is pinned. */
+#transfer-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--text-muted);
+  mask-image: linear-gradient(90deg, transparent, #000 1.4rem);
+  transition: opacity 200ms ease;
+}
+
+#transfer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+.transfer-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 16px;
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  color: var(--text-body);
+}
+.transfer-action svg { width: 10px; height: 10px; fill: currentColor; }
+.transfer-action[hidden] { display: none; }
 
 #transfer-track {
   height: 7px;
@@ -2810,7 +2922,9 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   transform-origin: center;
 }
 /* Six of these turned forever behind a panel that is laid out at its full box from load and only faded in, which was the largest single idle drain in the app. */
-#quick-panel.showing .ring-text {
+/* Written against `.showing` alone the turn stopped the frame the class came off, and every ring snapped back to 0deg — which is the teleport seen before a module rotates out: the collapse starts from a rotation the ring had never been standing at. Matching `.leaving` as well keeps the same animation running rather than restarting it, because the name and the timing are identical; `leaving` is taken off once the collapse has landed, so the idle drain this rule was written to stop stays stopped. */
+#quick-panel.showing .ring-text,
+#quick-panel.leaving .ring-text {
   animation: ring-turn 16s linear infinite;
 }
 
@@ -2838,17 +2952,16 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 .quick-charge {
   position: absolute;
   top: 50%;
-  left: calc(50% - var(--quick-grid-icon) / 2 + 6px);
+  left: calc(50% - var(--quick-grid-icon) / 2 + 13px);
   translate: 0 -50%;
   font-family: "Mono", monospace;
   font-size: calc((8px) * var(--font-scale, 1));
   line-height: 1;
   pointer-events: none;
-  color: #66a05e;
+  color: #ffffff;
   transition: color 400ms ease;
 }
-.quick-charge[data-charge="low"] { color: #b99a34; }
-.quick-charge[data-charge="critical"] { color: #b8544c; }
+.quick-charge[data-charge="critical"] { color: #b33a3a; }
 
 .ring-dots {
   transform-box: view-box;
@@ -2922,27 +3035,58 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   transition:
     scale 200ms var(--ease-split),
     left var(--solo-ms) var(--ease-split),
-    right var(--solo-ms) var(--ease-split);
+    right var(--solo-ms) var(--ease-split),
+    top var(--solo-ms) var(--ease-split),
+    bottom var(--solo-ms) var(--ease-split);
 }
 .level[data-level="brightness"] { left: 0; right: calc(50% + var(--quick-knob-gap) / 2); }
 .level[data-level="volume"] { left: calc(50% + var(--quick-knob-gap) / 2); right: 0; }
+/* OneUI hands the side buttons to the call stream for as long as a call stands and leaves the quick-settings bar on media, so the call level is the one the panel is otherwise the only way to reach. It is given no room of its own: the volume column splits and the two share the height the one bar had, which keeps the levels row exactly the height every other box in the panel is laid out against. Shut, it is a bar of no height rather than a hidden one, so the split is a travel on the same `top` / `bottom` the merge already animates and not an appearance. */
+.level[data-level="callVolume"] {
+  left: calc(50% + var(--quick-knob-gap) / 2);
+  right: 0;
+  bottom: calc(100% - 2px);
+  visibility: hidden;
+  transition:
+    scale 200ms var(--ease-split),
+    left var(--solo-ms) var(--ease-split),
+    right var(--solo-ms) var(--ease-split),
+    top var(--solo-ms) var(--ease-split),
+    bottom var(--solo-ms) var(--ease-split),
+    visibility 0s linear var(--solo-ms);
+}
+html.call-live .level[data-level="callVolume"] {
+  bottom: calc(50% + var(--quick-level-split) / 2);
+  visibility: visible;
+  transition:
+    scale 200ms var(--ease-split),
+    left var(--solo-ms) var(--ease-split),
+    right var(--solo-ms) var(--ease-split),
+    top var(--solo-ms) var(--ease-split),
+    bottom var(--solo-ms) var(--ease-split),
+    visibility 0s linear 0s;
+}
+html.call-live .level[data-level="volume"] { top: calc(50% + var(--quick-level-split) / 2); }
 .level.dragging { scale: 1.03; }
-/* The bar under the finger is pinned opaque from the frame the finger lands rather than from the frame the merge starts: the frost now leaves before the modules do, and a bar still carrying any of the panel's own fade went down with the glass for those frames. Nothing the panel does to itself may reach the one control being held. */
+/* The bar under the finger is pinned opaque from the frame the finger lands rather than from the frame the merge starts: the frost now leaves before the modules do, and a bar still carrying any of the panel's own fade went down with the glass for those frames. Nothing the panel does to itself may reach the one control being held. The transparency the settings hand the interface lives in `--pill-background`'s own alpha, not in any `opacity` — so what is written here is `--pill-solid`, the same colour with that alpha already dropped, rather than the element being made opaque by a property nothing was using. */
 .level.holding {
   opacity: 1;
   animation: none;
-  background: rgb(from var(--pill-background) r g b);
-  border-color: rgb(from var(--pill-background) r g b);
+  background: var(--pill-solid);
+  border-color: var(--pill-solid);
 }
 
 /* Both bars travel to the same box — the one under the finger is on top and the other grows into it from behind, and is dropped only once it has arrived and is completely covered. Leaving the far one standing while the near one grew over it was the first version: two bodies converging read as a merge, one body growing over a parked one reads as it being covered up. The box stops a tenth of the row short of the far edge, so the merged bar is narrower than the pair was, which is what says two became one rather than one grew. */
 #quick-row-levels.merged[data-held="brightness"] .level { left: 0; right: 10%; }
 #quick-row-levels.merged[data-held="volume"] .level { left: 10%; right: 0; }
+#quick-row-levels.merged[data-held="callVolume"] .level { left: 10%; right: 0; }
+/* A held bar takes the whole row, and with a call live the row is split as well as halved — so the merge gives the height back too, or the call bar would grow sideways into a box a tenth of the row tall. */
+#quick-row-levels.merged .level { top: 0; bottom: 0; }
 /* The bar under the finger is pinned opaque for the overlap: the same colour with its alpha dropped rather than a second black written here, so it stays right if --pill-background ever gains one. Nothing can then show through it while the far bar is underneath, whatever that token is carrying. */
 #quick-row-levels.merged .level:not(.solo-hidden) {
   z-index: 1;
-  background: rgb(from var(--pill-background) r g b);
-  border-color: rgb(from var(--pill-background) r g b);
+  background: var(--pill-solid);
+  border-color: var(--pill-solid);
 }
 /* The far bar is cut in one frame once it has arrived, never faded. It is opaque and so is the bar covering it, but their antialiased edges and their two-pixel borders stack where they coincide, so an alpha ramp walks that composite down over several frames and the merged bar's own edge lightens under it. Held at full opacity until the boxes are identical and then dropped outright, every frame up to the cut renders exactly what the overlap rendered. */
 #quick-row-levels.merged .level.solo-hidden {
@@ -2994,7 +3138,6 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   gap: var(--quick-knob-row-gap);
   width: max-content;
   height: 100%;
-  translate: var(--knob-shift, 0px) 0;
 }
 
 .quick-bubble.quick-knob {
@@ -3023,12 +3166,15 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   box-shadow: inset 0 0 0 2px var(--section-color);
 }
 .quick-knob.unavailable { opacity: 0.4; }
+.quick-knob[data-toggle="mic"]:not(.on) { color: #ff3b30; }
 .quick-knob .quick-icon svg {
   width: var(--quick-knob-icon, 22px);
   height: var(--quick-knob-icon, 22px);
   transition: width var(--grow-ms) var(--ease-grow), height var(--grow-ms) var(--ease-grow);
 }
 .quick-knob.on .record-dot { fill: #e5342b; }
+/* Measured, the comdirect mark's box already sits a hair right of its viewBox centre — what reads as left is the C's open side putting all its weight there, so the correction is optical and has to be larger than the geometry suggests. */
+.quick-knob[data-toggle="comdirect"] .quick-icon svg { transform: translateX(2px); }
 
 #quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
 #quick-panel.showing .quick-mode.turning .quick-icon { animation: mode-turn 460ms var(--ease-enter); }
@@ -3058,19 +3204,33 @@ html.now-open {
 
 
 
-#quick-panel.showing .quick-bubble {
-  opacity: 1;
+#quick-panel.showing .quick-bubble { opacity: 1; }
+/* The entrance was written on `.showing`, which stands for as long as the panel is open — so the frame any higher-specificity animation came off a bubble, the entrance became the applied animation again and played from the top. Letting go of the brightness bar was that frame: the whole Dashboard re-entered behind the bar coming back. It belongs on `entering`, which is taken off once the entrance has landed and can never be uncovered by anything later. */
+#quick-panel.entering .quick-bubble {
   animation: bubble-grow var(--quick-pop) var(--ease-sling) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
 }
-
-@keyframes bubble-grow {
-  from { opacity: 0.2; scale: 0; rotate: var(--pop-turn, 0deg); translate: 0 var(--pop-from, 0px); }
+/* The bars arrive from the other side of where they stand. Only the name is swapped, so the rank, the stagger and the easing are still the panel's — what changes is the direction of the pull, and it changes on the way in only: the leave keeps the travel `--pop-from` already describes, which is why this is a second set of keyframes rather than the token being negated on the element. */
+#quick-panel.entering .level {
+  animation-name: level-grow;
+}
+@keyframes level-grow {
+  from { opacity: 0; scale: 0; rotate: var(--pop-turn, 0deg); translate: 0 calc(var(--pop-from, 0px) * -1); }
   to   { opacity: 1; scale: 1; rotate: 0deg; translate: 0 0; }
 }
 
-#quick-panel.showing .quick-bubble > * {
-  animation: quick-contents-in 190ms ease calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
+/* Every direct child of every module carried its own 190ms opacity animation, so a panel of thirty modules entered with well over a hundred animations live at once — and each of them keeps its element's style dirty for every frame the liquid mirror forces layout on, which is the whole of the entrance. That is the stagger: not one hitch but a hundred animations' worth of style recalc under a per-frame getBoundingClientRect. The box's own opacity already covers everything standing inside it, so the fade is one animation per module rather than one per child, and the grow starts from nothing instead of from 0.2. */
+@keyframes bubble-grow {
+  from { opacity: 0; scale: 0; rotate: var(--pop-turn, 0deg); translate: 0 var(--pop-from, 0px); }
+  to   { opacity: 1; scale: 1; rotate: 0deg; translate: 0 0; }
 }
+
+/* A squircle box with a border and an SVG ring inside it is repainted rather than composited, thirty of them at once, for every frame of the pop. The layer is asked for only while the panel is actually moving — a promotion left standing is the compositor's attention spent on a panel that is not animating. */
+#quick-panel.entering .quick-bubble,
+#quick-panel.leaving .quick-bubble,
+#quick-panel.solo-out .quick-bubble,
+#quick-panel.solo-in .quick-bubble,
+#quick-panel.stats-in .quick-bubble { will-change: transform, opacity; }
+
 @keyframes quick-contents-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -3095,16 +3255,21 @@ html.now-open {
 
 
 
-/* The frost, the modules and the bar's own lift all fire off the same class change now, rather than the modules and the lift waiting out the frost first — a held brightness bar is one gesture and reads as one motion only when everything it triggers starts on the same frame. The panel leaves under a held brightness bar the same way it leaves when it is closed, and comes back on the same grow it arrived on — same keyframes, same per-module stagger. A fade of its own was written here first and it was the wrong motion: the panel has one way of going and one way of coming, and a second one invented for this state makes the hold read as a different panel. Everything but the two bars, which are what the hold is about. */
+/* The frost, the modules and the bar's own lift all fire off the same class change now, rather than the modules and the lift waiting out the frost first — a held brightness bar is one gesture and reads as one motion only when everything it triggers starts on the same frame. The hold has its own pair of keyframes rather than the panel's close and grow: the panel's leave is ranked top-to-bottom and slow enough to read as the Dashboard going away, and the hold is not the Dashboard going away — it is the room being cleared for one bar and handed straight back. Shorter, scale only, and ranked off `--solo-rank`, which is redrawn at random on every hold so no two clearances empty the panel in the same order. Everything but the two bars, which are what the hold is about. */
 #quick-panel.solo-out .quick-bubble:not(.level) {
-  animation: bubble-collapse 95ms var(--ease-leave) calc(var(--drop-rank, 0) * 20ms) both;
+  animation: solo-shrink var(--solo-shrink) var(--ease-leave) calc(var(--solo-rank, 0) * var(--solo-shrink-step)) both;
   pointer-events: none;
 }
 #quick-panel.solo-in .quick-bubble:not(.level) {
-  animation: bubble-grow var(--quick-pop) var(--ease-sling) calc(var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
+  animation: solo-swell var(--solo-swell) var(--ease-sling) calc(var(--solo-rank, 0) * var(--solo-swell-step)) backwards;
 }
-#quick-panel.solo-in .quick-bubble:not(.level) > * {
-  animation: quick-contents-in 190ms ease calc(var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms)) backwards;
+@keyframes solo-shrink {
+  from { opacity: 1; scale: 1; }
+  to   { opacity: 0; scale: 0; }
+}
+@keyframes solo-swell {
+  from { opacity: 0; scale: 0; }
+  to   { opacity: 1; scale: 1; }
 }
 
 #quick-panel.solo-out #quick-weather,
@@ -3237,9 +3402,16 @@ html.now-open {
 html:not(.grown) #pill.panel-top {
   top: calc(-1 * var(--edge-over));
   height: calc(var(--pill-height) + var(--edge-over));
-  padding-top: var(--edge-over);
   border-radius: 0 0 calc(var(--pill-height) / 2) calc(var(--pill-height) / 2);
 }
+/* The rise grows the box upwards past the screen's top edge, and every child of the bubble is absolutely positioned — so they are laid out against a box whose middle is half the rise above the strip that can actually be seen, and a `padding-top` here bought nothing because padding is exactly what an absolute child ignores. Both are pushed down by the rise instead, which puts the contents back in the visible strip. */
+/* The delay is the whole order on the way in: the contents ride the rise up with the bubble, and only once the box has settled do they align themselves down into it. Leaving, this rule is gone before the transition is read, so the base one runs — undelayed, and the contents lead. */
+html:not(.grown) #pill.panel-top .face,
+html:not(.grown) #pill.panel-top #indicators {
+  transition: opacity 160ms ease, top var(--content-drop-ms) var(--ease-grow) var(--grow-ms);
+}
+html:not(.grown) #pill.panel-top .face { top: var(--edge-over); }
+html:not(.grown) #pill.panel-top #indicators { top: calc(var(--edge-over) + 4px); }
 
 #clock.pressing { scale: 1.03; }
 #clock.lit { opacity: 1; }
@@ -3391,7 +3563,7 @@ html:not(.grown) #pill.panel-top {
 
   z-index: 40;
   top: auto;
-  bottom: var(--double-bottom, 120px);
+  bottom: var(--double-bottom, 40px);
   left: 0;
   right: 0;
   margin-inline: auto;
@@ -3400,7 +3572,7 @@ html:not(.grown) #pill.panel-top {
   box-sizing: border-box;
   border-radius: calc(var(--pill-height) / 2);
   background: var(--pill-background);
-  border: 1px solid var(--double-accent, var(--border));
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3419,8 +3591,6 @@ html:not(.grown) #pill.panel-top {
 #double.out { --double-pop: 1; --double-rise: 0px; }
 
 
-
-#double.duplicate #double-glyph { display: none; }
 
 #double.duplicate {
   --double-pop: 1;
@@ -3451,48 +3621,8 @@ html:not(.grown) #pill.panel-top {
 
 
 
-#double-glyph {
-  position: relative;
-  width: 30px;
-  height: 15px;
-  flex: none;
-  box-sizing: border-box;
-  border: 1.5px solid var(--double-accent, #ffb300);
-  border-radius: 4px;
-}
 
 
-#double-glyph::after {
-  content: "";
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  width: 2px;
-  height: 6px;
-  margin-left: 1.5px;
-  transform: translateY(-50%);
-  background: var(--double-accent, #ffb300);
-  border-radius: 0 2px 2px 0;
-}
-
-#double-fill {
-  position: absolute;
-  inset: 1px;
-  width: var(--double-level, 10%);
-  background: var(--double-accent, #ffb300);
-  border-radius: 2px;
-}
-
-
-
-/* `#double` is only faded out, never `display: none`, so an infinite animation on a child kept the WebView compositing a frame every vsync around the clock, screen off included — every always-on animation is gated on the state that shows it now. */
-#double.showing #double-fill {
-  animation: double-low 1.6s ease-in-out infinite;
-}
-@keyframes double-low {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
 
 #double-reading {
   font-size: calc((0.62rem) * var(--font-scale, 1));
@@ -3597,11 +3727,11 @@ html:not(.grown) #pill.panel-top {
 
 #app-name:not(.runs-out),
 #title:not(.runs-out),
-#call-name:not(.runs-out),
 #lock-title:not(.runs-out),
 #lock-artist:not(.runs-out),
 #timer-remaining:not(.runs-out),
-#timer-label:not(.runs-out) { mask-image: none; }
+#timer-label:not(.runs-out),
+#transfer-name:not(.runs-out) { mask-image: none; }
 
 
 
@@ -4037,9 +4167,6 @@ html.spread-landing #channel-under { opacity: 0; }
 }
 #quick-panel.stats-in #stats-section .quick-bubble {
   animation: bubble-grow var(--quick-pop) var(--ease-sling) calc(var(--pop-rank, 0) * var(--pop-step, 42ms)) backwards;
-}
-#quick-panel.stats-in #stats-section .quick-bubble > * {
-  animation: quick-contents-in 190ms ease calc(var(--pop-rank, 0) * var(--pop-step, 42ms)) backwards;
 }
 
 

@@ -63,8 +63,24 @@ object SystemToggles {
         return index * 100 / top
     }
 
+    /* The call bar is read before the shell is, and outside its early return: a phone with Shizuku asleep still knows it is in a call, and the one control the call is about must not be the one that goes missing. */
+    private fun readCall(answer: JSONObject) {
+        val audio = host?.getSystemService(AudioManager::class.java) ?: return
+        val isConnected = audio.mode == AudioManager.MODE_IN_CALL ||
+            audio.mode == AudioManager.MODE_IN_COMMUNICATION
+        answer.put("call", isConnected)
+        if (!isConnected) return
+        callVolumeTop = audio.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+        if (callVolumeTop <= 0) return
+        answer.put(
+            "callVolume",
+            audio.getStreamVolume(AudioManager.STREAM_VOICE_CALL) * 100 / callVolumeTop
+        )
+    }
+
     fun read(): JSONObject {
         val answer = JSONObject()
+        readCall(answer)
         
         
         val lines = ShizukuShell.run(READ_ALL)?.lines() ?: return answer
@@ -138,6 +154,13 @@ object SystemToggles {
                     )
                 }.isSuccess
             }
+            // Mirrors the `callVolume` level in pill.html and status.js. OneUI gives the side buttons to the call stream for as long as a call stands and leaves the quick-settings bar on media, so this is the one the panel cannot otherwise reach.
+            "callVolume" -> runCatching {
+                val audio = context.getSystemService(AudioManager::class.java)
+                callVolumeTop = audio.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                val top = callVolumeTop.takeIf { it > 0 } ?: return false
+                audio.setStreamVolume(AudioManager.STREAM_VOICE_CALL, share * top / 100, 0)
+            }.isSuccess
             "volume" -> runCatching {
                 val audio = context.getSystemService(AudioManager::class.java)
                 volumeTop = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
@@ -167,6 +190,8 @@ object SystemToggles {
 
     
     private var volumeTop = 0
+
+    private var callVolumeTop = 0
 
     
     fun set(name: String, isOn: Boolean): Boolean {

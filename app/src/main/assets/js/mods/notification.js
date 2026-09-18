@@ -1,6 +1,6 @@
-import { dashAlert, homeDashAlert, isAlertCentred, isAlertDashed, recentreAlert } from '../alert.js';
+import { dashAlert, fitAlert, isAlertCentred, isAlertDashed, layOutZone, recentreAlert, renewDashAlert, settleBox } from '../alert.js';
 import { setSize, showFace, toClosed } from '../row.js';
-import { PICTURE_MAX_HEIGHT, bridge, pill, shared } from '../state.js';
+import { PICTURE_MAX_HEIGHT, bridge, pill, root, shared } from '../state.js';
 import { isChannelLive, refreshChannel } from '../channel.js';
 import { statusOpen } from '../status.js';
 
@@ -126,15 +126,6 @@ function paintMatches(host, pattern, className) {
 const stack = document.getElementById('text');
 
 
-const ARRIVE_MILLIS = 300;
-
-
-const EASE_GROW = 'cubic-bezier(0.22, 1.12, 0.36, 1)';
-
-
-const LINE_GAP = '0.34rem';
-
-
 
 
 
@@ -173,23 +164,12 @@ function isSameConversation(shown, next) {
 
 function addLine(text, arriving) {
   const line = document.createElement('div');
-  line.className = 'message';
+  line.className = arriving ? 'message arriving' : 'message';
   
   
   line.dataset.line = text;
   markUp(line, text);
   stack.appendChild(line);
-  if (!arriving) return;
-  
-  
-  
-  line.animate(
-    [
-      { height: '0px', marginTop: '0px', opacity: 0, translate: '0 0.5rem' },
-      { height: line.offsetHeight + 'px', marginTop: LINE_GAP, opacity: 1, translate: '0 0' },
-    ],
-    { duration: ARRIVE_MILLIS, easing: EASE_GROW }
-  );
 }
 
 
@@ -233,7 +213,7 @@ function paintStack(notification, appending) {
     return;
   }
   stack.replaceChildren();
-  addLine(next[next.length - 1] || '', false);
+  addLine(next[next.length - 1] || '');
 }
 
 
@@ -259,6 +239,10 @@ function whoSent(notification) {
 }
 
 export function show(notification) {
+  if (statusOpen && shared.isDashAlertDisabled) {
+    if (isChannelLive()) refreshChannel();
+    return;
+  }
   clearTimeout(shared.dwellTimer);
   
   clearTimeout(goneTimer);
@@ -299,20 +283,31 @@ export function show(notification) {
   else if (statusOpen) {
     // The channel is already standing in the room a slung Alert would be flown into, and it is the same notification list: what arrives is a repaint of what it is showing rather than a second card landing on top of it.
     if (isChannelLive()) refreshChannel();
-    else if (appending && isAlertDashed()) {
-      clearTimeout(shared.dwellTimer);
-      shared.dwellTimer = setTimeout(homeDashAlert, shared.dwell);
-    } else {
+    // The Alert face is moved into the slung bubble rather than copied, and an appended line took the branch that renewed only the dwell — so the face and the idle one behind it were left with whatever showing classes the repaint had just cleared.
+    else if (appending && isAlertDashed()) renewDashAlert();
+    else {
       dashAlert();
     }
   }
-  else setSize(hasImage ? 'image' : 'alert');
+  // The height is measured before the size is asked for rather than a frame after it: the box goes straight to what the content needs instead of animating to a default first.
+  else if (hasImage) {
+    settleBox();
+    setSize('image');
+  }
+  else fitAlert();
   
   
   
   bridge.triggerHaptic('notification');
   // The gesture that answers an Alert is made anywhere across the top band rather than on the bubble alone, so the band is asked for while the Alert stands and given straight back at the close. Slung into the dashboard it is not asked for at all: the panel's own proxy already covers every pixel the Alert is standing on, and a band over the top of the screen would take the corner bubbles' touches with it.
-  if (!isAlertDashed()) bridge.setAlertOverlay(-1);
+  if (!isAlertDashed()) {
+    // A second message reaching an Alert that is already focused must not hand the whole-screen window back for the strip: it is still focused.
+    bridge.setAlertOverlay(isAlertCentred() ? 1 : -1);
+    if (!isAlertCentred()) {
+      layOutZone();
+      root.classList.add('alert-zone-live');
+    }
+  }
 
   // The slung Alert's dwell is its own — it ends by flying home rather than by collapsing where it stands — and `dashAlert` has already set it.
   if (!isAlertCentred() && !isAlertDashed()) shared.dwellTimer = setTimeout(toClosed, shared.dwell);

@@ -28,9 +28,10 @@
 
 
 const LABELS = [
-  '#app-name', '#title', '#call-name',
+  '#app-name', '#title',
   '#lock-title', '#lock-artist',
   '#timer-remaining', '#timer-label',
+  '#transfer-name',
 ].join(', ');
 
 
@@ -87,6 +88,11 @@ export function fitLabels() {
       
       
       boxes.observe(label);
+      // A bubble whose width is still easing hands its labels a box a fifth of the one they are going to get, so every label in a growing Alert measured itself as running out of room, earned the scroll that answers that, and snapped back into place the moment the growth finished. A label inside a box that is still travelling is left whole and measured once, when the box has stopped.
+      if (label.closest('.box-settling')) {
+        label.classList.remove('runs-out');
+        continue;
+      }
       measure(label);
     }
   });

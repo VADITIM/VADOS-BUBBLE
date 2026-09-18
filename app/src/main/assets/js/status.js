@@ -4,10 +4,10 @@ import { clockPill, enterCornerClock, leaveCornerClock } from './clock.js';
 import { stirLiquid } from './liquid.js';
 import { popIn, popOut, rubberBandPast, toy, untoy } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
-import { closePanelNow, openPanelNow } from './lock.js';
+import { closePanelNow, lockHolds, lockPill, openPanelNow } from './lock.js';
 import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
 import { GROWN_PAD, HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
-import { holdLabel, revealLabel, sweepInto, sweepLabel, hideLabel, showLabel } from './sweep.js';
+import { endSweep, holdLabel, revealLabel, settleSweep, sweepInto, sweepLabel, hideLabel, showLabel } from './sweep.js';
 import { channelHolds, closeChannel, collapseSpread, dropChannel, isChannelLive, isSpreadOpen, openChannel, stepChannel } from './channel.js';
 import { refreshEdgeProxy } from './edge.js';
 
@@ -61,9 +61,16 @@ function paintTransferStrip() {
   transferStrip.classList.toggle('idle', !isLive);
   if (!isLive) {
     transferGlyph.innerHTML = GLYPHS.dataToday;
+    transferName.textContent = '';
     setReading(transferReading, bridge.readDataToday() + ' today');
     return;
   }
+  transferName.textContent = transfer.label || '';
+  transferHold.innerHTML = transfer.isPaused ? GLYPHS.transferResume : GLYPHS.transferHold;
+  transferStop.innerHTML = GLYPHS.transferStop;
+  // A file that has landed has nothing left to pause or cancel, and an app that offers no pause action of its own leaves a button that could only ever do nothing.
+  transferHold.hidden = transfer.isDone || !transferButton(HOLD_WORDS);
+  transferStop.hidden = transfer.isDone;
   transferGlyph.innerHTML = transfer.isDone ? GLYPHS.transferDone : GLYPHS[transfer.mod];
   const share = transfer.isDone || !transfer.total ? 100 : Math.round((transfer.done / transfer.total) * 100);
   transferReading.textContent = transfer.isDone ? 'Done' : share + '%';
@@ -197,6 +204,9 @@ const GLYPHS = {
   download: '<svg viewBox="0 0 24 24"><path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4L11 12.2zM5 18h14v2H5z"/></svg>',
   upload: '<svg viewBox="0 0 24 24"><path d="M12 3l5.7 5.7-1.4 1.4L13 6.8V16h-2V6.8L7.7 10.1 6.3 8.7zM5 18h14v2H5z"/></svg>',
   transferDone: '<svg viewBox="0 0 24 24"><path d="M9.8 16.2 5.6 12l-1.4 1.4 5.6 5.6L20.4 7.9 19 6.5z"/></svg>',
+  transferHold: '<svg viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zm6.5 0H17v14h-3.5z"/></svg>',
+  transferResume: '<svg viewBox="0 0 24 24"><path d="M7 4l12 8-12 8z"/></svg>',
+  transferStop: '<svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z"/></svg>',
   dataToday: '<svg viewBox="0 0 24 24"><path d="M4 14h3v6H4zm6.5-5h3v11h-3zM17 4h3v16h-3z"/></svg>',
   hotspot: '<svg viewBox="0 0 24 24"><path d="M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM7.8 5.8 6.4 4.4a10 10 0 0 0 0 15.2l1.4-1.4a8 8 0 0 1 0-12.4zm9.8-1.4-1.4 1.4a8 8 0 0 1 0 12.4l1.4 1.4a10 10 0 0 0 0-15.2z"/></svg>',
   
@@ -268,6 +278,8 @@ function wifiGlyph() {
 
 const BATTERY_GLYPHS = {
   charging: '<svg viewBox="0 0 24 24"><path fill="none" d="M12.5 6L8.5 12H14.5L10.5 18M21 13V11M7.7 6H6.2C5.0799 6 4.51984 6 4.09202 6.21799C3.71569 6.40973 3.40973 6.71569 3.21799 7.09202C3 7.51984 3 8.0799 3 9.2V14.8C3 15.9201 3 16.4802 3.21799 16.908C3.40973 17.2843 3.71569 17.5903 4.09202 17.782C4.51984 18 5.0799 18 6.2 18H6.5M16.5 6H16.8C17.9201 6 18.4802 6 18.908 6.21799C19.2843 6.40973 19.5903 6.71569 19.782 7.09202C20 7.51984 20 8.0799 20 9.2V14.8C20 15.9201 20 16.4802 19.782 16.908C19.5903 17.2843 19.2843 17.5903 18.908 17.782C18.4802 18 17.9201 18 16.8 18H15.31" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  // The bolt alone, for standing inside the Status bubble's own fill — the drawing above is a whole battery and cannot be put inside one. The viewBox is the path's own bounds rather than a 24 square: drawn in that square the shape runs x 4 to 18, so it carried a unit of dead margin on its right and hung a unit left of every box it was centred in.
+  bolt: '<svg viewBox="4 2 14 20"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="currentColor"/></svg>',
 };
 
 
@@ -419,7 +431,8 @@ function bluetoothMark() {
   const paired = attached && attached.bluetooth;
   const level = paired && paired.charge >= 0 ? paired.charge : -1;
   if (level < 0) return GLYPHS.bluetooth;
-  return '<span class="modus-paired"><span class="paired-charge">' + level +
+  const critical = level <= BATTERY_CRITICAL ? ' charge-critical' : '';
+  return '<span class="modus-paired"><span class="paired-charge' + critical + '">' + level +
     '</span><span class="paired-glyph">' + GLYPHS.bluetooth + '</span></span>';
 }
 
@@ -808,7 +821,8 @@ const QUICK_STAGGER = Math.round(QUICK_POP * QUICK_OVERLAP / QUICK_RANK_STEPS);
 
 
 
-const SCRIM_FROST_MS = 450;
+// Mirrors the --scrim-frost leave duration on #quick-panel.leaving #quick-scrim in pill.css: how long the stir has to keep sending frames for the frost to finish ramping out.
+const SCRIM_FROST_MS = 270;
 
 
 
@@ -938,12 +952,13 @@ export function closeStatusPanel() {
   if (isAlertDashed()) toClosed();
   // The channel stands in the stats section and nowhere else, so the section going takes it: there is nothing left for the card to be standing in, and its own flight home would be a journey out of a panel that had already gone.
   dropChannel();
+  restoreStats();
   statusOpen = false;
   refreshEdgeProxy();
   clearTimeout(readingReveal);
   readingsHeld = false;
-  showLabel(weatherReading);
-  showLabel(transferReading);
+  settleSweep(weatherReading);
+  settleSweep(transferReading);
   
   
   
@@ -982,6 +997,8 @@ export function closeStatusPanel() {
     
     
     statusPill.classList.remove('panel-closing');
+    // The rings turn for the whole of the leave now rather than snapping to 0deg the frame `showing` comes off, so `leaving` is what is holding them — and left standing it would hold them turning behind a shut panel for ever, which is the idle drain the turn was scoped to `showing` to avoid in the first place.
+    quickPanel.classList.remove('leaving');
     releaseCornerWidths();
     fitStatusProxy();
     
@@ -1100,6 +1117,8 @@ function paintToggles(state) {
     knob.classList.toggle('unavailable', !(name in state) && name !== 'recording');
   });
   
+  // Mirrors the `call` key SystemToggles.read writes: the call bar stands for exactly as long as the phone says a call does, and the row splits off this one class.
+  root.classList.toggle('call-live', Boolean(state.call) || isCallDebugged);
   batteryBox.classList.toggle('saving', Boolean(state.saver));
 }
 
@@ -1143,15 +1162,9 @@ function holdPairedSwap(count) {
 
 const pairedChargeBadge = document.querySelector('.quick-mode[data-toggle="bluetooth"] .quick-charge');
 
-function pairedChargeBand(level) {
-  if (level >= 31) return 'ok';
-  if (level >= 11) return 'low';
-  return 'critical';
-}
-
 function paintPairedCharge(level) {
   pairedChargeBadge.textContent = level >= 0 ? level : '';
-  pairedChargeBadge.dataset.charge = level >= 0 ? pairedChargeBand(level) : '';
+  pairedChargeBadge.dataset.charge = level >= 0 && level <= BATTERY_CRITICAL ? 'critical' : '';
 }
 
 function paintModeLabels() {
@@ -1293,9 +1306,12 @@ function batteryIcon() {
       ? '<span class="battery-mark charging">' + BATTERY_GLYPHS.charging + '</span>'
       : '<span class="battery-mark">' + batteryLevelMark(charge) + '</span>';
   }
-  const readingHtml = showBatteryPercent
-    ? '<span class="mini-battery-reading">' + charge + '%</span>'
-    : '';
+  // On a cable the cell carries the bolt rather than the number: the cell is barely wider than two digits, and what is news while it is plugged in is that it is plugged in.
+  const readingHtml = isPlugged
+    ? '<span class="mini-battery-bolt">' + BATTERY_GLYPHS.bolt + '</span>'
+    : showBatteryPercent
+      ? '<span class="mini-battery-reading' + (charge <= BATTERY_CRITICAL ? ' charge-critical' : '') + '">' + charge + '%</span>'
+      : '';
   return '<span class="mini-battery' + (showBatteryPercent ? '' : ' bare') + '"><span class="mini-battery-cell"><span class="mini-battery-fill"></span>' +
     readingHtml + '</span></span>';
 }
@@ -1378,6 +1394,7 @@ window.onTogglesChanged = paintToggles;
 const LEVEL_GLYPHS = {
   brightness: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   volume: '<svg viewBox="0 0 24 24"><path d="M11 4.5 6.5 8.5H3.5v7h3l4.5 4zM15.4 8.6a4.8 4.8 0 0 1 0 6.8l1.4 1.4a6.8 6.8 0 0 0 0-9.6zM18.2 5.8a8.8 8.8 0 0 1 0 12.4l1.4 1.4a10.8 10.8 0 0 0 0-15.2z"/></svg>',
+  callVolume: '<svg viewBox="0 0 24 24"><path d="M6.6 3.5 4 6.1c-.5.5-.6 1.2-.4 1.8a20.4 20.4 0 0 0 10.5 10.5c.6.2 1.3.1 1.8-.4l2.6-2.6-4-2.4-1.8 1.8a15.6 15.6 0 0 1-4.5-4.5L10 8.5z"/><path d="M17.4 7.9a3.2 3.2 0 0 1 0 4.5l1.2 1.2a4.9 4.9 0 0 0 0-6.9zM19.5 5.8a6.2 6.2 0 0 1 0 8.7l1.2 1.2a7.9 7.9 0 0 0 0-11.1z"/></svg>',
 };
 
 const levels = [...document.querySelectorAll('.level')];
@@ -1464,6 +1481,19 @@ levels.forEach(level => {
   level.addEventListener('click', event => event.stopPropagation());
 });
 
+
+/* Debug stands the call bar up without a call, because there is no way to be in one and look at the panel at the same time. A forced bar has no stream behind it, so it is given a value to show rather than sitting at zero — a real call arriving over it still overwrites that on the next read. */
+let isCallDebugged = false;
+const CALL_DEBUG_LEVEL = 60;
+
+window.setCallDebug = isLive => {
+  isCallDebugged = Boolean(isLive);
+  root.classList.toggle('call-live', Boolean(toggles && toggles.call) || isCallDebugged);
+  const bar = levels.find(level => level.dataset.level === 'callVolume');
+  if (isCallDebugged && bar && !(toggles && typeof toggles.callVolume === 'number')) {
+    paintLevel(bar, CALL_DEBUG_LEVEL);
+  }
+};
 
 function paintLevels(state) {
   levels.forEach(level => {
@@ -1600,16 +1630,21 @@ let knobGlide = 0;
 let knobGlideAt = 0;
 let knobDrag = dragGate();
 
+// The wrap was measured off a scrollWidth read inside setKnobShift, so every frame of a drag and every frame of a fling forced the panel's layout before it could write the row's place — the same recalc that was taking the slider's frames, and what left a 120Hz drag rendering like 60. The row's width only changes when the observer below says it has, so that is where it is read. The place itself is written to `translate` rather than to a custom property: an unregistered custom property is a style invalidation of the row and all twenty-seven knobs standing in it, on every frame, for a value only the compositor needed.
+let knobCycle = 0;
+
 function setKnobShift(value) {
-  const cycle = knobRow.scrollWidth / KNOB_COPIES;
-  let shift = cycle > 0 ? value % cycle : value;
-  if (shift > 0) shift -= cycle;
+  let shift = knobCycle > 0 ? value % knobCycle : value;
+  if (shift > 0) shift -= knobCycle;
   knobShift = shift;
-  knobRow.style.setProperty('--knob-shift', shift.toFixed(1) + 'px');
+  knobRow.style.translate = shift.toFixed(1) + 'px 0';
 }
 
 // The row's width changes with the toggles when the Now bubble opens, and the wrap is measured off that width. Watching the row re-wraps it on every frame of that transition rather than on a duration this file would have to keep in step with the CSS.
-new ResizeObserver(() => setKnobShift(knobShift)).observe(knobRow);
+new ResizeObserver(() => {
+  knobCycle = knobRow.scrollWidth / KNOB_COPIES;
+  setKnobShift(knobShift);
+}).observe(knobRow);
 
 function stopKnobGlide() {
   cancelAnimationFrame(knobGlide);
@@ -1702,10 +1737,12 @@ let statusDrop = 0;
 // Every tap inside the open panel used to close it: the proxy resolves a touch against the Status bubble's box, and nothing in the panel is a descendant of that bubble, so each control's press fell back to the bubble itself, which reads a press as "close". The panel resolves its own targets now, and answers with nothing where a tap really is meant to close.
 const QUICK_GRACE = 12;
 
-const QUICK_CONTROLS = '.quick-mode, .quick-knob, .level, #quick-battery, #quick-vitals';
+const QUICK_CONTROLS = '.quick-mode, .quick-knob, .level, #quick-battery, #quick-vitals, .transfer-action';
 
 export function statusPanelTarget(x, y) {
   if (!statusOpen) return null;
+  // The Now bubble stands over the panel but is no part of it, so the grace radius below answered a touch on it with whichever knob happened to be nearest — and the upward flick, which the bubble is not allowed to answer there, then read as begun on the panel's own ground and was confirmed with the dismiss buzz. Naming it a control keeps the close and drops the buzz, the same way a swipe begun on a toggle is treated.
+  if (lockHolds(x, y)) return lockPill;
   const hit = document.elementFromPoint(x, y);
   // The stats section's own controls are still in the document while the channel stands over them, collapsed and untouchable but with boxes the grace radius can still reach — so a tap on the notification card was answered by the vitals bubble underneath it.
   if (channelHolds(x, y) || isSpreadOpen()) return hit;
@@ -1717,6 +1754,8 @@ export function statusPanelTarget(x, y) {
   for (const control of quickPanel.querySelectorAll(QUICK_CONTROLS)) {
     if (isChannelLive() && statsSection.contains(control)) continue;
     const box = control.getBoundingClientRect();
+    // The transfer strip's two buttons are drawn only while a file is in flight, and a control with no box measures at the screen's own origin — so with nothing transferring every touch near the top-left corner of the panel fell inside the grace radius of a button that was not there.
+    if (!box.width) continue;
     // A toggle scrolled past the window's edge is still in the document and still a candidate for the grace radius, so a tap near the edge would answer with a switch nobody can see.
     if (control.classList.contains('quick-knob') && (box.left < knobs.left - 1 || box.right > knobs.right + 1)) continue;
     const across = Math.max(box.left - x, 0, x - box.right);
@@ -1922,6 +1961,36 @@ export function setTransfer(payload) {
 const transferStrip = document.getElementById('quick-transfer');
 const transferGlyph = document.getElementById('transfer-glyph');
 const transferReading = document.getElementById('transfer-reading');
+const transferName = document.getElementById('transfer-name');
+const transferHold = document.getElementById('transfer-hold');
+const transferStop = document.getElementById('transfer-stop');
+
+
+const HOLD_WORDS = /pause|pausieren|anhalten|resume|fortsetzen|weiter/i;
+const STOP_WORDS = /cancel|abbrechen|abbruch|stop|stopp|beenden/i;
+
+function transferButton(words) {
+  const actions = (transfer && transfer.actions) || [];
+  return actions.find(action => words.test(action.title));
+}
+
+transferHold.addEventListener('click', event => {
+  event.stopPropagation();
+  const button = transferButton(HOLD_WORDS);
+  if (!button) return;
+  bridge.triggerHaptic('tap');
+  bridge.transferAction(button.index);
+});
+
+// An app that offers no cancel action of its own still has its notification taken away, which is the only thing this project can do about a transfer it did not start — and for most apps it is what cancelling it means.
+transferStop.addEventListener('click', event => {
+  event.stopPropagation();
+  if (!transfer) return;
+  bridge.triggerHaptic('tap');
+  const button = transferButton(STOP_WORDS);
+  if (button) bridge.transferAction(button.index);
+  else bridge.dismissNotification(transfer.key);
+});
 
 function holdTheTick() {
   clearTimeout(transferTick);
@@ -1943,6 +2012,12 @@ window.onCharge = (level, plugged, remaining) => {
   isPlugged = plugged;
   remainingMinutes = remaining;
   paintStatus();
+};
+
+// The battery announcement was hooked from `double.js`, which owned the bottom-screen bubble that used to carry it; the announcement is the Status bubble's own and moved here with the Double's removal.
+window.onBattery = payload => {
+  if (!payload) return;
+  announceCharge(payload.state);
 };
 
 
@@ -2065,14 +2140,15 @@ vitalsBox.addEventListener('click', event => {
 
 
 
-// The brightness bar held clears the panel: the frost goes first and the modules leave behind it on the panel's own close, and the lift runs the same order — frost back first, then the modules grow in. Volume takes the merge and leaves the panel standing.
+// The brightness bar held clears the panel: the frost, the modules' own clearance and the bar's lift all start on the frame the finger lands, and all come back on the frame it lifts. Volume takes the merge and leaves the panel standing.
 const levelsRow = document.getElementById('quick-row-levels');
 export const SOLO_HOLD = 420;
-// Mirrors --solo-ms and --solo-out in pill.css; SOLO_OUT is the panel's own collapse allowance, the same 110ms and slack closeStatusPanel gives it.
+// Mirrors --solo-ms, --solo-shrink, --solo-shrink-step, --solo-swell, --solo-swell-step and --solo-frost in pill.css.
 const SOLO_TRAVEL = 420;
-const SOLO_OUT = 180;
 const SOLO_FROST = 260;
-const SOLO_IN = QUICK_POP + QUICK_RANK_STEPS * QUICK_STAGGER;
+const SOLO_RANKS = 5;
+const SOLO_OUT = 130 + SOLO_RANKS * 14;
+const SOLO_IN = 300 + SOLO_RANKS * 16;
 
 let soloTimer = 0;
 let soloBackTimer = 0;
@@ -2082,15 +2158,20 @@ function enterSolo(level) {
   if (soloLevel) return;
   soloLevel = level;
   clearTimeout(soloBackTimer);
+  const isBrightness = level.dataset.level === 'brightness';
+  /* The lift was measured after the merge had been written, and a getBoundingClientRect between two class changes flushes the first of them on its own — so the bars started their travel on the frame the measurement forced and the modules' clearance started on the next one, which is one gesture arriving in two beats. Everything is read before anything is written. */
+  let lift = 0;
+  if (isBrightness) {
+    const panelBox = quickPanel.getBoundingClientRect();
+    const rowBox = levelsRow.getBoundingClientRect();
+    lift = Math.round((panelBox.top + panelBox.height / 2) - (rowBox.top + rowBox.height / 2));
+  }
   quickPanel.classList.remove('solo-in');
   levelsRow.dataset.held = level.dataset.level;
   levelsRow.classList.add('merged');
   levels.forEach(other => other.classList.toggle('solo-hidden', other !== level));
-  if (level.dataset.level === 'brightness') {
-    quickPanel.style.setProperty('--pop-step', QUICK_STAGGER + 'ms');
-  const panelBox = quickPanel.getBoundingClientRect();
-    const rowBox = levelsRow.getBoundingClientRect();
-    const lift = Math.round((panelBox.top + panelBox.height / 2) - (rowBox.top + rowBox.height / 2));
+  if (isBrightness) {
+    quickBubbles.forEach(bubble => bubble.style.setProperty('--solo-rank', Math.round(Math.random() * SOLO_RANKS)));
     root.style.setProperty('--solo-lift', lift + 'px');
     quickPanel.classList.add('solo-out', 'level-solo');
   }
@@ -2108,13 +2189,11 @@ function leaveSolo() {
     stirLiquid(SOLO_TRAVEL);
     return;
   }
-  quickPanel.classList.remove('level-solo');
-  soloBackTimer = setTimeout(() => {
-    quickPanel.classList.remove('solo-out');
-    quickPanel.classList.add('solo-in');
-    soloBackTimer = setTimeout(() => quickPanel.classList.remove('solo-in'), SOLO_IN);
-  }, SOLO_FROST);
-  stirLiquid(SOLO_FROST + Math.max(SOLO_IN, SOLO_TRAVEL));
+  /* The modules waited out the frost before growing back, so they arrived after the bars had already finished splitting — the hold let go in two beats, the same fault the enter had. The frost, the bars and the modules all come back on the frame the finger lifts. */
+  quickPanel.classList.remove('level-solo', 'solo-out');
+  quickPanel.classList.add('solo-in');
+  soloBackTimer = setTimeout(() => quickPanel.classList.remove('solo-in'), SOLO_IN);
+  stirLiquid(Math.max(SOLO_IN, SOLO_TRAVEL));
 }
 
 
@@ -2176,6 +2255,14 @@ export function statsIn() {
   sweepSectionBack(transferReading);
   statsBackTimer = setTimeout(() => quickPanel.classList.remove('stats-in'), STATS_BACK);
   stirLiquid(STATS_BACK);
+}
+
+// The section coming back animated is `statsIn`; this is the section coming back because the panel around it has gone, which has no motion to play and must leave nothing behind — a close taken while the channel stood left `stats-out` on the panel and the two readings swept away, and the next open had neither.
+function restoreStats() {
+  clearTimeout(statsBackTimer);
+  quickPanel.classList.remove('stats-out', 'stats-in');
+  sweptReadings.forEach((text, element) => endSweep(element, text));
+  sweptReadings.clear();
 }
 
 export function statsBox() {

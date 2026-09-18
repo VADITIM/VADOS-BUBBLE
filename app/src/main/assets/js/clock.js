@@ -118,7 +118,6 @@ function bornClock() {
 
 
 /* The Clock's own handover into the dashboard corner and back, on the interface's one pop. The hours and minutes are deliberately not in it: they are the same reading at both sizes, so the only parts handed over are the seconds — which change form, colon and all — and the date, which is arriving. The seconds shake out, take their grown form while they are standing at nothing, and turn back in at it, because the form change is exactly what the empty frame is for. */
-const CORNER_LEAVE = 260;
 
 /* Mirrors --ease-split and --grow-ms in pill.css. */
 const CORNER_EASE = 'cubic-bezier(0.2, 1.7, 0.35, 1)';
@@ -127,8 +126,48 @@ const CORNER_TRAVEL = 340;
 let secondsHandover = 0;
 let facePutBack = null;
 let pinnedSeconds = [];
+let heldParts = [];
+
+function carryFace(acrossX, downY) {
+  return clockFace.animate(
+    { transform: ['translate(' + acrossX + 'px, ' + downY + 'px)', 'translate(0px, 0px)'] },
+    { duration: CORNER_TRAVEL, easing: CORNER_EASE, composite: 'add' }
+  );
+}
+
+function readLength(styles, name, fallback) {
+  const value = parseFloat(styles.getPropertyValue(name));
+  return Number.isNaN(value) ? fallback : value;
+}
+
+/* Mirrors #clock's own placement in pill.css: --clock-left over --grab on the bar, --corner-inset on both axes in the corner, `left` on --clock-width-ms and `top` on --grow-ms. The two axes are read apart because they are not on one clock: status.js pins --clock-width-ms at 0ms for the open, so `left` lands in the frame handOverClock's own layout read flushes while `top` eases the whole way. Read before a class is toggled — the properties are never transitioned, and the box they place is. */
+function cornerOriginShift(isGrown) {
+  const styles = getComputedStyle(clockPill);
+  const inset = readLength(styles, '--corner-inset', 10);
+  const acrossX = inset - readLength(styles, '--clock-left', CLOCK_LEFT);
+  const downY = inset - readLength(styles, '--grab', 0);
+  return {
+    acrossX: isGrown ? acrossX : -acrossX,
+    downY: isGrown ? downY : -downY,
+    acrossMillis: readLength(styles, '--clock-width-ms', 300),
+    downMillis: readLength(styles, '--grow-ms', 340)
+  };
+}
+
+/* The Clock's top-left is what a pinned part hangs off, and it was taken for the one point that does not move — it is the one point that does, since the box is placed from a different pair of properties at either end of the journey. So a part standing perfectly still in the layout was carried across the screen by the whole of that shift: down towards the minute's landing place on the way in, up and left away from the time on the way out. Handing it the face's own travel instead was worse rather than better, because a pinned part is not in flow and so has no jump to be given back — it starts where it was measured, and what it needs is the corner's shift taken back off it on the clock each axis of the box actually moves on. */
+function holdStill(part, shift) {
+  return [
+    ['translate(' + -shift.acrossX + 'px, 0px)', shift.acrossMillis],
+    ['translate(0px, ' + -shift.downY + 'px)', shift.downMillis]
+  ].map(([to, duration]) => part.animate(
+    { transform: ['translate(0px, 0px)', to] },
+    { duration, easing: CORNER_EASE, composite: 'add', fill: 'forwards' }
+  ));
+}
 
 function releaseSeconds() {
+  heldParts.forEach((animation) => animation.cancel());
+  heldParts = [];
   pinnedSeconds.forEach((part) => {
     part.classList.remove('standing-still');
     part.style.removeProperty('left');
@@ -152,7 +191,7 @@ function pinCornerDate() {
     clockDate.classList.remove('handed-over');
     clockDate.style.removeProperty('left');
     clockDate.style.removeProperty('top');
-  }, CORNER_LEAVE + 60);
+  }, CORNER_TRAVEL);
 }
 
 function handOverClock(isGrown) {
@@ -164,6 +203,7 @@ function handOverClock(isGrown) {
     return { part, left: box.left - around.left, top: box.top - around.top };
   });
   const tall = clockSeconds.offsetHeight;
+  const shift = cornerOriginShift(isGrown);
   if (!isGrown) pinCornerDate();
   clockPill.classList.toggle('corner-grow', isGrown);
   /* The seconds are the width the layout will need before they are wearing it, so the row reflows once — here — rather than a second time when the form arrives in the middle of the pop. */
@@ -175,12 +215,9 @@ function handOverClock(isGrown) {
   /* The column the corner stacks, the size the digits take and the room the seconds ask for all land in one frame, and the hours and minutes were wherever that left them — a reading teleporting for a change that is not about it. The difference is measured and given back as one additive travel, so the time is carried to its new place over the same stretch the box takes to grow. Additive because `transform` is the drag's and the pop's as well. */
   const now = clockFace.getBoundingClientRect();
   facePutBack?.cancel();
-  facePutBack = clockFace.animate(
-    { transform: ['translate(' + (was.left - now.left) + 'px, ' + (was.top - now.top) + 'px)', 'translate(0px, 0px)'] },
-    { duration: CORNER_TRAVEL, easing: CORNER_EASE, composite: 'add' }
-  );
+  facePutBack = carryFace(was.left - now.left, was.top - now.top);
 
-  /* The seconds were shaking out over the same frames the corner's reflow was carrying them across, so they were seen sliding to their grown place before they left it. Holding the measured difference on them was not enough: the box grows for the whole of the travel, so a constant offset cancels the jump and then rides the rest of it. Each digit is taken out of the flow and pinned to the Clock's own top-left corner instead — the one point in this transition that does not move — and what is left standing in the row is the width and nothing else. */
+  /* The seconds were shaking out over the same frames the corner's reflow was carrying them across, so they were seen sliding to their grown place before they left it. Each digit is taken out of the flow and pinned where it already stood, and what is left standing in the row is the width and nothing else. */
   clockSeconds.style.height = tall + 'px';
   standing.forEach(({ part, left, top }) => {
     part.style.left = left + 'px';
@@ -188,6 +225,8 @@ function handOverClock(isGrown) {
     part.classList.add('standing-still');
   });
   pinnedSeconds = standing.map(({ part }) => part);
+  heldParts = standing.flatMap(({ part }) => holdStill(part, shift));
+  if (!isGrown) heldParts.push(...holdStill(clockDate, shift));
   popOut([...clockSeconds.children]);
   clearTimeout(secondsHandover);
   secondsHandover = setTimeout(() => {

@@ -1,6 +1,7 @@
 import { openCurrent } from './mods/notification.js';
 import { HOLD_BLOCK, pillHolds, toy, untoy } from './motion.js';
 import { setSize, toClosed } from './row.js';
+import { fitLabels } from './labels.js';
 import { HALO_MILLIS, startHalo, stirLiquid } from './liquid.js';
 import { slingInto } from './sling.js';
 import { statsBox, statsIn, statsOut } from './status.js';
@@ -26,6 +27,22 @@ const CENTRE_LIFT = 0.1;
 
 
 const HOME_TRAVEL = 460;
+
+
+const ALERT_FLOOR = 88;
+
+
+const FIT_TRAVEL = 340;
+
+
+// Mirrors --grow-ms on #pill.alert-centred in pill.css, and is long enough for the row's own growth as well.
+const BOX_SETTLE = 460;
+
+let settleTimer = null;
+
+
+// Mirrors ALERT_ZONE_HEIGHT_PART in BubbleService.kt.
+const ZONE_HEIGHT_PART = 0.30;
 
 let homeTimer = null;
 
@@ -70,7 +87,7 @@ export function alertTouch(action, x, y) {
     if (Math.hypot(across, down) <= HOLD_BLOCK) return;
     if (!alertDrag(x, y)) return;
     toy(pill, '--drag', 0, down);
-    // The window is the whole screen now, so a pull begun out at the edge of it is as far across as it is down and a fixed sideways cap read every one of those as no gesture at all. Which direction a travel is, is which axis it has covered more of.
+    // The pull is made at the screen's right edge as often as on the bubble, so it is as far across as it is down and a fixed sideways cap read every one of those as no gesture at all. Which direction a travel is, is which axis it has covered more of.
     if (down < -ALERT_PULL && -down > across) {
       hasActed = true;
       dismissAlert();
@@ -97,7 +114,7 @@ export function alertTouch(action, x, y) {
   if (action !== 'up' || hasActed) return;
   if (Math.hypot(x - startX, y - startY) > ALERT_TAP_SLOP) return;
   if (pillHolds(x, y)) openCurrent();
-  // The window an Alert takes covers the screen so the pull can be made anywhere, and a window that hears a press is the only window that hears it — a tap nowhere near the bubble would simply be eaten by an Alert that has nothing to do with what the finger was aiming at. The host hands it back to whatever is underneath.
+  // A window that hears a press is the only window that hears it, so a tap inside the pull zone that was not aimed at the Alert would simply be eaten. The host hands it back to whatever is underneath.
   else bridge.passAlertTap();
 }
 
@@ -107,8 +124,55 @@ export function isAlertCentred() {
 }
 
 function dismissAlert() {
-  bridge.triggerHaptic('dismiss');
+  // Letting a focused Alert go is not the same act as throwing an unread one away, and it was answering with the same double click as the pull that focused it.
+  bridge.triggerHaptic(isAlertCentred() ? 'release' : 'dismiss');
   toClosed();
+}
+
+
+export function layOutZone() {
+  const height = Math.round(root.clientHeight * ZONE_HEIGHT_PART);
+  root.style.setProperty('--alert-zone-height', height + 'px');
+  root.style.setProperty('--alert-zone-top', Math.round((root.clientHeight - height) / 2) + 'px');
+}
+
+
+export function measureAlert() {
+  const face = faces.alert;
+  const head = document.getElementById('alert-head');
+  const text = document.getElementById('text');
+  const picture = document.getElementById('picture');
+  const style = getComputedStyle(face);
+  const room = SIZES.alert.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const gap = parseFloat(style.rowGap) || 0;
+  // The bubble is still the width it is leaving when an arrival is measured, so the reading is wrapped at the Alert's own width for the read and let go again in the same breath. Measured a frame later instead — after the size had already been applied — the box animated to a default height first and then to the right one, which is the height changing during the arrival.
+  text.style.width = room + 'px';
+  const hasImage = pill.classList.contains('with-image');
+  const wanted = head.offsetHeight + gap + text.scrollHeight +
+    (hasImage ? gap + picture.offsetHeight : 0) +
+    parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  text.style.removeProperty('width');
+  const ceiling = Math.round(root.clientHeight * CENTRE_CEILING);
+  return Math.max(ALERT_FLOOR, Math.min(ceiling, Math.round(wanted)));
+}
+
+
+export function settleBox() {
+  pill.classList.add('box-settling');
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => {
+    pill.classList.remove('box-settling');
+    fitLabels();
+  }, BOX_SETTLE);
+}
+
+
+export function fitAlert() {
+  settleBox();
+  const height = measureAlert();
+  root.style.setProperty('--alert-height', height + 'px');
+  setSize('alert', { width: SIZES.alert.width, height });
+  stirLiquid(FIT_TRAVEL);
 }
 
 
@@ -134,17 +198,13 @@ export function recentreAlert() {
 }
 
 function layOutCentre() {
+  settleBox();
+  root.classList.remove('alert-zone-live');
   // An Alert dwells and closes itself, and one that has been pulled down has been asked for: it stands until the hand says otherwise.
   clearTimeout(shared.dwellTimer);
 
 
-  const head = document.getElementById('alert-head');
-  const text = document.getElementById('text');
-  const picture = document.getElementById('picture');
-  const ceiling = Math.round(root.clientHeight * CENTRE_CEILING);
-  const wanted = head.offsetHeight + text.scrollHeight +
-    (pill.classList.contains('with-image') ? picture.offsetHeight : 0) + 40;
-  const height = Math.max(SIZES.alert.height, Math.min(ceiling, wanted));
+  const height = measureAlert();
   root.style.setProperty('--alert-height', height + 'px');
 
   // A notification is read above the middle rather than across it — the thumb and the hand holding the phone are under the lower half, and a box centred on the glass has the hand in front of the end of it.
@@ -167,6 +227,9 @@ export function leaveAlertCentre() {
   isBandWanted = false;
 
   untoy(pill, '--drag');
+  clearTimeout(settleTimer);
+  pill.classList.remove('box-settling');
+  root.classList.remove('alert-zone-live');
   root.style.removeProperty('--alert-drop');
   root.style.removeProperty('--alert-height');
   // The goo region is the row's band again the moment the bubble stops being grown, and a bubble drawn outside the region has its skin dropped while `html.liquid` is still blanking its own background — so the bubble travelling home from the middle of the screen was simply not drawn for the whole journey. The region is held at full height until it is back on the bar.
@@ -287,6 +350,12 @@ function layOutDash() {
   root.style.setProperty('--dash-home-x', Math.round(main.left + main.width / 2 - (left + width / 2)) + 'px');
   root.style.setProperty('--dash-home-y', Math.round(main.top + main.height / 2 - (top + height / 2)) + 'px');
   return { left, top, width, height };
+}
+
+export function renewDashAlert() {
+  carryAlert();
+  clearTimeout(shared.dwellTimer);
+  shared.dwellTimer = setTimeout(homeDashAlert, shared.dwell);
 }
 
 export function homeDashAlert() {

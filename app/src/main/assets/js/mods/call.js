@@ -1,8 +1,7 @@
 import { toClosed } from '../row.js';
-import { mods, pill, shared } from '../state.js';
+import { mods, shared } from '../state.js';
 
-const callAvatar = document.getElementById('call-avatar');
-const callName = document.getElementById('call-name');
+const callAvatar = document.getElementById('call-avatar');
 const callTime = document.getElementById('call-time');
 let callTicker = null;
 
@@ -57,18 +56,15 @@ export function paintCall() {
   if (!shared.call) return;
   document.documentElement.style.setProperty(
     '--app-accent', shared.call.accent || 'var(--section-color)'
-  );
-  pill.classList.toggle('phone-call', Boolean(shared.call.phone));
-  paintAvatar(callAvatar);
-  callName.textContent = shared.call.name || '';
+  );
+  paintAvatar(callAvatar);
 }
 
 window.onCallUpdate = payload => {
   shared.call = payload;
   if (!shared.call) {
     mods.delete('call');
-    clearInterval(callTicker);
-    pill.classList.remove('phone-call');
+    clearInterval(callTicker);
     if (shared.state === 'idle') toClosed();
     return;
   }

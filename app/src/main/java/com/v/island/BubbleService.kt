@@ -12,6 +12,7 @@ import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.VibrationEffect
@@ -105,6 +106,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private const val EDGE_TOP = 0.14f
         private const val EDGE_BOTTOM = 0.78f
         private const val SCRIM_PANE = 0
+
+        // Mirrors #alert-zone in pill.css — the strip a pull-to-focus is heard on, standing at the right edge across the middle of the screen.
+        private const val ALERT_ZONE_WIDTH = 96
+        private const val ALERT_ZONE_HEIGHT_PART = 0.30f
 
         const val PANEL_BROADCAST = "com.v.island.TOGGLE_STATUS_PANEL"
         const val NOTIFICATIONS_BROADCAST = "com.v.island.TOGGLE_NOTIFICATIONS"
@@ -201,6 +206,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         
+        // The call bar answers AudioManager's mode, and there is no way to put the phone in a call to look at it, so Debug stands the bar up on its own with a value of its own.
+        fun deliverCallVolume(isLive: Boolean) {
+            instance?.push("window.setCallDebug($isLive)")
+        }
+
         fun deliverMedia(media: JSONObject?) {
             instance?.push("window.onMediaUpdate(${media ?: "null"})")
         }
@@ -442,7 +452,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                     return true
                 }
             }
-            addJavascriptInterface(Bridge(), "Android")
+            addJavascriptInterface(bubbleBridge, "Android")
             webViewClient = AssetOrigin.client(this@BubbleService)
             loadUrl(AssetOrigin.ROOT + "pill.html")
         }
@@ -695,6 +705,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         applyVisibility()
         ShizukuShell.bind(this)
         SystemToggles.attach(this)
+        /* Nothing else asks the panel to read itself again while it stands open, and a call beginning is exactly when the levels row has to change shape — so the one event that says so pushes a fresh read. It fires a handful of times a day. */
+        getSystemService(AudioManager::class.java)?.addOnModeChangedListener(mainExecutor) {
+            bubbleBridge.requestToggles()
+        }
         instance = this
 
         MediaControl.start(this) { media -> deliverMedia(media) }
@@ -1056,16 +1070,22 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
-    private fun setAlertBand(heightDp: Int) {
+    private fun setAlertBand(mode: Int) {
         if (!this::alertOverlay.isInitialized) return
-        val wanted = heightDp != 0 && !isHidden()
-        // A pull on an Alert is answered from wherever the hand already is rather than from the strip the bubble happens to stand in, so the window an Alert asks for is the whole screen. The tap that is not a pull is handed back to whatever is underneath by `replayAlertTap`, so covering everything costs the app below nothing.
-        alertOverlayParams.width = if (wanted) screenWidth() else 0
-        alertOverlayParams.height = if (wanted) screenHeight() else 0
+        val wanted = mode != 0 && !isHidden()
+        // An Alert standing on the bar asks for one named strip — the right edge, across the middle, where the indicator is drawn — because the whole display taken for every arrival is every pixel dead to the app underneath and a dispatched replay for most taps made while a notification stands. Focused, the Alert *is* what the screen is for: its gestures are made anywhere and its tap opens the app, so it takes the display back and the main proxy stands down for the length of it rather than the two being stacked and their order reasoned about.
+        val isWhole = mode > 0
+        val width = if (isWhole) screenWidth() else dp(ALERT_ZONE_WIDTH)
+        val height =
+            if (isWhole) screenHeight() else (screenHeight() * ALERT_ZONE_HEIGHT_PART).toInt()
+        alertOverlayParams.width = if (wanted) width else 0
+        alertOverlayParams.height = if (wanted) height else 0
+        alertOverlayParams.x = if (wanted) screenWidth() - width else 0
+        alertOverlayParams.y = if (wanted) (screenHeight() - height) / 2 else 0
         alertOverlayParams.flags = proxyFlags(wanted)
         runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
 
-        proxyParams.flags = proxyFlags(!wanted)
+        proxyParams.flags = proxyFlags(!(wanted && isWhole))
         runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
     }
 
@@ -1171,10 +1191,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         val y = (proxy.y + event.y) / density
         
-        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
-            wakeFrames()
-            keepAwake()
-        }
+        /* The high frame rate was voted for once, on the touch down, and `REQUESTED_FRAME_RATE_CATEGORY_HIGH` is a vote that expires — so a drag that sends nothing back to the service, which is every drag inside the Dashboard, dropped the window to the display's default part-way through and finished at 60Hz under a finger still moving at 120. The vote is renewed off every forwarded touch; `wakeFrames` already throttles itself to one call per 150ms, which is far inside the vote's own life. */
+        wakeFrames()
+        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) keepAwake()
         val action = when (event.actionMasked) {
             android.view.MotionEvent.ACTION_DOWN -> "down"
             android.view.MotionEvent.ACTION_MOVE -> "move"
@@ -1282,6 +1301,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setNowPushes(${Preferences.get(preferences, Preferences.NOW_PUSHES)})")
         push("window.setAlertDwell(${Preferences.get(preferences, Preferences.ALERT_DWELL)})")
         push("window.setQuickDividers(${Preferences.get(preferences, Preferences.QUICK_DIVIDERS)})")
+        push("window.setDashAlertsDisabled(${Preferences.get(preferences, Preferences.DASH_ALERTS_DISABLED)})")
+        push("window.setAlertZoneShown(${Preferences.get(preferences, Preferences.ALERT_ZONE_SHOWN)})")
         push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
         push("window.setLabelSweep(${Preferences.get(preferences, Preferences.LABEL_SWEEP)})")
         push("window.setStatusBatteryPercent(${Preferences.get(preferences, Preferences.STATUS_BATTERY_PERCENT)})")
@@ -1435,6 +1456,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     // How soon after a switch the phone is asked again, for as long as one is still standing for an ask nothing has confirmed.
     private val TOGGLE_RECHECK_MILLIS = 400L
+
+    private val bubbleBridge = Bridge()
 
     inner class Bridge {
         @JavascriptInterface
@@ -1603,6 +1626,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             IslandNotificationListener.recordingAction(index)
         }
 
+
+        @JavascriptInterface
+        fun transferAction(index: Int) {
+            IslandNotificationListener.transferAction(index)
+        }
+
         
         @JavascriptInterface
         fun setClockProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
@@ -1735,6 +1764,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                     "tap" -> VibrationEffect.EFFECT_CLICK
                     "expand" -> VibrationEffect.EFFECT_HEAVY_CLICK
                     "dismiss" -> VibrationEffect.EFFECT_DOUBLE_CLICK
+                    "release" -> VibrationEffect.EFFECT_TICK
                     else -> VibrationEffect.EFFECT_TICK
                 }
             )

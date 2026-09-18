@@ -207,16 +207,15 @@ object ConnectivityWatch {
                 isHotspotOn = !intent.getStringArrayListExtra(TETHER_ACTIVE).isNullOrEmpty()
 
             
+            // The charge was wiped on every ACL event as well, and the only thing that can refill it is the device's own BATTERY_LEVEL_CHANGED broadcast, which it sends when the level moves rather than when it is asked — so one profile link of a headset that holds several coming or going left the percentage gone until the headset was reconnected. It is held now for as long as anything is connected, and cleared where the connected set is rebuilt empty.
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
                 nameOf(intent)?.takeIf { it.isNotEmpty() }?.let { pairedNames.add(it) }
                 pairedName = pairedNames.firstOrNull()
-                pairedCharge = -1
                 readConnected(context)
             }
 
             // A headset holds several ACL links at once — A2DP, the handsfree profile, and an LE one — and Android reports each of them separately, so one transport dropping while the rest stay up arrived here as the device having gone. The name was cleared on that first disconnect and the ring emptied with the headphones still playing. A disconnect is a reason to ask what is still connected, never an answer on its own.
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                pairedCharge = -1
                 readConnected(context)
             }
 
@@ -281,6 +280,7 @@ object ConnectivityWatch {
                 pairedNames.clear()
                 pairedNames.addAll(found)
                 pairedName = pairedNames.firstOrNull()
+                if (found.isEmpty()) pairedCharge = -1
                 publish()
             }
 

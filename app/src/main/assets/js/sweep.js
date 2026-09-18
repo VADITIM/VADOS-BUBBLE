@@ -115,6 +115,33 @@ export function sweepInto(element, next, force) {
   }, SWEEP_IN + SWEEP_OUT);
 }
 
+// A sweep only hands its text back when its second timer fires, so a reading swept away in a section that is being torn down under it would have been handed back into a panel that had already gone — the bar is cleared and the text put on in the same frame instead.
+export function endSweep(element, text) {
+  const running = sweeping.get(element);
+  if (running) {
+    clearTimeout(running.cover);
+    clearTimeout(running.clear);
+    sweeping.delete(element);
+    clearBar(element, running.host);
+  }
+  element.textContent = text;
+  showLabel(element);
+}
+
+// A panel closing over a sweep left its two timers to fire into a section that had gone: the text was handed back late, and the reveal asked for on the next open was swallowed whole by the stale entry still standing for the same wanted text — which is the reveal that plays twice, or does not play at all. The bar is cleared and the wanted text written instead. Whether the label is *seen* is left exactly as the close found it: a reading still waiting for its reveal was being handed its text and un-hidden on the way out, so it faded in over a dashboard that was already leaving, with nothing having revealed it.
+export function settleSweep(element) {
+  const running = sweeping.get(element);
+  const wasHidden = element.classList.contains('sweep-hidden');
+  if (running) {
+    clearTimeout(running.cover);
+    clearTimeout(running.clear);
+    sweeping.delete(element);
+    clearBar(element, running.host);
+    element.textContent = running.wanted;
+  }
+  if (wasHidden) hideLabel(element);
+}
+
 export function sweepLabel(element, next) {
   if (shared.labelSweep) sweepInto(element, next);
   else element.textContent = next || '';

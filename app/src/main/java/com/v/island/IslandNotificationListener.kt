@@ -130,12 +130,17 @@ class IslandNotificationListener : NotificationListenerService() {
         
         fun transfer(): StatusBarNotification? =
             instance?.activeNotifications
-                ?.filter { NowWatch.isTransfer(it) }
+                ?.filter { NowWatch.isTransfer(it) && !isPlayer(it) }
                 ?.minByOrNull { it.postTime }
 
         
         fun recordingAction(index: Int) {
             recording()?.let { NowWatch.act(it, index) }
+        }
+
+
+        fun transferAction(index: Int) {
+            transfer()?.let { NowWatch.act(it, index) }
         }
 
         
@@ -222,16 +227,17 @@ class IslandNotificationListener : NotificationListenerService() {
         
         
         
-        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
-            publishNowMods()
-            return
-        }
-        
-        
-        
+
+
+
+        // A player is asked about before a transfer now that a transfer is recognised by its progress bar alone: a media notification carrying one — which is most of them — would otherwise be read as a file in flight and never reach the media session at all.
         if (isPlayer(statusBarNotification)) {
             MediaControl.refresh()
             MediaControl.offer(standInFor(statusBarNotification))
+            return
+        }
+        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
+            publishNowMods()
             return
         }
         BubbleService.deliverCount(count())

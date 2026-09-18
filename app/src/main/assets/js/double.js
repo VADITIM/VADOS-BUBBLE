@@ -1,104 +1,16 @@
-import { announceCharge } from './status.js';
 import { stirLiquid } from './liquid.js';
 import { toClosed } from './row.js';
 import { GROWN_PAD, bridge, pill, root } from './state.js';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const doublePill = document.getElementById('double');
 const doubleReading = document.getElementById('double-reading');
 
-
-const DOUBLE_DWELL = 4200;
-
-
-
-
-
-
-const DOUBLE_BOTTOM = 120;
-
-
-const DOUBLE_RISE = 40;
-
-
-const DOUBLE_TRAVEL = 380;
-
-const DOUBLE_COLOURS = {
-  low: '#ffb300',
-  critical: '#ff3b30',
-};
-
-let dwell = null;
-let isOut = false;
-let homing = null;
-
-
-export function announceDouble(payload) {
-  const level = Math.max(0, Math.min(100, Number(payload.level) || 0));
-  root.style.setProperty('--double-accent', DOUBLE_COLOURS[payload.state] || DOUBLE_COLOURS.low);
-  
-  
-  root.style.setProperty('--double-rise', DOUBLE_RISE + 'px');
-  root.style.setProperty('--double-level', Math.max(8, level) + '%');
-  doubleReading.textContent = level + ' %';
-
-  clearTimeout(dwell);
-  if (!isOut) {
-    isOut = true;
-    
-    
-    root.classList.add('double-live');
-    doublePill.classList.add('showing');
-    requestAnimationFrame(() => doublePill.classList.add('out'));
-    bridge.triggerHaptic('notification');
-  }
-  stirLiquid(DOUBLE_TRAVEL + 300);
-  dwell = setTimeout(retireDouble, DOUBLE_DWELL);
-}
-
-
-
-
-
-
-
-
-
 const DUPLICATE_TRAVEL = 460;
-
 
 const DUPLICATE_BOTTOM = 40;
 
-
-
-
-
-
-
-
-
+let isOut = false;
+let homing = null;
 
 export function duplicateReach() {
   return root.clientHeight - DUPLICATE_BOTTOM - Math.round(pill.getBoundingClientRect().top);
@@ -112,10 +24,8 @@ function grownTop() {
 
 export function duplicateDouble(reading, box) {
   if (isOut) return;
-  clearTimeout(dwell);
   clearSwap();
   isOut = true;
-  root.style.removeProperty('--double-accent');
   doubleReading.textContent = reading;
 
   const seat = root.clientHeight - DUPLICATE_BOTTOM - box.height;
@@ -125,7 +35,7 @@ export function duplicateDouble(reading, box) {
   root.style.setProperty('--double-bottom', DUPLICATE_BOTTOM + 'px');
   root.style.setProperty('--double-rise', -swapSpan + 'px');
 
-  root.classList.add("double-live");
+  root.classList.add('double-live');
   doublePill.classList.add('duplicate', 'born', 'showing');
   requestAnimationFrame(() => {
     doublePill.classList.remove('born');
@@ -133,28 +43,6 @@ export function duplicateDouble(reading, box) {
   });
   stirLiquid(DUPLICATE_TRAVEL + 300);
 }
-
-
-
-
-
-
-
-export function retireDouble() {
-  if (!isOut) return;
-  isOut = false;
-  doublePill.classList.remove('out');
-  setTimeout(() => {
-    if (isOut) return;
-    doublePill.classList.remove('showing', 'duplicate');
-    root.style.setProperty('--double-rise', DOUBLE_RISE + 'px');
-    root.classList.remove('double-live');
-  }, DOUBLE_TRAVEL);
-  stirLiquid(DOUBLE_TRAVEL + 400);
-}
-
-
-
 
 const SWAP_TRAVEL = 460;
 const SWAP_PULL = 22;
@@ -217,41 +105,19 @@ export function duplicateTouch(action, x, y) {
   if (isDuplicateOnTop() && travel > 0) swapDuplicate();
   else if (!isDuplicateOnTop() && travel < 0) toClosed();
 }
+
 export function isDoubleOut() {
   return doublePill.classList.contains('showing');
 }
 
 export { doublePill };
 
-root.style.setProperty('--double-bottom', DOUBLE_BOTTOM + 'px');
-root.style.setProperty('--double-rise', DOUBLE_RISE + 'px');
-
-
-
-
-
-
-
-
-
-
-
-
-window.onBattery = payload => {
-  if (!payload) return;
-  announceCharge(payload.state);
-};
-
-
-
-
 export function retireDuplicate() {
   if (!isOut || !doublePill.classList.contains('duplicate')) return;
   isOut = false;
-  clearTimeout(dwell);
   clearSwap();
 
-  // The duplicate was retired on the Double's own 380ms while its travel runs for 460, so it reached the bubble, had its classes stripped 80ms early and fell back to the Double's seat in full view, reading and all. It goes home on its own clock now, and on the geometry it is going to rather than the one it is leaving.
+  // The duplicate was retired on the Double's own 380ms while its travel runs for 460, so it reached the bubble, had its classes stripped 80ms early and fell back to its seat in full view, reading and all. It goes home on its own clock now, and on the geometry it is going to rather than the one it is leaving.
   const style = getComputedStyle(root);
   const idleHeight = parseFloat(style.getPropertyValue('--pill-height')) || 26;
   const grab = parseFloat(style.getPropertyValue('--grab')) || 0;
@@ -269,9 +135,7 @@ export function retireDuplicate() {
   setTimeout(() => {
     if (isOut) return;
     doublePill.classList.remove('showing', 'duplicate', 'merging');
-    root.style.setProperty('--double-bottom', DOUBLE_BOTTOM + 'px');
-    root.style.setProperty('--double-rise', DOUBLE_RISE + 'px');
-    root.classList.remove("double-live");
+    root.classList.remove('double-live');
   }, DUPLICATE_TRAVEL);
   stirLiquid(DUPLICATE_TRAVEL + 300);
 }

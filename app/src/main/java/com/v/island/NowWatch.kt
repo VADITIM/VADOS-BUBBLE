@@ -46,11 +46,11 @@ object NowWatch {
 
 
 
+    // Requiring FLAG_ONGOING_EVENT here is what kept transfers out of the Status bubble almost always: Telegram and WhatsApp post their download and upload progress as an ordinary notification and rewrite it per tick, so every tick fell past this test into the alert path and the file in flight arrived as a spam of alerts that swiping up brought straight back. A determinate progress bar is the platform's own statement that something is in flight, and it is the whole test now.
     fun isTransfer(statusBarNotification: StatusBarNotification): Boolean {
         val extras = statusBarNotification.notification.extras
         if (extras.getBoolean(PROGRESS_INDETERMINATE, false)) return false
-        if (extras.getInt(PROGRESS_MAX, 0) <= 0) return false
-        return statusBarNotification.notification.flags and Notification.FLAG_ONGOING_EVENT != 0
+        return extras.getInt(PROGRESS_MAX, 0) > 0
     }
 
     fun describeRecording(statusBarNotification: StatusBarNotification): JSONObject {
@@ -88,6 +88,7 @@ object NowWatch {
             
             
             .put("detail", text)
+            .put("isPaused", isPaused(notification))
             .put("actions", actions(notification))
     }
 

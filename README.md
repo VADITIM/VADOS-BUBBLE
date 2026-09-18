@@ -198,10 +198,10 @@ through all of it: a dot is a count, and the count does not change while the row
 
 Discord keeps a foreground service running while a voice call is connected, and the notification
 that service must post therefore exists exactly as long as the call does — which makes it the same
-kind of state as a song or a timer, and the third closed mod. It carries a ringed circle and the
-name of whoever is on the other end, faded out rather than cut where it runs out of room — and the
-name starts to the right of centre, because the bubble is welded to the cutout and anything
-beginning in the middle is read through the camera hole.
+kind of state as a song or a timer, and the third closed mod. It carries a circle and how long the
+call has been running. It used to name whoever was on the other end as well, and the name was the
+whole width of the face — a reading nobody looks at on a bubble welded to the cutout, where anything
+beginning in the middle is read through the camera hole. The circle lost its ring with it.
 
 The circle wants the caller's avatar and never gets one: `android.largeIcon` is null on every voice
 notification Discord posts. Its small icon is no stand-in — that is a crossed-out microphone, which
@@ -209,7 +209,7 @@ says muted rather than who. So the circle holds Discord's own mark, and a real p
 one ever arrives. The only offline route to the actual avatar is caching them out of Discord's
 message notifications, which do carry one, and matching by name.
 
-Neither does the ring pulse. The other two mods animate because what they show is changing — the
+Nothing on it moves, either. The other two mods animate because what they show is changing — the
 sound moves, the time runs out — and a call simply is or is not. There is no panel of its own
 either: everything worth doing to a call, mute, hang up, see who is talking, is already in the app.
 So a tap is a tap on the bubble and opens what the bare bubble opens, and a hold leaves for Discord
@@ -316,7 +316,7 @@ are edge-triggered and remembered, so a slow drain announces once rather than on
 charging clears them for the next time down. The first, sticky broadcast only primes the state --
 without that a low battery would pop up on every install.
 
-**The three do not all land in the same place.** Being plugged in is announced by the **Status
+**All three land in the same place.** Being plugged in, running low and nearly out are announced by the **Status
 bubble**, which is the one already carrying the charge — the news and the reading it is news about
 belong to one shape, and a bubble opening at the bottom of the screen to say something about a
 number standing at the top of it is two places for one fact. It is a takeover rather than a second
@@ -326,9 +326,7 @@ glyph-as-cause order read at bubble scale. No percentage — the number was on t
 and the news is that it is going up. After a few seconds the readings grow back one by one the same
 way any of them arrives.
 
-Running low stays on the **Double** at the bottom of the screen, which is where an announcement with
-no home on the bar belongs. It is drawn as the fill at rest, breathing. Both can be exercised
-without waiting for a real battery:
+All three can be exercised without waiting for a real battery:
 
 ```
 adb shell cmd battery unplug; adb shell cmd battery set level 14
@@ -383,13 +381,13 @@ Next, in order — each of these is a phase, and each is why the one after it is
    touch-proxy windows carry the touches.
 3. ~~**The Now bubble on the canvas.**~~ Done. Liquid across the whole bar; the second window and
    the window-reordering workaround are gone.
-4. **Modules and the `Bubble` type.** `pill.html` splits into ES modules, and Main, Satellite, Now
-   and Double become one type with one set of shared behaviour.
+4. **Modules and the `Bubble` type.** `pill.html` splits into ES modules, and Main, Satellite
+   and Now become one type with one set of shared behaviour.
 5. **Additive motion.** Every animated property owned in one place, animated through the Web
    Animations API with `composite: 'add'`, so an interaction layers onto what is already running
    instead of replacing it.
 
-After that: the Double bubble, the lock-screen bubbles, the Discord video tab and
+After that: the lock-screen bubbles, the Discord video tab and
 the recording Now state — each one ordinary feature work standing on the contract in
 `.claude/rules/`.
 
@@ -398,6 +396,9 @@ The live backlog is a note in the Obsidian vault, not in this repository.
 ## Device facts measured on-device
 
 - Display 1080x2340, density 480dpi (3.0x).
+- The lock screen's fingerprint guide is a device setting, not something an overlay can cover: it is
+  turned off with `adb shell settings put secure fingerprint_screen_on_icon_lock 0`, and `2` puts it
+  back. It stands where the Now bubble does, and the two cannot share that room.
 - Cutout bounding rect `Rect(511, 0 - 569, 103)` px = 58x103 px = ~19.3 x 34.3 dp, horizontally
   centred (centre x = 540 px). The default pill height of 34 dp matches it.
 

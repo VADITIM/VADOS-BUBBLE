@@ -54,7 +54,8 @@ object DebugStage {
                         .put("done", done)
                         .put("total", 100)
                         .put("detail", "$done,4 von 118 MB · 12,1 MB/s")
-                        .put("actions", JSONArray())
+                        .put("isPaused", false)
+                        .put("actions", JSONArray().put(JSONObject().put("index", 0).put("title", "Pause")))
                 )
         )
     }
@@ -106,6 +107,9 @@ object DebugStage {
 
             "timer" -> { clear(); BubbleService.deliverTimer(timer(isPaused = false)) }
             "timer-paused" -> { clear(); BubbleService.deliverTimer(timer(isPaused = true)) }
+
+            "call-volume" -> BubbleService.deliverCallVolume(true)
+            "call-volume-off" -> BubbleService.deliverCallVolume(false)
 
             "call" -> { clear(); BubbleService.deliverCall(call(phone = false)) }
             "call-phone" -> { clear(); BubbleService.deliverCall(call(phone = true)) }
