@@ -6,6 +6,10 @@ export const SWIPE_AWAY = 90;
 
 const ROW_PULL = 0.18;
 
+const FLING_TO = 400;
+const FLING_SLOWEST = 120;
+const FLING_LONGEST = 320;
+
 
 
 
@@ -25,10 +29,16 @@ export function swipeToDismiss(row, keys, { rowSelector, afterRemove }) {
   let originY = 0;
   let travel = 0;
   let isHorizontal = false;
+  let lastX = 0;
+  let lastAt = 0;
+  let speed = 0;
 
   row.addEventListener('touchstart', event => {
     originX = event.touches[0].clientX;
     originY = event.touches[0].clientY;
+    lastX = originX;
+    lastAt = event.timeStamp;
+    speed = 0;
     travel = 0;
     isHorizontal = false;
     row.dataset.swiped = 'false';
@@ -45,6 +55,10 @@ export function swipeToDismiss(row, keys, { rowSelector, afterRemove }) {
     if (!isHorizontal && Math.abs(dx) < 12) return;
     if (row.dataset.scrolled === 'true') return;
     isHorizontal = true;
+    const elapsed = event.timeStamp - lastAt;
+    if (elapsed > 0) speed = Math.abs(event.touches[0].clientX - lastX) / elapsed;
+    lastX = event.touches[0].clientX;
+    lastAt = event.timeStamp;
     travel = dx;
     if (Math.abs(dx) > 12) row.dataset.swiped = 'true';
     row.style.transform = 'translateX(' + dx + 'px)';
@@ -61,10 +75,12 @@ export function swipeToDismiss(row, keys, { rowSelector, afterRemove }) {
       releaseNeighbours(rowSelector);
       return;
     }
-    row.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
+    // The fling was 400px in 200ms whatever the hand had done, so a slow deliberate drag past the threshold was thrown off at several thousand pixels a second. `ease-out` leaves at 1.72 times its average speed, so the duration is chosen to leave at the finger's own.
+    const fling = Math.min(FLING_LONGEST, Math.max(FLING_SLOWEST, 1.72 * (FLING_TO - Math.abs(travel)) / Math.max(speed, 0.5)));
+    row.style.transition = 'transform ' + fling + 'ms ease-out, opacity ' + fling + 'ms ease-out';
     keys.forEach(one => bridge.dismissNotification(one));
     bridge.triggerHaptic('dismiss');
-    row.style.transform = 'translateX(' + (travel > 0 ? 400 : -400) + 'px)';
+    row.style.transform = 'translateX(' + (travel > 0 ? FLING_TO : -FLING_TO) + 'px)';
     row.style.opacity = '0';
     releaseNeighbours(rowSelector);
     row.addEventListener('transitionend', () => {

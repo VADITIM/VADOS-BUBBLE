@@ -311,9 +311,14 @@ function pulse(bar, from, run) {
 
   const low = 18 + Math.random() * 26;
   const top = Math.random() < 0.2 ? low + 8 : high;
+  // One ease-in-out across the whole swing put its fastest moment exactly on the peak keyframe, so every bar hit the top at full speed and turned back in a single frame. Each leg eases on its own now: a quick attack that slows into the peak, and a longer fall.
   const swing = bar.animate(
-    [{ translate: from }, { translate: lift(top) }, { translate: lift(low) }],
-    { duration: 500 + Math.random() * 750, easing: 'ease-in-out' }
+    [
+      { translate: from, easing: 'cubic-bezier(0.3, 0, 0.2, 1)' },
+      { translate: lift(top), offset: 0.35, easing: 'ease-in-out' },
+      { translate: lift(low) },
+    ],
+    { duration: 500 + Math.random() * 750 }
   );
   swing.onfinish = () => {
     if (run !== barRun || !bar.isConnected) return;

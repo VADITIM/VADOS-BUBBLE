@@ -560,14 +560,15 @@ function takeLockBack() {
 
 
 
+// The overshooting curve was the effect's rather than each leg's, so its progress raced through the 0.35 keyframe — the whole 12px kick went up and came back inside 90ms, peaking on the second frame, and the other 330ms were a 2px sag. The rise decelerates into its apex and the fall is the bubble family's own spring.
 export function bumpPill() {
   pill.animate(
     [
-      { transform: 'translateY(0px)' },
-      { transform: 'translateY(-' + LOCK_BUMP + 'px)', offset: 0.35 },
+      { transform: 'translateY(0px)', easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
+      { transform: 'translateY(-' + LOCK_BUMP + 'px)', offset: 0.3, easing: 'cubic-bezier(0.2, 1.7, 0.35, 1)' },
       { transform: 'translateY(0px)' },
     ],
-    { duration: LOCK_BUMP_MS, easing: 'cubic-bezier(0.2, 1.6, 0.35, 1)', composite: 'add' }
+    { duration: LOCK_BUMP_MS, composite: 'add' }
   );
   stirLiquid(LOCK_BUMP_MS + 200);
 }
