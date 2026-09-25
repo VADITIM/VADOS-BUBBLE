@@ -245,6 +245,9 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun testNotification() = runOnUiThread { pushToIsland(testPayload()) }
 
+        @JavascriptInterface
+        fun sendDebugNotifications() = runOnUiThread { DebugNotifications.send(this@MainActivity, 5) }
+
         
         @JavascriptInterface
         fun readAppStyles(): String = JSONArray().apply {

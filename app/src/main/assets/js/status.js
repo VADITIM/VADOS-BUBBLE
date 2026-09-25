@@ -814,6 +814,8 @@ const QUICK_DROP_STAGGER = 20;
 const QUICK_POP = 360;
 
 // Written onto the panel as --pop-step rather than mirrored into pill.css: the gap between two bands is derived from the pop, and a second copy of it could only ever disagree.
+// Mirrors html.fast-dashboard in pill.css — the spread plus its 220ms drop has to land inside the entering window.
+const QUICK_FAST_SPREAD = 300;
 const QUICK_STAGGER = Math.round(QUICK_POP * QUICK_OVERLAP / QUICK_RANK_STEPS);
 
 
@@ -848,6 +850,14 @@ function rankQuickBubbles() {
     const side = fromCenter < 0 ? -1 : 1;
     bubble.style.setProperty('--pop-from', Math.round(fromCenter * QUICK_PULL + side * QUICK_PULL_FLOOR) + 'px');
   });
+  for (const bubble of quickBubbles) bubble.style.setProperty('--fast-at', Math.round(Math.random() * QUICK_FAST_SPREAD) + 'ms');
+  // A throw deeper, springier or longer than the pop it replaced grew the goo region past the row's band and ran past the stir, which is the lag and the early Now blur that came back — every roll stays inside the pop's own envelope.
+  for (const knob of quickPanel.querySelectorAll('.quick-knob')) {
+    const strength = 0.6 + Math.random() * 0.4;
+    knob.style.setProperty('--pop-from', Math.round(parseFloat(knob.style.getPropertyValue('--pop-from')) * strength) + 'px');
+    knob.style.setProperty('--throw-ease', `cubic-bezier(0.3, ${(1.1 + Math.random() * 0.35).toFixed(2)}, 0.6, 1)`);
+    knob.style.setProperty('--throw-ms', Math.round(QUICK_POP * (0.8 + Math.random() * 0.2)) + 'ms');
+  }
   for (const connector of quickPanel.querySelectorAll('.quick-mode')) {
     connector.style.setProperty('--pop-jitter', Math.round(Math.random() * QUICK_JITTER) + 'ms');
   }
@@ -900,7 +910,6 @@ export function openStatusPanel() {
 
 
 
-  root.style.setProperty('--liquid-tall', (STATUS_PANEL.height + GROWN_PAD + 24) + 'px');
 
 
 
@@ -1001,9 +1010,6 @@ export function closeStatusPanel() {
     quickPanel.classList.remove('leaving');
     releaseCornerWidths();
     fitStatusProxy();
-    
-    
-    root.style.removeProperty('--liquid-tall');
   }, Math.max(STATUS_PANEL.ms, dropped) + 40);
   
   

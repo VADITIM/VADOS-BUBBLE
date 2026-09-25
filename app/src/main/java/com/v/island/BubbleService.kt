@@ -796,6 +796,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         if (wanted == (shadeGuard != null)) return
         if (!wanted) {
             runCatching { windowManager.removeView(shadeGuard) }
+            shadeGuard?.let { appliedLayouts.remove(it) }
             shadeGuard = null
             shadeGuardParams = null
             return
@@ -836,6 +837,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 windowManager.removeView(view)
                 windowManager.addView(view, viewParams)
             }
+            appliedLayouts.remove(view)
         }
     }
 
@@ -856,6 +858,20 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         if (isLive && !isHidden()) BASE_FLAGS
         else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
 
+    private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
+
+    private var outsideReportedAt = -1L
+    private var isHiddenOutsideSpent = false
+
+    /* `updateViewLayout` marks the window changed whatever it is handed, so every call was a traversal and a synchronous relayout into the window manager on the thread that also paces the WebView's frames — and the page re-sends its proxies on every minute turn, every size change and every repaint, mostly unchanged. A window is only laid out again when its params differ from the ones it last got. */
+    private fun relayout(view: View?, layout: WindowManager.LayoutParams) {
+        if (view == null) return
+        val applied = appliedLayouts.getOrPut(view) { WindowManager.LayoutParams() }
+        if (applied.copyFrom(layout) == 0) return
+        runCatching { windowManager.updateViewLayout(view, layout) }
+            .onFailure { appliedLayouts.remove(view) }
+    }
+
     
 
 
@@ -865,6 +881,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         /* `alpha = 0f` left the WebView visible to Chromium, so every animation and every rAF in the page went on running through a screen-off night at the high frame rate the stage had asked for and never given back. INVISIBLE stops the page drawing while leaving its timers and the bridge alone, and the frame rate drops back until something wakes it. */
         stage.visibility = if (isHidden) View.INVISIBLE else View.VISIBLE
+        if (!isHidden) isHiddenOutsideSpent = false
         push("window.setStageHidden($isHidden)")
         if (isHidden) {
             stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_LOW
@@ -890,15 +907,15 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         if (isHidden) {
             lockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
+            relayout(lockProxy, lockProxyParams)
             statusProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
+            relayout(statusProxy, statusProxyParams)
             clockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            runCatching { windowManager.updateViewLayout(clockProxy, clockProxyParams) }
+            relayout(clockProxy, clockProxyParams)
             edgeLeftParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            runCatching { windowManager.updateViewLayout(edgeLeftProxy, edgeLeftParams) }
+            relayout(edgeLeftProxy, edgeLeftParams)
             edgeRightParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            runCatching { windowManager.updateViewLayout(edgeRightProxy, edgeRightParams) }
+            relayout(edgeRightProxy, edgeRightParams)
             setAlertBand(0)
         } else {
             push("window.refitProxies()")
@@ -908,10 +925,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             guardParams.flags =
                 if (isHidden) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 else BASE_FLAGS
-            runCatching { windowManager.updateViewLayout(shadeGuard, guardParams) }
+            relayout(shadeGuard, guardParams)
         }
-        runCatching { windowManager.updateViewLayout(stage, params) }
-        runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+        relayout(stage, params)
+        relayout(touchProxy, proxyParams)
     }
 
     override fun onDestroy() {
@@ -951,8 +968,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         blurRadius = Preferences.get(preferences, Preferences.BLUR)
         scrimBlurRadius = Preferences.get(preferences, Preferences.SCRIM_BLUR)
         repaintBlur()
-        runCatching { windowManager.updateViewLayout(stage, params) }
-        runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+        relayout(stage, params)
+        relayout(touchProxy, proxyParams)
         applyBarLock()
         pushAppearance()
     }
@@ -1041,7 +1058,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private val awake = android.os.Handler(android.os.Looper.getMainLooper())
     private val sleepAgain = Runnable {
         params.flags = params.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON.inv()
-        runCatching { windowManager.updateViewLayout(stage, params) }
+        relayout(stage, params)
     }
 
     private fun keepAwake() {
@@ -1055,7 +1072,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         awake.removeCallbacks(sleepAgain)
         if (params.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON == 0) {
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            runCatching { windowManager.updateViewLayout(stage, params) }
+            relayout(stage, params)
         }
         awake.postDelayed(sleepAgain, LOCK_AWAKE)
     }
@@ -1083,10 +1100,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         alertOverlayParams.x = if (wanted) screenWidth() - width else 0
         alertOverlayParams.y = if (wanted) (screenHeight() - height) / 2 else 0
         alertOverlayParams.flags = proxyFlags(wanted)
-        runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
+        relayout(alertOverlay, alertOverlayParams)
 
         proxyParams.flags = proxyFlags(!(wanted && isWhole))
-        runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+        relayout(touchProxy, proxyParams)
     }
 
     // The Alert's window covers the screen while it stands, and a window that hears a press is the only window that hears it — a tap the page has decided is not for the bubble would simply be eaten. It is handed on instead: the overlay goes untouchable for as long as the replay takes, the tap is dispatched where the finger actually was, and the window is touchable again on the way out.
@@ -1095,12 +1112,12 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         val x = alertTapX
         val y = alertTapY
         alertOverlayParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
+        relayout(alertOverlay, alertOverlayParams)
 
         val restore = {
             if (alertOverlayParams.width != 0) {
                 alertOverlayParams.flags = proxyFlags(true)
-                runCatching { windowManager.updateViewLayout(alertOverlay, alertOverlayParams) }
+                relayout(alertOverlay, alertOverlayParams)
             }
         }
         val path = Path().apply { moveTo(x, y) }
@@ -1167,7 +1184,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
+    /* Every proxy watching outside touches reports the same press, and every press on the phone is one — so each tap in any app was several scripts into the page, each a forced layout and a hit test, and in a landscape game with the stage hidden it went on at the rate of the game's own taps, 28 in 15 seconds, for a page with nothing left to close after the first. One report per press, and only the first while the stage is hidden. */
     private fun reportOutside(event: android.view.MotionEvent) {
+        if (event.eventTime == outsideReportedAt) return
+        outsideReportedAt = event.eventTime
+        if (isHidden()) {
+            if (isHiddenOutsideSpent) return
+            isHiddenOutsideSpent = true
+        }
         val density = resources.displayMetrics.density
         
         
@@ -1302,6 +1326,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setAlertDwell(${Preferences.get(preferences, Preferences.ALERT_DWELL)})")
         push("window.setQuickDividers(${Preferences.get(preferences, Preferences.QUICK_DIVIDERS)})")
         push("window.setDashAlertsDisabled(${Preferences.get(preferences, Preferences.DASH_ALERTS_DISABLED)})")
+        push("window.setFastDashboard(${Preferences.get(preferences, Preferences.FAST_DASHBOARD)})")
         push("window.setAlertZoneShown(${Preferences.get(preferences, Preferences.ALERT_ZONE_SHOWN)})")
         push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
         push("window.setLabelSweep(${Preferences.get(preferences, Preferences.LABEL_SWEEP)})")
@@ -1514,7 +1539,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 
                 proxyParams.x =
                     dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + shiftDp)
-                runCatching { windowManager.updateViewLayout(touchProxy, proxyParams) }
+                relayout(touchProxy, proxyParams)
             }
         }
 
@@ -1587,8 +1612,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 edgeRightParams.x = screenWidth() - width
                 edgeRightParams.y = top
                 edgeRightParams.flags = proxyFlags(isLive)
-                runCatching { windowManager.updateViewLayout(edgeLeftProxy, edgeLeftParams) }
-                runCatching { windowManager.updateViewLayout(edgeRightProxy, edgeRightParams) }
+                relayout(edgeLeftProxy, edgeLeftParams)
+                relayout(edgeRightProxy, edgeRightParams)
             }
         }
 
@@ -1604,7 +1629,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 lockProxyParams.x = params.x + dp(leftDp)
                 lockProxyParams.y = dp(topDp)
                 lockProxyParams.flags = proxyFlags(isLive)
-                runCatching { windowManager.updateViewLayout(lockProxy, lockProxyParams) }
+                relayout(lockProxy, lockProxyParams)
             }
         }
 
@@ -1641,7 +1666,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 clockProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
                 clockProxyParams.x = params.x + dp(leftDp)
                 clockProxyParams.flags = proxyFlags(isLive)
-                runCatching { windowManager.updateViewLayout(clockProxy, clockProxyParams) }
+                relayout(clockProxy, clockProxyParams)
             }
         }
 
@@ -1653,7 +1678,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 statusProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
                 statusProxyParams.x = params.x + dp(leftDp)
                 statusProxyParams.flags = proxyFlags(isLive)
-                runCatching { windowManager.updateViewLayout(statusProxy, statusProxyParams) }
+                relayout(statusProxy, statusProxyParams)
             }
         }
 

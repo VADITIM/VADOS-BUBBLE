@@ -1,4 +1,3 @@
-import { isDuplicateLive, isDuplicateSwapped, swapDuplicate } from './double.js';
 import { stirLiquid } from './liquid.js';
 import { openPlayer } from './mods/media.js';
 import { openCurrent, openPicture } from './mods/notification.js';
@@ -330,6 +329,7 @@ export function endHold() {
 pill.addEventListener('touchstart', event => {
   startY = event.touches[0].clientY;
   startX = event.touches[0].clientX;
+  scrollOrigin = notificationsList.scrollTop;
   hasMoved = false;
   shared.hasHeld = false;
   hasGrown = false;
@@ -413,21 +413,22 @@ pill.addEventListener('touchmove', event => {
   // A grown bubble has nothing to drag — the trade, the pull and the upward dismiss all belong to the closed row — and the band underneath them only leaned a panel that is meant to be read. So a finger that wandered while a mod or the notifications stood open played a gesture instead of the tap it was, and a gesture that has begun waits for a threshold the finger is no longer travelling towards, which is the open-close-open. Grown, the pill answers taps and its own controls answer theirs; its gesture handling is off entirely, and the hold that opens the mod's app keeps its wander.
   if (!CLOSED.has(shared.size) || shared.state === 'extended') {
     grantHoldWander();
-    // The Notifications menu is two bubbles, and which one is on top is the gesture rather than a state: a pull down on the upper one trades their places, and a pull up on the lower one closes the menu from wherever it currently stands. A list long enough to scroll owns the drag that starts inside it, or the menu traded places every time it was read.
-    if (!hasDismissed && shared.size === 'notifications' && isDuplicateLive() &&
+    // A list that scrolled under every finger took the swipe up that closes the menu, so scrolling is kept to a band down the bubble's right end and everywhere else a swipe up closes.
+    if (shared.size === 'notifications' && inScrollBand(startX)) {
+      hasMoved = true;
+      endHold();
+      notificationsList.scrollTop = scrollOrigin - (event.touches[0].clientY - startY);
+      return;
+    }
+    if (!hasDismissed && shared.size === 'notifications' &&
+        startY - event.touches[0].clientY > PULL_TRIGGER &&
         Math.abs(event.touches[0].clientX - startX) < 40) {
-      const travel = event.touches[0].clientY - startY;
-      const wants = !isDuplicateSwapped() ? travel > PULL_TRIGGER : travel < -PULL_TRIGGER;
-      if (wants && !overScroller(startX, startY)) {
-        hasDismissed = true;
-        hasMoved = true;
-        endHold();
-        if (isDuplicateSwapped()) {
-          bridge.triggerHaptic('dismiss');
-          toClosed();
-        } else swapDuplicate();
-        return;
-      }
+      hasDismissed = true;
+      hasMoved = true;
+      endHold();
+      bridge.triggerHaptic('dismiss');
+      toClosed();
+      return;
     }
     // The one gesture an expanded mod keeps, because tapping it no longer closes it and a finger on the bubble needs a way out that is not the app behind it. It is the closed row's dismiss read on a grown bubble and it dismisses nothing — a mod is not a notification, so the panel closes and the mod stays in the row. An Alert is grown too and its tap opens the app rather than closing it, so it was the one face with no way out at all until it was named here beside the mods.
     if (!hasDismissed && (MOD_FACES[shared.size] || shared.state === 'alert') &&
@@ -619,8 +620,10 @@ window.onOutsideTap = (x, y) => {
 };
 
 
-function overScroller(x, y) {
-  const hit = document.elementFromPoint(x, y);
-  const list = hit && hit.closest('#notifications-list');
-  return Boolean(list) && list.scrollHeight - list.clientHeight > 2;
+const notificationsList = document.getElementById('notifications-list');
+const SCROLL_BAND = 0.15;
+let scrollOrigin = 0;
+
+function inScrollBand(x) {
+  return x >= pill.getBoundingClientRect().right - screen.width * SCROLL_BAND;
 }

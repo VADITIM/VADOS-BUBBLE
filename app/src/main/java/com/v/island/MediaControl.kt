@@ -50,6 +50,12 @@ object MediaControl {
     private var artKey: String? = null
     private var artUri: String? = null
 
+    // The WebP encode ran on the main thread, which is also the thread pacing the WebView, so every song change dropped frames out of the very swipe that asked for it.
+    private var artEncoding: String? = null
+    private const val ART_PENDING = "pending"
+    private val artWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val mainThread = android.os.Handler(android.os.Looper.getMainLooper())
+
     
 
 
@@ -196,9 +202,10 @@ object MediaControl {
 
 
 
-    fun offer(fallback: JSONObject) {
+    // The stand-in PNG-encodes the notification's cover on the main thread, which paces the WebView, and it was built on every post of a player notification only to be thrown away whenever a session was already answering — every play, pause and song change spent a full-size PNG encode on the thread the bubble's frames wait for.
+    fun offer(fallback: () -> JSONObject) {
         if (controller != null) return
-        onChanged(fallback)
+        onChanged(fallback())
     }
 
     fun command(action: String) {
@@ -256,6 +263,7 @@ object MediaControl {
         if (current == null) {
             artKey = null
             artUri = null
+            artEncoding = null
             artSent = null
             publishedState = null
             onChanged(null)
@@ -274,6 +282,7 @@ object MediaControl {
             ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST).orEmpty()
 
         val art = encodeArt(metadata, title + artist)
+        if (art === ART_PENDING) return
         val payload = JSONObject()
             .put("app", AppStyles.of(current.packageName).key)
             .put("accent", AppStyles.of(current.packageName).accent)
@@ -326,13 +335,21 @@ object MediaControl {
             ?: return null
         
         
-        val stamp = "$key#${bitmap.generationId}#${bitmap.width}x${bitmap.height}"
+        val stamp = "$key#${bitmap.width}x${bitmap.height}"
         if (stamp == artKey) return artUri
-        artKey = stamp
-        artUri = "data:image/webp;base64," + Base64.encodeToString(
-            toWebp(scaleDown(bitmap)), Base64.NO_WRAP
-        )
-        return artUri
+        if (stamp == artEncoding) return ART_PENDING
+        artEncoding = stamp
+        artWorker.execute {
+            val uri = "data:image/webp;base64," + Base64.encodeToString(toWebp(scaleDown(bitmap)), Base64.NO_WRAP)
+            mainThread.post {
+                if (artEncoding != stamp) return@post
+                artEncoding = null
+                artKey = stamp
+                artUri = uri
+                publish()
+            }
+        }
+        return ART_PENDING
     }
 
     private fun scaleDown(bitmap: Bitmap): Bitmap {

@@ -154,6 +154,7 @@ function mirrorFrame() {
   
   const elapsed = mirroredAt ? Math.min(0.05, (now - mirroredAt) / 1000) : 0;
   mirroredAt = now;
+  reachThisFrame = 0;
 
   const measured = blobs.map(blob => {
     if (!isSkinned(blob.name)) return null;
@@ -218,6 +219,7 @@ function mirrorFrame() {
   });
 
   paintWalls(measured);
+  fitRegion(false);
   meltBy(measured);
   
   
@@ -562,8 +564,32 @@ function paint(shape, colour) {
 }
 
 
+const region = document.getElementById('liquid');
+
+// Mirrors the goo filters' region in pill.html, which ends at the element's own bottom edge. The alpha threshold puts every edge back where its shape's own edge is, so what the goo draws below the lowest shape is only the threshold's antialiasing — this is room for that, not for the blur's spread.
+const REGION_MARGIN = 16;
+
+const REGION_STEP = 32;
+
+let reachThisFrame = 0;
+let reachReserved = 0;
+let regionTall = 0;
+
+export function reserveRegion(bottom) {
+  reachReserved = Math.max(reachReserved, bottom);
+}
+
+/* The region was a class's to size, and every grown state took the whole screen: measured on the phone, a frame of the goo at full height cost 12-15ms against 4 at the row's band, 7-10ms of it on the GPU — past the 8.3ms a 120Hz frame has, for the whole of every open state. It is read off the lowest shape the mirror drew, grown in the frame that shape needs it and given back once the stir that moved it has ended, so it can never be shorter than what it is filtering. */
+function fitRegion(canShrink) {
+  const tall = Math.ceil((Math.max(reachThisFrame, reachReserved) + REGION_MARGIN) / REGION_STEP) * REGION_STEP;
+  if (tall === regionTall || (tall < regionTall && !canShrink)) return;
+  regionTall = tall;
+  region.style.height = tall + 'px';
+}
+
 /* Every blob was written five properties deep on every frame whether or not it had moved, so a transition that touches one bubble dirtied the style of all of them — and `corner-shape`, which is the newest and most expensive of the five to resolve, was rewritten sixty times a second with the same value. A shape that has not changed is not touched at all now, which on a typical frame is most of them. */
 function write(shape, box, grow, seen) {
+  reachThisFrame = Math.max(reachThisFrame, box.top + box.height + grow);
   const width = (box.width + grow * 2) + 'px';
   const height = (box.height + grow * 2) + 'px';
   const transform =
@@ -637,9 +663,13 @@ function flowLiquid() {
     );
   }
   framesSinceWake += 1;
-  liquidFrame = after < liquidUntil
-    ? requestAnimationFrame(flowLiquid)
-    : null;
+  if (after < liquidUntil) {
+    liquidFrame = requestAnimationFrame(flowLiquid);
+    return;
+  }
+  liquidFrame = null;
+  reachReserved = 0;
+  fitRegion(true);
 }
 
 

@@ -1,5 +1,5 @@
-import { catchInto, releaseCatch, resendBlur, stirLiquid } from './liquid.js';
-import { blankLockLabels, clock, flipPlaying, joinWave, livePosition, setWaveRatio, songSwapping, typeLabels } from './mods/media.js';
+import { catchInto, releaseCatch, resendBlur, reserveRegion, stirLiquid } from './liquid.js';
+import { blankLockLabels, clock, flipPlaying, joinWave, livePosition, setWaveRatio, songSwapping, throwLockArt, typeLabels } from './mods/media.js';
 import { cancelSpring, HOLD_BLOCK, rubberBandPast, toy, untoy } from './motion.js';
 import { fitClockProxy } from './clock.js';
 import { closeStatusPanel, fitStatusProxy, setPanelNowOpen } from './status.js';
@@ -169,7 +169,7 @@ export function paintLock() {
   // On the keyguard the bubble used to be placed rather than flown, which made it the one bubble that appeared at its own position. It arrives out of Main on the same slingshot the panel's arrival already is — the journey is the same journey, so it is the same code.
   if (showing && !wasShowing && !lockPill.classList.contains('arriving')) {
     lockPill.classList.add('arriving');
-    requestAnimationFrame(playNowEnter);
+    requestAnimationFrame(() => playNowEnter(null));
   }
   // `.idle` is what blanks the bubble's children, and it used to come off in the same frame `showing` did — so leaving the panel with nothing playing spent the whole fade out showing the last mod's artwork and labels. It follows there being no mod at all now rather than a blank bubble that is also standing.
   lockPill.classList.toggle('idle', !live);
@@ -344,7 +344,9 @@ export function lockHolds(x, y) {
 
 
 
+// The hide marks the lock proxy untouchable on the host's side, and the wake's refit sent nothing back because the box had not moved — so the Now bubble on the lock screen stood there deaf until something resized it.
 window.refitProxies = () => {
+  shownProxy = '';
   fitLockProxy();
   fitStatusProxy();
   fitClockProxy();
@@ -701,9 +703,10 @@ lockPill.addEventListener('touchmove', event => {
     lockSwiped = true;
     clearTimeout(lockHoldTimer);
     lockPill.classList.remove('pressed');
-    bridge.triggerHaptic('expand');
     untoy(lockPill, '--lock-drag');
-    bridge.mediaControl(dx > 0 ? 'next' : 'previous');
+    bridge.triggerHaptic('expand');
+    throwLockArt();
+    bridge.mediaControl(dx > 0 ? 'previous' : 'next');
     return;
   }
   if (!lockSwiped && Math.abs(dy) > LOCK_SWIPE && Math.abs(dy) > Math.abs(dx)) {
@@ -714,8 +717,7 @@ lockPill.addEventListener('touchmove', event => {
     // In the dashboard an upward flick is the panel's own dismiss and the panel hears the same touch through its own proxy, so the bubble answers nothing: it played the expand on a panel that was already leaving, and the card grew into a screen going away underneath it.
     if (startedInPanel && dy < 0) return;
     const isBig = startedInPanel ? panelExpanded : lockOpen;
-    // Where the play button stood, down is what plays and pauses. Retracted there is nothing to pause onto, so down is still the close.
-    if (isBig && dy > 0) {
+    if ((isBig || startedInPanel) && dy > 0) {
       bridge.triggerHaptic('expand');
       const wanted = shared.media && shared.media.isPlaying ? 'pause' : 'play';
       flipPlaying();
@@ -852,6 +854,9 @@ let panelExpanded = false;
 
 
 export function openPanelNow(expanded) {
+  // The ball was born at Main's centre while Main's own cover rose away with the bubble and faded, so the same picture stood in two places for a frame and the new one appeared in the punch hole out of nowhere — it is born where the cover is instead, and the cover is gone in that frame.
+  const mainArt = document.getElementById('media-art');
+  const isArtShowing = Boolean(mainArt.closest('.face')?.classList.contains('showing'));
   panelHeld = true;
   // Expanded is the state a mod is read in, so remembering it across a mod that has since ended stood a full-height blank pill at the panel's foot and held the spare row's room shut behind it.
   panelExpanded = expanded && Boolean(lockMod());
@@ -870,7 +875,13 @@ export function openPanelNow(expanded) {
     lockPill.classList.remove('arriving');
     return;
   }
-  requestAnimationFrame(playNowEnter);
+  // Measured on the arrival's own frame rather than here: a rect read in the middle of the panel's class changes forced a layout between them and the whole dashboard entrance paid for it.
+  if (isArtShowing) mainArt.style.visibility = 'hidden';
+  requestAnimationFrame(() => {
+    const artFrom = isArtShowing ? mainArt.getBoundingClientRect() : null;
+    playNowEnter(artFrom?.width ? artFrom : null);
+    if (isArtShowing) setTimeout(() => mainArt.style.removeProperty('visibility'), 400);
+  });
 }
 
 export function closePanelNow(lean) {
@@ -904,20 +915,27 @@ function setPanelNowExpanded(expanded) {
 }
 
 // The arrival is the leave run the other way, on the leave's own numbers: the drop is born out of Main as a circle of exactly the diameter the shot ends at, flies the same damped-spring arc back to the bar, and only then opens out of the ball into the pill. It used to arrive as a full-width bar sliding in at 0.9 of its size, which read as a box being positioned rather than as the mod being handed back. .arriving takes the CSS off scale, width and opacity for the length of the journey: one owner per property.
-function playNowEnter() {
+function playNowEnter(artFrom) {
   const to = lockPill.getBoundingClientRect();
-  const from = pill.getBoundingClientRect();
-  if (!to.width || !from.width) return;
+  const from = artFrom || pill.getBoundingClientRect();
+  if (!to.width || !from.width) {
+    lockPill.classList.remove('arriving');
+    return;
+  }
   stopLockArrival();
   lockPill.classList.add('arriving');
   lockRest = to;
   fitLockProxy();
+  // The goo region followed the ball down the screen one 32px step at a time, reallocating its filter surface on nearly every frame of the flight — that was the dashboard entrance lagging again once the panel stopped sizing the region up front.
+  reserveRegion(to.bottom);
 
   const art = lockMovers[0].element.getBoundingClientRect();
   // The radius the bubble opens back out to is whatever it wears where it is standing — 16 retracted in the panel, 40 carrying a song, 34 on the keyguard. Landed on a hardcoded 34 the shape had one more corner change left in it after the journey was over, on the border-radius transition's own clock rather than on the arrival's.
   const restRadius = getComputedStyle(lockPill).borderTopLeftRadius;
   const ball = Math.min(to.width, to.height);
-  const drop = (Math.min(from.width, mainRestHeight()) / ball) * 0.9;
+  const drop = artFrom
+    ? Math.min(from.width, from.height) / ball
+    : (Math.min(from.width, mainRestHeight()) / ball) * 0.9;
 
   const dx = (from.left + from.width / 2) - (to.left + to.width / 2);
   const dy = (from.top + from.height / 2) - (to.top + to.height / 2);

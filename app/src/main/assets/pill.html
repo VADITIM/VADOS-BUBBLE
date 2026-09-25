@@ -45,7 +45,7 @@
 
 
     <div id="media-art-slot" class="glyph"><img id="media-art" data-morph="art" data-morph-scale alt=""></div>
-    <div id="equalizer"><span></span><span></span><span></span></div>
+    <div id="equalizer"><span><i></i></span><span><i></i></span><span><i></i></span></div>
   </div>
 
   <div class="face" id="timer-face">
@@ -308,7 +308,8 @@
 
 
 
-  <filter id="bubble-goo" x="-15%" y="-40%" width="130%" height="180%">
+  <!-- Ends at the element's own bottom edge: the blur's spread below the lowest shape is REGION_MARGIN in liquid.js, which sizes the element. -->
+  <filter id="bubble-goo" x="-15%" y="-10%" width="130%" height="110%">
     <feGaussianBlur id="bubble-melt" in="SourceGraphic" stdDeviation="2" result="blurred"/>
     <feColorMatrix in="blurred" type="matrix"
       values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -14"/>

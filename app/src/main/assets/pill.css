@@ -188,7 +188,7 @@ html, body {
   
 
 
-  translate: var(--shift, 0px) calc(var(--alert-drop, 0px) + var(--swap-drop, 0px));
+  translate: var(--shift, 0px) calc(var(--alert-drop, 0px) + var(--notifications-drop, 0px));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -226,7 +226,7 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
 #pill.alerting.with-image { height: 190px; }
 #pill.expanded { width: 340px; height: 150px; border-radius: 30px; }
 #pill.picture { width: 340px; height: var(--picture-height, 320px); border-radius: 26px; }
-#pill.notifications { width: 340px; height: var(--notifications-height, 320px); border-radius: 26px; }
+#pill.notifications { width: 340px; height: var(--notifications-height, 320px); border-radius: 26px; --carry-ms: var(--grow-ms); --shift-delay: 0ms; }
 
 
 
@@ -564,32 +564,11 @@ html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
   top: 0;
   
 
-  height: calc(var(--grab, 0px) + var(--liquid-tall, calc(var(--pill-height) * 1.2 + 16px)));
+  height: calc(var(--grab, 0px) + var(--pill-height) * 1.2 + 16px);
   display: none;
   pointer-events: none;
 }
 html.liquid #liquid { display: block; }
-
-
-
-
-
-
-
-html.lock-live #liquid, html.locked #liquid { height: 100%; }
-
-
-
-
-
-html.double-live #liquid { height: 100%; }
-
-
-
-html.grown #liquid { height: 100%; }
-
-/* Worn for the length of the return home from any grown state. The goo region snapped back to the short idle band the instant `grown` came off, so a bubble still tall and still travelling was drawn outside the region and had its skin dropped — the cut `alert-homing` and `notifications-homing` below each stop for their own state, held here for every other one. */
-html.returning #liquid { height: 100%; }
 
 /* The same wall `--ease-reach` exists for on `top`, met on `height`: a 155px box collapsing to 26 on the bubble family's 1.7 overshoot undershoots to a few pixels tall, so the bubble read as shooting up and being cut off rather than as landing. Every return home takes the reach curve on all four channels, which is what `notifications-homing` below had written for its own state alone. */
 html.returning #pill {
@@ -600,7 +579,6 @@ html.returning #pill {
 }
 
 
-html.alert-homing #liquid { height: 100%; }
 html.alert-homing #pill {
   --carry-ms: 460ms;
   --shift-delay: 0ms;
@@ -608,7 +586,6 @@ html.alert-homing #pill {
 }
 
 /* The bubble leaving the Notifications menu found the same wall the Alert did: 340x320 collapsing on the bubble family's 1.7 overshoot undershoots the idle pill hard enough to leave the top of the screen, and above the bar there is nothing to overshoot into. */
-html.notifications-homing #liquid { height: 100%; }
 /* Closed out of a trade, the bubble is the lower of the two and the long climb home is its own, carried on `translate` — and `clearSwap` takes `html.swapping` away at that exact moment, so the one rule holding that channel to the reach curve and to no delay was gone for the longest carry in the state: the row wrote its own 120ms back and the climb set off an eighth of a second after the box had begun collapsing, on the 1.7 overshoot the line above exists to avoid. The carry is named here beside the width and the height it travels with. */
 html.notifications-homing #pill {
   --grow-ms: 460ms;
@@ -714,6 +691,8 @@ html.dragging #pill { transition: scale 350ms linear; }
   transition: opacity 160ms ease, top var(--content-drop-ms) var(--ease-grow);
 }
 .face.showing { opacity: 1; pointer-events: auto; }
+/* A face losing `showing` fades while the bubble collapses under it, and its contents kept their open size — the player's artwork and labels hung outside the shrinking bubble for the whole fade. A face on its way out is cut to the bubble's own shape; a showing face stays unclipped because glyphs fly in from past its edge. */
+.face:not(.showing) { overflow: clip; border-radius: inherit; }
 
 
 
@@ -1097,8 +1076,11 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
   border-radius: 999px;
   background: rgb(255 255 255 / 0.1);
   filter: blur(16px);
-  animation: alert-zone-hint 2200ms var(--ease-sweep) infinite;
+  animation: alert-zone-hint 2200ms var(--ease-sweep) infinite paused;
 }
+/* Running on the base rules these two loops ran from the page's first frame to its last behind a zone at opacity 0, and an opacity-0 ancestor stops nothing: the renderer built a main frame on every vsync of every idle minute, 120 a second, for an arrow nobody could see. Paused rather than removed, so the arrow holds where it stood while the zone fades instead of jumping home under the fade. */
+html.alert-zone-live :is(#alert-zone-glow, #alert-zone-arrow),
+html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-state: running; }
 
 /* Every inline svg here is given both axes: with a viewBox and a width alone Chromium resolves the height to nothing inside a centred flex box, which is what drew no arrow at all. */
 #alert-zone-arrow {
@@ -1111,7 +1093,7 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
   stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  animation: alert-zone-mark 2200ms var(--ease-sweep) infinite;
+  animation: alert-zone-mark 2200ms var(--ease-sweep) infinite paused;
 }
 @keyframes alert-zone-hint {
   0%, 100% { translate: 0 -3px; opacity: 0.55; }
@@ -1194,7 +1176,7 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
   background: var(--sunken);
 }
 #media-art, #player-art {
-  transition: opacity 150ms ease, transform 150ms var(--ease-grow);
+  transition: opacity 150ms ease, transform 150ms var(--ease-grow), translate 150ms var(--ease-grow);
   
 
 
@@ -1207,12 +1189,14 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 .leaving-art, .hidden-art { opacity: 0; transform: translateX(var(--art-exit)); }
 .entering-art {
   opacity: 0;
-  transform: translateX(calc(var(--art-exit) * -1));
+  transform: translateX(var(--art-enter, calc(var(--art-exit) * -1)));
   transition: none;
 }
 
 #media-art { --art-exit: -32px; }
 #player-art { --art-exit: -76px; }
+/* The Now bubble's cover leaves and comes back on the left whichever way the song was swiped. */
+#lock-art { --art-exit: -32px; --art-enter: -32px; transition: opacity 150ms ease, transform 150ms var(--ease-grow), translate 150ms var(--ease-grow); }
 
 
 
@@ -1232,11 +1216,19 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
   height: var(--mod-glyph);
   flex: none;
 }
+/* The bars swung on `height`, which is layout: for as long as a song played the pill was restyled, relaid and repainted on every vsync, hidden behind the open player or not. A full-height capsule slid down inside a capsule-shaped clip draws the same bar with both caps round, and `translate` is the compositor's. */
 #equalizer span {
   width: 3px;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+}
+#equalizer i {
+  display: block;
+  height: 100%;
   border-radius: 999px;
   background: var(--app-accent);
-  height: 40%;
+  translate: 0 60%;
 }
 
 
@@ -1419,6 +1411,7 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 
 
 
+#player-face.warming:not(.showing) { opacity: 0.004; transition: none; }
 #player-face {
   --wave-band: 52px;
   --wave-band-open: 110px;
@@ -1442,17 +1435,23 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
   z-index: 2;
   padding: 0.85rem 1.05rem 2.6rem;
 }
-#player-meta::before, #player-clock::before {
+/* One blur faded out by a mask is a sheet of full-strength frost whose opacity drops, so the glass ended on a band of equally smeared picture. Two layers make the blur itself fall off: a soft one reaching the whole depth and a strong one only at the outer edge, so the artwork sharpens towards the middle instead of the frost thinning. Both reach a quarter past the strip that holds the text. */
+#player-meta::before, #player-clock::before,
+#player-meta::after, #player-clock::after {
   content: '';
   position: absolute;
-  inset: 0;
   z-index: -1;
-  backdrop-filter: blur(22px) saturate(1.35);
+  pointer-events: none;
 }
+#player-meta::before, #player-meta::after { inset: 0 0 -25% 0; }
+#player-clock::before, #player-clock::after { inset: -25% 0 0 0; }
+#player-meta::before, #player-clock::before { backdrop-filter: blur(9px) saturate(1.2); }
+#player-meta::after, #player-clock::after { backdrop-filter: blur(26px) saturate(1.35); }
 #player-meta::before {
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.08));
-  mask-image: linear-gradient(to bottom, #000 52%, transparent 100%);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.08) 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
 }
+#player-meta::after { mask-image: linear-gradient(to bottom, #000 0%, transparent 55%); }
 #player-art {
   position: absolute;
   inset: 0;
@@ -1558,9 +1557,10 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
   color: var(--text-muted);
 }
 #player-clock::before {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.08));
-  mask-image: linear-gradient(to top, #000 52%, transparent 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.08) 70%, transparent);
+  mask-image: linear-gradient(to top, #000 0%, transparent 100%);
 }
+#player-clock::after { mask-image: linear-gradient(to top, #000 0%, transparent 55%); }
 
 
 
@@ -1613,7 +1613,7 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 }
 
 #notifications-list {
-  overflow-y: auto;
+  overflow-y: hidden;
   overscroll-behavior: contain;
   scrollbar-width: none;
   flex: 1 1 auto;
@@ -1627,9 +1627,9 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 .notification-row {
   display: grid;
   grid-template-columns: 3px minmax(0, 1fr);
-  gap: 0.6rem;
+  gap: 0.75rem;
   align-items: start;
-  padding: 0.5rem 0.7rem;
+  padding: 0.7rem 0.8rem;
   border-bottom: 1px solid var(--border);
 }
 .notification-row:last-child { border-bottom: 0; }
@@ -1647,20 +1647,21 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 }
 
 .notification-row:has(.notification-icon) {
-  grid-template-columns: 3px 20px minmax(0, 1fr);
+  grid-template-columns: 3px 34px minmax(0, 1fr);
 }
 .notification-icon {
-  width: 20px;
-  height: 20px;
+  width: 34px;
+  height: 34px;
+  max-height: 90%;
+  align-self: center;
   border-radius: 999px;
-  margin-top: 0.1rem;
   object-fit: cover;
 }
 
 .notification-mark { align-self: stretch; border-radius: 999px; }
 .notification-copy { min-width: 0; }
 .notification-name {
-  font-size: calc((0.58rem) * var(--font-scale, 1));
+  font-size: calc((0.66rem) * var(--font-scale, 1));
   letter-spacing: 0.16rem;
   text-transform: uppercase;
 }
@@ -1674,7 +1675,7 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 
 
 .notification-tally {
-  font-size: calc((0.56rem) * var(--font-scale, 1));
+  font-size: calc((0.64rem) * var(--font-scale, 1));
   letter-spacing: 0.06rem;
   color: var(--text-muted);
   flex: none;
@@ -1684,7 +1685,7 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 
 
 .notification-when {
-  font-size: calc((0.56rem) * var(--font-scale, 1));
+  font-size: calc((0.64rem) * var(--font-scale, 1));
   letter-spacing: 0.04rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -1694,13 +1695,13 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
 }
 
 .notification-who {
-  font-size: calc((0.76rem) * var(--font-scale, 1));
+  font-size: calc((0.88rem) * var(--font-scale, 1));
   line-height: 1.35;
   margin-top: 0.2rem;
   overflow-wrap: anywhere;
 }
 .notification-text {
-  font-size: calc((0.74rem) * var(--font-scale, 1));
+  font-size: calc((0.84rem) * var(--font-scale, 1));
   line-height: 1.5;
   color: var(--text-muted);
   
@@ -3213,6 +3214,30 @@ html.now-open {
 #quick-panel.entering .level {
   animation-name: level-grow;
 }
+/* Text inside a box scaling up from nothing is re-rasterised at each raster scale the compositor steps through, so the stats readings jumped in coarse steps while their bubbles grew; they wait out their own bubble's pop and fade in once it has landed. */
+#quick-panel.entering :is(.vital-reading, .vital-gauge, #battery-remaining) {
+  animation: stat-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--quick-pop) + var(--rise-after, 0ms)) backwards;
+}
+#quick-panel.entering .vital-gauge { --rise-after: 50ms; }
+#quick-panel.entering .vital[data-vital="ram"] { --rise-after: 70ms; }
+#quick-panel.entering .vital[data-vital="ram"] .vital-gauge { --rise-after: 120ms; }
+@keyframes stat-rise {
+  from { opacity: 0; translate: 0 8px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+#quick-panel.entering .quick-knob {
+  animation-duration: var(--throw-ms, var(--quick-pop));
+  animation-timing-function: var(--throw-ease, var(--ease-sling));
+}
+/* Mirrors QUICK_FAST_SPREAD in js/status.js. */
+html.fast-dashboard #quick-panel.entering .quick-bubble {
+  animation: fast-drop 220ms ease-out calc(var(--panel-at, 0ms) + var(--fast-at, 0ms)) backwards;
+}
+html.fast-dashboard #quick-panel.entering :is(.vital-reading, .vital-gauge, #battery-remaining) { animation: none; }
+@keyframes fast-drop {
+  from { opacity: 0; translate: 0 -14px; }
+  to   { opacity: 1; translate: 0 0; }
+}
 @keyframes level-grow {
   from { opacity: 0; scale: 0; rotate: var(--pop-turn, 0deg); translate: 0 calc(var(--pop-from, 0px) * -1); }
   to   { opacity: 1; scale: 1; rotate: 0deg; translate: 0 0; }
@@ -3810,6 +3835,12 @@ html:not(.grown) #pill.panel-top #indicators { top: calc(var(--edge-over) + 4px)
 
 /* The arrival owns scale, opacity and width outright while it plays. Leaving the CSS transitions on meant three clocks running the one journey — the 320ms scale transition off .showing, the 340ms width transition off .compact and the flight's own keyframes — so the bubble changed size a second time after it had landed, at a moment none of the three agreed on. */
 #lock-now.arriving, #lock-now.flying { transition: none; }
+/* The flight starts a frame after `showing` goes on, and the mirror's frame runs first — so it measured the bubble standing at its rest at full opacity and sent the frost pane and the goo skin there before the ball had left Main. Until the flight has taken the bubble (`circling`), it is not there. */
+#lock-now.arriving:not(.circling) { opacity: 0; }
+/* The head eases its padding and gap into .compact, so the arrival measured the cover's rest spot at the start of that ease and the cover jumped the rest of the way when the flight let go of it; the normal bubble never changed its head, which is why only compact teleported. */
+#lock-now.arriving #lock-head { transition: none; }
+/* The compact title stayed readable through the whole draw home; leaving the panel it goes on the first frame. */
+#lock-now.compact.flying #lock-meta { opacity: 0; transition: none; }
 
 /* Timeline one narrows the box to a circle, and a stretched flex child narrowing collapses toward the start of its column rather than around its own middle — the ball would form at the left edge of the screen instead of where the bubble was standing. Centred, and with the width pinned to what was just measured, the first frame is identical and every frame after it closes inward.
 

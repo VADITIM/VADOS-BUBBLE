@@ -115,6 +115,8 @@ object Preferences {
 
     const val DASH_ALERTS_DISABLED = "dashAlertsDisabled"
 
+    const val FAST_DASHBOARD = "fastDashboard"
+
     const val ALERT_ZONE_SHOWN = "alertZoneShown"
 
     const val FONT_CLOCK = "fontClock"
@@ -177,6 +179,7 @@ object Preferences {
         BAR_LOCKED to 0,
         QUICK_DIVIDERS to 1,
         DASH_ALERTS_DISABLED to 0,
+        FAST_DASHBOARD to 0,
         ALERT_ZONE_SHOWN to 0,
 
         FONT_CLOCK to 0,

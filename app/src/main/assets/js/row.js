@@ -1,8 +1,8 @@
 import { refreshEdgeProxy } from './edge.js';
-import { retireDuplicate } from './double.js';
 import { leaveAlertCentre, leaveAlertDash } from './alert.js';
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
 import { isStolen } from './lock.js';
+import { retireNotifications } from './tabs.js';
 import { paintAvatar, paintCall } from './mods/call.js';
 import { carryArt, mediaWindow, paintMedia, runBars } from './mods/media.js';
 import { paintTimer, timerWindow } from './mods/timer.js';
@@ -1405,7 +1405,7 @@ export function toClosed() {
   pill.classList.remove('alert', 'with-image', 'charging');
   leaveAlertCentre();
   leaveAlertDash();
-  retireDuplicate();
+  retireNotifications();
 
   const live = liveMods();
   const owner = live[0] || null;

@@ -1,8 +1,7 @@
 import { alertTouch, dashHolds, isAlertCentred, isAlertDashed, isAlertLive, layOutZone } from './alert.js';
-import { duplicateHolds, duplicateTouch } from './double.js';
 import { fitLabels } from './labels.js';
 import { stirLiquid } from './liquid.js';
-import { mediaWindow } from './mods/media.js';
+import { mediaWindow, warmPlayer } from './mods/media.js';
 import { show } from './mods/notification.js';
 import { timerWindow } from './mods/timer.js';
 import { nowOpen, nowOwnsClock, nowTouch } from './now.js';
@@ -37,7 +36,6 @@ let statusOwnsTouch = false;
 let clockOwnsTouch = false;
 let mainOwnsTouch = false;
 let alertOwnsTouch = false;
-let doubleOwnsTouch = false;
 
 
 export const PROXY_TAP_SLOP = 22;
@@ -163,15 +161,18 @@ window.onProxyTouch = (action, x, y, source) => {
     edgeTouch(action, x, y, source);
     return;
   }
+  /* The Debug screen's note was written ahead of the press it describes — a forced layout, a hit test and a synchronous call into the host on every down and every lift, paid before the gesture had been answered at all. It is written once the frame is out of the way. */
   if (action !== 'move') {
-    const box = clockPill.getBoundingClientRect();
-    bridge.note(
-      'page: ' + action + ' at ' + Math.round(x) + ', ' + Math.round(y) +
-      ' — the clock is at ' + Math.round(box.left) + '–' + Math.round(box.right) +
-      ', ' + Math.round(box.top) + '–' + Math.round(box.bottom) +
-      ' — owner ' + (clockHolds(x, y) ? (nowOwnsClock() ? 'a Now mod' : 'the clock') : 'the row') +
-      ' — under it ' + describe(document.elementFromPoint(x, y))
-    );
+    requestIdleCallback(() => {
+      const box = clockPill.getBoundingClientRect();
+      bridge.note(
+        'page: ' + action + ' at ' + Math.round(x) + ', ' + Math.round(y) +
+        ' — the clock is at ' + Math.round(box.left) + '–' + Math.round(box.right) +
+        ', ' + Math.round(box.top) + '–' + Math.round(box.bottom) +
+        ' — owner ' + (clockHolds(x, y) ? (nowOwnsClock() ? 'a Now mod' : 'the clock') : 'the row') +
+        ' — under it ' + describe(document.elementFromPoint(x, y))
+      );
+    }, { timeout: 500 });
   }
   
   
@@ -189,13 +190,6 @@ window.onProxyTouch = (action, x, y, source) => {
     return;
   }
 
-  // The Notifications duplicate is drawn inside the row's own proxy but is no part of the bubble, so every touch on it was handed to the pill by `pillTarget`'s fallback and answered as a touch on the menu above it.
-  if (action === 'down') doubleOwnsTouch = duplicateHolds(x, y);
-  if (doubleOwnsTouch) {
-    duplicateTouch(action, x, y);
-    if (action === 'up' || action === 'cancel') doubleOwnsTouch = false;
-    return;
-  }
 
   if (action === 'down') {
     // The panel's push is read off every touch its proxy hears, so a swipe on an Alert standing over the panel leaned and closed the panel underneath it as well as dismissing the Alert. The bubble owns the whole touch it started, not only the point it began at.
@@ -286,6 +280,7 @@ window.setStageHidden = hidden => {
   wakeClock();
   fitLabels();
   stirLiquid(240);
+  warmPlayer();
 };
 
 // Mirrors the FONT_STACKS array in panel.html — the index a preference holds has to mean the same face in both places.
@@ -388,6 +383,10 @@ window.setQuickDividers = value => {
 
 window.setDashAlertsDisabled = value => {
   shared.isDashAlertDisabled = Number(value) !== 0;
+};
+
+window.setFastDashboard = value => {
+  root.classList.toggle('fast-dashboard', Number(value) !== 0);
 };
 
 window.setAlertZoneShown = value => {

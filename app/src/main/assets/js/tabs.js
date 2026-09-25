@@ -1,8 +1,8 @@
-import { duplicateDouble, duplicateReach } from './double.js';
+import { stirLiquid } from './liquid.js';
 import { markUp } from './mods/notification.js';
 import { becomeExtended, setSize, showFace, toClosed } from './row.js';
 import { swipeToDismiss } from './swipeDismiss.js';
-import { SIZES, bridge, root, shared } from './state.js';
+import { GROWN_PAD, SIZES, bridge, root, shared } from './state.js';
 
 
 function afterRowRemoved(below, gap) {
@@ -42,7 +42,10 @@ function closeGap(below, gap) {
   });
   
   
-  if (shared.size === 'notifications') setSize('notifications', notificationsWindow(), true);
+  if (shared.size === 'notifications') {
+    setSize('notifications', notificationsWindow(), true);
+    stirLiquid(600);
+  }
 }
 
 
@@ -233,31 +236,31 @@ export function openNotifications() {
     list.appendChild(row);
   }
 
-  const box = notificationsWindow();
-  duplicateDouble(entries.length ? String(entries.length) + ' waiting' : 'Nothing waiting', box);
   becomeExtended();
   showFace('notifications');
-  // The menu is two bubbles and the lower one has to answer a pull, so the room asked for reaches its bottom edge rather than the menu's — this is the modal's own area for as long as it stands, and it is handed back at the close.
-  setSize('notifications', { width: box.width, height: duplicateReach() });
+  setSize('notifications', notificationsWindow());
+  stirLiquid(760);
 }
 
-
-
-
-
-
-
-
-
+export function retireNotifications() {
+  if (!root.style.getPropertyValue('--notifications-drop')) return;
+  root.style.removeProperty('--notifications-drop');
+  root.classList.add('notifications-homing');
+  setTimeout(() => root.classList.remove('notifications-homing'), 460);
+}
 
 function notificationsWindow() {
-  const ceiling = Math.round(screen.height * 0.75);
+  const floor = Math.round(screen.height * 0.35);
+  const ceiling = Math.round(screen.height * 0.85);
   const head = document.getElementById('notifications-head');
   const list = document.getElementById('notifications-list');
-  
   const frame = 20;
   const wanted = head.offsetHeight + list.scrollHeight + frame;
-  const height = Math.max(SIZES.notifications.height, Math.min(ceiling, wanted));
+  const height = Math.max(floor, Math.min(ceiling, wanted));
+  const grab = parseFloat(getComputedStyle(root).getPropertyValue('--grab')) || 0;
+  const top = Math.round((root.clientHeight - height) / 2);
   root.style.setProperty('--notifications-height', height + 'px');
-  return { width: SIZES.notifications.width, height };
+  root.style.setProperty('--notifications-drop', (top - grab - GROWN_PAD) + 'px');
+  // The proxy is measured from the top of the screen, so the room asked for has to reach the bottom of a bubble that now stands in the middle of it rather than just under the bar.
+  return { width: SIZES.notifications.width, height: top + height - grab };
 }

@@ -423,10 +423,6 @@ function openNowPanel() {
   
   
   stirLiquid(NOW_PANEL.ms + 120);
-  
-  
-  
-  root.style.setProperty('--liquid-tall', (NOW_PANEL.height + 24) + 'px');
   requestAnimationFrame(() => {
     clockPill.classList.add('open');
     showNowFace('panel');
@@ -442,9 +438,6 @@ export function closeNowPanel() {
   setPanelShift(0, NOW_PANEL.ms);
   fitClockProxy();
   stirLiquid(NOW_PANEL.ms + 120);
-  
-  
-  nowAfter(NOW_PANEL.ms + 40, () => root.style.removeProperty('--liquid-tall'));
 }
 
 

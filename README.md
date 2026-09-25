@@ -3,6 +3,58 @@
 Overlay pill for one Samsung Galaxy S25 (SM-S931B, Android 16 / SDK 36).
 Sideload only. No Play Store, no other devices.
 
+## What it is for
+
+A system overhaul for One UI. Several One UI features that each live in their own corner of the
+screen are replaced by one component at the camera cutout, which grows, splits and reshapes around
+whatever the phone is doing.
+
+### Why one component instead of several
+
+Stock One UI answers every event with its own piece of interface. A song gets a media chip, a timer
+gets a notification row, a call gets its own indicator, a message gets a heads-up card that drops
+over whatever is open, the clock and status icons sit in a bar that knows nothing about any of them,
+and the notification shade and quick settings are a separate world again. Each is designed on its
+own, animates on its own terms and leaves without reference to the others. The phone ends up feeling
+like a stack of unrelated overlays rather than one system.
+
+Folding them into a single component fixes that at the root. There is one place to look, one shape
+every piece of news arrives in, and one set of rules for how it moves. When a song starts, the bubble
+widens to carry it; when a timer runs as well, the two share it; when a notification lands, it grows
+out of the same bubble instead of dropping in from the top. Nothing appears from nowhere.
+
+### What it replaces
+
+- **The clock display.** The clock is drawn at the left end of the bar by the same page as the
+  bubble, so it shares the type, colour and motion of everything beside it. Good Lock is optional
+  here, used to tidy up One UI's own clock.
+- **The activity bubble.** Media, timers, calls, charging and incoming notifications show up in the
+  bubble at the cutout instead of as One UI's heads-up pop-ups, which are switched off. The bubble
+  is the pop-up; a phone showing both would be telling the same news twice.
+- **The status display.** The status reading merges directly with One UI's notification shade and
+  quick settings panel rather than sitting on top of them as a separate layer, so pulling the shade
+  down continues from the bubble instead of cutting away from it.
+
+### Why Shizuku
+
+Replacing a system feature means switching the original off, and Android does not let a normal app
+do that. Suppressing the heads-up and Samsung's own brief pop-up, the microphone access toggle and
+the hotspot all need the shell UID. Shizuku provides it without root, so the phone stays on stock
+firmware.
+
+### Why it is so animated
+
+This is the daily driver, used everywhere: on the street, one-handed, pulled out of a pocket and
+glanced at for half a second. At that length of attention, motion carries information faster than
+text does. A bubble that grows says something arrived; the direction it grows says what it belongs
+to; the speed it leaves says it is done. A static swap says only that the screen changed.
+
+So every state change is animated rather than swapped, and the motion follows V/AS, a design
+language of my own with written standards for how every surface looks, arrives, idles and leaves.
+The standards are what keep it lively without turning into noise: nothing moves unless something
+caused it, and everything that moves does so the same way. The aim is a phone that feels alive, not
+one that feels decorated.
+
 ## Build and install
 
 ```
@@ -38,7 +90,7 @@ the notification listener and the accessibility service the bubble window needs.
 
 ## Style
 
-The interface follows the VADITIM Style DNA from `PORTFOLIO25/.claude/style-dna`: near-black ground,
+The interface follows V/AS — VADOS APPLICATION SYSTEMS, cloned into `.claude/skills/vas/`: near-black ground,
 hairline-bordered translucent panels, monospaced uppercase micro-labels, one terminal-green accent
 inherited from the root, and motion that arrives slowly and diagonally and leaves fast.
 

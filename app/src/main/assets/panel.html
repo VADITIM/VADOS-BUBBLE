@@ -627,6 +627,7 @@
     </div>
     <div class="actions">
       <button class="wide" onclick="Panel.testNotification()">Send test notification</button>
+      <button class="wide" onclick="Panel.sendDebugNotifications()">Send 5 random notifications</button>
     </div>
   </section>
 
@@ -738,6 +739,8 @@
     { group: 'Other', key: 'quickDividers', name: 'Dashboard dividers', min: 0, max: 1,
       labels: ['Off', 'On'] },
     { group: 'Other', key: 'dashAlertsDisabled', name: 'Disable Alerts in Dashboard', min: 0, max: 1,
+      labels: ['Off', 'On'] },
+    { group: 'Other', key: 'fastDashboard', name: 'Fast Dashboard', min: 0, max: 1,
       labels: ['Off', 'On'] },
     { group: 'Other', key: 'statusBatteryPercent', name: 'Status battery %', min: 0, max: 1,
       labels: ['Hidden', 'Shown'] },

@@ -15,6 +15,8 @@ import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -202,6 +204,7 @@ class IslandNotificationListener : NotificationListenerService() {
         MediaControl.refresh()
         publishTimer()
         publishCall()
+        iconWorker.execute { shade() }
     }
 
     override fun onListenerDisconnected() {
@@ -233,7 +236,7 @@ class IslandNotificationListener : NotificationListenerService() {
         // A player is asked about before a transfer now that a transfer is recognised by its progress bar alone: a media notification carrying one — which is most of them — would otherwise be read as a file in flight and never reach the media session at all.
         if (isPlayer(statusBarNotification)) {
             MediaControl.refresh()
-            MediaControl.offer(standInFor(statusBarNotification))
+            MediaControl.offer { standInFor(statusBarNotification) }
             return
         }
         if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
@@ -241,7 +244,10 @@ class IslandNotificationListener : NotificationListenerService() {
             return
         }
         BubbleService.deliverCount(count())
-        if (!isWorthShowing(statusBarNotification)) return
+        if (!isWorthShowing(statusBarNotification)) {
+            if (belongsInList(statusBarNotification)) iconWorker.execute { iconOf(statusBarNotification) }
+            return
+        }
 
         val notification = statusBarNotification.notification
         
@@ -268,6 +274,7 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
         NotificationLog.forget(statusBarNotification.key)
+        icons.remove(statusBarNotification.key)
         
         
         BubbleService.deliverGone(statusBarNotification.key)
@@ -326,7 +333,7 @@ class IslandNotificationListener : NotificationListenerService() {
             .put("title", extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty())
             .put("text", extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty())
             .put("lines", messages(statusBarNotification.notification))
-            .put("iconBase64", encodeIcon(statusBarNotification.notification))
+            .put("iconBase64", iconOf(statusBarNotification))
             .put("appIconBase64", encodeAppIcon(statusBarNotification.packageName))
             
             
@@ -369,7 +376,7 @@ class IslandNotificationListener : NotificationListenerService() {
 
 
     private fun belongsInList(statusBarNotification: StatusBarNotification): Boolean {
-        if (statusBarNotification.packageName == packageName) return false
+        if (statusBarNotification.packageName == packageName && statusBarNotification.notification.channelId != DebugNotifications.CHANNEL) return false
         if (statusBarNotification.packageName in systemPackages) return false
         
         
@@ -422,7 +429,19 @@ class IslandNotificationListener : NotificationListenerService() {
 
     
 
-    private val appIcons = HashMap<String, Any>()
+    private val appIcons = ConcurrentHashMap<String, Any>()
+
+    // Opening the menu reads the shade synchronously from the page, and every notification's icon was PNG-encoded inside that read, so the page stood still for as long as the encoding took; each icon is encoded once per post now, off the main thread.
+    private val icons = ConcurrentHashMap<String, Pair<Long, Any>>()
+    private val iconWorker = Executors.newSingleThreadExecutor()
+
+    private fun iconOf(statusBarNotification: StatusBarNotification): Any {
+        icons[statusBarNotification.key]?.let { (postedAt, icon) ->
+            if (postedAt == statusBarNotification.postTime) return icon
+        }
+        return encodeIcon(statusBarNotification.notification)
+            .also { icons[statusBarNotification.key] = statusBarNotification.postTime to it }
+    }
 
 
     private fun encodeAppIcon(packageName: String): Any = appIcons.getOrPut(packageName) {
