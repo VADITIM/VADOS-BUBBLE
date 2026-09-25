@@ -44,6 +44,14 @@ export const PROXY_TAP_SLOP = 22;
 const PILL_GRACE = 22;
 const PILL_CONTROLS = '.transport, .timer-button, .notification-row';
 
+const PRESSABLE = '.quick-mode, .quick-knob, .status-action, .timer-button, #now-stop';
+let pressed = null;
+
+function letGoOfPress() {
+  if (pressed) pressed.classList.remove('pressing');
+  pressed = null;
+}
+
 
 function describe(element) {
   if (!element) return 'nothing';
@@ -231,14 +239,20 @@ window.onProxyTouch = (action, x, y, source) => {
     proxySource = source;
     proxyTarget = proxyPoint(x, y, source);
     proxyDown = { x, y };
+    // Every touch reaches the page as a synthesised TouchEvent, and a synthesised event never sets `:active` — so every `:active` press in the stylesheet was dead and the toggles, the knobs and the Status actions answered a finger with nothing until it lifted.
+    letGoOfPress();
+    pressed = proxyTarget ? proxyTarget.closest(PRESSABLE) : null;
+    if (pressed) pressed.classList.add('pressing');
     if (proxyTarget) proxyEvent('touchstart', proxyTarget, x, y, false);
     return;
   }
   if (!proxyTarget) return;
   if (action === 'move') {
+    if (pressed && Math.hypot(x - proxyDown.x, y - proxyDown.y) >= PROXY_TAP_SLOP) letGoOfPress();
     proxyEvent('touchmove', proxyTarget, x, y, false);
     return;
   }
+  letGoOfPress();
   proxyEvent(action === 'up' ? 'touchend' : 'touchcancel', proxyTarget, x, y, true);
   
   

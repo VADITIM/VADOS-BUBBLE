@@ -177,7 +177,7 @@ html, body {
 
     translate var(--carry-ms, var(--shift-ms, var(--grow-ms)))
       var(--carry-ease, var(--ease-split)) var(--shift-delay, 0ms),
-    scale 350ms linear,
+    scale 350ms var(--hold-ease, var(--ease-bubble)),
     border-color 220ms ease;
   transition: var(--pill-transition);
   
@@ -657,12 +657,14 @@ html.holding #pill { --hold-now: var(--hold-scale, 1.14); }
 
 
 html.pressing #pill { --hold-now: 1.03; }
+/* The swell ran back to rest on `linear` as well, so a hold let go of stopped dead on its last frame — the one ease in the bubble family with no landing in it. Linear is kept for the growth, which is the hold's progress, and the way back is the bubble's own spring. */
+html.holding #pill, html.pressing #pill { --hold-ease: linear; }
 
 
 
 
 
-html.dragging #pill { transition: scale 350ms linear; }
+html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble)); }
 
 
 
@@ -1336,7 +1338,9 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
   letter-spacing: 0.14rem;
   text-transform: uppercase;
   color: var(--text-body);
+  transition: scale 200ms var(--ease-split);
 }
+.timer-button.pressing { scale: 0.96; }
 .timer-button:first-child { border-color: var(--app-accent); color: var(--app-accent); }
 
 
@@ -1521,7 +1525,7 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 
 .transport {
   transition:
-    scale 220ms var(--ease-grow),
+    scale 220ms var(--ease-split),
     width var(--grow-ms) var(--ease-split),
     height var(--grow-ms) var(--ease-split);
 }
@@ -2162,9 +2166,9 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 .popping-in:not(.status-slot) {
   animation: pop-in 460ms var(--ease-split) var(--pop-at, 0ms) both;
 }
+/* The 1.14 crest was written as a keyframe under a curve that already crests at 1.143, so every part overshot to 1.30, came to a dead stop at 55% and undershot again — two landings for one arrival. The curve alone is the crest, and the counter-turn is its overshoot on `rotate`. */
 @keyframes pop-in {
   0%   { scale: 0; rotate: var(--pop-tilt, 8deg); }
-  55%  { scale: 1.14; rotate: calc(var(--pop-tilt, 8deg) * -0.3); }
   100% { scale: 1; rotate: 0deg; }
 }
 
@@ -2369,7 +2373,7 @@ html.battery-percent-light .mini-battery-bolt {
 }
 .status-action svg { width: 100%; height: 100%; fill: currentColor; }
 /* Written with the arrival rule's specificity rather than left to source order: `.status-face.showing > *` stands on this button for as long as the panel is open (motion.md#an-arrival-animation-outranks-the-press-animation-on-the-same-element). */
-.status-face.showing .status-action:active { scale: 0.9; }
+.status-face.showing .status-action.pressing { scale: 0.9; }
 #status-power { color: #e5342b; }
 
 
@@ -2841,7 +2845,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   width: var(--transfer-share, 0%);
   border-radius: 4px;
   background: var(--transfer-color, var(--section-color));
-  transition: width 320ms var(--ease-split), background 400ms ease;
+  transition: width 320ms var(--ease-grow), background 400ms ease;
 }
 
 
@@ -2876,7 +2880,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   color: var(--text-muted);
   transition: color 200ms ease, scale 200ms var(--ease-split);
 }
-.quick-mode:active { scale: 0.96; }
+.quick-mode.pressing { scale: 0.96; }
 .quick-mode.unavailable { opacity: 0.4; }
 
 .quick-icon { display: grid; place-items: center; }
@@ -3161,7 +3165,7 @@ html.call-live .level[data-level="volume"] { top: calc(50% + var(--quick-level-s
     width var(--grow-ms) var(--ease-grow),
     height var(--grow-ms) var(--ease-grow);
 }
-.quick-knob:active { scale: 0.94; }
+.quick-knob.pressing { scale: 0.94; }
 .quick-knob.on {
   color: var(--section-color);
   box-shadow: inset 0 0 0 2px var(--section-color);
@@ -3704,7 +3708,9 @@ html:not(.grown) #pill.panel-top #indicators { top: calc(var(--edge-over) + 4px)
   font: inherit;
   font-size: calc((0.8rem) * var(--font-scale, 1));
   font-weight: 500;
+  transition: scale 200ms var(--ease-split);
 }
+#now-stop.pressing { scale: 0.96; }
 
 
 
@@ -3882,12 +3888,12 @@ html.label-sweep .sweep-host::after {
 }
 html.label-sweep .sweep-host.sweeping::after {
   transform: scaleX(1);
-  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 300ms var(--ease-sweep);
 }
 html.label-sweep .sweep-host.swept::after {
   transform: scaleX(0);
   transform-origin: right center;
-  transition: transform 340ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 340ms var(--ease-sweep);
 }
 html.label-sweep .sweep-hidden { opacity: 0; }
 #label-ruler {

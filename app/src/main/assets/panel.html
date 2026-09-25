@@ -153,9 +153,11 @@
     padding: 0.55rem 0.8rem;
     
 
-    transition: transform 0.12s var(--ease-leave), border-color 0.2s ease, color 0.2s ease;
+    /* Press and release both ran on --ease-leave, an ease-in: the button answered the finger late and let go of it with no landing. The press is immediate and the release is the family's overshoot. */
+    transition: transform 0.26s var(--ease-enter), border-color 0.2s ease, color 0.2s ease;
   }
   button:active {
+    transition: transform 0.08s ease-out, border-color 0.2s ease, color 0.2s ease;
     transform: scale(0.96);
     border-color: var(--section-color);
     color: var(--section-color);
@@ -192,7 +194,7 @@
     color: var(--text-muted);
     position: relative;
     overflow: hidden;
-    transition: color 0.24s ease, border-color 0.24s ease, transform 0.12s var(--ease-leave);
+    transition: color 0.24s ease, border-color 0.24s ease, transform 0.26s var(--ease-enter);
   }
   .grant::before {
     content: "";
@@ -422,7 +424,7 @@
 
 
   .slider:not(.dragging) .slider-fill {
-    transition: width 0.18s var(--ease-leave);
+    transition: width 0.18s ease-out;
   }
 
   .group-nav {

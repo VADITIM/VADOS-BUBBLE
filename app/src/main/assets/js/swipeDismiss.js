@@ -53,13 +53,15 @@ export function swipeToDismiss(row, keys, { rowSelector, afterRemove }) {
   }, { passive: true });
 
   row.addEventListener('touchend', () => {
-    row.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
     if (Math.abs(travel) < SWIPE_AWAY) {
+      // The row came home on 200ms ease-out while the neighbours it had dragged came home on 260ms --ease-grow, so one gesture let go of on two clocks and the pair visibly parted on the way back.
+      row.style.transition = 'transform 260ms var(--ease-grow), opacity 200ms ease-out';
       row.style.transform = '';
       row.style.opacity = '';
       releaseNeighbours(rowSelector);
       return;
     }
+    row.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
     keys.forEach(one => bridge.dismissNotification(one));
     bridge.triggerHaptic('dismiss');
     row.style.transform = 'translateX(' + (travel > 0 ? 400 : -400) + 'px)';
