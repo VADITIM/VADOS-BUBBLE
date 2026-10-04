@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     
@@ -43,19 +44,33 @@
     </queries>
 
     <application
-        android:label="VADOS BUBBLE"
-        android:icon="@android:drawable/ic_dialog_info"
+        android:label="VAD/OS - Bubble"
+        android:icon="@mipmap/ic_bubble_idle"
         android:hardwareAccelerated="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.Material.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <activity-alias android:name=".IconIdle" android:targetActivity=".MainActivity" android:enabled="true" android:exported="true" android:icon="@mipmap/ic_bubble_idle">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconMedia" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_bubble_media">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconClock" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_bubble_clock">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconCall" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_bubble_call">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconOverflow" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_bubble_overflow">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".IconSatellite" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_bubble_satellite">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity-alias>
 
         
 
@@ -102,7 +117,7 @@
 
         <service
             android:name=".BubbleService"
-            android:label="VADOS BUBBLE"
+            android:label="VAD/OS - Bubble"
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
@@ -128,6 +143,9 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+        <receiver
+            android:name=".WirelessAdb$PairingReceiver"
+            android:exported="false" />
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

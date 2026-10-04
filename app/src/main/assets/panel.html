@@ -247,6 +247,7 @@
     font-size: 0.66rem;
   }
   button.pronounced:active { color: var(--ground); transform: scale(0.98); }
+  button.pronounced.running { background: var(--danger); border-color: var(--danger); }
 
   
 
@@ -550,6 +551,32 @@
     border-color: var(--section-color);
     background: var(--raised);
   }
+  .icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+  .icon-choice {
+    display: grid;
+    justify-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.3rem;
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  }
+  .icon-choice[aria-pressed="true"] {
+    color: var(--text-bright);
+    border-color: var(--section-color);
+    background: var(--raised);
+  }
+  .icon-tile {
+    width: 4.2rem;
+    height: 4.2rem;
+    border-radius: 22%;
+    overflow: hidden;
+    background: #181818;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+  .icon-tile img { display: block; width: 150%; height: 150%; margin: -25% 0 0 -25%; }
   .field > div + .swipe-strip { margin-top: 0.35rem; }
   .field > div > .swipe-strip .swipe-chip { padding: 0.4rem 0.75rem; font-size: 0.78rem; }
 
@@ -581,6 +608,11 @@
       <button class="grant" id="status-listener" onclick="Panel.requestNotificationAccess()">checking</button>
     </div>
 
+    <div class="row">
+      <span class="row-name">Shizuku revive</span>
+      <button class="grant" id="status-wireless-adb" onclick="Panel.pairWirelessAdb()">checking</button>
+    </div>
+
     <div class="divider"></div>
 
     <div class="row depends">
@@ -594,7 +626,7 @@
 
 
 
-    <button class="pronounced" onclick="Panel.stopBubbles()">Force stop the bubbles</button>
+    <button class="pronounced" id="service-toggle" onclick="Panel.toggleBubbles()">Force stop the bubbles</button>
     <button class="pronounced" onclick="Panel.openApplicationInfo()">Open app info</button>
     <p class="note">* Shizuku's shell UID, so it reads "no access" until Shizuku is connected. Everything above it grants itself from here once Shizuku is; without it a press opens the system page instead.</p>
   </section>
@@ -730,11 +762,21 @@
     { group: 'Behaviour', key: 'scrimBlurRadius', name: 'Dashboard-Blur', min: 0, max: 150 },
     { group: 'Behaviour', key: 'barLocked', name: 'Shade', min: 0, max: 1,
       labels: ['Off', 'On'] },
+    { group: 'Landscape', key: 'landscapeReveal', name: 'Show bubbles by', min: 0, max: 2,
+      labels: ['Swipe', 'Corner', 'Both'] },
 
     { group: 'Alerts', key: 'notificationIdentity', name: 'App identity', min: 0, max: 2,
       labels: ['Icon', 'Name', 'Both'] },
     { group: 'Alerts', key: 'alertDwellTenths', name: 'Alert stands for', min: 5, max: 200, step: 5,
       read: tenths => (tenths / 10).toFixed(1) + 's' },
+    { group: 'Alerts', key: 'notificationsRise', name: 'Notifications position', min: 0, max: 100,
+      read: rise => rise === 0 ? 'Bottom' : rise === 100 ? 'Top' : rise + '%' },
+    { group: 'Alerts', key: 'lockNotes', name: 'Lock screen notifications', min: 0, max: 1,
+      labels: ['Off', 'On'] },
+    { group: 'Alerts', key: 'lockNotesHome', name: 'Lock notifications on unlock', min: 0, max: 1,
+      labels: ['Vanish', 'Fly to bubble'] },
+    { group: 'Alerts', key: 'notificationsClearCorner', name: 'Delete all position', min: 0, max: 1,
+      labels: ['Under menu', 'Bottom right'] },
 
     { group: 'Other', key: 'quickDividers', name: 'Dashboard dividers', min: 0, max: 1,
       labels: ['Off', 'On'] },
@@ -749,6 +791,13 @@
     { group: 'Other', key: 'statusBatteryIcons', name: 'Status battery style', min: 0, max: 1,
       labels: ['Fill', 'Icon'] },
     { group: 'Other', key: 'lockOffsetDp', name: 'Bubble X', min: -150, max: 150 },
+
+    // Mirrors DATE_FORMATS in js/clock.js, in the same order, each written as it reads on 28 September 2026.
+    { group: 'Clock', key: 'dateFormat', name: 'Date format', min: 0, max: 14, strip: true,
+      labels: ['Mo, 28.9.', '28.9.', '28.09.', '28.09.26', '28.09.2026', '28/09/26', '28/09/2026', '28-09-26', '28-09-2026',
+        '28 Sep', '28 Sep 2026', '28. September 2026', 'Mo, 28.09.26', 'Mo 28 Sep', 'Montag, 28.9.'] },
+
+    { group: 'Icon', key: 'appIcon', name: 'App icon', iconChoice: true },
 
     { group: 'Font Settings', key: 'fontClock', sizeKey: 'fontSizeClock', name: 'Clock', fontFamily: true },
     { group: 'Font Settings', key: 'fontMain', sizeKey: 'fontSizeMain', name: 'Main', fontFamily: true },
@@ -767,6 +816,9 @@
     { group: 'Channels', screen: 'debug', key: 'green', name: 'Green', min: 0, max: 255 },
     { group: 'Channels', screen: 'debug', key: 'blue',  name: 'Blue',  min: 0, max: 255 },
   ];
+
+  // Mirrors ICON_ALIASES in MainActivity.kt and the activity-alias entries in AndroidManifest.xml, in the same order; each name is also the file under assets/icons/.
+  const ICONS = ['Idle', 'Media', 'Clock', 'Call', 'Overflow', 'Satellite'];
 
   const STATES = [
     { group: 'Base', states: [['idle', 'Idle'], ['clear', 'Clear'], ['locked', 'Lock screen']] },
@@ -895,8 +947,16 @@
         root.appendChild(module);
         modules.set(field.group, container);
       }
+      if (field.iconChoice) {
+        buildIconChoice(container, field, preferences);
+        continue;
+      }
       if (field.fontFamily) {
         buildFontChoice(container, field, preferences, defaults);
+        continue;
+      }
+      if (field.strip) {
+        buildStripChoice(container, field, preferences, defaults);
         continue;
       }
       if (field.labels) {
@@ -935,6 +995,32 @@
 
 
 
+
+  function buildIconChoice(container, field, preferences) {
+    const grid = document.createElement('div');
+    grid.className = 'icon-grid';
+    const buttons = ICONS.map((name, index) => {
+      const button = document.createElement('button');
+      button.className = 'icon-choice';
+      const tile = document.createElement('span');
+      tile.className = 'icon-tile';
+      const image = document.createElement('img');
+      image.src = 'icons/icon_' + name.toLowerCase() + '.png';
+      tile.appendChild(image);
+      const label = document.createElement('span');
+      label.textContent = name;
+      button.append(tile, label);
+      button.addEventListener('click', () => {
+        buttons.forEach((other, otherIndex) => other.setAttribute('aria-pressed', String(otherIndex === index)));
+        Panel.setAppIcon(index);
+        Panel.triggerHaptic();
+      });
+      grid.appendChild(button);
+      return button;
+    });
+    buttons[preferences[field.key]].setAttribute('aria-pressed', 'true');
+    container.appendChild(grid);
+  }
 
   function buildChoice(container, field, preferences, defaults) {
     const wrapper = document.createElement('div');
@@ -1032,6 +1118,21 @@
     requestAnimationFrame(() => chips[startIndex]?.scrollIntoView({ inline: 'center', block: 'nearest' }));
 
     return { strip, jumpTo: index => { select(index, true); chips[index]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } };
+  }
+
+  // Fifteen answers split into buttons are fifteen slivers nobody can read, so a setting with more answers than a row holds is swiped through instead.
+  function buildStripChoice(container, field, preferences, defaults) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+    const head = document.createElement('div');
+    head.className = 'field-head';
+    const name = document.createElement('span');
+    name.textContent = field.name;
+    head.append(name);
+    const control = buildSwipeStrip(field.labels, preferences[field.key], index => Panel.setPreference(field.key, index));
+    name.addEventListener('dblclick', () => control.jumpTo(defaults[field.key]));
+    wrapper.append(head, control.strip);
+    container.appendChild(wrapper);
   }
 
   // A family (Mono, Clash Display, General Sans, …) is picked first, and only a family with more than one weight gets a second strip to pick the weight from.
@@ -1179,8 +1280,12 @@
     paintGrant('status-accessibility', state.accessibility, 'granted', 'blocked');
     paintGrant('status-post', state.postNotifications, 'granted', 'blocked');
     paintGrant('status-listener', state.notificationAccess, 'granted', 'blocked');
+    paintGrant('status-wireless-adb', state.wirelessAdb, 'paired', 'pair');
     paintGrant('status-statusbar', state.statusBar === 'hidden', 'hidden', state.statusBar === 'unavailable' ? 'no access' : 'showing');
     paintStatus('status-service', state.serviceRunning, 'running', 'stopped');
+    const serviceToggle = document.getElementById('service-toggle');
+    serviceToggle.textContent = state.serviceRunning ? 'Force stop the bubbles' : 'Start the bubbles';
+    serviceToggle.classList.toggle('running', state.serviceRunning);
   };
 
   

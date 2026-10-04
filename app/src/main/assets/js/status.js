@@ -3,11 +3,12 @@ import { isAlertDashed } from './alert.js';
 import { clockPill, enterCornerClock, leaveCornerClock } from './clock.js';
 import { stirLiquid } from './liquid.js';
 import { popIn, popOut, rubberBandPast, toy, untoy } from './motion.js';
-import { closeNowPanel, nowOpen } from './now.js';
-import { closePanelNow, lockHolds, lockPill, openPanelNow } from './lock.js';
-import { applyClosedWindow, liveMods, showFace, toClosed } from './row.js';
-import { GROWN_PAD, HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
-import { endSweep, holdLabel, revealLabel, settleSweep, sweepInto, sweepLabel, hideLabel, showLabel } from './sweep.js';
+import { clearNowMods, closeNowPanel, hasDismissedNowMods, hasNowMods, nowOpen, restoreNowMods } from './now.js';
+import { closePanelNow, lockHolds, lockPill, openPanelNow, paintLock } from './lock.js';
+import { throwOf } from './sling.js';
+import { applyClosedWindow, isLive, liveMods, showFace, toClosed } from './row.js';
+import { HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
+import { endSweep, holdLabel, revealLabel, settleSweep, sweepInto, writeLabel, hideLabel, showLabel } from './sweep.js';
 import { channelHolds, closeChannel, collapseSpread, dropChannel, isChannelLive, isSpreadOpen, openChannel, stepChannel } from './channel.js';
 import { refreshEdgeProxy } from './edge.js';
 
@@ -38,7 +39,7 @@ const STATUS_RIGHT = 14;
 
 
 
-const CLOSED_FACE = { media: 'media', timer: 'timer', call: 'call' };
+const CLOSED_FACE = { media: 'media', timer: 'timer', call: 'call', trip: 'trip' };
 function closedFace() {
   const owner = liveMods()[0];
   return owner ? CLOSED_FACE[owner] : 'idle';
@@ -46,13 +47,14 @@ function closedFace() {
 
 function setReading(element, text) {
   if (readingsHeld) holdLabel(element, text);
-  else sweepLabel(element, text);
+  else writeLabel(element, text);
 }
 
 
 const TRANSFER_COLOUR = { download: '#f09b3a', upload: '#3a8cff' };
 
 export function refreshDock() {
+  paintModsToggle();
   if (statusOpen) paintTransferStrip();
 }
 
@@ -149,6 +151,7 @@ function fitStatusPanel() {
   root.style.setProperty('--quick-top', Math.round(top) + 'px');
   root.style.setProperty('--quick-width', STATUS_PANEL.width + 'px');
   root.style.setProperty('--quick-height', STATUS_PANEL.height + 'px');
+  root.style.setProperty('--quick-centre-shift', Math.round((STATUS_MARGIN_FOOT - top) / 2) + 'px');
 }
 fitStatusPanel();
 
@@ -197,7 +200,7 @@ const GLYPHS = {
   wifiOff: '<svg viewBox="0 0 24 24"><path d="M1.33309 8.07433C0.92156 8.44266 0.886539 9.07485 1.25487 9.48638C1.62319 9.89791 2.25539 9.93293 2.66691 9.5646L1.33309 8.07433ZM21.3331 9.5646C21.7446 9.93293 22.3768 9.89791 22.7451 9.48638C23.1135 9.07485 23.0784 8.44266 22.6669 8.07433L21.3331 9.5646ZM12 19C11.4477 19 11 19.4477 11 20C11 20.5523 11.4477 21 12 21V19ZM12.01 21C12.5623 21 13.01 20.5523 13.01 20C13.01 19.4477 12.5623 19 12.01 19V21ZM14.6905 17.04C15.099 17.4116 15.7315 17.3817 16.1031 16.9732C16.4748 16.5646 16.4448 15.9322 16.0363 15.5605L14.6905 17.04ZM18.0539 13.3403C18.4624 13.7119 19.0949 13.682 19.4665 13.2734C19.8381 12.8649 19.8082 12.2324 19.3997 11.8608L18.0539 13.3403ZM7.96372 15.5605C7.55517 15.9322 7.52524 16.5646 7.89687 16.9732C8.2685 17.3817 8.90095 17.4116 9.3095 17.04L7.96372 15.5605ZM4.60034 11.8608C4.19179 12.2324 4.16185 12.8649 4.53348 13.2734C4.90511 13.682 5.53756 13.7119 5.94611 13.3403L4.60034 11.8608ZM10.5705 4.06305C10.0204 4.1118 9.61391 4.59729 9.66266 5.14741C9.71141 5.69754 10.1969 6.10399 10.747 6.05525L10.5705 4.06305ZM17.3393 10.3798C16.8567 10.1114 16.2478 10.285 15.9794 10.7677C15.711 11.2504 15.8847 11.8593 16.3673 12.1277L17.3393 10.3798ZM3.70711 2.29289C3.31658 1.90237 2.68342 1.90237 2.29289 2.29289C1.90237 2.68342 1.90237 3.31658 2.29289 3.70711L3.70711 2.29289ZM20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L20.2929 21.7071ZM12 6C15.5863 6 18.8556 7.34716 21.3331 9.5646L22.6669 8.07433C19.8369 5.54138 16.0972 4 12 4V6ZM12 21H12.01V19H12V21ZM12 16C13.0367 16 13.9793 16.3931 14.6905 17.04L16.0363 15.5605C14.9713 14.5918 13.5536 14 12 14V16ZM9.3095 17.04C10.0207 16.3931 10.9633 16 12 16V14C10.4464 14 9.02872 14.5918 7.96372 15.5605L9.3095 17.04ZM10.747 6.05525C11.1596 6.01869 11.5775 6 12 6V4C11.5185 4 11.0417 4.0213 10.5705 4.06305L10.747 6.05525ZM16.3673 12.1277C16.9757 12.466 17.5412 12.874 18.0539 13.3403L19.3997 11.8608C18.7751 11.2927 18.0844 10.7941 17.3393 10.3798L16.3673 12.1277ZM2.29289 3.70711L5.46648 6.8807L6.8807 5.46648L3.70711 2.29289L2.29289 3.70711ZM2.66691 9.5646C3.81213 8.53961 5.12648 7.70074 6.56232 7.09494L5.78486 5.25224C4.14251 5.94517 2.64069 6.904 1.33309 8.07433L2.66691 9.5646ZM5.46648 6.8807L9.46042 10.8746L10.8746 9.46042L6.8807 5.46648L5.46648 6.8807ZM9.46042 10.8746L20.2929 21.7071L21.7071 20.2929L10.8746 9.46042L9.46042 10.8746ZM5.94611 13.3403C7.15939 12.2367 8.67355 11.4612 10.3496 11.1508L9.98543 9.18424C7.93271 9.5644 6.08108 10.5139 4.60034 11.8608L5.94611 13.3403Z" fill="currentColor"/></svg>',
   ethernet: '<svg viewBox="0 0 24 24"><path d="M7 3h10a2 2 0 0 1 2 2v5h-3v3h-2v-3h-4v3H8v-3H5V5a2 2 0 0 1 2-2zm-2 12h14v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/></svg>',
   bluetooth: '<svg viewBox="0 0 24 24"><path fill="none" d="M7 17L17 7L12 2V22L17 17L7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  usb: '<svg viewBox="0 0 24 24"><path d="M11 2h2l1.5 2.5h-5zM11 5h2v10.2l3-2.4V10h-1.5V7.5h4V10H17v3.4l-4.8 3.8V19a2 2 0 1 1-2 0v-3.6l-3.4-2.6V10.9a2 2 0 1 1 2 0v.9l1.4 1.1z"/></svg>',
+  usb: '<svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M6.5 6.5h11a5.5 5.5 0 0 1 0 11h-11a5.5 5.5 0 0 1 0-11zM8.5 10.5h7a1.5 1.5 0 0 1 0 3h-7a1.5 1.5 0 0 1 0-3z"/></svg>',
   
   
   
@@ -240,7 +243,6 @@ const GLYPHS = {
   rotate: '<svg viewBox="0 0 24 24"><path fill="none" d="M20.4898 14.9907C19.8414 16.831 18.6124 18.4108 16.9879 19.492C15.3635 20.5732 13.4316 21.0972 11.4835 20.9851C9.5353 20.873 7.67634 20.1308 6.18668 18.8704C4.69703 17.61 3.65738 15.8996 3.22438 13.997C2.79138 12.0944 2.98849 10.1026 3.78602 8.32177C4.58354 6.54091 5.93827 5.06746 7.64608 4.12343C9.35389 3.17941 11.3223 2.81593 13.2546 3.08779C16.5171 3.54676 18.6725 5.91142 21 8M21 8V2M21 8H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   saver: '<svg viewBox="0 0 32 32" fill="currentColor"><path d="M18.605 2.022v0zM18.605 2.022l-2.256 11.856 8.174 0.027-11.127 16.072 2.257-13.043-8.174-0.029zM18.606 0.023c-0.054 0-0.108 0.002-0.161 0.006-0.353 0.028-0.587 0.147-0.864 0.333-0.154 0.102-0.295 0.228-0.419 0.373-0.037 0.043-0.071 0.088-0.103 0.134l-11.207 14.832c-0.442 0.607-0.508 1.407-0.168 2.076s1.026 1.093 1.779 1.099l5.773 0.042-1.815 10.694c-0.172 0.919 0.318 1.835 1.18 2.204 0.257 0.11 0.527 0.163 0.793 0.163 0.629 0 1.145-0.294 1.533-0.825l11.22-16.072c0.442-0.607 0.507-1.408 0.168-2.076-0.34-0.669-1.026-1.093-1.779-1.098l-5.773-0.010 1.796-9.402c0.038-0.151 0.057-0.308 0.057-0.47 0-1.082-0.861-1.964-1.939-1.999-0.024-0.001-0.047-0.001-0.071-0.001v0z"/></svg>',
   augenkomfort: '<svg viewBox="0 0 24 24"><path fill="none" d="M15.0007 12C15.0007 13.6569 13.6576 15 12.0007 15C10.3439 15 9.00073 13.6569 9.00073 12C9.00073 10.3431 10.3439 9 12.0007 9C13.6576 9 15.0007 10.3431 15.0007 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path fill="none" d="M12.0012 5C7.52354 5 3.73326 7.94288 2.45898 12C3.73324 16.0571 7.52354 19 12.0012 19C16.4788 19 20.2691 16.0571 21.5434 12C20.2691 7.94291 16.4788 5 12.0012 5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  camera: '<svg viewBox="0 0 24 24"><circle fill="none" cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path fill="none" d="M22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   comdirect: '<svg viewBox="0 0 192 192" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path fill="none" d="M164.181 144.948a74.37 73.795 0 0 1-81.836 20.19 74.37 73.795 0 0 1-48.233-68.637 74.37 73.795 0 0 1 47.384-69.217 74.37 73.795 0 0 1 82.079 19.196"/><path fill="none" d="M139.233 123.543a40.627 40.627 0 0 1-44.706 11.116A40.627 40.627 0 0 1 68.178 96.87a40.627 40.627 0 0 1 25.885-38.106 40.627 40.627 0 0 1 44.838 10.568"/><path fill="none" d="m163.604 46.52-24.732 22.788"/><path fill="none" d="m139.167 123.575 24.973 21.273"/></svg>',
   
   recording: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle class="record-dot" cx="12" cy="12" r="4.5" fill="currentColor"/></svg>',
@@ -263,7 +265,7 @@ const glyphFor = (name, isOn) => (name === 'wifi' ? (isOn ? wifiGlyph() : GLYPHS
 
 /* Wifi is the one glyph that says more than on/off: strength is a four-rung ladder and "joined but the link does not reach the internet" is its own rung above all of them, because a bar showing full arcs while nothing loads is the state that wastes the most time. */
 function wifiGlyph() {
-  if (!attached || attached.link !== 'wifi') return GLYPHS.wifiOff;
+  if (!attached || attached.link !== 'wifi') return GLYPHS.wifi;
   if (attached.online === false) return GLYPHS.wifiAlert;
   if (attached.level < 0 || attached.level >= 3) return GLYPHS.wifi;
   if (attached.level === 2) return GLYPHS.wifiGood;
@@ -398,6 +400,8 @@ let attached = null;
 
 let transfer = null;
 let charge = -1;
+let exactCharge = -1;
+let batteryFollow = null;
 let isPlugged = false;
 let remainingMinutes = -1;
 let isBorn = false;
@@ -629,10 +633,8 @@ export function fitStatusProxy() {
   
   
   if (statusOpen) {
-    bridge.setStatusProxy(
-      
-      STATUS_PANEL.width, STATUS_PANEL.height + GROWN_PAD, Math.round(statusPanelLeft())
-    );
+    // The window hangs from the top of the screen and was sized to the panel's own height, but the panel starts below the grown corner bubbles — so it ended that far short of the panel's foot, and every tap and swipe on the bottom of the Dashboard went straight through the frost to the app behind it. The frost covers the whole screen, so the window does; a tap on it still answers nothing and closes.
+    bridge.setStatusProxy(Math.round(screenWidth()), Math.round(screenHeight()), 0);
     return;
   }
   
@@ -770,7 +772,7 @@ function statusPanelLeft() {
 const quickPanel = document.getElementById('quick-panel');
 const statsSection = document.getElementById('stats-section');
 
-// The row runs on forever, and what makes it run is three copies of the nine standing end to end: the shift wraps by one copy's width, so a flick never reaches an end and never has to be told it has. The copies are made here, before quickBubbles is captured below, so every copy is ranked and staggered like the original rather than reading --pop-rank and --pop-from as unset.
+// The row runs on forever, and what makes it run is three copies of the eight standing end to end: the shift wraps by one copy's width, so a flick never reaches an end and never has to be told it has. The copies are made here, before quickBubbles is captured below, so every copy is ranked and staggered like the original rather than reading --pop-rank and --pop-from as unset.
 const KNOB_COPIES = 3;
 
 const knobRow = document.getElementById('quick-row-knobs');
@@ -893,6 +895,9 @@ export function openStatusPanel() {
   
   
   fitStatusPanel();
+  // The transfer strip is painted a few lines down, and with the hold only taken at the end of this function a changed day's figure swept on its own under the dropping panel — the bar standing there mid-entrance, and the reveal on the landing playing over it a second time.
+  clearTimeout(readingReveal);
+  readingsHeld = true;
 
 
   statusOpen = true;
@@ -901,9 +906,13 @@ export function openStatusPanel() {
   enterPanelNow();
   raiseMain();
   paintTransferStrip();
+  paintModsToggle();
   paintVitals();
   bridge.requestVitals();
   bridge.requestWeather();
+  clearInterval(batteryFollow);
+  followBatteryReading();
+  batteryFollow = setInterval(followBatteryReading, 1000);
 
 
   bridge.requestToggles();
@@ -941,8 +950,6 @@ export function openStatusPanel() {
   quickEntering = setTimeout(() => quickPanel.classList.remove('entering'), QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
   
   // A reading that swept while its bubble was still dropping was a bar moving under a box that was itself moving — the reveal is asked for once the quick panel has landed instead, over the text it is already standing on. Until then the reading is held out of sight and any answer arriving early only writes its text, so a weather reply landing mid-drop no longer plays a reveal of its own before the real one.
-  clearTimeout(readingReveal);
-  readingsHeld = true;
   hideLabel(weatherReading);
   hideLabel(transferReading);
   readingReveal = setTimeout(() => {
@@ -963,6 +970,7 @@ export function closeStatusPanel() {
   dropChannel();
   restoreStats();
   statusOpen = false;
+  clearInterval(batteryFollow);
   refreshEdgeProxy();
   clearTimeout(readingReveal);
   readingsHeld = false;
@@ -1049,13 +1057,15 @@ const RING_ADVANCE = 5.6;
 const RING_GAP = 3;
 const RING_DOTS = 20;
 const RING_BURST_MS = 420;
-// RING_SWAP_OUT_MS and RING_SWAP_IN_MS mirror the ring-char-out and ring-char-in durations plus their per-character delays in pill.css: the new reading is only drawn once the old one has finished collapsing, and there is no build step joining the two files.
-const RING_SWAP_OUT_MS = 340;
-const RING_SWAP_IN_MS = 260;
+const RING_POP_SPREAD = 220;
+const RING_POP_TILT = 18;
+// Mirrors the pop-out duration in pill.css: the old reading is only cleared once its last character has shaken down to nothing, and there is no build step joining the two files.
+const RING_OUT_MS = RING_POP_SPREAD + 150;
+const ringLeaves = new Map();
 
-function drawRing(ring, reading) {
+function drawRing(button, reading) {
   const characters = [...reading];
-  const text = ring.querySelector('.ring-text');
+  const text = button.querySelector('.ring-text');
   if (!characters.length) {
     text.innerHTML = '';
     return;
@@ -1069,10 +1079,27 @@ function drawRing(ring, reading) {
     characters.forEach((character, index) => {
       const turn = ((copy * run + index) * step).toFixed(2);
       const glyph = character === ' ' ? '&#160;' : character;
-      marks.push(`<g transform="translate(${RING_CENTER} ${RING_CENTER}) rotate(${turn}) translate(0 ${-RING_RADIUS})"><text class="ring-char" style="--index:${index}">${glyph}</text></g>`);
+      const at = Math.round(Math.random() * RING_POP_SPREAD);
+      const tilt = ((Math.random() * 0.6 + 0.4) * RING_POP_TILT * (Math.random() < 0.5 ? -1 : 1)).toFixed(1);
+      marks.push(`<g transform="translate(${RING_CENTER} ${RING_CENTER}) rotate(${turn}) translate(0 ${-RING_RADIUS})"><text class="ring-char" style="--pop-at:${at}ms;--pop-tilt:${tilt}deg">${glyph}</text></g>`);
     });
   }
   text.innerHTML = marks.join('');
+}
+
+// A reading going to nothing was cleared with `innerHTML = ''` and one coming from nothing skipped the leave, so only a swap between two readings ever animated — every connect and disconnect blinked the whole ring on or off in one frame.
+function swapRing(button, written) {
+  clearTimeout(ringLeaves.get(button));
+  if (!button.querySelector('.ring-char')) {
+    button.classList.remove('ring-leaving');
+    drawRing(button, written);
+    return;
+  }
+  button.classList.add('ring-leaving');
+  ringLeaves.set(button, setTimeout(() => {
+    button.classList.remove('ring-leaving');
+    drawRing(button, written);
+  }, RING_OUT_MS));
 }
 
 function drawDots(ring) {
@@ -1085,6 +1112,7 @@ function drawDots(ring) {
 }
 
 const quickModes = [...document.querySelectorAll('.quick-mode')];
+const usbReading = document.getElementById('usb-reading');
 const quickKnobs = [...document.querySelectorAll('.quick-knob')];
 
 
@@ -1198,7 +1226,7 @@ function paintModeLabels() {
     plane: toggles.plane ? 'offline' : '',
     
     
-    gps: toggles.gps ? 'gps location' : '',
+    gps: toggles.gps ? 'GPS' : '',
   };
   const waiting = {
     bluetooth: 'nothing paired',
@@ -1222,19 +1250,8 @@ function paintModeLabels() {
       button.classList.toggle('searching', isWaiting);
       const written = isWaiting ? '' : reading;
       if (button.dataset.ring !== written) {
-        const wasReading = button.dataset.ring;
         button.dataset.ring = written;
-        if (wasReading && written) {
-          button.classList.add('swapping');
-          window.setTimeout(() => {
-            button.classList.remove('swapping');
-            button.classList.add('swapped');
-            drawRing(ring, written);
-            window.setTimeout(() => button.classList.remove('swapped'), RING_SWAP_IN_MS);
-          }, RING_SWAP_OUT_MS);
-        } else {
-          drawRing(ring, written);
-        }
+        swapRing(button, written);
       }
       if (wasWaiting && !isWaiting) {
         button.classList.add('found');
@@ -1246,6 +1263,7 @@ function paintModeLabels() {
     
     if (name === 'usb') {
       button.classList.toggle('attached', Boolean(attached && attached.usb));
+      usbReading.textContent = text.usb;
     }
   });
   
@@ -1267,9 +1285,8 @@ function isRecordingLive() {
 
 
 const batteryBox = document.getElementById('quick-battery');
-const batteryGlyphBox = document.getElementById('battery-glyph');
-const batteryReading = document.getElementById('battery-reading');
-const batteryRemaining = document.getElementById('battery-remaining');
+const batteryReadings = document.querySelectorAll('#battery-cell .battery-reading');
+const batteryRemainings = document.querySelectorAll('#battery-cell .battery-remaining');
 
 
 
@@ -1312,22 +1329,39 @@ function batteryIcon() {
       ? '<span class="battery-mark charging">' + BATTERY_GLYPHS.charging + '</span>'
       : '<span class="battery-mark">' + batteryLevelMark(charge) + '</span>';
   }
-  // On a cable the cell carries the bolt rather than the number: the cell is barely wider than two digits, and what is news while it is plugged in is that it is plugged in.
-  const readingHtml = isPlugged
-    ? '<span class="mini-battery-bolt">' + BATTERY_GLYPHS.bolt + '</span>'
-    : showBatteryPercent
-      ? '<span class="mini-battery-reading' + (charge <= BATTERY_CRITICAL ? ' charge-critical' : '') + '">' + charge + '%</span>'
-      : '';
+  const readingHtml = showBatteryPercent
+    ? '<span class="mini-battery-reading' + (charge <= BATTERY_CRITICAL ? ' charge-critical' : '') + '">' + charge + '%</span>'
+    : '';
   return '<span class="mini-battery' + (showBatteryPercent ? '' : ' bare') + '"><span class="mini-battery-cell"><span class="mini-battery-fill"></span>' +
     readingHtml + '</span></span>';
+}
+
+function paintBatteryReading() {
+  if (charge < 0) {
+    batteryReadings.forEach(reading => { reading.textContent = '--'; });
+    return;
+  }
+  const [whole, hundredths] = exactCharge.toFixed(2).split('.');
+  const digits = [...hundredths].map(digit => '<span class="battery-digit">' + digit + '</span>').join('');
+  const html = '<span class="battery-whole">' + whole + '</span>' +
+    '<span class="battery-side"><span class="battery-unit">%</span><span class="battery-hundredths">.' + digits + '</span></span>';
+  batteryReadings.forEach(reading => { reading.innerHTML = html; });
+}
+
+// Android only broadcasts the battery every forty seconds to two minutes, so the hundredths stood still between them; while the dashboard is open the reading is asked for every second instead.
+function followBatteryReading() {
+  const exact = bridge.readBatteryExact();
+  if (exact < 0) return;
+  exactCharge = exact;
+  paintBatteryReading();
 }
 
 function paintBattery() {
 
 
-  batteryGlyphBox.innerHTML = isPlugged ? BATTERY_GLYPHS.charging : '';
-  batteryReading.textContent = charge >= 0 ? charge + '%' : '--';
-  batteryRemaining.textContent = isPlugged ? formatRemaining(remainingMinutes) : '';
+  paintBatteryReading();
+  const remaining = isPlugged ? formatRemaining(remainingMinutes) : '';
+  batteryRemainings.forEach(label => { label.textContent = remaining; });
   batteryBox.style.setProperty('--charge-width', Math.max(0, charge) + '%');
   batteryBox.style.setProperty('--charge-color', chargeColour());
   statusPill.style.setProperty('--charge-width', Math.max(0, charge) + '%');
@@ -1405,14 +1439,14 @@ const LEVEL_GLYPHS = {
 
 const levels = [...document.querySelectorAll('.level')];
 levels.forEach(level => {
-  level.querySelector('.level-icon').innerHTML = LEVEL_GLYPHS[level.dataset.level];
+  level.querySelectorAll('.level-icon').forEach(icon => { icon.innerHTML = LEVEL_GLYPHS[level.dataset.level]; });
 });
 
 
 const LEVEL_SLOP = 8;
 
 
-const LEVEL_STEP = 2;
+const LEVEL_STEP = 1;
 
 
 
@@ -1469,11 +1503,11 @@ levels.forEach(level => {
   ['touchend', 'touchcancel'].forEach(type => {
     level.addEventListener(type, () => {
       from = null;
-      // The 2% gate above lets the last few percent of a drag go unsent, which left the panel showing one number and the phone standing at another, so the value under the finger is always sent again on release.
+      // The step gate above lets the last few percent of a drag go unsent, and a drag's frames may only be temporary on the phone's side, so the value under the finger is always settled on release.
       const settled = Math.round(parseFloat(level.style.getPropertyValue('--level')) || 0);
-      if (level.classList.contains('dragging') && settled !== sent) {
+      if (level.classList.contains('dragging')) {
         sent = settled;
-        bridge.setLevel(name, settled);
+        bridge.settleLevel(name, settled);
       }
       level.classList.remove('dragging', 'holding');
       clearTimeout(soloTimer);
@@ -1539,14 +1573,13 @@ function setControl(control, isOn, isTurning) {
   control.classList.remove('turning');
   void control.offsetWidth;
   control.classList.add('turning');
-  // The ring carries the same turn as the face rather than sharing the face's animation: `.ring-text` and the dots are already animating, and a second rule on one element does not add to the first, it replaces it. Two elements, two rules, and what is seen is the sum.
-  const ring = control.querySelector('.quick-ring');
-  if (ring) {
+  // The ring carries the same turn as the face rather than sharing the face's animation: `.ring-spin` and the dots are already animating, and a second rule on one element does not add to the first, it replaces it. Two elements, two rules, and what is seen is the sum.
+  control.querySelectorAll('.quick-ring').forEach(ring => {
     ring.animate(
       [{ rotate: '0deg', scale: 0.55 }, { rotate: '360deg', scale: 1 }],
       { duration: KNOB_TURN, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }
     );
-  }
+  });
   turnTimers.set(control, setTimeout(() => {
     faceOf(control).innerHTML = glyphFor(control.dataset.toggle, control.classList.contains('on'));
   }, KNOB_TURN / 2));
@@ -1616,7 +1649,7 @@ quickModes.forEach(control => {
   });
 });
 
-// The nine toggles are one row inside a window five wide, and the four beyond either edge are reached by dragging it. Nothing here can scroll: the panel is driven by touches the host synthesises against a proxy, and a synthetic touch moves no scroll box, so the row is carried by hand. The drag also has to disarm whichever toggle the finger came down on, because the bridge only withholds its click for a travel shorter than a tap's own slop and a short drag would otherwise flip a switch as well as move the row.
+// The eight toggles are one row inside a window five wide, and the three beyond either edge are reached by dragging it. Nothing here can scroll: the panel is driven by touches the host synthesises against a proxy, and a synthetic touch moves no scroll box, so the row is carried by hand. The drag also has to disarm whichever toggle the finger came down on, because the bridge only withholds its click for a travel shorter than a tap's own slop and a short drag would otherwise flip a switch as well as move the row.
 const KNOB_DRAG_SLOP = 8;
 
 // Pixels per millisecond a flick is allowed to leave behind, and how much of that survives each frame of the glide.
@@ -1636,7 +1669,7 @@ let knobGlide = 0;
 let knobGlideAt = 0;
 let knobDrag = dragGate();
 
-// The wrap was measured off a scrollWidth read inside setKnobShift, so every frame of a drag and every frame of a fling forced the panel's layout before it could write the row's place — the same recalc that was taking the slider's frames, and what left a 120Hz drag rendering like 60. The row's width only changes when the observer below says it has, so that is where it is read. The place itself is written to `translate` rather than to a custom property: an unregistered custom property is a style invalidation of the row and all twenty-seven knobs standing in it, on every frame, for a value only the compositor needed.
+// The wrap was measured off a scrollWidth read inside setKnobShift, so every frame of a drag and every frame of a fling forced the panel's layout before it could write the row's place — the same recalc that was taking the slider's frames, and what left a 120Hz drag rendering like 60. The row's width only changes when the observer below says it has, so that is where it is read. The place itself is written to `translate` rather than to a custom property: an unregistered custom property is a style invalidation of the row and all twenty-four knobs standing in it, on every frame, for a value only the compositor needed.
 let knobCycle = 0;
 
 function setKnobShift(value) {
@@ -1743,7 +1776,7 @@ let statusDrop = 0;
 // Every tap inside the open panel used to close it: the proxy resolves a touch against the Status bubble's box, and nothing in the panel is a descendant of that bubble, so each control's press fell back to the bubble itself, which reads a press as "close". The panel resolves its own targets now, and answers with nothing where a tap really is meant to close.
 const QUICK_GRACE = 12;
 
-const QUICK_CONTROLS = '.quick-mode, .quick-knob, .level, #quick-battery, #quick-vitals, .transfer-action';
+const QUICK_CONTROLS = '.quick-mode, .quick-knob, .level, #quick-battery, #quick-vitals, .transfer-action, #quick-mods';
 
 export function statusPanelTarget(x, y) {
   if (!statusOpen) return null;
@@ -1815,8 +1848,9 @@ function turnChannel(across, down) {
 }
 
 
-// The Now bubble is thrown home along the flick that dismissed the panel, so how far across that flick had gone when it crossed has to survive the two calls between here and the throw. It is reported in pixels rather than as a ratio: what those pixels are worth as an angle is the throw's business and not this one's. Every other way the panel closes has no hand behind it and leaves this at nothing.
-let panelPushLean = 0;
+// The Now bubble is thrown home at the velocity of the flick that dismissed the panel, read off the trail's last SLING_THROW_WINDOW at the crossing and carried across the two calls between here and the throw. Every other way the panel closes has no hand behind it and leaves this at null.
+let panelPushTrail = [];
+let panelPushThrow = null;
 
 function releasePanelHolds() {
   releaseModeHold();
@@ -1844,9 +1878,12 @@ export function statusPanelPush(action, x, y) {
     // An open stack covers the whole screen, so the swipe that closes it is made anywhere rather than over the section it grew out of.
     panelPushFromStats = isSpreadOpen() || statsHolds(x, y) || channelHolds(x, y);
     panelPushed = false;
+    panelPushTrail = [{ x, y, time: performance.now() }];
     return;
   }
   if (action !== 'move' || !panelPushFrom || panelPushed) return;
+  panelPushTrail.push({ x, y, time: performance.now() });
+  if (panelPushTrail.length > 16) panelPushTrail.shift();
   // The stats section answers the swipe before the panel does, and only a swipe that began inside it: up out of an open stack, up out of the channel, down into the channel, and sideways between its entries. Everywhere else on the panel an upward swipe is still the panel's own dismiss.
   if (panelPushFromStats && turnChannel(x - panelPushFrom.x, y - panelPushFrom.y)) {
     panelPushed = true;
@@ -1858,7 +1895,7 @@ export function statusPanelPush(action, x, y) {
   if (Math.hypot(x - panelPushFrom.x, y - panelPushFrom.y) > KNOB_DRAG_SLOP) releasePanelHolds();
   if (y - panelPushFrom.y < -24 && Math.abs(x - panelPushFrom.x) < 40) {
     panelPushed = true;
-    panelPushLean = x - panelPushFrom.x;
+    panelPushThrow = throwOf(panelPushTrail);
     panelPushFrom = null;
     // A swipe that starts on a control is the same finger that would have pressed it, and answering it with the dismiss buzz reads as the control having fired. Only a swipe begun on the panel's own ground is confirmed.
     if (!panelPushFromControl) bridge.triggerHaptic('dismiss');
@@ -2013,8 +2050,9 @@ window.onConnectivity = state => {
 };
 
 
-window.onCharge = (level, plugged, remaining) => {
+window.onCharge = (level, plugged, remaining, exact) => {
   charge = level;
+  exactCharge = exact;
   isPlugged = plugged;
   remainingMinutes = remaining;
   paintStatus();
@@ -2069,6 +2107,37 @@ statusPower.addEventListener('click', event => {
   bridge.openPowerMenu();
   closeStatusPanel();
 });
+
+const modsToggle = document.getElementById('quick-mods');
+const MODS_GLYPHS = {
+  clear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>',
+  restore: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+};
+
+function modsAreCleared() {
+  return shared.clearedMods.size > 0 || hasDismissedNowMods();
+}
+
+function paintModsToggle() {
+  modsToggle.hidden = !modsAreCleared() && !shared.modOrder.some(isLive) && !hasNowMods();
+  modsToggle.innerHTML = MODS_GLYPHS[modsAreCleared() ? 'restore' : 'clear'];
+}
+
+modsToggle.addEventListener('click', event => {
+  event.stopPropagation();
+  bridge.triggerHaptic('tap');
+  if (modsAreCleared()) {
+    shared.clearedMods.clear();
+    restoreNowMods();
+  } else {
+    shared.modOrder.filter(isLive).forEach(mod => shared.clearedMods.add(mod));
+    clearNowMods();
+  }
+  if (shared.state === 'idle') toClosed();
+  paintLock();
+  paintModsToggle();
+});
+paintModsToggle();
 
 
 
@@ -2218,9 +2287,9 @@ function enterPanelNow() {
 }
 
 function leavePanelNow() {
-  const lean = panelPushLean;
-  panelPushLean = 0;
-  closePanelNow(lean);
+  const thrown = panelPushThrow;
+  panelPushThrow = null;
+  closePanelNow(thrown);
 }
 
 

@@ -1,4 +1,5 @@
 import { stirLiquid } from './liquid.js';
+import { isLandscape } from './reveal.js';
 import { markUp } from './mods/notification.js';
 import { becomeExtended, setSize, showFace, toClosed } from './row.js';
 import { swipeToDismiss } from './swipeDismiss.js';
@@ -49,7 +50,7 @@ function closeGap(below, gap) {
 }
 
 
-export const MOD_FACES = { player: 'media', timer: 'timer' };
+export const MOD_FACES = { player: 'media', timer: 'timer', trip: 'trip' };
 
 
 
@@ -73,6 +74,7 @@ export function leaveForMod(mod) {
   }
   if (mod === 'timer' && shared.timer && shared.timer.key) bridge.openNotification(shared.timer.key);
   if (mod === 'call' && shared.call && shared.call.key) bridge.openNotification(shared.call.key);
+  if (mod === 'trip' && shared.trip && shared.trip.key) bridge.openNotification(shared.trip.key);
 }
 
 
@@ -108,7 +110,7 @@ function grouped(entries) {
 
 
 
-function agoText(postedAt) {
+export function agoText(postedAt) {
   if (!postedAt) return '';
   const minutes = Math.floor((Date.now() - postedAt) / 60000);
   if (minutes < 1) return 'now';
@@ -139,6 +141,7 @@ export function openNotifications() {
     
     
     row.dataset.count = String(group.entries.length);
+    row.dataset.keys = JSON.stringify(group.entries.map(one => one.key));
     
     
     swipeToDismiss(row, group.entries.map(one => one.key), {
@@ -206,12 +209,17 @@ export function openNotifications() {
         ? one.lines.map(line => line.text)
         : [one.text || (entry.title ? '' : one.title || '')]
     ).filter(Boolean);
-    lines.forEach((line, index) => {
-      const text = document.createElement('div');
-      text.className = index ? 'notification-text divided' : 'notification-text';
-      markUp(text, line);
-      copy.appendChild(text);
-    });
+    if (lines.length) {
+      const body = document.createElement('div');
+      body.className = 'notification-body';
+      for (const line of lines) {
+        const text = document.createElement('div');
+        text.className = 'notification-text';
+        markUp(text, line);
+        body.appendChild(text);
+      }
+      copy.appendChild(body);
+    }
 
     // The large icon a messenger posts is whoever wrote the message, not the app, so a list read at a glance says which app it came from and falls back to the notification's own icon where an app has none.
     const badge = entry.appIconBase64 || entry.iconBase64;
@@ -220,8 +228,9 @@ export function openNotifications() {
       icon.className = 'notification-icon';
       icon.alt = '';
       icon.src = badge;
-      row.append(mark, icon, copy);
+      row.append(icon, copy);
     } else {
+      mark.textContent = (entry.appName || entry.app || '').trim().charAt(0).toUpperCase();
       row.append(mark, copy);
     }
     row.addEventListener('click', event => {
@@ -249,18 +258,71 @@ export function retireNotifications() {
   setTimeout(() => root.classList.remove('notifications-homing'), 460);
 }
 
+// How far the lowest notifications menu stands off the bottom edge of the screen.
+const NOTIFICATIONS_FOOT = 16;
+// Mirrors --clear-size, --clear-gap and --clear-foot on #notifications-clear in pill.css.
+const CLEAR_SIZE = 44;
+const CLEAR_GAP = 12;
+const CLEAR_STAGGER = 35;
+const CLEAR_FLIGHT = 240;
+
+const clearButton = document.getElementById('notifications-clear');
+
+export function clearHolds(x, y) {
+  if (shared.size !== 'notifications') return false;
+  const box = clearButton.getBoundingClientRect();
+  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+}
+
+export { clearButton };
+
+clearButton.addEventListener('touchstart', () => clearButton.classList.add('pressing'), { passive: true });
+clearButton.addEventListener('touchend', () => clearButton.classList.remove('pressing'), { passive: true });
+clearButton.addEventListener('touchcancel', () => clearButton.classList.remove('pressing'), { passive: true });
+
+clearButton.addEventListener('click', event => {
+  event.stopPropagation();
+  if (shared.size !== 'notifications') return;
+  const rows = [...document.querySelectorAll('.notification-row')];
+  for (const row of rows) JSON.parse(row.dataset.keys || '[]').forEach(key => bridge.dismissNotification(key));
+  bridge.triggerHaptic('dismiss');
+  rows.forEach((row, index) => {
+    const delay = Math.min(index, 8) * CLEAR_STAGGER;
+    row.style.transition = 'transform ' + CLEAR_FLIGHT + 'ms var(--ease-grow) ' + delay + 'ms, opacity ' + CLEAR_FLIGHT + 'ms ease ' + delay + 'ms';
+    row.style.transform = 'translateX(400px)';
+    row.style.opacity = '0';
+  });
+  document.getElementById('notifications-count').textContent = '';
+  setTimeout(() => {
+    if (shared.size === 'notifications') toClosed();
+  }, Math.min(rows.length, 8) * CLEAR_STAGGER + CLEAR_FLIGHT);
+});
+
 function notificationsWindow() {
-  const floor = Math.round(screen.height * 0.35);
-  const ceiling = Math.round(screen.height * 0.85);
+  // In landscape the delete-all bubble stands beside the menu rather than under it, so the menu may take every pixel under the bar and the proxy is widened for the bubble instead of lengthened.
+  const isWide = isLandscape();
+  const grab = parseFloat(getComputedStyle(root).getPropertyValue('--grab')) || 0;
+  const highest = grab + GROWN_PAD;
+  const tall = isWide ? root.clientHeight : screen.height;
+  const below = isWide ? 0 : CLEAR_GAP + CLEAR_SIZE;
+  const floor = Math.round(tall * 0.35);
+  const ceiling = isWide ? tall - highest - NOTIFICATIONS_FOOT : Math.round(tall * 0.85) - below;
   const head = document.getElementById('notifications-head');
   const list = document.getElementById('notifications-list');
   const frame = 20;
   const wanted = head.offsetHeight + list.scrollHeight + frame;
   const height = Math.max(floor, Math.min(ceiling, wanted));
-  const grab = parseFloat(getComputedStyle(root).getPropertyValue('--grab')) || 0;
-  const top = Math.round((root.clientHeight - height) / 2);
-  root.style.setProperty('--notifications-height', height + 'px');
-  root.style.setProperty('--notifications-drop', (top - grab - GROWN_PAD) + 'px');
+  const lowest = Math.max(highest, root.clientHeight - height - below - NOTIFICATIONS_FOOT);
+  const top = Math.round(lowest + (highest - lowest) * shared.notificationsRise);
+  const clearBottom = isWide ? top + height
+    : shared.isClearCornered ? root.clientHeight - NOTIFICATIONS_FOOT : top + height + CLEAR_GAP + CLEAR_SIZE;
   // The proxy is measured from the top of the screen, so the room asked for has to reach the bottom of a bubble that now stands in the middle of it rather than just under the bar.
-  return { width: SIZES.notifications.width, height: top + height - grab };
+  return {
+    width: SIZES.notifications.width + (isWide ? (CLEAR_GAP + CLEAR_SIZE) * 2 : 0),
+    height: clearBottom - grab,
+    geometry: {
+      '--notifications-height': height + 'px',
+      '--notifications-drop': (top - grab - GROWN_PAD) + 'px',
+    },
+  };
 }

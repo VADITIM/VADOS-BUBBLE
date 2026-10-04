@@ -7,6 +7,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.graphics.Canvas
+import android.graphics.ImageDecoder
+import android.net.Uri
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
@@ -126,6 +128,18 @@ class IslandNotificationListener : NotificationListenerService() {
 
 
         
+        fun trip(): StatusBarNotification? =
+            instance?.activeNotifications?.firstOrNull { DbWatch.isTrip(it) }
+
+        fun tripAction(index: Int) {
+            trip()?.let { DbWatch.act(it, index) }
+        }
+
+        fun publishTrip() {
+            val service = instance ?: return
+            BubbleService.deliverTrip(trip()?.let { DbWatch.describe(service, it) })
+        }
+
         fun recording(): StatusBarNotification? =
             instance?.activeNotifications?.firstOrNull { NowWatch.isRecording(it) }
 
@@ -204,6 +218,7 @@ class IslandNotificationListener : NotificationListenerService() {
         MediaControl.refresh()
         publishTimer()
         publishCall()
+        publishTrip()
         iconWorker.execute { shade() }
     }
 
@@ -211,8 +226,31 @@ class IslandNotificationListener : NotificationListenerService() {
         instance = null
     }
 
+    private fun traceVerdict(statusBarNotification: StatusBarNotification) {
+        val notification = statusBarNotification.notification
+        val ranking = Ranking()
+        val isRanked = currentRanking.getRanking(statusBarNotification.key, ranking)
+        android.util.Log.d(
+            "IslandBubble",
+            "posted ${statusBarNotification.packageName} key=${statusBarNotification.key} " +
+                "flags=${notification.flags} category=${notification.category} channel=${notification.channelId} " +
+                "belongs=${belongsInList(statusBarNotification)} worth=${isWorthShowing(statusBarNotification)} " +
+                "ranked=$isRanked importance=${if (isRanked) ranking.importance else -1} " +
+                "filter=${if (isRanked) ranking.matchesInterruptionFilter() else null} " +
+                "player=${isPlayer(statusBarNotification)} transfer=${NowWatch.isTransfer(statusBarNotification)} " +
+                "title=${!notification.extras.getCharSequence(Notification.EXTRA_TITLE).isNullOrBlank()} " +
+                "text=${!notification.extras.getCharSequence(Notification.EXTRA_TEXT).isNullOrBlank()}"
+        )
+    }
+
     override fun onNotificationPosted(statusBarNotification: StatusBarNotification) {
-        
+        traceVerdict(statusBarNotification)
+        if (statusBarNotification.packageName == DbWatch.PACKAGE) DbWatch.dump(this, statusBarNotification)
+        if (DbWatch.isTrip(statusBarNotification)) {
+            publishTrip()
+            return
+        }
+
         
         if (TimerWatch.isTimer(statusBarNotification)) {
             publishTimer()
@@ -265,12 +303,41 @@ class IslandNotificationListener : NotificationListenerService() {
         
         
         val key = statusBarNotification.key
-        handler.postDelayed({ if (isStillPosted(key)) pushToIsland(payload) }, KILL_GRACE)
+        handler.postDelayed({ if (isStillShowable(key)) pushToIsland(payload) }, KILL_GRACE)
     }
 
-    
-    private fun isStillPosted(key: String): Boolean =
-        runCatching { activeNotifications }.getOrNull()?.any { it.key == key } == true
+    // A summary standing alone is announced, so the grace re-asks whether its children have landed since — a summary posted a moment before its child would otherwise announce the same message twice.
+    private fun isStillShowable(key: String): Boolean =
+        runCatching { activeNotifications }.getOrNull()
+            ?.firstOrNull { it.key == key }
+            ?.let { belongsInList(it) } == true
+
+    private fun hasChildren(summary: StatusBarNotification): Boolean =
+        runCatching { activeNotifications }.getOrNull()?.any {
+            it.key != summary.key &&
+                it.groupKey == summary.groupKey &&
+                it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0
+        } == true
+
+    private fun titleOf(notification: Notification): String {
+        val extras = notification.extras
+        return listOf(Notification.EXTRA_TITLE, Notification.EXTRA_TITLE_BIG, Notification.EXTRA_CONVERSATION_TITLE)
+            .firstNotNullOfOrNull { extras.getCharSequence(it)?.toString()?.takeIf(String::isNotBlank) }
+            .orEmpty()
+    }
+
+    private fun textOf(notification: Notification): String {
+        val extras = notification.extras
+        val messages = messages(notification)
+        return listOfNotNull(
+            extras.getCharSequence(Notification.EXTRA_TEXT),
+            extras.getCharSequence(Notification.EXTRA_BIG_TEXT),
+            extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.lastOrNull(),
+            messages.optJSONObject(messages.length() - 1)?.optString("text"),
+            extras.getCharSequence(Notification.EXTRA_SUB_TEXT),
+            notification.tickerText
+        ).map { it.toString() }.firstOrNull { it.isNotBlank() }.orEmpty()
+    }
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
         NotificationLog.forget(statusBarNotification.key)
@@ -280,6 +347,7 @@ class IslandNotificationListener : NotificationListenerService() {
         BubbleService.deliverGone(statusBarNotification.key)
         if (TimerWatch.isTimer(statusBarNotification)) publishTimer()
         if (CallWatch.isCall(statusBarNotification)) publishCall()
+        if (DbWatch.isTrip(statusBarNotification)) publishTrip()
         if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
             publishNowMods()
         }
@@ -320,7 +388,6 @@ class IslandNotificationListener : NotificationListenerService() {
 
 
     private fun describe(statusBarNotification: StatusBarNotification): JSONObject {
-        val extras = statusBarNotification.notification.extras
         val style = AppStyles.of(statusBarNotification.packageName)
         return JSONObject()
             .put("key", statusBarNotification.key)
@@ -330,8 +397,8 @@ class IslandNotificationListener : NotificationListenerService() {
             
             .put("gradient", style.gradient ?: JSONObject.NULL)
             .put("package", statusBarNotification.packageName)
-            .put("title", extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty())
-            .put("text", extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty())
+            .put("title", titleOf(statusBarNotification.notification))
+            .put("text", textOf(statusBarNotification.notification))
             .put("lines", messages(statusBarNotification.notification))
             .put("iconBase64", iconOf(statusBarNotification))
             .put("appIconBase64", encodeAppIcon(statusBarNotification.packageName))
@@ -385,10 +452,10 @@ class IslandNotificationListener : NotificationListenerService() {
         
         if (CallWatch.isCall(statusBarNotification)) return false
         val notification = statusBarNotification.notification
-        if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return false
-        val extras = notification.extras
-        return !extras.getCharSequence(Notification.EXTRA_TITLE).isNullOrBlank() ||
-            !extras.getCharSequence(Notification.EXTRA_TEXT).isNullOrBlank()
+        // Reddit posts some messages as a group summary with no child, and as a summary the message was never announced nor listed, while the shade showed it.
+        if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0 && hasChildren(statusBarNotification)) return false
+        // Reading only the plain title and text dropped every notification that carries its words in a style's own fields — big text, inbox lines, messages — while the shade drew them.
+        return titleOf(notification).isNotBlank() || textOf(notification).isNotBlank()
     }
 
     
@@ -460,19 +527,39 @@ class IslandNotificationListener : NotificationListenerService() {
 
 
 
+    // Telegram and other messengers attach a photo to the newest message as an image URI rather than as EXTRA_PICTURE, and a picture Icon that loads as anything but a BitmapDrawable was thrown away, so those alerts arrived without the image One UI showed.
     private fun encodePicture(notification: Notification): Any {
         val extras = notification.extras
         val bitmap = extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
             ?: extras.getParcelable(Notification.EXTRA_PICTURE_ICON, Icon::class.java)
                 ?.let { icon -> runCatching { icon.loadDrawable(this) }.getOrNull() }
-                ?.let { drawable -> (drawable as? BitmapDrawable)?.bitmap }
+                ?.let { drawable -> toBitmap(drawable, drawable.intrinsicWidth, drawable.intrinsicHeight) }
+            ?: messagePicture(notification)
             ?: return JSONObject.NULL
         return dataUri(scaleDown(bitmap))
     }
 
-    private fun toBitmap(drawable: Drawable): Bitmap =
+    private fun messagePicture(notification: Notification): Bitmap? {
+        val newest = notification.extras
+            .getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java)
+            ?.lastOrNull() ?: return null
+        if (newest.getString("type")?.startsWith("image/") != true) return null
+        val uri = newest.getParcelable("uri", Uri::class.java) ?: return null
+        return runCatching {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(contentResolver, uri)) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val longest = maxOf(info.size.width, info.size.height)
+                if (longest > PICTURE_MAX_PIXELS) {
+                    val scale = PICTURE_MAX_PIXELS.toFloat() / longest
+                    decoder.setTargetSize((info.size.width * scale).toInt(), (info.size.height * scale).toInt())
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun toBitmap(drawable: Drawable, width: Int = ICON_PIXELS, height: Int = ICON_PIXELS): Bitmap =
         (drawable as? BitmapDrawable)?.bitmap?.takeIf { !it.isRecycled }
-            ?: Bitmap.createBitmap(ICON_PIXELS, ICON_PIXELS, Bitmap.Config.ARGB_8888).also {
+            ?: Bitmap.createBitmap(width.takeIf { it > 0 } ?: ICON_PIXELS, height.takeIf { it > 0 } ?: ICON_PIXELS, Bitmap.Config.ARGB_8888).also {
                 val canvas = Canvas(it)
                 drawable.setBounds(0, 0, canvas.width, canvas.height)
                 drawable.draw(canvas)

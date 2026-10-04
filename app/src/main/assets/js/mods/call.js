@@ -1,7 +1,8 @@
 import { toClosed } from '../row.js';
+import { refreshDock } from '../status.js';
 import { mods, shared } from '../state.js';
 
-const callAvatar = document.getElementById('call-avatar');
+const callAvatar = document.getElementById('call-avatar');
 const callTime = document.getElementById('call-time');
 let callTicker = null;
 
@@ -56,19 +57,22 @@ export function paintCall() {
   if (!shared.call) return;
   document.documentElement.style.setProperty(
     '--app-accent', shared.call.accent || 'var(--section-color)'
-  );
-  paintAvatar(callAvatar);
+  );
+  paintAvatar(callAvatar);
 }
 
 window.onCallUpdate = payload => {
   shared.call = payload;
   if (!shared.call) {
     mods.delete('call');
-    clearInterval(callTicker);
+    shared.clearedMods.delete('call');
+    refreshDock();
+    clearInterval(callTicker);
     if (shared.state === 'idle') toClosed();
     return;
   }
   mods.add('call');
+  refreshDock();
   paintCall();
   runCallClock();
   if (shared.state === 'idle') toClosed();

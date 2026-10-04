@@ -16,9 +16,11 @@ import './liquid.js';
 import './row.js';
 import './mods/notification.js';
 import './mods/media.js';
+import './notes.js';
 import './lock.js';
 import './mods/timer.js';
 import './mods/call.js';
+import './mods/trip.js';
 import './tabs.js';
 import './now.js';
 import './status.js';
@@ -28,6 +30,7 @@ import './double.js';
 
 import './labels.js';
 import './edge.js';
+import './reveal.js';
 import './bridge.js';
 
 bridge.ready();

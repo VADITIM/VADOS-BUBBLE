@@ -44,6 +44,22 @@ object ShizukuShell {
 
     fun requestPermission() = runCatching { Shizuku.requestPermission(PERMISSION_REQUEST) }
 
+    private var isWatching = false
+
+    fun watch(context: Context) {
+        val appContext = context.applicationContext
+        WirelessAdb.attach(appContext)
+        if (isWatching) return
+        isWatching = true
+        Shizuku.addBinderReceivedListenerSticky { bind(appContext) }
+        // Any USB mode change passes sys.usb.config through `none`, where Samsung's init.qcom.usb.rc runs `stop adbd` — and Shizuku, started from adbd, goes with it; it is started again over our own wireless debugging pairing.
+        Shizuku.addBinderDeadListener {
+            service = null
+            WirelessAdb.revive()
+        }
+        if (!isRunning()) WirelessAdb.revive()
+    }
+
     fun bind(context: Context) {
         if (service != null || !isRunning() || !hasPermission()) return
         val arguments = Shizuku.UserServiceArgs(
@@ -51,8 +67,8 @@ object ShizukuShell {
         )
             .daemon(false)
             .processNameSuffix("shell")
-            // Shizuku keeps a running user service of the same version alive across a reinstall, and a stale one has no setHotspot to answer — so the version moves whenever IShellService gains a method.
-            .version(2)
+            // Shizuku keeps a running user service of the same version alive across a reinstall, and a stale one has no setHotspot to answer — so the version moves whenever the service changes, not only when IShellService gains a method.
+            .version(5)
         runCatching { Shizuku.bindUserService(arguments, connection) }
     }
 
@@ -63,4 +79,7 @@ object ShizukuShell {
 
     fun setHotspot(isOn: Boolean): Boolean =
         service?.let { runCatching { it.setHotspot(isOn) }.getOrDefault(false) } ?: false
+
+    fun setBrightness(brightness: Float, isFinal: Boolean): Boolean =
+        service?.let { runCatching { it.setBrightness(brightness, isFinal) }.getOrDefault(false) } ?: false
 }

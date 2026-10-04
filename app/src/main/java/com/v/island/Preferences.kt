@@ -64,6 +64,8 @@ object Preferences {
 
     const val ALERT_DWELL = "alertDwellTenths"
 
+    const val NOTIFICATIONS_RISE = "notificationsRise"
+
     
 
 
@@ -111,13 +113,24 @@ object Preferences {
 
     const val BAR_LOCKED = "barLocked"
 
+    // Mirrors the Landscape field's labels in panel.html: 0 a swipe down from the top edge, 1 a tap on the top-left corner, 2 either.
+    const val LANDSCAPE_REVEAL = "landscapeReveal"
+
     const val QUICK_DIVIDERS = "quickDividers"
 
     const val DASH_ALERTS_DISABLED = "dashAlertsDisabled"
 
+    const val LOCK_NOTES = "lockNotes"
+    const val LOCK_NOTES_HOME = "lockNotesHome"
+
     const val FAST_DASHBOARD = "fastDashboard"
 
+    const val NOTIFICATIONS_CLEAR_CORNER = "notificationsClearCorner"
+
     const val ALERT_ZONE_SHOWN = "alertZoneShown"
+
+    // Mirrors DATE_FORMATS in js/clock.js and the Date format labels in panel.html: an index into that list, which is written once on the page's side.
+    const val DATE_FORMAT = "dateFormat"
 
     const val FONT_CLOCK = "fontClock"
     const val FONT_MAIN = "fontMain"
@@ -162,32 +175,38 @@ object Preferences {
         BLUE to 0,
         BACKGROUND_ALPHA to 70,
 
-        ACCENT to 0x5BFD5B,
+        ACCENT to 0xFFFFFF,
         BLUR to 50,
         SCRIM_BLUR to 35,
         NOTIFICATION_IDENTITY to 2,
         GOO to 100,
         MOD_WIDTH to 40,
         NOW_PUSHES to 0,
-        ALERT_DWELL to 5,
+        ALERT_DWELL to 57,
+        NOTIFICATIONS_RISE to 50,
         EDGE_MERGE to 0,
-        LABEL_SWEEP to 0,
-        STATUS_BATTERY_PERCENT to 1,
-        STATUS_BATTERY_PERCENT_LIGHT to 1,
+        LABEL_SWEEP to 1,
+        STATUS_BATTERY_PERCENT to 0,
+        STATUS_BATTERY_PERCENT_LIGHT to 0,
         STATUS_BATTERY_ICONS to 0,
         LOCK_X to 0,
         BAR_LOCKED to 0,
-        QUICK_DIVIDERS to 1,
-        DASH_ALERTS_DISABLED to 0,
+        LANDSCAPE_REVEAL to 0,
+        QUICK_DIVIDERS to 0,
+        DASH_ALERTS_DISABLED to 1,
+        LOCK_NOTES to 1,
+        LOCK_NOTES_HOME to 0,
         FAST_DASHBOARD to 0,
+        NOTIFICATIONS_CLEAR_CORNER to 0,
         ALERT_ZONE_SHOWN to 0,
+        DATE_FORMAT to 0,
 
         FONT_CLOCK to 0,
         FONT_MAIN to 0,
         FONT_SATELLITE to 0,
         FONT_STATUS to 0,
         FONT_OVERLAY to 0,
-        FONT_BATTERY to 0,
+        FONT_BATTERY to 23,
         FONT_STATS to 0,
         FONT_CONNECTORS to 0,
         FONT_NOTIFICATION_HEADING to 0,
@@ -198,7 +217,7 @@ object Preferences {
         FONT_SIZE_SATELLITE to 100,
         FONT_SIZE_STATUS to 100,
         FONT_SIZE_OVERLAY to 100,
-        FONT_SIZE_BATTERY to 100,
+        FONT_SIZE_BATTERY to 150,
         FONT_SIZE_STATS to 100,
         FONT_SIZE_CONNECTORS to 100,
         FONT_SIZE_NOTIFICATION_HEADING to 100,

@@ -6,6 +6,8 @@ export const faces = {
   player: document.getElementById('player-face'),
   timer: document.getElementById('timer-face'),
   timerPanel: document.getElementById('timer-panel'),
+  trip: document.getElementById('trip-face'),
+  tripPanel: document.getElementById('trip-panel'),
   call: document.getElementById('call-face'),
 
 
@@ -14,14 +16,14 @@ export const faces = {
 };
 export const bridge = window.Android || {
   ready() {}, setWindowSize() {}, setWindowBounds() {}, setBlurFrame() {}, triggerHaptic() {}, onSwipeDismiss() {},
-  mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, readDataToday() { return '0 MB'; }, setTorchLit() {},
-  setMicrophoneAccess() {}, readNotifications() { return '[]'; }, readUnreadCount() { return 0; }, setAlertOverlay() {}, passAlertTap() {},
-  openNotification() {}, dismissNotification() {}, timerAction() {},
+  mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, readDataToday() { return '0 MB'; }, readBatteryExact() { return -1; }, setTorchLit() {},
+  setMicrophoneAccess() {}, readNotifications() { return '[]'; }, readUnreadCount() { return 0; }, setAlertOverlay() {}, passAlertTap() {}, liftScreenDark() {}, sleepScreen() {},
+  openNotification() {}, dismissNotification() {}, timerAction() {}, tripAction() {},
   setTorch() {}, setLockProxy() {}, setEdgeProxy() {}, setStatusProxy() {}, setClockProxy() {},
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
-  requestToggles() {}, setToggle() {}, setLevel() {}, requestVitals() {}, requestWeather() {},
+  requestToggles() {}, setToggle() {}, setLevel() {}, settleLevel() {}, requestVitals() {}, requestWeather() {},
   recordingAction() {}, transferAction() {}, setNotesProxy() {}, mediaSpeed() {},
-  note() {}, wakeFrames() {},
+  note() {}, wakeFrames() {}, setLandscapeStage() {}, passRevealTap() {},
 };
 
 
@@ -47,6 +49,7 @@ export const SIZES = {
   picture:  { width: 340, height: 320 },
   player:   { width: 340, height: 304 },
   timer:    { width: 340, height: 132 },
+  trip:     { width: 340, height: 232 },
   
 
   notifications: { width: 340, height: 320 },
@@ -113,7 +116,7 @@ export const SWAP_STILL = 90;
 export const HOLD_GRACE = 140;
 document.documentElement.style.setProperty('--hold-scale', HOLD_SCALE);
 export const PICTURE_MAX_HEIGHT = 460;
-export const CLOSED = new Set(['idle', 'playing', 'timing', 'calling', 'alertDash']);
+export const CLOSED = new Set(['idle', 'playing', 'timing', 'calling', 'travelling', 'alertDash']);
 
 
 export const root = document.documentElement;
@@ -155,8 +158,9 @@ export const shared = {
 
 
 
-  modOrder: ['timer', 'media', 'call'],
-  size: 'idle',            
+  modOrder: ['timer', 'media', 'call', 'trip'],
+  clearedMods: new Set(),
+  size: 'idle',          
   current: null,           
   
   
@@ -167,6 +171,7 @@ export const shared = {
   restoreTimer: null,
   mediaTicker: null,
   timerTicker: null,
+  tripTicker: null,
   
   isScrubbing: false,
   scrubPosition: 0,
@@ -176,19 +181,22 @@ export const shared = {
   timer: null,
   
   call: null,
+  trip: null,
   hasHeld: false,
   
   goo: MELT_MAX,
   
   
   dwell: DWELL,
+  notificationsRise: 0.5,
   
   edgeMerge: true,
-  labelSweep: false,
+  labelSweep: true,
   
   nowPushes: true,
 
   isDashAlertDisabled: false,
+  isClearCornered: false,
   
   modWidth: 56,
 

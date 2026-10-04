@@ -7,7 +7,8 @@ import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js'
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
 import { leaveForMod } from './tabs.js';
 import { refreshEdgeProxy } from './edge.js';
-import { SLING_DRAW_BACK, SLING_DRAW_EASE, SLING_DRAW_MILLIS, SLING_DRAW_SQUEEZE, SLING_POP_EASE, SLING_SHOT_ANGLE, SLING_SHOT_EASE, SLING_SHOT_LEAD, SLING_SHOT_MILLIS, SLING_SHOT_OVER, between, slingFrames } from './sling.js';
+import { fitNotesProxies, forgetNotesProxies, paintNotes } from './notes.js';
+import { SLING_DRAW_BACK, SLING_DRAW_EASE, SLING_DRAW_MILLIS, SLING_DRAW_SQUEEZE, SLING_POP_EASE, SLING_SHOT_ANGLE, SLING_SHOT_EASE, SLING_SHOT_LEAD, SLING_SHOT_MILLIS, SLING_SHOT_OVER, SLING_THROW_CIRCLE, between, slingFrames, smoothly, throwShot } from './sling.js';
 
 
 let lockShift = 0;
@@ -32,9 +33,6 @@ const LOCK_OPEN_HEIGHT = 546;
 
 
 const LOCK_SWIPE = 24;
-
-
-const LOCK_LEAN_REACH = 18;
 
 
 
@@ -350,6 +348,8 @@ window.refitProxies = () => {
   fitLockProxy();
   fitStatusProxy();
   fitClockProxy();
+  forgetNotesProxies();
+  fitNotesProxies();
 };
 
 
@@ -378,8 +378,8 @@ function flyLockHome() {
 let lockShot = null;
 
 
-// Which way the hand threw it. Every way of closing that has no hand behind it — the unlock, a tap elsewhere, another bubble opening — leaves this at nothing and the shot picks a side of its own.
-let lockLean = 0;
+// The velocity the hand threw it at, in px/ms. Every way of closing that has no hand behind it — the unlock, a tap elsewhere, another bubble opening — leaves this at null and the shot is drawn back and takes a side of its own.
+let lockThrow = null;
 
 
 // The drop is sized against the bubble it is flying into, so that has to be the bubble which will be standing there and not the one measurable on the way out of the panel. Closing the panel takes `panel-top` off Main and its height eases from `--pill-height` plus `--edge-over` back down to `--pill-height` across the whole of the flight, so the first frame of that transition — the frame the shot is worked out on — reported 46px where the target is 26. The drop was thrown at nearly twice the size of what it was landing in, its overlap topped out around 0.57 against a `CATCH_ENTERED` of 0.8, and the touch could then only fire on the catch's stall fallback: that fallback is what read as the merge lagging out of the panel but not off the lock screen, where Main is already at rest and the measurement happens to agree. Only the height was ever wrong — the width is Main's own and is not mid-flight, and the shot is aimed at the artwork slot rather than at this box, which `panel-top` leaves exactly where it is by pushing the contents down by the rise.
@@ -402,12 +402,15 @@ function drawLockBack() {
   const dx = (aim.left + aim.width / 2) - (from.left + from.width / 2);
   const dy = (aim.top + aim.height / 2) - (from.top + from.height / 2);
   const reach = Math.hypot(dx, dy) || 1;
+  const drop = (Math.min(to.width, mainRestHeight()) / ball) * 0.9;
 
-  // The throw is aimed by the hand. The flick that dismissed the panel fires the moment it has gone 24px up, so what it has done sideways by then is a handful of pixels rather than a whole gesture — LOCK_LEAN_REACH is what a full lean is worth, and it is small for exactly that reason. A close with no flick behind it leaves it at nothing and the shot takes a side of its own, since straight up the middle is the one shape this journey may not be.
-  const lean = Math.max(-1, Math.min(1, lockLean / LOCK_LEAN_REACH));
-  const side = lean === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(lean);
-  const degrees = SLING_SHOT_ANGLE[0] + Math.abs(lean) * (SLING_SHOT_ANGLE[1] - SLING_SHOT_ANGLE[0]);
-  const angle = (side * degrees * Math.PI) / 180;
+  if (lockThrow) {
+    throwLockHome(from, art, ball, dx, dy, drop);
+    return;
+  }
+
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const angle = (side * SLING_SHOT_ANGLE * Math.PI) / 180;
 
   // The launch line is the direct line turned by the angle. The draw is straight back along that line: the pull and the release are one line, and the bow is what bends off it afterwards.
   const launchX = (Math.cos(angle) * dx - Math.sin(angle) * dy) / reach;
@@ -422,7 +425,7 @@ function drawLockBack() {
     launchY,
     backX: -launchX * back,
     backY: -launchY * back,
-    drop: (Math.min(to.width, mainRestHeight()) / ball) * 0.9,
+    drop,
     over: between(SLING_SHOT_OVER),
     millis: Math.round(between(SLING_SHOT_MILLIS)),
   };
@@ -470,26 +473,96 @@ function drawLockBack() {
       ],
       { duration: millis, easing: SLING_SHOT_EASE, fill: 'forwards' }
     ),
-    ...lockMovers.filter(mover => !mover.travels).map((mover, index) => {
-      const goes = index * LOCK_LEAVE_STAGGER;
-      return mover.element.animate(
-        [
-          { opacity: 1, translate: '0px 0px', offset: 0 },
-          { opacity: 1, translate: '0px 0px', offset: goes, easing: SLING_SHOT_EASE },
-          {
-            opacity: 0,
-            translate: '0px ' + LOCK_LEAVE_DROP + 'px',
-            offset: Math.min(1, goes + LOCK_LEAVE_SPRIG),
-          },
-          { opacity: 0, translate: '0px ' + LOCK_LEAVE_DROP + 'px', offset: 1 },
-        ],
-        { duration: millis, fill: 'forwards' }
-      );
-    }),
+    ...dropLockReading(millis),
   ];
 
   stirLiquid(millis + 200);
   draw.addEventListener('finish', shootLockHome);
+}
+
+function dropLockReading(millis) {
+  return lockMovers.filter(mover => !mover.travels).map((mover, index) => {
+    const goes = index * LOCK_LEAVE_STAGGER;
+    return mover.element.animate(
+      [
+        { opacity: 1, translate: '0px 0px', offset: 0 },
+        { opacity: 1, translate: '0px 0px', offset: goes, easing: SLING_SHOT_EASE },
+        {
+          opacity: 0,
+          translate: '0px ' + LOCK_LEAVE_DROP + 'px',
+          offset: Math.min(1, goes + LOCK_LEAVE_SPRIG),
+        },
+        { opacity: 0, translate: '0px ' + LOCK_LEAVE_DROP + 'px', offset: 1 },
+      ],
+      { duration: millis, fill: 'forwards' }
+    );
+  });
+}
+
+
+// A throw has already had its anticipation — the finger's own flick — so it is not drawn back: a pull the other way after the hand let go is exactly the stop in velocity a throw may not have. The shot sets off on the release frame at the finger's speed and the pill closes to its ball over the first SLING_THROW_CIRCLE of the flight, sampled on the shot's own steps so the canvas clamp knows how wide the box is at each of them.
+function throwLockHome(from, art, ball, dx, dy, drop) {
+  const canvas = document.documentElement;
+  const centreX = from.left + from.width / 2;
+  const centreY = from.top + from.height / 2;
+  const room = {
+    left: -centreX,
+    right: canvas.clientWidth - centreX,
+    top: -centreY,
+    bottom: canvas.clientHeight - centreY,
+  };
+  const shot = throwShot({ velocity: lockThrow, endX: dx, endY: dy, room, radius: ball / 2 });
+  const closing = step => smoothly(Math.min(1, step / SLING_THROW_CIRCLE));
+  const frames = slingFrames({
+    startX: 0,
+    startY: 0,
+    holdX: shot.holdX,
+    holdY: shot.holdY,
+    endX: dx,
+    endY: dy,
+    scaleStart: 1,
+    scaleEnd: drop,
+    over: shot.over,
+    reach: shot.reach,
+    launch: shot.launch,
+    room,
+    extent: step => ({ width: from.width + (ball - from.width) * closing(step), height: from.height }),
+  });
+  const artX = (art.left + art.width / 2) - centreX;
+  const artY = (art.top + art.height / 2) - centreY;
+
+  lockPill.classList.add('circling');
+  root.classList.add('lock-incoming');
+  lockFlight = [
+    lockPill.animate(frames, { duration: shot.millis, fill: 'forwards' }),
+    lockPill.animate(
+      frames.map(({ offset }) => {
+        const share = closing(offset);
+        return {
+          offset,
+          width: (from.width + (ball - from.width) * share).toFixed(1) + 'px',
+          borderRadius: (34 + (ball / 2 - 34) * share).toFixed(1) + 'px',
+        };
+      }),
+      { duration: shot.millis, fill: 'forwards' }
+    ),
+    lockMovers[0].element.animate(
+      frames.map(({ offset }) => {
+        const share = closing(offset);
+        return {
+          offset,
+          translate: (artX * (1 - share)).toFixed(1) + 'px ' + (artY * (1 - share)).toFixed(1) + 'px',
+          width: (art.width + (ball - art.width) * share).toFixed(1) + 'px',
+          height: (art.height + (ball - art.height) * share).toFixed(1) + 'px',
+        };
+      }),
+      { duration: shot.millis, fill: 'forwards' }
+    ),
+    ...dropLockReading(Math.round(shot.millis * SLING_THROW_CIRCLE)),
+  ];
+
+  catchInto(lockPill, pill, { entered: meltLockHome });
+  stirLiquid(shot.millis + LOCK_MERGE_FADE + 400);
 }
 
 
@@ -616,6 +689,7 @@ window.onLock = next => {
   
   root.classList.toggle('locked', next);
   refreshEdgeProxy();
+  paintNotes(next);
 
   
   
@@ -624,7 +698,7 @@ window.onLock = next => {
   
   
   const flying = !next && Boolean(lockMod());
-  lockLean = 0;
+  lockThrow = null;
   locked = next;
   lockFlying = flying;
   
@@ -884,9 +958,9 @@ export function openPanelNow(expanded) {
   });
 }
 
-export function closePanelNow(lean) {
+export function closePanelNow(thrown) {
   if (!panelHeld) return;
-  lockLean = Number(lean) || 0;
+  lockThrow = thrown || null;
   panelHeld = false;
   // A blank bubble has no mod to carry home, and flying one anyway sent an empty pill across the screen into a row that was not expecting it.
   if (lockPill.classList.contains('idle')) {
@@ -943,7 +1017,7 @@ function playNowEnter(artFrom) {
 
   // Nothing threw this one, so the arc takes a side of its own: straight down the middle is the one shape this journey may not be, whichever way it is travelled.
   const side = Math.random() < 0.5 ? -1 : 1;
-  const angle = (side * SLING_SHOT_ANGLE[0] * Math.PI) / 180;
+  const angle = (side * SLING_SHOT_ANGLE * Math.PI) / 180;
   const launchX = (Math.cos(angle) * -dx - Math.sin(angle) * -dy) / reach;
   const launchY = (Math.sin(angle) * -dx + Math.cos(angle) * -dy) / reach;
 

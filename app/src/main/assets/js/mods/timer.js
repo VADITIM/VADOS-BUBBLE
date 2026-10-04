@@ -1,4 +1,5 @@
 import { becomeExtended, closedTarget, setSize, showFace, toClosed } from '../row.js';
+import { refreshDock } from '../status.js';
 import { bridge, mods, pill, setSweepPhase, shared } from '../state.js';
 
 const timerRemaining = document.getElementById('timer-remaining');
@@ -91,12 +92,15 @@ window.onTimerUpdate = payload => {
   shared.timer = payload;
   if (!shared.timer) {
     mods.delete('timer');
+    shared.clearedMods.delete('timer');
+    refreshDock();
     clearInterval(shared.timerTicker);
     pill.classList.remove('running');
     if (shared.state === 'idle' || shared.size === 'timer') toClosed();
     return;
   }
   mods.add('timer');
+  refreshDock();
   paintTimer();
   runTimerClock();
   if (shared.state === 'idle') toClosed();

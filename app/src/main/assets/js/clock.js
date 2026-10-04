@@ -25,6 +25,36 @@ const clockDate = document.getElementById('clock-date');
 
 
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const WEEKDAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+const pad = value => (value < 10 ? '0' : '') + value;
+
+// Mirrors the Date format labels in panel.html, in the same order: the setting stores an index into this list.
+const DATE_FORMATS = [
+  date => WEEKDAYS[date.getDay()] + ', ' + date.getDate() + '.' + (date.getMonth() + 1) + '.',
+  date => date.getDate() + '.' + (date.getMonth() + 1) + '.',
+  date => pad(date.getDate()) + '.' + pad(date.getMonth() + 1) + '.',
+  date => pad(date.getDate()) + '.' + pad(date.getMonth() + 1) + '.' + pad(date.getFullYear() % 100),
+  date => pad(date.getDate()) + '.' + pad(date.getMonth() + 1) + '.' + date.getFullYear(),
+  date => pad(date.getDate()) + '/' + pad(date.getMonth() + 1) + '/' + pad(date.getFullYear() % 100),
+  date => pad(date.getDate()) + '/' + pad(date.getMonth() + 1) + '/' + date.getFullYear(),
+  date => pad(date.getDate()) + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getFullYear() % 100),
+  date => pad(date.getDate()) + '-' + pad(date.getMonth() + 1) + '-' + date.getFullYear(),
+  date => date.getDate() + ' ' + MONTHS[date.getMonth()],
+  date => date.getDate() + ' ' + MONTHS[date.getMonth()] + ' ' + date.getFullYear(),
+  date => date.getDate() + '. ' + MONTH_NAMES[date.getMonth()] + ' ' + date.getFullYear(),
+  date => WEEKDAYS[date.getDay()] + ', ' + pad(date.getDate()) + '.' + pad(date.getMonth() + 1) + '.' + pad(date.getFullYear() % 100),
+  date => WEEKDAYS[date.getDay()] + ' ' + date.getDate() + ' ' + MONTHS[date.getMonth()],
+  date => WEEKDAY_NAMES[date.getDay()] + ', ' + date.getDate() + '.' + (date.getMonth() + 1) + '.',
+];
+let dateFormat = DATE_FORMATS[0];
+
+export function setDateFormat(index) {
+  dateFormat = DATE_FORMATS[index] || DATE_FORMATS[0];
+  paintClock();
+}
 
 
 const CLOCK_LEFT = 14;
@@ -65,7 +95,7 @@ function paintClock() {
   
   
   
-  clockDate.textContent = WEEKDAYS[now.getDay()] + ', ' + now.getDate() + '.' + (now.getMonth() + 1) + '.';
+  clockDate.textContent = dateFormat(now);
 }
 
 

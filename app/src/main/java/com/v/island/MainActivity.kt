@@ -3,6 +3,7 @@ package com.v.island
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -23,6 +24,11 @@ import org.json.JSONObject
 
 
 class MainActivity : Activity() {
+
+    companion object {
+        // Mirrors the activity-alias names in AndroidManifest.xml and ICONS in panel.html, in the same order.
+        private val ICON_ALIASES = listOf("IconIdle", "IconMedia", "IconClock", "IconCall", "IconOverflow", "IconSatellite")
+    }
 
     private val preferences by lazy { Preferences.of(this) }
     private lateinit var webView: WebView
@@ -82,11 +88,18 @@ class MainActivity : Activity() {
         .put("notificationAccess", hasNotificationAccess())
         .put("serviceRunning", BubbleService.isRunning)
         .put("shizuku", ShizukuShell.isRunning() && ShizukuShell.hasPermission())
+        .put("wirelessAdb", WirelessAdb.isPaired(this))
         .put("statusBar", StatusBarPolicy.read())
-        .put("preferences", Preferences.asJson(preferences))
+        .put("preferences", Preferences.asJson(preferences).put("appIcon", currentIconIndex()))
         .put("defaults", JSONObject(Preferences.defaults as Map<*, *>))
 
     
+    private fun iconComponent(index: Int) = ComponentName(this, "$packageName.${ICON_ALIASES[index]}")
+
+    private fun currentIconIndex(): Int = ICON_ALIASES.indices.firstOrNull {
+        packageManager.getComponentEnabledSetting(iconComponent(it)) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+    } ?: 0
+
     private fun hasAccessibilityAccess(): Boolean {
         val enabled = Settings.Secure.getString(contentResolver, "enabled_accessibility_services")
         return enabled?.split(':')?.any { it.startsWith("$packageName/") } == true
@@ -220,6 +233,9 @@ class MainActivity : Activity() {
 
 
         @JavascriptInterface
+        fun pairWirelessAdb() = runOnUiThread { WirelessAdb.startPairing(this@MainActivity) }
+
+        @JavascriptInterface
         fun toggleStatusBar() = runOnUiThread {
             StatusBarPolicy.set(StatusBarPolicy.read() != StatusBarPolicy.HIDDEN)
             repaint()
@@ -232,7 +248,12 @@ class MainActivity : Activity() {
 
 
         @JavascriptInterface
-        fun stopBubbles() = runOnUiThread {
+        fun toggleBubbles() = runOnUiThread {
+            if (!BubbleService.isRunning) {
+                requestAccessibility()
+                webView.postDelayed({ repaint() }, 400)
+                return@runOnUiThread
+            }
             BubbleService.stopBubbles()
             
             webView.postDelayed({ repaint() }, 400)
@@ -285,6 +306,16 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun setPreference(key: String, value: Int) = Preferences.set(preferences, key, value)
+
+        // Enabling before disabling keeps a launcher entry standing the whole time, so the home screen never loses the app between the two calls.
+        @JavascriptInterface
+        fun setAppIcon(index: Int) = runOnUiThread {
+            val chosen = index.coerceIn(ICON_ALIASES.indices)
+            packageManager.setComponentEnabledSetting(iconComponent(chosen), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
+            ICON_ALIASES.indices.filter { it != chosen }.forEach {
+                packageManager.setComponentEnabledSetting(iconComponent(it), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+            }
+        }
 
         
         @JavascriptInterface

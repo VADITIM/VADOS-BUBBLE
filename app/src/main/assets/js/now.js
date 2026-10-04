@@ -2,7 +2,7 @@ import { PROXY_TAP_SLOP } from './bridge.js';
 import { clockPill, fitClockProxy } from './clock.js';
 import { stirLiquid, traceEvent } from './liquid.js';
 import { toClosed } from './row.js';
-import { closeStatusPanel, setTransfer, statusOpen } from './status.js';
+import { closeStatusPanel, refreshDock, setTransfer, statusOpen } from './status.js';
 import { HOLD_MILLIS, bridge, root, shared } from './state.js';
 
 
@@ -222,6 +222,7 @@ function fitElapsedTick() {
 
 
 function setNowMod(name, payload) {
+  queueMicrotask(refreshDock);
   const had = nowOrder.length;
   if (payload) {
     nowLive[name] = payload;
@@ -505,6 +506,39 @@ function dismissNowMod() {
   }
   restNowMod();
 }
+export function hasNowMods() {
+  return nowOrder.length > 0;
+}
+
+export function hasDismissedNowMods() {
+  return Object.keys(nowDismissed).some(name => nowLive[name]);
+}
+
+export function clearNowMods() {
+  if (!nowOrder.length) return;
+  nowOrder.forEach(name => { nowDismissed[name] = true; });
+  nowOrder = [];
+  fitElapsedTick();
+  restNowMod();
+}
+
+export function restoreNowMods() {
+  const back = Object.keys(nowDismissed).filter(name => nowLive[name]);
+  Object.keys(nowDismissed).forEach(name => delete nowDismissed[name]);
+  if (!back.length) return;
+  const had = nowOrder.length;
+  nowOrder.push(...back);
+  fitElapsedTick();
+  if (!had) {
+    wakeNowMod();
+    return;
+  }
+  paintNowFace();
+  setClockWidth(nowWidthFor(nowOwner()), NOW_EXPAND);
+  fitClockProxy();
+  keepTorchOpen();
+}
+
 export function nowTouch(action, x, y) {
   if (action === 'down') {
     nowHeld = false;

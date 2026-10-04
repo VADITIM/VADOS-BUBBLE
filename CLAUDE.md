@@ -2,7 +2,7 @@
 
 A system-wide overlay pill for one Samsung Galaxy S25 (SM-S931B, Android 16 / SDK 36). Sideload only — no Play Store, no other devices, no API-level fallbacks for hardware this phone does not have. Kotlin services host WebViews; the interface itself is HTML and CSS.
 
-`README.md` is the long form: what every state is, why each gesture belongs to the mod it belongs to, and what the platform forced. Read it before changing behaviour — most of what looks like an odd choice in the code is a workaround recorded there.
+`INSTRUCTIONS.md` is the long form: what every state is, why each gesture belongs to the mod it belongs to, and what the platform forced. Read it before changing behaviour — most of what looks like an odd choice in the code is a workaround recorded there.
 
 ## The documents
 

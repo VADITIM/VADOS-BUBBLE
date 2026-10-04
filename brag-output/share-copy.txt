@@ -1,0 +1,2 @@
+Introducing Dynamic Bubble: a system overhaul for One UI. Every pop-up, chip and heads-up on my Galaxy S25 now grows out of one liquid bubble at the camera cutout, so nothing appears from nowhere.
+Built as an accessibility overlay with WebView UI, and Shizuku to switch the stock pop-ups off.

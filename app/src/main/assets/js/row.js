@@ -1,11 +1,14 @@
 import { refreshEdgeProxy } from './edge.js';
-import { leaveAlertCentre, leaveAlertDash } from './alert.js';
+import { alertLeaving } from './reveal.js';
+import { leaveAlertCentre, leaveAlertDash, sleepDark } from './alert.js';
+import { refreshNotes } from './notes.js';
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
 import { isStolen } from './lock.js';
 import { retireNotifications } from './tabs.js';
 import { paintAvatar, paintCall } from './mods/call.js';
-import { carryArt, mediaWindow, paintMedia, runBars } from './mods/media.js';
+import { carryArt, joinEqualizer, mediaWindow, paintMedia } from './mods/media.js';
 import { paintTimer, timerWindow } from './mods/timer.js';
+import { paintTrip } from './mods/trip.js';
 import { endHold } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
 import { closeStatusPanel, statusOpen } from './status.js';
@@ -81,7 +84,7 @@ function morphInto(face, before) {
 }
 
 // Every mod paints `--app-accent` once, when its payload arrives, so an alert borrowing the same property left the mod wearing the notification's colour once the alert was gone — and media caches its accent, so for media it never came back at all. The face that is showing owns the colour.
-const FACE_OWNERS = { media: 'media', player: 'media', timer: 'timer', timerPanel: 'timer', call: 'call' };
+const FACE_OWNERS = { media: 'media', player: 'media', timer: 'timer', timerPanel: 'timer', call: 'call', trip: 'trip', tripPanel: 'trip' };
 
 export function showFace(name) {
   const owner = FACE_OWNERS[name];
@@ -93,6 +96,7 @@ export function showFace(name) {
     element.classList.toggle('showing', key === name);
   }
   if (arriving) morphInto(arriving, before);
+  if (name === 'media') joinEqualizer();
 }
 
 
@@ -113,7 +117,14 @@ function afterRelayout(work) {
 const HOME_TRAVEL = 420;
 let returningTimer = null;
 
+let pendingGeometry = null;
+
 function paintSize() {
+  // A size's drop and height were written by its caller while the class they belong to waited a frame for the window, so `translate` (which reads the drop unconditionally) began on the row's old clock before the growth existed — they are written here, in the frame the class goes on.
+  if (pendingGeometry) {
+    for (const [name, value] of Object.entries(pendingGeometry)) root.style.setProperty(name, value);
+    pendingGeometry = null;
+  }
   pill.classList.toggle('alerting', shared.size === 'alert' || shared.size === 'image');
   pill.classList.toggle('alert-centred', shared.size === 'alertCentre');
   pill.classList.toggle('expanded', shared.size === 'haptic');
@@ -123,6 +134,8 @@ function paintSize() {
   pill.classList.toggle('player', shared.size === 'player');
   pill.classList.toggle('timing', shared.size === 'timing');
   pill.classList.toggle('calling', shared.size === 'calling');
+  pill.classList.toggle('travelling', shared.size === 'travelling');
+  pill.classList.toggle('trip', shared.size === 'trip');
 
   pill.classList.toggle('timer', shared.size === 'timer');
 
@@ -142,11 +155,6 @@ function paintSize() {
     returningTimer = setTimeout(() => root.classList.remove('returning'), HOME_TRAVEL);
   }
   if (!CLOSED.has(shared.size)) {
-    
-    
-    root.style.setProperty('--width-ease', 'var(--ease-grow)');
-    root.style.setProperty('--width-ms', 'var(--grow-ms)');
-    root.style.setProperty('--width-delay', '0ms');
     root.style.setProperty('--face-delay', '0ms');
     root.style.setProperty('--face-fade', '0ms');
   }
@@ -217,6 +225,7 @@ const SATELLITE_FACES = {
   media: '<img class="sat-art glyph" alt="">',
   timer: '<div class="sat-clock"></div>',
   call: '<div class="sat-avatar avatar"></div>',
+  trip: '<div class="sat-trip trip-mark">DB</div>',
 
 };
 
@@ -260,9 +269,11 @@ let swapMovedAt = 0;
 
 
 export function isLive(mod) {
+  if (shared.clearedMods.has(mod)) return false;
   if (mod === 'timer') return mods.has('timer') && Boolean(shared.timer);
   if (mod === 'media') return mods.has('media') && Boolean(shared.media);
   if (mod === 'call') return mods.has('call') && Boolean(shared.call);
+  if (mod === 'trip') return mods.has('trip') && Boolean(shared.trip);
 
   return false;
 }
@@ -271,6 +282,7 @@ export function isLive(mod) {
 function payloadOf(mod) {
   if (mod === 'media') return shared.media;
   if (mod === 'timer') return shared.timer;
+  if (mod === 'trip') return shared.trip;
 
   return shared.call;
 }
@@ -398,7 +410,18 @@ function restingMain() {
   if (mergeHold) return shared.compact.width;
   const live = liveMods();
   if (!live.length) return shared.compact.width;
-  return shared.compact.width + shared.modWidth + 4 - (live.length > 1 ? SPLIT_SHRINK : 0);
+  const split = shared.compact.width + shared.modWidth + 4 - (live.length > 1 ? SPLIT_SHRINK : 0);
+  return Math.max(split, modFloor());
+}
+
+// Mirrors --hole-gap in pill.css.
+const HOLE_GAP = 40;
+
+// The split's shrink took a narrow mod width under what a face's two glyphs and the corridor between them need, so the equalizer stood past the bubble's right edge whenever a satellite was out.
+function modFloor() {
+  const glyph = shared.compact.height - 10;
+  const inset = (shared.compact.height - glyph) / 2 - 1;
+  return 2 * (inset + glyph) + HOLE_GAP + 2;
 }
 
 
@@ -766,8 +789,6 @@ function dressSatellite(element, mod) {
     element.dataset.mod = mod;
     element.innerHTML = SATELLITE_FACES[mod];
     
-    runBars();
-    
     
     
     if (mod === 'timer') setSweepPhase(element);
@@ -1108,6 +1129,7 @@ function windowFor(next, override) {
   if (next === 'playing') return mediaWindow();
   if (next === 'timing') return timerWindow();
   if (next === 'calling') return closedTarget();
+  if (next === 'travelling') return closedTarget();
   return SIZES[next];
 }
 
@@ -1122,6 +1144,7 @@ export function setSize(next, override) {
   if (shared.size === next && !override) return;
   shared.size = next;
   const target = windowFor(next, override);
+  pendingGeometry = target.geometry || null;
   const width = target.width < 0 ? shared.compact.width : target.width;
 
   if (width > windowWidth) {
@@ -1182,6 +1205,7 @@ const MOD_CLOSED = {
   timer: { paint: () => paintTimer(), face: 'timer', size: 'timing', room: () => timerWindow() },
   media: { paint: () => paintMedia(), face: 'media', size: 'playing', room: () => mediaWindow() },
   call: { paint: () => paintCall(), face: 'call', size: 'calling', room: closedTarget },
+  trip: { paint: () => paintTrip(), face: 'trip', size: 'travelling', room: closedTarget },
 };
 
 
@@ -1399,13 +1423,19 @@ export function toClosed() {
   
   const wasOpen = !CLOSED.has(shared.size);
   if (wasOpen) shared.closedInTouch = shared.isTouchDown;
+  const wasAlert = shared.state === 'alert';
   shared.state = 'idle';
   shared.current = null;
+  alertLeaving();
   refreshEdgeProxy();
   pill.classList.remove('alert', 'with-image', 'charging');
   leaveAlertCentre();
   leaveAlertDash();
   retireNotifications();
+  if (wasAlert) {
+    sleepDark();
+    refreshNotes();
+  }
 
   const live = liveMods();
   const owner = live[0] || null;

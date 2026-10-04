@@ -2,9 +2,10 @@ import { openCurrent } from './mods/notification.js';
 import { HOLD_BLOCK, pillHolds, toy, untoy } from './motion.js';
 import { setSize, toClosed } from './row.js';
 import { fitLabels } from './labels.js';
-import { HALO_MILLIS, startHalo, stirLiquid } from './liquid.js';
+import { FOCUS_FROST_MILLIS, stirLiquid } from './liquid.js';
 import { slingInto } from './sling.js';
 import { statsBox, statsIn, statsOut } from './status.js';
+import { isLandscape } from './reveal.js';
 import { SIZES, bridge, dragGate, faces, pill, root, shared } from './state.js';
 
 
@@ -21,6 +22,7 @@ const CENTRE_TRAVEL = 520;
 
 
 const CENTRE_CEILING = 0.6;
+const PICTURE_CENTRE_CEILING = 0.8;
 
 
 const CENTRE_LIFT = 0.1;
@@ -30,6 +32,10 @@ const HOME_TRAVEL = 460;
 
 
 const ALERT_FLOOR = 88;
+
+// A landscape screen is less than half as tall as a portrait one, so the Alert on the bar is held to its head and one line of the message. Mirrors the line clamp on html.landscape #pill.alerting .message in pill.css.
+const LANDSCAPE_ALERT_FLOOR = 52;
+const LANDSCAPE_ALERT_CEILING = 64;
 
 
 const FIT_TRAVEL = 340;
@@ -52,6 +58,12 @@ let pullDrop = 0;
 let hasActed = false;
 let alertDrag = null;
 let isBandWanted = false;
+let isDark = false;
+
+document.getElementById('picture').addEventListener('load', () => {
+  if (isAlertCentred() && pill.classList.contains('with-image')) recentreAlert();
+});
+let sleepTimer = null;
 
 
 export function isAlertLive() {
@@ -113,11 +125,37 @@ export function alertTouch(action, x, y) {
   }
   if (action !== 'up' || hasActed) return;
   if (Math.hypot(x - startX, y - startY) > ALERT_TAP_SLOP) return;
-  if (pillHolds(x, y)) openCurrent();
+  if (pillHolds(x, y)) {
+    liftDark();
+    openCurrent();
+  }
+  else if (isDark) liftDark();
   // A window that hears a press is the only window that hears it, so a tap inside the pull zone that was not aimed at the Alert would simply be eaten. The host hands it back to whatever is underneath.
   else bridge.passAlertTap();
 }
 
+
+export function isScreenDark() {
+  return isDark;
+}
+
+export function setScreenDark(isOn) {
+  isDark = isOn;
+  clearTimeout(sleepTimer);
+  root.classList.toggle('screen-dark', isOn);
+}
+
+function liftDark() {
+  if (!isDark) return;
+  setScreenDark(false);
+  bridge.liftScreenDark();
+}
+
+export function sleepDark() {
+  if (!isDark) return;
+  clearTimeout(sleepTimer);
+  sleepTimer = setTimeout(() => bridge.sleepScreen(), HOME_TRAVEL);
+}
 
 export function isAlertCentred() {
   return shared.size === 'alertCentre';
@@ -137,7 +175,7 @@ export function layOutZone() {
 }
 
 
-export function measureAlert() {
+export function measureAlert(isFocused = false) {
   const face = faces.alert;
   const head = document.getElementById('alert-head');
   const text = document.getElementById('text');
@@ -148,11 +186,16 @@ export function measureAlert() {
   // The bubble is still the width it is leaving when an arrival is measured, so the reading is wrapped at the Alert's own width for the read and let go again in the same breath. Measured a frame later instead — after the size had already been applied — the box animated to a default height first and then to the right one, which is the height changing during the arrival.
   text.style.width = room + 'px';
   const hasImage = pill.classList.contains('with-image');
+  const isWholePicture = hasImage && isFocused && picture.naturalWidth > 0;
+  const pictureHeight = isWholePicture ? room * picture.naturalHeight / picture.naturalWidth : picture.offsetHeight;
   const wanted = head.offsetHeight + gap + text.scrollHeight +
-    (hasImage ? gap + picture.offsetHeight : 0) +
+    (hasImage ? gap + pictureHeight : 0) +
     parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
   text.style.removeProperty('width');
-  const ceiling = Math.round(root.clientHeight * CENTRE_CEILING);
+  if (isLandscape() && !isFocused) {
+    return Math.max(LANDSCAPE_ALERT_FLOOR, Math.min(LANDSCAPE_ALERT_CEILING, Math.round(wanted)));
+  }
+  const ceiling = Math.round(root.clientHeight * (isWholePicture ? PICTURE_CENTRE_CEILING : CENTRE_CEILING));
   return Math.max(ALERT_FLOOR, Math.min(ceiling, Math.round(wanted)));
 }
 
@@ -170,8 +213,7 @@ export function settleBox() {
 export function fitAlert() {
   settleBox();
   const height = measureAlert();
-  root.style.setProperty('--alert-height', height + 'px');
-  setSize('alert', { width: SIZES.alert.width, height });
+  setSize('alert', { width: SIZES.alert.width, height, geometry: { '--alert-height': height + 'px' } });
   stirLiquid(FIT_TRAVEL);
 }
 
@@ -184,9 +226,8 @@ export function fitAlert() {
 function centreAlert() {
   bridge.triggerHaptic('expand');
   layOutCentre();
-  // The halo comes up after the bubble has landed, so the mirror has to keep sending frames past the travel or the ramp stops at whatever strength had arrived.
-  startHalo();
-  stirLiquid(CENTRE_TRAVEL + HALO_MILLIS);
+  // The frost ramps behind the travel, so the mirror has to keep sending frames past it or the ramp stops at whatever strength had arrived.
+  stirLiquid(CENTRE_TRAVEL + FOCUS_FROST_MILLIS);
 }
 
 
@@ -204,13 +245,15 @@ function layOutCentre() {
   clearTimeout(shared.dwellTimer);
 
 
-  const height = measureAlert();
-  root.style.setProperty('--alert-height', height + 'px');
+  const height = measureAlert(true);
 
   // A notification is read above the middle rather than across it — the thumb and the hand holding the phone are under the lower half, and a box centred on the glass has the hand in front of the end of it.
   const drop = Math.round((root.clientHeight - height) / 2 - root.clientHeight * CENTRE_LIFT);
-  root.style.setProperty('--alert-drop', drop + 'px');
-  setSize('alertCentre', { width: SIZES.alert.width, height });
+  setSize('alertCentre', {
+    width: SIZES.alert.width,
+    height,
+    geometry: { '--alert-height': height + 'px', '--alert-drop': drop + 'px' },
+  });
   // Resizing the window the finger is standing on pulls the surface out from under it and the system answers with a cancel, so the window is asked for at the lift — the same deferral `setSize` makes for the touch proxy, and for the same reason.
   isBandWanted = true;
   if (!shared.isTouchDown) bridge.setAlertOverlay(1);

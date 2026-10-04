@@ -43,6 +43,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     companion object {
         
         private const val WAKE_MILLIS = 6_000L
+        private const val DARK_BRIGHTNESS = 0.05f
 
         
 
@@ -93,7 +94,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
-        private const val BLUR_PANES = 14
+        // Mirrors BLUR_PANES in assets/js/liquid.js plus the scrim, plus NOTE_PANES.
+        private const val BLUR_PANES = 9 + 5
+
+        // Mirrors NOTES_PROXIES in assets/js/notes.js: one window per lock-screen notification group and one for its delete-all bubble.
+        private const val NOTES_PROXIES = 4
 
         
 
@@ -110,6 +115,23 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         // Mirrors #alert-zone in pill.css — the strip a pull-to-focus is heard on, standing at the right edge across the middle of the screen.
         private const val ALERT_ZONE_WIDTH = 96
         private const val ALERT_ZONE_HEIGHT_PART = 0.30f
+
+        private const val REVEAL_STRIP = 14
+        private const val REVEAL_BAND = 56
+        private const val LANDSCAPE_REACH = 20
+        private const val CORNER_TARGET = 40
+        // Mirrors CORNER_DOUBLE in js/reveal.js: the corner stays live this long after a reveal so a second tap can ask for the Dashboard.
+        private const val CORNER_DOUBLE = 300L
+        private const val ROTATION_SETTLE = 600L
+        private const val SUMMON_NONE = 0
+        private const val SUMMON_STATUS = 1
+        private const val SUMMON_NOTIFICATIONS = 2
+
+        // Mirrors STAGE_HIDDEN, STAGE_ALERT, STAGE_REVEALED and STAGE_LEAVING in assets/js/reveal.js.
+        private const val STAGE_HIDDEN = 0
+        private const val STAGE_ALERT = 1
+        private const val STAGE_REVEALED = 2
+        private const val STAGE_LEAVING = 3
 
         const val PANEL_BROADCAST = "com.v.island.TOGGLE_STATUS_PANEL"
         const val NOTIFICATIONS_BROADCAST = "com.v.island.TOGGLE_NOTIFICATIONS"
@@ -156,11 +178,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         
         fun toggleStatusPanel() {
+            instance?.summon(SUMMON_STATUS)
             instance?.push("window.onToggleStatusPanel()")
         }
 
 
         fun toggleNotifications() {
+            instance?.summon(SUMMON_NOTIFICATIONS)
             instance?.push("window.onToggleNotifications()")
         }
 
@@ -177,7 +201,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         fun deliver(payload: JSONObject) {
             val service = instance ?: return
-            service.wakeScreen()
+            if (service.wakeScreen()) service.darken()
             service.push("window.onNotificationUpdate($payload)")
             service.push("window.setUnreadCount(${IslandNotificationListener.count()})")
         }
@@ -185,9 +209,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         fun deliverCount(count: Int) {
             instance?.push("window.setUnreadCount($count)")
-            
-            
-            instance?.push("window.onNotesChanged()")
         }
 
         
@@ -196,6 +217,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         
+        fun deliverTrip(trip: JSONObject?) {
+            instance?.push("window.onTripUpdate(${trip ?: "null"})")
+        }
+
         fun deliverGone(key: String) {
             instance?.push("window.onNotificationGone(${JSONObject.quote(key)})")
         }
@@ -273,6 +298,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     
     private lateinit var lockProxy: View
     private lateinit var lockProxyParams: WindowManager.LayoutParams
+    private lateinit var notesProxies: List<View>
+    private lateinit var notesProxyParams: List<WindowManager.LayoutParams>
     private lateinit var edgeLeftProxy: View
     private lateinit var edgeLeftParams: WindowManager.LayoutParams
     private lateinit var edgeRightProxy: View
@@ -288,6 +315,17 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private var alertTapX = 0f
     private var alertTapY = 0f
+
+    private lateinit var revealStrip: View
+    private lateinit var revealStripParams: WindowManager.LayoutParams
+    private lateinit var cornerProxy: View
+    private lateinit var cornerProxyParams: WindowManager.LayoutParams
+
+    private var stripTapX = 0f
+    private var stripTapY = 0f
+
+    private var landscapeStage = STAGE_HIDDEN
+    private var cornerKeptUntil = 0L
 
     
 
@@ -355,6 +393,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private var isFullScreen = false
     private var isLandscape = false
     private var isGrown = false
+    private var summoned = SUMMON_NONE
+    private var hasSummonGrown = false
 
     
 
@@ -409,6 +449,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (instance !== this) return
+        readFullScreen(event)
+    }
+
+    private fun readFullScreen(event: AccessibilityEvent?) {
         val isBarHidden = !windowManager.currentWindowMetrics.windowInsets
             .isVisible(android.view.WindowInsets.Type.statusBars()) && !isBarOurs
         
@@ -506,10 +550,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            x = dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET))
-            
-            
-            
+            x = dp(horizontalOffset())
+
+
+
             y = 0
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -536,7 +580,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            x = dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET))
+            x = dp(horizontalOffset())
             y = 0
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -622,6 +666,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         
         
+        notesProxyParams = List(NOTES_PROXIES) { edgeParams() }
+        notesProxies = notesProxyParams.map { notesParams ->
+            object : View(this) {
+                override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                    if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                        reportOutside(event)
+                        return false
+                    }
+                    forwardTouch(event, notesParams, "notes")
+                    return true
+                }
+            }
+        }
         edgeLeftProxy = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
@@ -671,8 +728,32 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             setCanPlayMoveAnimation(false)
         }
 
+        revealStrip = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) return false
+                stripTapX = event.rawX
+                stripTapY = event.rawY
+                forwardTouch(event, revealStripParams, "reveal")
+                return true
+            }
+        }
+        revealStripParams = edgeParams()
+        cornerProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) return false
+                forwardTouch(event, cornerProxyParams, "corner")
+                return true
+            }
+        }
+        cornerProxyParams = edgeParams()
+
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, params)
+        // Added before every proxy so the bubbles' own windows stand above it: windows of one type stack in the order they were added, and a strip added last would take the bubbles' touches.
+        windowManager.addView(revealStrip, revealStripParams)
+        windowManager.addView(cornerProxy, cornerProxyParams)
+        // Below every bubble's own window: the Dashboard and the Notifications menu stand over the list while they are open, and their proxies have to hear those touches rather than the list's.
+        notesProxies.forEachIndexed { index, view -> windowManager.addView(view, notesProxyParams[index]) }
 
 
         windowManager.addView(touchProxy, proxyParams)
@@ -702,8 +783,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 }
             }
         )
+        fitCanvas()
         applyVisibility()
         ShizukuShell.bind(this)
+        ShizukuShell.watch(this)
         SystemToggles.attach(this)
         /* Nothing else asks the panel to read itself again while it stands open, and a call beginning is exactly when the levels row has to change shape — so the one event that says so pushes a fresh read. It fires a handful of times a day. */
         getSystemService(AudioManager::class.java)?.addOnModeChangedListener(mainExecutor) {
@@ -719,7 +802,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         BatteryWatch.start(
             this,
             { battery -> deliverBattery(battery) },
-            { percent, plugged, remainingMinutes -> instance?.push("window.onCharge($percent, $plugged, $remainingMinutes)") }
+            { percent, exact, plugged, remainingMinutes -> instance?.push("window.onCharge($percent, $plugged, $remainingMinutes, $exact)") }
         )
 
         
@@ -733,8 +816,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         isScreenOff = !getSystemService(PowerManager::class.java).isInteractive
         screenWatch = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action != Intent.ACTION_SCREEN_ON) lightUp()
                 if (intent.action != Intent.ACTION_USER_PRESENT) {
                     isScreenOff = intent.action == Intent.ACTION_SCREEN_OFF
+                    if (isScreenOff) landscapeStage = STAGE_HIDDEN
                     applyVisibility()
                 }
                 reportLock()
@@ -772,11 +857,83 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     override fun onConfigurationChanged(configuration: Configuration) {
         super.onConfigurationChanged(configuration)
         isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        landscapeStage = STAGE_HIDDEN
+        summoned = SUMMON_NONE
+        fitCanvas()
+        applyVisibility()
+        // A landscape game hides the status bar, and the fullscreen reading was only taken again on the next accessibility event, so back in portrait the stage stayed hidden until something was touched. It is read again once the rotation has settled.
+        webView.postDelayed({ readFullScreen(null) }, ROTATION_SETTLE)
+    }
+
+    // In landscape the page decides whether anything is drawn — nothing, an Alert on its own, or the whole bar — and a fullscreen app is exactly where landscape is used, so it no longer hides the stage there.
+    private fun isHidden() =
+        isScreenOff || if (isLandscape) landscapeStage == STAGE_HIDDEN else isFullScreen && summoned == SUMMON_NONE
+
+    // The Dashboard and Notifications launchers toggled a panel on a stage a fullscreen app had hidden, so it opened where nobody could see it: the stage is held out for as long as the panel it was summoned for stands.
+    private fun summon(panel: Int) {
+        if (isLandscape || isScreenOff || !isFullScreen || summoned != SUMMON_NONE) return
+        summoned = panel
+        hasSummonGrown = false
         applyVisibility()
     }
 
-    
-    private fun isHidden() = isLandscape || isFullScreen || isScreenOff
+    private fun settleSummon(panel: Int, isOpen: Boolean) {
+        if (summoned != panel) return
+        if (isOpen) hasSummonGrown = true
+        else if (hasSummonGrown) {
+            summoned = SUMMON_NONE
+            applyVisibility()
+        }
+    }
+
+    // Only the revealed bar may be touched in landscape: an Alert shown on its own answers through its own windows, and a bar that is leaving or parked off the screen answers nothing, so a tap near the top edge never lands on a bubble nobody can see.
+    private fun isBarTouchable() = !isLandscape || landscapeStage == STAGE_REVEALED
+
+    private fun horizontalOffset() =
+        if (isLandscape) 0 else Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET)
+
+    // The canvas was sized once, at the orientation the service started in, so a rotation left it a portrait-shaped window across a landscape screen. It is resized here and only here — once per rotation, while the landscape stage is still hidden — which is the one exception to never resizing the WebView.
+    private fun fitCanvas() {
+        params.width = screenWidth()
+        params.height = stageHeight()
+        params.x = dp(horizontalOffset())
+        proxyParams.x = params.x
+        val stageLayout = webView.layoutParams as FrameLayout.LayoutParams
+        if (stageLayout.height != stageHeight()) {
+            stageLayout.height = stageHeight()
+            webView.layoutParams = stageLayout
+        }
+        relayout(stage, params)
+        relayout(touchProxy, proxyParams)
+        push("window.setLandscape($isLandscape)")
+        placeRevealWindows()
+    }
+
+    private fun placeRevealWindows() {
+        if (!this::revealStrip.isInitialized) return
+        val mode = Preferences.get(preferences, Preferences.LANDSCAPE_REVEAL)
+        val isOpen = isLandscape && !isScreenOff && landscapeStage != STAGE_LEAVING
+        val hasStrip = isOpen && mode != 1
+        revealStripParams.x = 0
+        revealStripParams.y = 0
+        revealStripParams.width = if (hasStrip) screenWidth() else 0
+        revealStripParams.height =
+            if (hasStrip) dp(if (landscapeStage == STAGE_REVEALED) REVEAL_BAND else REVEAL_STRIP) else 0
+        revealStripParams.flags =
+            if (hasStrip) BASE_FLAGS else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        relayout(revealStrip, revealStripParams)
+
+        // The revealed Clock stands in this corner, so the target is given up to it while the bar is out.
+        val hasCorner = isOpen && mode != 0 &&
+            (landscapeStage != STAGE_REVEALED || android.os.SystemClock.uptimeMillis() < cornerKeptUntil)
+        cornerProxyParams.x = 0
+        cornerProxyParams.y = 0
+        cornerProxyParams.width = if (hasCorner) dp(CORNER_TARGET) else 0
+        cornerProxyParams.height = if (hasCorner) dp(CORNER_TARGET) else 0
+        cornerProxyParams.flags =
+            if (hasCorner) BASE_FLAGS else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        relayout(cornerProxy, cornerProxyParams)
+    }
 
     
 
@@ -824,7 +981,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         applyVisibility()
         
-        listOf(
+        (notesProxies.zip(notesProxyParams) + listOf(
             touchProxy to proxyParams,
             lockProxy to lockProxyParams,
             statusProxy to statusProxyParams,
@@ -832,7 +989,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             edgeLeftProxy to edgeLeftParams,
             edgeRightProxy to edgeRightParams,
             alertOverlay to alertOverlayParams,
-        ).forEach { (view, viewParams) ->
+        )).forEach { (view, viewParams) ->
             runCatching {
                 windowManager.removeView(view)
                 windowManager.addView(view, viewParams)
@@ -854,8 +1011,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         setCanPlayMoveAnimation(false)
     }
 
-    private fun proxyFlags(isLive: Boolean) =
-        if (isLive && !isHidden()) BASE_FLAGS
+    private fun proxyFlags(isLive: Boolean, isAlertWindow: Boolean = false) =
+        if (isLive && !isHidden() &&
+            (isBarTouchable() || (isAlertWindow && landscapeStage == STAGE_ALERT))
+        ) BASE_FLAGS
         else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
 
     private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
@@ -894,18 +1053,16 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         if (isHidden) blurPanes.forEachIndexed { index, pane -> clearBlur(index, pane) } else repaintBlur()
         
         
-        proxyParams.flags =
-            if (isHidden) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            else BASE_FLAGS
-        
-        
-        
-        
-        
-        
-        
-        
-        if (isHidden) {
+        proxyParams.flags = proxyFlags(true, true)
+
+
+
+
+
+
+
+
+        if (isHidden || !isBarTouchable()) {
             lockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             relayout(lockProxy, lockProxyParams)
             statusProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -916,19 +1073,27 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             relayout(edgeLeftProxy, edgeLeftParams)
             edgeRightParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             relayout(edgeRightProxy, edgeRightParams)
-            setAlertBand(0)
-        } else {
+            notesProxies.forEachIndexed { index, view ->
+                notesProxyParams[index].flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                relayout(view, notesProxyParams[index])
+            }
+        }
+        if (isHidden) setAlertBand(0)
+        else {
+            alertOverlayParams.flags = proxyFlags(alertOverlayParams.width != 0, true)
+            relayout(alertOverlay, alertOverlayParams)
             push("window.refitProxies()")
         }
-        
+
         shadeGuardParams?.let { guardParams ->
             guardParams.flags =
-                if (isHidden) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                if (isHidden || isLandscape) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 else BASE_FLAGS
             relayout(shadeGuard, guardParams)
         }
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
+        placeRevealWindows()
     }
 
     override fun onDestroy() {
@@ -951,6 +1116,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.removeView(statusProxy) }
             runCatching { windowManager.removeView(lockProxy) }
             runCatching { windowManager.removeView(touchProxy) }
+            notesProxies.forEach { view -> runCatching { windowManager.removeView(view) } }
+            runCatching { windowManager.removeView(cornerProxy) }
+            runCatching { windowManager.removeView(revealStrip) }
             runCatching { windowManager.removeView(stage) }
             webView.destroy()
         }
@@ -960,7 +1128,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     override fun onSharedPreferenceChanged(changed: SharedPreferences, key: String?) {
         
         
-        params.x = dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET))
+        params.x = dp(horizontalOffset())
         proxyParams.width = dp(compactWidth() + (GRAB + BLEED) * 2)
         proxyParams.height = dp(compactHeight() + topGrab() + GRAB)
         proxyParams.x = params.x
@@ -971,6 +1139,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
         applyBarLock()
+        placeRevealWindows()
         pushAppearance()
     }
 
@@ -988,7 +1157,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private fun applyBlur(index: Int, view: View, corner: Float, resized: Boolean = false) {
         
         
-        if (isLandscape || isFullScreen || isScreenOff) {
+        if (isHidden()) {
             clearBlur(index, view)
             return
         }
@@ -1099,10 +1268,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         alertOverlayParams.height = if (wanted) height else 0
         alertOverlayParams.x = if (wanted) screenWidth() - width else 0
         alertOverlayParams.y = if (wanted) (screenHeight() - height) / 2 else 0
-        alertOverlayParams.flags = proxyFlags(wanted)
+        alertOverlayParams.flags = proxyFlags(wanted, true)
         relayout(alertOverlay, alertOverlayParams)
 
-        proxyParams.flags = proxyFlags(!(wanted && isWhole))
+        proxyParams.flags = proxyFlags(!(wanted && isWhole), true)
         relayout(touchProxy, proxyParams)
     }
 
@@ -1114,12 +1283,23 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         alertOverlayParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         relayout(alertOverlay, alertOverlayParams)
 
-        val restore = {
+        dispatchTap(x, y) {
             if (alertOverlayParams.width != 0) {
-                alertOverlayParams.flags = proxyFlags(true)
+                alertOverlayParams.flags = proxyFlags(true, true)
                 relayout(alertOverlay, alertOverlayParams)
             }
         }
+    }
+
+    // The reveal strip spans the whole top edge in landscape, so every tap an app expects up there lands on it first; the page decides it was a tap rather than a pull and it is handed on exactly as the Alert's band hands its taps on.
+    private fun replayStripTap() {
+        if (revealStripParams.width == 0) return
+        revealStripParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        relayout(revealStrip, revealStripParams)
+        dispatchTap(stripTapX, stripTapY) { placeRevealWindows() }
+    }
+
+    private fun dispatchTap(x: Float, y: Float, restore: () -> Unit) {
         val path = Path().apply { moveTo(x, y) }
         val stroke = GestureDescription.StrokeDescription(path, 0, TAP_MILLIS)
         val sent = runCatching {
@@ -1324,12 +1504,17 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setModWidth(${Preferences.get(preferences, Preferences.MOD_WIDTH)})")
         push("window.setNowPushes(${Preferences.get(preferences, Preferences.NOW_PUSHES)})")
         push("window.setAlertDwell(${Preferences.get(preferences, Preferences.ALERT_DWELL)})")
+        push("window.setNotificationsRise(${Preferences.get(preferences, Preferences.NOTIFICATIONS_RISE)})")
         push("window.setQuickDividers(${Preferences.get(preferences, Preferences.QUICK_DIVIDERS)})")
         push("window.setDashAlertsDisabled(${Preferences.get(preferences, Preferences.DASH_ALERTS_DISABLED)})")
+        push("window.setLockNotes(${Preferences.get(preferences, Preferences.LOCK_NOTES)})")
+        push("window.setLockNotesHome(${Preferences.get(preferences, Preferences.LOCK_NOTES_HOME)})")
         push("window.setFastDashboard(${Preferences.get(preferences, Preferences.FAST_DASHBOARD)})")
+        push("window.setNotificationsClearCorner(${Preferences.get(preferences, Preferences.NOTIFICATIONS_CLEAR_CORNER)})")
         push("window.setAlertZoneShown(${Preferences.get(preferences, Preferences.ALERT_ZONE_SHOWN)})")
         push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
         push("window.setLabelSweep(${Preferences.get(preferences, Preferences.LABEL_SWEEP)})")
+        push("window.setDateFormat(${Preferences.get(preferences, Preferences.DATE_FORMAT)})")
         push("window.setStatusBatteryPercent(${Preferences.get(preferences, Preferences.STATUS_BATTERY_PERCENT)})")
         push("window.setStatusBatteryPercentLight(${Preferences.get(preferences, Preferences.STATUS_BATTERY_PERCENT_LIGHT)})")
         push("window.setStatusBatteryIcons(${Preferences.get(preferences, Preferences.STATUS_BATTERY_ICONS)})")
@@ -1345,6 +1530,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         
         IslandNotificationListener.publishCall()
+        IslandNotificationListener.publishTrip()
     }
 
     private fun push(js: String) {
@@ -1413,6 +1599,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private fun topGrab(): Int = Preferences.get(preferences, Preferences.VERTICAL_OFFSET)
 
+    // In landscape a thumb reaching up to the bar lands below a bubble as often as on it, and that miss fell through to the reveal band and was replayed into the game, so the revealed bar's resting bubbles take a margin below them too.
+    private fun landscapeReach(): Int = if (isLandscape) LANDSCAPE_REACH else 0
+
     private fun dp(value: Int): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
     ).toInt()
@@ -1422,9 +1611,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
-    private fun wakeScreen() {
+    private fun wakeScreen(): Boolean {
         val power = getSystemService(PowerManager::class.java)
-        if (power.isInteractive) return
+        if (power.isInteractive) return false
         @Suppress("DEPRECATION")
         power.newWakeLock(
             PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
@@ -1435,6 +1624,24 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         isScreenOff = false
         applyVisibility()
+        return true
+    }
+
+    private fun darken() {
+        if (!getSystemService(KeyguardManager::class.java).isKeyguardLocked) return
+        push("window.setScreenDark(1)")
+        setStageBrightness(DARK_BRIGHTNESS)
+    }
+
+    private fun lightUp() {
+        push("window.setScreenDark(0)")
+        setStageBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+    }
+
+    private fun setStageBrightness(brightness: Float) {
+        if (params.screenBrightness == brightness) return
+        params.screenBrightness = brightness
+        relayout(stage, params)
     }
 
     private fun vibrate(effect: Int) {
@@ -1464,6 +1671,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     }
 
     private val togglesWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+    // A level shared the toggles' worker, so a drag begun as the dashboard opened waited behind the panel's whole read-back — a dozen shell commands — and every recheck after it; the bar under the finger ran a few hundred milliseconds behind and then caught up in a jump. A level is one in-process call and never waits on the shell.
+    private val levelsWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val togglesQueued = java.util.concurrent.atomic.AtomicInteger(0)
     private val levelTargets = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
@@ -1522,13 +1731,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             webView.post {
                 
                 isGrown = heightDp >= 0
+                settleSummon(SUMMON_NOTIFICATIONS, isGrown)
                 proxyParams.width =
                     dp((if (widthDp < 0) compactWidth() else widthDp) + (GRAB + BLEED) * 2)
                 // The proxy ended a grace margin below the bubble's own bottom edge, and every point in that margin routes to the bubble, so a tap aimed at the app underneath opened the bubble and a tap under a closing one reopened it. The margin is sideways and upward now: a grown state ends at its own bottom edge, the compact bubble GRAB past its.
                 proxyParams.height =
                     dp(
                         if (isGrown) heightDp + topGrab()
-                        else compactHeight() + topGrab() + GRAB
+                        else compactHeight() + topGrab() + GRAB + landscapeReach()
                     )
                 
                 
@@ -1537,8 +1747,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 
                 
                 
-                proxyParams.x =
-                    dp(Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET) + shiftDp)
+                proxyParams.x = dp(horizontalOffset() + shiftDp)
                 relayout(touchProxy, proxyParams)
             }
         }
@@ -1562,6 +1771,34 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun passAlertTap() {
             webView.post { replayAlertTap() }
+        }
+
+        @JavascriptInterface
+        fun liftScreenDark() {
+            webView.post { setStageBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE) }
+        }
+
+        @JavascriptInterface
+        fun sleepScreen() {
+            performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+        }
+
+        @JavascriptInterface
+        fun passRevealTap() {
+            webView.post { replayStripTap() }
+        }
+
+        @JavascriptInterface
+        fun setLandscapeStage(stage: Int) {
+            webView.post {
+                if (!isLandscape || stage == landscapeStage) return@post
+                landscapeStage = stage
+                if (stage == STAGE_REVEALED) {
+                    cornerKeptUntil = android.os.SystemClock.uptimeMillis() + CORNER_DOUBLE
+                    webView.postDelayed({ placeRevealWindows() }, CORNER_DOUBLE)
+                }
+                applyVisibility()
+            }
         }
 
         @JavascriptInterface
@@ -1618,6 +1855,23 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         @JavascriptInterface
+        fun setNotesProxies(spec: String) {
+            webView.post {
+                val boxes = spec.split(';')
+                notesProxyParams.forEachIndexed { index, notesParams ->
+                    val box = boxes.getOrNull(index).orEmpty().split(',').mapNotNull { it.toIntOrNull() }
+                    val isLive = box.size == 4 && box[2] > 0 && box[3] > 0
+                    notesParams.width = if (isLive) dp(box[2]) else 0
+                    notesParams.height = if (isLive) dp(box[3]) else 0
+                    notesParams.x = if (isLive) params.x + dp(box[0]) else 0
+                    notesParams.y = if (isLive) dp(box[1]) else 0
+                    notesParams.flags = proxyFlags(isLive)
+                    relayout(notesProxies[index], notesParams)
+                }
+            }
+        }
+
+        @JavascriptInterface
         fun setLockProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {
             webView.post {
                 val isLive = widthDp > 0
@@ -1663,7 +1917,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             webView.post {
                 val isLive = widthDp > 0
                 clockProxyParams.width = if (isLive) dp(widthDp) else 0
-                clockProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
+                clockProxyParams.height = if (isLive) dp(heightDp + topGrab() + landscapeReach()) else 0
                 clockProxyParams.x = params.x + dp(leftDp)
                 clockProxyParams.flags = proxyFlags(isLive)
                 relayout(clockProxy, clockProxyParams)
@@ -1674,8 +1928,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         fun setStatusProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
             webView.post {
                 val isLive = widthDp > 0
+                // The open Dashboard asks for the whole screen and the settled bubble for its own box, so those two are its open and its shut; the zero in between is only the leave.
+                if (isLive) settleSummon(SUMMON_STATUS, dp(widthDp) >= screenWidth() - dp(1))
                 statusProxyParams.width = if (isLive) dp(widthDp) else 0
-                statusProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
+                statusProxyParams.height = if (isLive) dp(heightDp + topGrab() + landscapeReach()) else 0
                 statusProxyParams.x = params.x + dp(leftDp)
                 statusProxyParams.flags = proxyFlags(isLive)
                 relayout(statusProxy, statusProxyParams)
@@ -1864,6 +2120,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         @JavascriptInterface
+        fun readBatteryExact(): Double = BatteryWatch.readExact(this@BubbleService)
+
+        @JavascriptInterface
         fun requestVitals() {
             val context = this@BubbleService
             Thread { push("window.onVitals(${VitalsWatch.read(context)})") }.start()
@@ -1937,10 +2196,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             levelTargets[name] = percent
             levelIntents[name] = percent to
                 (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
-            togglesWorker.execute {
+            levelsWorker.execute {
                 val target = levelTargets.remove(name) ?: return@execute
-                SystemToggles.setLevel(name, target)
+                SystemToggles.setLevel(name, target, false)
             }
+        }
+
+        // The lift is the one write that persists: a drag's frames may be temporary, and a temporary brightness is let go of the moment anything else touches the display.
+        @JavascriptInterface
+        fun settleLevel(name: String, percent: Int) {
+            levelTargets.remove(name)
+            levelIntents[name] = percent to
+                (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
+            levelsWorker.execute { SystemToggles.setLevel(name, percent, true) }
         }
 
         
@@ -1978,6 +2246,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         @JavascriptInterface
         fun timerAction(index: Int) = IslandNotificationListener.timerAction(index)
+
+        @JavascriptInterface
+        fun tripAction(index: Int) = IslandNotificationListener.tripAction(index)
 
         @JavascriptInterface
         fun mediaSeek(milliseconds: String) {

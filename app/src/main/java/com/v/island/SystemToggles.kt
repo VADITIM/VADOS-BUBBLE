@@ -125,7 +125,7 @@ object SystemToggles {
 
 
 
-    fun setLevel(name: String, percent: Int): Boolean {
+    fun setLevel(name: String, percent: Int, isFinal: Boolean): Boolean {
         val share = percent.coerceIn(0, 100)
         // A level used to be written with `settings put` and `cmd media_session`, and each of those forks a shell and then a whole app_process to run one Java command — a fifth of a second per frame, which is why a drag arrived as a series of late jumps however tightly the calls were queued. Both are one in-process call away, so the shell is now only the fallback for a phone that has not handed over WRITE_SETTINGS.
         val context = host ?: return false
@@ -133,6 +133,14 @@ object SystemToggles {
             "brightness" -> {
                 if (brightnessMax <= 0) return false
                 val level = (share * brightnessMax / 100).coerceAtLeast(1)
+                if (isFinal) isTemporaryBrightnessLive = false
+                // The mode is read once per drag rather than per frame: once the first temporary frame has landed the drag can only have flipped it to manual, never back.
+                if (!isFinal && (isTemporaryBrightnessLive || isManualBrightness(context)) &&
+                    ShizukuShell.setBrightness(share / 100f, false)
+                ) {
+                    isTemporaryBrightnessLive = true
+                    return true
+                }
                 if (!Settings.System.canWrite(context)) {
                     ShizukuShell.run(
                         "settings put system screen_brightness_mode 0;" +
@@ -172,6 +180,13 @@ object SystemToggles {
 
     private var host: Context? = null
 
+    private var isTemporaryBrightnessLive = false
+
+    // A temporary brightness is ignored under auto brightness, so the first frame of a drag still goes through settings and flips the mode, and the frames after it are temporary.
+    private fun isManualBrightness(context: Context) = Settings.System.getInt(
+        context.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, 0
+    ) == Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+
     // WRITE_SETTINGS is an app op rather than a permission a grant dialog can hand over, so Shizuku sets it once instead of sending the user to the Settings app for it — and it has to wait for the shell to actually connect, which is a callback and not the return of bind().
     fun attach(context: Context) {
         host = context.applicationContext
@@ -200,9 +215,14 @@ object SystemToggles {
             "wifi" -> "svc wifi " + if (isOn) "enable" else "disable"
             "bluetooth" -> "svc bluetooth " + if (isOn) "enable" else "disable"
             
-            "usb" -> "svc usb setFunctions " + if (isOn) "mtp" else ""
+            "usb" -> {
+                val usb = "svc usb setFunctions " + if (isOn) "mtp" else ""
+                return (ShizukuShell.run(usb) ?: WirelessAdb.run(usb)) != null
+            }
             "mobile" -> "svc data " + if (isOn) "enable" else "disable"
-            "modus" -> "cmd notification set_dnd " + if (isOn) "on" else "off"
+            // `set_dnd on` is total silence on the manual rule, which neither ends a Samsung mode that is running nor brings back the one last used — both of those belong to the Routines app and its permissions are signature-only. Its Modes tile does exactly that on a tap: stops the running mode, or restarts the most recent one.
+            "modus" -> "cmd statusbar click-tile " +
+                "com.samsung.android.app.routines/com.samsung.android.app.routines.LifestyleModeTile"
             "dim" -> "settings put secure reduce_bright_colors_activated $one"
             "rotate" -> "settings put system accelerometer_rotation $one"
             "saver" -> "settings put global low_power $one"

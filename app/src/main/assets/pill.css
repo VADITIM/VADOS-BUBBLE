@@ -55,6 +55,7 @@
 
 
 
+  /* Mirrored as HOLE_GAP in js/row.js. */
   --hole-gap: 40px;
   
 
@@ -129,7 +130,8 @@ html, body {
 #text, .message, #app-name, #title, #unread,
 #player-title, #player-artist, #player-position, #player-duration,
 #notifications-label, #notifications-count, #notifications-empty, .notification-name, .notification-text,
-#timer-remaining, #timer-label, #timer-clock {
+#timer-remaining, #timer-label, #timer-clock,
+#trip-remaining, #trip-label, #trip-clock, #trip-train, #trip-route {
   border-radius: 0;
 }
 
@@ -171,7 +173,7 @@ html, body {
     
 
     border-radius var(--grow-ms) ease-out,
-    top var(--grow-ms) var(--ease-reach),
+    top var(--grow-ms) var(--top-ease, var(--ease-reach)),
     padding-right var(--grow-ms) var(--ease-bubble),
     padding-bottom var(--grow-ms) var(--ease-bubble),
 
@@ -188,7 +190,7 @@ html, body {
   
 
 
-  translate: var(--shift, 0px) calc(var(--alert-drop, 0px) + var(--notifications-drop, 0px));
+  translate: var(--shift, 0px) calc(var(--alert-drop, 0px) + var(--notifications-drop, 0px) - var(--conceal-lift, 0px));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,19 +224,27 @@ html, body {
 
 
 
-html.grown #pill { top: calc(var(--grab, 0px) + var(--grown-pad)); }
+/* A growth ran on four clocks — width on an ease-grow the root resolved at its own 340ms, height on the 1.7 overshoot, top on the reach curve, translate on the row's leftover `--shift-delay` — so the move and the resize landed in whichever order those happened to fall; every channel of a growth is now the bubble's one timeline. */
+html.grown #pill {
+  top: calc(var(--grab, 0px) + var(--grown-pad));
+  --width-ms: var(--grow-ms);
+  --width-delay: 0ms;
+  --width-ease: var(--ease-grow);
+  --height-ease: var(--ease-grow);
+  --top-ease: var(--ease-grow);
+  --carry-ms: var(--grow-ms);
+  --carry-ease: var(--ease-grow);
+  --shift-delay: 0ms;
+}
 #pill.alerting.with-image { height: 190px; }
 #pill.expanded { width: 340px; height: 150px; border-radius: 30px; }
 #pill.picture { width: 340px; height: var(--picture-height, 320px); border-radius: 26px; }
-#pill.notifications { width: 340px; height: var(--notifications-height, 320px); border-radius: 26px; --carry-ms: var(--grow-ms); --shift-delay: 0ms; }
+#pill.notifications { width: 340px; height: var(--notifications-height, 320px); border-radius: 26px; }
 
 
 
 #pill.alert-centred {
-  /* Everything about this journey is one timeline: the travel to the middle and the box growing under it share a clock, and `--shift-delay` is zeroed because the row leaves 120ms standing on it after a shift, so the bubble began travelling long after it had begun growing. */
   --grow-ms: 460ms;
-  --carry-ms: var(--grow-ms);
-  --shift-delay: 0ms;
   width: var(--alert-width);
   height: var(--alert-height, 162px);
   border-radius: 28px;
@@ -602,12 +612,26 @@ html.notifications-homing #pill {
 
 
 html.liquid #pill, html.liquid .satellite, html.liquid #lock-now,
-html.liquid #status, html.liquid #clock, html.liquid #double {
+html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #notifications-clear {
   background: transparent;
   border-color: transparent;
 }
 
 #liquid-edge, #liquid-fill { position: absolute; inset: 0; filter: url(#bubble-goo); }
+
+#screen-dark {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 360ms var(--ease-leave);
+}
+html.screen-dark #screen-dark { opacity: 1; transition: none; }
+html.screen-dark #pill { z-index: 51; }
+/* The skin is drawn in #liquid, which the dark covers, so over it the Alert wears its own box the way it did before the goo existed. */
+html.liquid.screen-dark #pill.alert { background: var(--pill-background); border-color: var(--app-accent); }
 
 
 
@@ -707,10 +731,10 @@ html.dragging #pill { transition: scale 350ms linear; }
 
 
 
-#media-face, #timer-face, #call-face {
+#media-face, #timer-face, #call-face, #trip-face {
   transition: opacity var(--face-fade, 0ms) ease var(--face-delay, 0ms);
 }
-#equalizer, #timer-remaining, #call-time {
+#equalizer, #timer-remaining, #call-time, #trip-remaining {
   transition: opacity 380ms ease, transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
   transition-delay: var(--face-delay, 0ms);
 }
@@ -722,7 +746,7 @@ html.dragging #pill { transition: scale 350ms linear; }
 
 
 .face:not(.showing) #equalizer, .face:not(.showing) #timer-remaining,
-.face:not(.showing) #call-time {
+.face:not(.showing) #call-time, .face:not(.showing) #trip-remaining {
   opacity: 0;
   transform: translateX(30px);
   transition: none;
@@ -787,6 +811,8 @@ html.entering .face.showing > :not(.glyph) { opacity: 0; transition: none; }
 
 
 html.leaving .face.showing > :not(.glyph) { opacity: 0; transition: opacity 140ms ease; }
+/* A mod leaving keeps `showing` until its glyph has gone into the hole, so the out-clip above never reached it and its glyph and reading faded outside the bubble while it shrank to idle. */
+html.leaving .face.showing { overflow: clip; border-radius: inherit; }
 
 
 
@@ -1116,6 +1142,7 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 }
 #pill.with-image #picture { display: block; }
 #pill.picture #picture { object-fit: contain; }
+#pill.alert-centred #picture { object-fit: contain; }
 
 
 
@@ -1132,16 +1159,16 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 #pill.player { width: 340px; height: 304px; border-radius: 34px; }
 
 
-#pill.player, #pill.timer,
+#pill.player, #pill.timer, #pill.trip,
 #pill.notifications, #pill.expanded, #pill.picture { --grow-ms: 460ms; }
-#pill.player .face.showing, #pill.timer .face.showing,
+#pill.player .face.showing, #pill.timer .face.showing, #pill.trip .face.showing,
 #pill.notifications .face.showing, #pill.expanded .face.showing { transition-duration: 280ms; }
 
 
 
 
 
-#media-face, #timer-face, #call-face {
+#media-face, #timer-face, #call-face, #trip-face {
   justify-content: space-between;
   padding: 0 0.4rem 0 var(--glyph-inset);
 }
@@ -1162,9 +1189,10 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 
 
 
-#media-face, #timer-face, #call-face {
+#media-face, #timer-face, #call-face, #trip-face {
   column-gap: var(--hole-gap);
 }
+#media-face { padding-right: var(--glyph-inset); }
 
 
 #media-art {
@@ -1208,27 +1236,10 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 
 
 #equalizer {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 2px;
+  display: block;
   width: var(--mod-glyph);
   height: var(--mod-glyph);
   flex: none;
-}
-/* The bars swung on `height`, which is layout: for as long as a song played the pill was restyled, relaid and repainted on every vsync, hidden behind the open player or not. A full-height capsule slid down inside a capsule-shaped clip draws the same bar with both caps round, and `translate` is the compositor's. */
-#equalizer span {
-  width: 3px;
-  height: 100%;
-  border-radius: 999px;
-  overflow: hidden;
-}
-#equalizer i {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--app-accent);
-  translate: 0 60%;
 }
 
 
@@ -1350,6 +1361,93 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
   width: var(--main-width);
   height: var(--pill-height);
 }
+
+#pill.travelling {
+  width: var(--main-width);
+  height: var(--pill-height);
+}
+#pill.trip { width: 340px; height: 232px; border-radius: 26px; }
+
+.trip-mark {
+  height: calc(var(--mod-glyph) * 0.72);
+  width: var(--mod-glyph);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--app-accent);
+  border-radius: 4px;
+  color: var(--app-accent);
+  font-size: calc(var(--mod-glyph) * 0.4);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+#trip-remaining {
+  font-size: calc((0.62rem) * var(--font-scale, 1));
+  letter-spacing: 0.02rem;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+  max-width: 104px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+#trip-panel {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+}
+#trip-panel [hidden] { display: none; }
+#trip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+#trip-label {
+  font-size: calc((0.6rem) * var(--font-scale, 1));
+  letter-spacing: 0.19rem;
+  text-transform: uppercase;
+  color: var(--app-accent);
+}
+#trip-clock {
+  font-size: calc((1.3rem) * var(--font-scale, 1));
+  letter-spacing: 0.06rem;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+}
+#trip-train {
+  font-size: calc((1rem) * var(--font-scale, 1));
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+}
+#trip-route, #trip-exit, #trip-next {
+  font-size: calc((0.7rem) * var(--font-scale, 1));
+  color: var(--text-body);
+  white-space: nowrap;
+  overflow: hidden;
+}
+#trip-facts {
+  display: flex;
+  gap: 0.8rem;
+  font-size: calc((0.7rem) * var(--font-scale, 1));
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+#trip-delay { color: var(--app-accent); }
+#trip-lines {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
+  color: var(--text-muted);
+}
+.trip-line { white-space: nowrap; overflow: hidden; }
+#trip-actions { display: flex; gap: 0.6rem; }
 
 
 
@@ -1575,7 +1673,7 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
   align-items: stretch;
   justify-content: flex-start;
   gap: 0;
-  padding: 0.75rem 0.4rem 0.5rem;
+  padding: 0.9rem 0.4rem 0.5rem;
   
 
 
@@ -1596,7 +1694,7 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 0 0.7rem 0.5rem;
+  padding: 0 0.9rem 0.6rem;
   flex: none;
 }
 #notifications-label {
@@ -1626,18 +1724,14 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 
 .notification-row {
   display: grid;
-  grid-template-columns: 3px minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 0.8rem;
   align-items: start;
-  padding: 0.7rem 0.8rem;
+  margin: 0 0.35rem;
+  padding: 0.8rem 0.55rem;
   border-bottom: 1px solid var(--border);
 }
 .notification-row:last-child { border-bottom: 0; }
-
-
-
-
-
 .notification-row[data-gradient] .notification-mark { background-image: var(--row-gradient); }
 .notification-row[data-gradient] .notification-name {
   background-image: var(--row-gradient);
@@ -1645,77 +1739,131 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
   -webkit-background-clip: text;
   color: transparent;
 }
-
-.notification-row:has(.notification-icon) {
-  grid-template-columns: 3px 34px minmax(0, 1fr);
+.notification-icon, .notification-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 30%;
+  corner-shape: squircle;
 }
-.notification-icon {
-  width: 34px;
-  height: 34px;
-  max-height: 90%;
-  align-self: center;
-  border-radius: 999px;
-  object-fit: cover;
+.notification-icon { object-fit: cover; }
+.notification-mark {
+  display: grid;
+  place-items: center;
+  font-size: calc((0.9rem) * var(--font-scale, 1));
+  color: var(--pill-solid);
 }
-
-.notification-mark { align-self: stretch; border-radius: 999px; }
 .notification-copy { min-width: 0; }
-.notification-name {
-  font-size: calc((0.66rem) * var(--font-scale, 1));
-  letter-spacing: 0.16rem;
-  text-transform: uppercase;
-}
-
 .notification-head-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 0.5rem;
+  font-family: var(--font-notification-heading);
+  --font-scale: var(--font-size-notification-heading, 1);
 }
-
-
+.notification-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: calc((0.68rem) * var(--font-scale, 1));
+  letter-spacing: 0.14rem;
+  text-transform: uppercase;
+}
 .notification-tally {
-  font-size: calc((0.64rem) * var(--font-scale, 1));
-  letter-spacing: 0.06rem;
-  color: var(--text-muted);
   flex: none;
-}
-
-
-
-
-.notification-when {
-  font-size: calc((0.64rem) * var(--font-scale, 1));
-  letter-spacing: 0.04rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-  margin-left: auto;
-  padding-left: 0.5rem;
+}
+.notification-when {
   flex: none;
+  margin-left: auto;
+  font-size: calc((0.68rem) * var(--font-scale, 1));
+  color: var(--text-label);
+  font-variant-numeric: tabular-nums;
 }
-
 .notification-who {
-  font-size: calc((0.88rem) * var(--font-scale, 1));
-  line-height: 1.35;
   margin-top: 0.2rem;
+  font-family: var(--font-notification-heading);
+  --font-scale: var(--font-size-notification-heading, 1);
+  font-size: calc((0.95rem) * var(--font-scale, 1));
+  line-height: 1.3;
+  color: var(--text-bright);
   overflow-wrap: anywhere;
 }
-.notification-text {
-  font-size: calc((0.84rem) * var(--font-scale, 1));
-  line-height: 1.5;
-  color: var(--text-muted);
-  
+.notification-body {
+  margin-top: 0.25rem;
+  font-family: var(--font-notification-content);
+  --font-scale: var(--font-size-notification-content, 1);
+  font-size: calc((0.86rem) * var(--font-scale, 1));
+  line-height: 1.45;
+  color: var(--text-body);
+}
+.notification-text { overflow-wrap: anywhere; }
+.notification-text + .notification-text { margin-top: 0.2rem; }
+/* Mirrors CLEAR_SIZE, CLEAR_GAP and NOTIFICATIONS_FOOT in js/tabs.js, which ask the proxy window for the room beneath the menu this bubble stands in. */
+#notifications-clear {
+  --clear-size: 44px;
+  --clear-gap: 12px;
+  --clear-foot: 16px;
+  position: absolute;
+  z-index: 30;
+  top: calc(var(--grab, 0px) + var(--grown-pad) + var(--notifications-drop, 0px) + var(--notifications-height, 320px) + var(--clear-gap));
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: var(--clear-size);
+  height: var(--clear-size);
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  transform-origin: 50% 0;
+  translate: 0 calc(-1 * (var(--clear-size) + var(--clear-gap)));
+  scale: 0;
+  pointer-events: none;
+  transition:
+    top 460ms var(--ease-grow),
+    translate 220ms var(--ease-grow),
+    scale 220ms var(--ease-grow);
+}
+#notifications-clear svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--text-bright);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+#pill.notifications ~ #notifications-clear {
+  translate: 0 0;
+  scale: var(--clear-press, 1);
+  pointer-events: auto;
+  transition:
+    top 460ms var(--ease-grow),
+    translate 380ms var(--ease-split) 220ms,
+    scale 320ms var(--ease-split) 220ms;
+}
+#pill.notifications ~ #notifications-clear svg { opacity: 1; transition-delay: 380ms; }
+#notifications-clear.pressing { --clear-press: 1.03; }
+#pill.notifications ~ #notifications-clear.pressing { transition-delay: 0ms; }
 
-  overflow-wrap: anywhere;
+html.clear-corner #notifications-clear {
+  top: calc(100% - var(--clear-foot) - var(--clear-size));
+  left: auto;
+  right: calc(50% - 170px);
+  margin-inline: 0;
+  transform-origin: 50% 50%;
+  translate: 0 0;
 }
 
-
-
-.notification-text.divided {
-  margin-top: 0.35rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--border);
-}
 #notifications-empty {
   font-size: calc((0.72rem) * var(--font-scale, 1));
   color: var(--text-muted);
@@ -1871,6 +2019,9 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
   flex: none;
   background: var(--sunken);
 }
+
+
+.sat-trip { font-size: calc(var(--mod-glyph) * 0.36); }
 
 .sat-clock {
   width: var(--mod-glyph);
@@ -2246,34 +2397,51 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 
 /* The Status bubble's battery is a small copy of the dashboard's cell/fill/pin, reading the same --charge-width and --charge-color the dashboard's own icon reads — set on #status itself in paintBattery() so both inherit off one paint. */
 .status-slot[data-slot="battery"] .status-slot-inner {
-  width: auto;
+  width: max-content;
   height: auto;
+  justify-items: start;
 }
+.status-slot[data-slot="battery"]:not(.arriving, .leaving, .popping) .status-slot-inner { overflow: visible; }
 .mini-battery {
+  --battery-outline: var(--charge-color, var(--text-faint));
   position: relative;
   display: flex;
   align-items: center;
-  height: calc(var(--mod-glyph) * 0.72);
+  height: calc(var(--mod-glyph) * 0.8);
 }
-.mini-battery.bare { height: calc(var(--mod-glyph) * 0.60); }
-.mini-battery.bare .mini-battery-cell { width: calc(var(--mod-glyph) * 1.14); }
+.mini-battery.bare { height: calc(var(--mod-glyph) * 0.67); }
+.mini-battery.bare .mini-battery-cell { width: calc(var(--mod-glyph) * 1.1); }
+.mini-battery::after {
+  content: "";
+  flex: none;
+  width: 1.5px;
+  height: 34%;
+  margin-left: 1px;
+  border-radius: 0 1px 1px 0;
+  background: var(--battery-outline);
+  transition: background 500ms ease;
+}
 .mini-battery-cell {
   position: relative;
   overflow: hidden;
   display: grid;
   place-items: center;
-  width: calc(var(--mod-glyph) * 1.24);
+  box-sizing: border-box;
+  width: calc(var(--mod-glyph) * 1.3);
   height: 100%;
-  border-radius: 0;
+  border: 1.5px solid var(--battery-outline);
+  transition: border-color 500ms ease;
+  border-radius: calc(var(--mod-glyph) * 0.17);
   background: rgba(42, 40, 50, 0.85);
 }
 .mini-battery-fill {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  left: 1px;
+  top: 1px;
+  bottom: 1px;
   width: var(--charge-width, 0%);
-  border-radius: 0;
+  max-width: calc(100% - 2px);
+  border-radius: max(1px, calc(var(--mod-glyph) * 0.17 - 2.5px));
   background: var(--charge-color, var(--text-faint));
   transition: background 500ms ease, width 500ms ease;
 }
@@ -2578,6 +2746,29 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   transition: opacity 200ms ease;
 }
 #quick-panel.showing #quick-weather { opacity: 1; transition-delay: 160ms; }
+
+#quick-mods {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  top: -18px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-bright);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease, scale 200ms var(--ease-split);
+}
+#quick-mods[hidden] { display: none; }
+#quick-mods svg { width: 60%; height: 60%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#quick-panel.showing #quick-mods { opacity: 0.32; pointer-events: auto; transition-delay: 160ms, 0ms; }
+#quick-panel.showing #quick-mods:active { opacity: 0.6; scale: 0.9; transition-delay: 0ms; }
 #weather-glyph svg { width: 16px; height: 16px; fill: currentColor; }
 
 
@@ -2730,40 +2921,79 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   background: var(--charge-color, var(--text-faint));
   transition: background 500ms ease;
 }
-/* The top was a hand-guessed 7px against a cell whose height is the row's, so the mark sat low in the fill rather than on its middle line — it is centred off the box now instead of measured into it. */
-#battery-glyph {
+#battery-fill { overflow: hidden; }
+.charge-bubble {
   position: absolute;
-  top: 50%;
-  translate: 0 -50%;
-  left: 9px;
-  width: 20px;
-  height: 20px;
-  z-index: 3;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
 }
-#battery-glyph svg { width: 100%; height: 100%; fill: currentColor; }
-#battery-reading {
+.charge-bubble i {
+  position: absolute;
+  left: calc(var(--bubble-size) * -1);
+  top: var(--bubble-y);
+  width: var(--bubble-size);
+  height: var(--bubble-size);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+#quick-panel.showing #quick-battery.charging .charge-bubble {
+  animation: charge-rise var(--bubble-ms) cubic-bezier(0.45, 0, 0.7, 1) var(--bubble-delay) infinite;
+}
+#quick-panel.showing #quick-battery.charging .charge-bubble i {
+  animation: charge-wobble calc(var(--bubble-ms) / 3) ease-in-out var(--bubble-delay) infinite alternate;
+}
+@keyframes charge-rise {
+  0%   { translate: 0 0; opacity: 0; }
+  15%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { translate: calc(100% + var(--bubble-size) * 2) 0; opacity: 0; }
+}
+@keyframes charge-wobble {
+  0%   { translate: 0 -2px; scale: 0.6; }
+  100% { translate: 0 2px; scale: 1; }
+}
+/* The reading stood in white with a black stroke over both the bright fill and the dark well, so it read as neither; it is drawn twice now, white clipped to the well and black clipped to the fill, and each glyph takes whichever colour is behind that part of it. */
+.battery-ink {
+  position: absolute;
+  inset: 0;
   z-index: 3;
-  position: relative;
+  display: grid;
+  place-items: center;
+  color: #fff;
   font-family: var(--font-battery);
+  clip-path: inset(0 0 0 max(0px, calc(var(--charge-width, 0%) - 4px)));
+}
+.battery-ink.over-fill {
+  color: #000;
+  clip-path: inset(0 calc(100% - max(0px, calc(var(--charge-width, 0%) - 4px))) 0 0);
+}
+.battery-reading {
+  display: inline-flex;
+  align-items: center;
   font-size: calc((1.75rem) * var(--font-scale, 1));
   line-height: 1;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 2px #000;
-  paint-order: stroke fill;
 }
-#battery-remaining {
+/* tabular-nums only holds where the chosen battery font carries tabular figures, so the hundredths pulled the reading sideways every second; each of them is its own box as wide as the font's own 0. The whole number is left to its own spacing, since boxing a condensed 1 spread it apart and it only changes once a percent. */
+.battery-hundredths .battery-digit { display: inline-block; width: 1ch; text-align: center; }
+.battery-side {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 0.06em;
+  font-size: 0.5em;
+  line-height: 1;
+}
+.battery-remaining {
   position: absolute;
   right: 9px;
-  bottom: 6px;
-  z-index: 3;
-  font-family: var(--font-battery);
-  font-size: calc((0.58rem) * var(--font-scale, 1));
+  bottom: 3px;
+  font-size: calc((0.48rem) * var(--font-scale, 1));
   line-height: 1;
-  color: rgba(255, 255, 255, 0.82);
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 2px #000;
-  paint-order: stroke fill;
 }
 
 
@@ -2773,9 +3003,17 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 #quick-transfer.idle #transfer-track,
 #quick-transfer.idle #transfer-actions { display: none; }
 #quick-transfer.idle #transfer-name { opacity: 0; }
-#quick-transfer {
+#quick-row-transfer {
+  display: flex;
+  gap: var(--quick-gap);
   flex: none;
   height: var(--quick-transfer-tall);
+}
+
+#quick-transfer {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2846,6 +3084,25 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 
 
 
+
+#quick-usb {
+  flex: none;
+  width: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 0.8rem;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  font-family: "Mono", monospace;
+  font-size: calc((0.66rem) * var(--font-scale, 1));
+  white-space: nowrap;
+}
+#quick-usb:not(.attached) { display: none; }
+#quick-usb .quick-icon svg { width: 18px; height: 18px; }
+#quick-usb.on { color: var(--section-color); border-color: color-mix(in srgb, var(--section-color) 50%, var(--border)); }
+#usb-reading { color: var(--text-body); }
 
 #quick-row-body {
   display: flex;
@@ -2918,14 +3175,16 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 }
 .quick-mode.on .quick-ring { color: color-mix(in srgb, var(--section-color) 70%, var(--text-body)); }
 
-.ring-text {
-  transform-box: view-box;
-  transform-origin: center;
+.ring-spin {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 /* Six of these turned forever behind a panel that is laid out at its full box from load and only faded in, which was the largest single idle drain in the app. */
 /* Written against `.showing` alone the turn stopped the frame the class came off, and every ring snapped back to 0deg — which is the teleport seen before a module rotates out: the collapse starts from a rotation the ring had never been standing at. Matching `.leaving` as well keeps the same animation running rather than restarting it, because the name and the timing are identical; `leaving` is taken off once the collapse has landed, so the idle drain this rule was written to stop stays stopped. */
-#quick-panel.showing .ring-text,
-#quick-panel.leaving .ring-text {
+/* The turn was on a `<g>` inside the ring's SVG, which the compositor cannot take, so six rings of text were repainted on the main thread every frame the Dashboard stood open — the one loop that never stopped while a video behind it was already costing the GPU every frame. On an HTML box the same turn is a composited transform over a raster painted once. */
+#quick-panel.showing .ring-spin,
+#quick-panel.leaving .ring-spin {
   animation: ring-turn 16s linear infinite;
 }
 
@@ -2937,17 +3196,12 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   transform-box: fill-box;
   transform-origin: center;
   dominant-baseline: central;
-  animation: ring-char-in 320ms var(--ease-grow) backwards;
-  animation-delay: calc(var(--index) * 26ms);
+  animation: pop-in 460ms var(--ease-split) var(--pop-at, 0ms) both;
 }
 
-.quick-mode.swapping .ring-char {
-  animation: ring-char-out 240ms var(--ease-split) forwards;
-  animation-delay: calc(var(--index) * 14ms);
-}
-.quick-mode.swapped .ring-char {
-  animation-duration: 180ms;
-  animation-delay: calc(var(--index) * 12ms);
+/* The pop-out duration is mirrored by RING_OUT_MS in status.js. */
+.quick-mode.ring-leaving .ring-char {
+  animation: pop-out 150ms var(--ease-grow) var(--pop-at, 0ms) both;
 }
 
 .quick-charge {
@@ -2996,14 +3250,6 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 @keyframes ring-burst {
   0%   { opacity: 1; scale: 1; }
   100% { opacity: 0; scale: 1.35; }
-}
-@keyframes ring-char-out {
-  from { rotate: 0deg; scale: 1; opacity: 1; }
-  to   { rotate: 160deg; scale: 0; opacity: 0; }
-}
-@keyframes ring-char-in {
-  from { rotate: -120deg; scale: 0; opacity: 0; }
-  to   { rotate: 0deg; scale: 1; opacity: 1; }
 }
 
 
@@ -3116,6 +3362,14 @@ html.call-live .level[data-level="volume"] { top: calc(50% + var(--quick-level-s
   place-items: center;
 }
 .level-icon svg { width: 24px; height: 24px; fill: currentColor; }
+.level-icon-covered {
+  top: 0;
+  bottom: 0;
+  padding-top: 14px;
+  place-items: start center;
+  color: #000;
+  clip-path: inset(calc(100% - var(--level, 0%)) 0 0 0);
+}
 .level.lit { color: var(--text-bright); }
 
 
@@ -3127,7 +3381,7 @@ html.call-live .level[data-level="volume"] { top: calc(50% + var(--quick-level-s
   width: calc(100% + var(--quick-margin) * 2);
   margin-inline: calc(var(--quick-margin) * -1);
   height: var(--quick-knob-size);
-  /* The window clips the knob row sideways so the nine scroll inside it, and clipped on both axes it cut the arrival's own pull off — the bottom row starts furthest below its place, which is exactly the travel this box was hiding. */
+  /* The window clips the knob row sideways so the eight scroll inside it, and clipped on both axes it cut the arrival's own pull off — the bottom row starts furthest below its place, which is exactly the travel this box was hiding. */
   overflow-x: clip;
   overflow-y: visible;
   transition: width var(--grow-ms) var(--ease-grow), height var(--grow-ms) var(--ease-grow);
@@ -3191,7 +3445,7 @@ html.call-live .level[data-level="volume"] { top: calc(50% + var(--quick-level-s
 
 
 
-/* Expanded, the Now bubble is what is being read, so the toggles give it the room rather than the two fighting over a section that has lost half its height: the row shrinks and travels down to the panel's own foot, and the same nine stay reachable because the window scrolls either way. The mini bubble takes none of it — the lift is what the row was already standing at, so nothing moves until the bubble is opened.
+/* Expanded, the Now bubble is what is being read, so the toggles give it the room rather than the two fighting over a section that has lost half its height: the row shrinks and travels down to the panel's own foot, and the same eight stay reachable because the window scrolls either way. The mini bubble takes none of it — the lift is what the row was already standing at, so nothing moves until the bubble is opened.
 
    The tokens are on the root rather than on the panel: the Now bubble's stack stands outside the panel and is anchored off the knob row, so it has to be able to read both of these. */
 html.now-open {
@@ -3215,7 +3469,7 @@ html.now-open {
   animation-name: level-grow;
 }
 /* Text inside a box scaling up from nothing is re-rasterised at each raster scale the compositor steps through, so the stats readings jumped in coarse steps while their bubbles grew; they wait out their own bubble's pop and fade in once it has landed. */
-#quick-panel.entering :is(.vital-reading, .vital-gauge, #battery-remaining) {
+#quick-panel.entering :is(.vital-reading, .vital-gauge, .battery-remaining) {
   animation: stat-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--quick-pop) + var(--rise-after, 0ms)) backwards;
 }
 #quick-panel.entering .vital-gauge { --rise-after: 50ms; }
@@ -3233,7 +3487,7 @@ html.now-open {
 html.fast-dashboard #quick-panel.entering .quick-bubble {
   animation: fast-drop 220ms ease-out calc(var(--panel-at, 0ms) + var(--fast-at, 0ms)) backwards;
 }
-html.fast-dashboard #quick-panel.entering :is(.vital-reading, .vital-gauge, #battery-remaining) { animation: none; }
+html.fast-dashboard #quick-panel.entering :is(.vital-reading, .vital-gauge, .battery-remaining) { animation: none; }
 @keyframes fast-drop {
   from { opacity: 0; translate: 0 -14px; }
   to   { opacity: 1; translate: 0 0; }
@@ -3274,6 +3528,7 @@ html.fast-dashboard #quick-panel.entering :is(.vital-reading, .vital-gauge, #bat
   --pop-turn: -360deg;
   --pop-turn-out: 180deg;
 }
+.quick-bubble#quick-usb { --pop-turn: 0deg; --pop-turn-out: 0deg; }
 
 
 
@@ -4219,3 +4474,282 @@ html.spread-landing #channel-under { opacity: 0; }
   filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55));
 }
 #player-hint.settling { transition: opacity 200ms ease, scale 200ms var(--ease-grow); }
+
+
+
+
+/* Landscape. The bar is not on the screen until it is asked for (js/reveal.js): everything but Main is faded to nothing, which also takes it out of the goo and the blur, and Main is parked above the top edge so an Alert can come down from outside the screen rather than out of a bubble nobody can see. */
+html.landscape.concealed :is(#clock, #status, #satellite-left, #satellite-right, #dots-left, #dots-right, #lock-stack, #double) {
+  opacity: 0 !important;
+}
+html.landscape.concealed:not(.grown) #pill {
+  --conceal-lift: calc(var(--grab, 0px) + var(--pill-height) + 60px);
+}
+/* The reveal pops Main open where it rests and the leave parks it again once it is a drop, so the travel between the two places is a jump rather than a carry. */
+html.revealing #pill {
+  --carry-ms: 0ms;
+  --shift-delay: 0ms;
+}
+html.landscape #pill.alerting .message { -webkit-line-clamp: 1; }
+
+/* Landscape dashboard: the stats stand top-left, the toggles run along the foot from the left edge to the system section, and the system section is last so the two levels are the right-hand end of the screen, where the thumb holding the phone already is. The storage and memory bubble is left out, since the width it took is what lets the toggle row reach the left edge. */
+html.landscape {
+  --land-stats-wide: 260px;
+  --land-divider-room: 10px;
+  --land-knob-fade: 36px;
+  --land-knob-overflow: 28px;
+  --land-system-wide: calc(
+    var(--quick-grid-column) * 2 + var(--quick-knob-gap) + var(--quick-gap) +
+    var(--quick-levels-wide) + var(--quick-levels-inset)
+  );
+  --quick-grid-tall: 250px;
+  --quick-levels-tall: 250px;
+  --quick-toggle-lift: 0px;
+}
+html.landscape #quick-panel {
+  display: grid;
+  grid-template-columns: var(--land-stats-wide) minmax(0, 1fr) auto var(--land-system-wide);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+}
+html.landscape #stats-section {
+  grid-area: 1 / 1 / 2 / 2;
+  padding-top: 0;
+  justify-content: flex-start;
+}
+html.landscape #quick-vitals,
+html.landscape #stats-section + .quick-divider { display: none; }
+html.landscape #toggle-section {
+  grid-area: 2 / 1 / 3 / 3;
+  min-width: 0;
+  padding-bottom: 0;
+}
+html.landscape #system-section + .quick-divider { grid-area: 1 / 3 / 3 / 4; }
+/* Centred on the panel, the system section sat below the screen's middle by half the corner bubbles' band, so it is lifted by that half (--quick-centre-shift, written by fitStatusPanel in js/status.js). */
+html.landscape #system-section {
+  grid-area: 1 / 4 / 3 / 5;
+  translate: 0 var(--quick-centre-shift, 0px);
+}
+html.landscape #quick-panel .quick-divider {
+  width: 1px;
+  height: 46%;
+  align-self: center;
+  margin: 0 var(--land-divider-room);
+  background: linear-gradient(180deg, transparent, var(--text-muted), transparent);
+}
+/* The row scrolled off both ends on a hard edge; the padding gives the fade room inside the clip, and the vertical padding keeps the knobs' own arrival, which pulls them in from below, inside the mask's box. */
+html.landscape #quick-knob-window {
+  box-sizing: content-box;
+  width: calc(100% - var(--land-knob-fade) * 2);
+  margin: calc(var(--land-knob-overflow) * -1) 0;
+  padding: var(--land-knob-overflow) var(--land-knob-fade);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--land-knob-fade), #000 calc(100% - var(--land-knob-fade)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--land-knob-fade), #000 calc(100% - var(--land-knob-fade)), transparent);
+}
+/* The Now bubble stands over the toggle row, right of the stats. Mirrors the grid's columns: the stats' width, and the system section's width with its divider's room beside it. */
+html.landscape #lock-stack:has(> #lock-now.in-panel) {
+  left: calc(var(--quick-left, 10px) + var(--land-stats-wide) + var(--land-divider-room));
+  right: calc(var(--quick-left, 10px) + var(--land-system-wide) + var(--land-divider-room) * 2 + 1px);
+}
+
+/* Landscape notifications: there is no room under the menu, so the delete-all bubble stands beside its bottom-right corner, growing out of the menu's right edge. Mirrors the landscape branch of notificationsWindow() in js/tabs.js, which widens the proxy for it. */
+html.landscape #notifications-clear,
+html.landscape.clear-corner #notifications-clear {
+  top: calc(var(--grab, 0px) + var(--grown-pad) + var(--notifications-drop, 0px) + var(--notifications-height, 320px) - var(--clear-size));
+  left: calc(50% + 170px + var(--clear-gap));
+  right: auto;
+  margin-inline: 0;
+  transform-origin: 0 50%;
+  translate: calc(-1 * (var(--clear-size) + var(--clear-gap))) 0;
+}
+html.landscape #pill.notifications ~ #notifications-clear { translate: 0 0; }
+
+
+/* Mirrors NOTE_RADIUS in js/notes.js. --notes-top is where One UI starts its own lock-screen list, a measurement off the phone. */
+#lock-notes {
+  --note-radius: 22px;
+  --notes-top: 280px;
+  --notes-gap: 8px;
+  --notes-slice: 8px;
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--lock-inset, 16px) + var(--lock-x, 0px));
+  right: calc(var(--lock-inset, 16px) - var(--lock-x, 0px));
+  top: var(--notes-top);
+  display: flex;
+  flex-direction: column;
+  gap: var(--notes-gap);
+  overflow: visible;
+  pointer-events: none;
+  color: var(--text-bright);
+  font-family: var(--font-overlay);
+  --font-scale: var(--font-size-overlay, 1);
+  transition: opacity 220ms ease;
+}
+#lock-notes:not(.showing), #lock-notes.empty { visibility: hidden; }
+#pill:is(.notifications, .alert-centred, .player, .timer, .picture, .expanded) ~ #lock-notes,
+#quick-panel.showing ~ #lock-notes { opacity: 0; }
+
+#lock-notes-head { display: flex; justify-content: flex-end; }
+#lock-notes-clear, #lock-notes-more {
+  box-sizing: border-box;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  transition: scale 320ms var(--ease-split);
+}
+#lock-notes-clear {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+#lock-notes-clear svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--text-bright);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#lock-notes-clear.pressed { scale: 1.03; }
+#lock-notes-more {
+  align-self: center;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  font-size: calc((0.66rem) * var(--font-scale, 1));
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+#lock-notes-more:not(.present) { display: none; }
+
+#lock-notes-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--notes-gap);
+}
+.lock-group { position: relative; }
+.lock-group.homing > .lock-note { overflow: hidden; }
+.lock-group.stacked:not(.fanned) { padding-bottom: var(--notes-slice); }
+.lock-group.fanned {
+  display: flex;
+  flex-direction: column;
+  gap: var(--notes-gap);
+}
+.lock-note {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--note-radius);
+  corner-shape: squircle;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  overflow: visible;
+  transition: scale 320ms var(--ease-split);
+}
+.lock-note.pressed { scale: 1.03; }
+.lock-group:not(.fanned) > .lock-note + .lock-note {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  scale: 0.92 1;
+  transform-origin: 50% 100%;
+}
+.lock-group:not(.fanned) > .lock-note + .lock-note > .lock-note-inner,
+.lock-group:not(.fanned) > .lock-note:nth-child(n + 3) { visibility: hidden; }
+.lock-group.gathering > .lock-note + .lock-note > .lock-note-inner,
+.lock-group.gathering > .lock-note:nth-child(n + 3) { visibility: visible; }
+.lock-note-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 0.7rem;
+  align-items: start;
+  padding: 0.7rem 0.85rem;
+  border-radius: inherit;
+}
+.lock-note-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 30%;
+  corner-shape: squircle;
+  object-fit: cover;
+}
+.lock-note-mark {
+  display: grid;
+  place-items: center;
+  font-size: calc((0.85rem) * var(--font-scale, 1));
+  color: var(--pill-solid);
+}
+.lock-note-copy { min-width: 0; }
+.lock-note-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: var(--font-notification-heading);
+  --font-scale: var(--font-size-notification-heading, 1);
+}
+.lock-note-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
+  letter-spacing: 0.14rem;
+  text-transform: uppercase;
+}
+.lock-note-tally {
+  flex: none;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  font-size: calc((0.58rem) * var(--font-scale, 1));
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.lock-note-when {
+  flex: none;
+  margin-left: auto;
+  font-size: calc((0.62rem) * var(--font-scale, 1));
+  color: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+.lock-note-who {
+  margin-top: 0.15rem;
+  font-family: var(--font-notification-heading);
+  --font-scale: var(--font-size-notification-heading, 1);
+  font-size: calc((0.88rem) * var(--font-scale, 1));
+  line-height: 1.3;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.lock-note-body {
+  margin-top: 0.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  font-family: var(--font-notification-content);
+  --font-scale: var(--font-size-notification-content, 1);
+  font-size: calc((0.8rem) * var(--font-scale, 1));
+  line-height: 1.4;
+  color: var(--text-body);
+}
+.lock-note-text { flex: none; white-space: nowrap; overflow: hidden; }
+.lock-note:not(.expanded) .lock-note-text:not(:last-child) { display: none; }
+.lock-note:not(.expanded) :is(.lock-note-who, .lock-note-text).runs-out {
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+.lock-note.expanded :is(.lock-note-who, .lock-note-text) { white-space: normal; overflow-wrap: anywhere; }
+.lock-note.expanded .lock-note-text + .lock-note-text { margin-top: 0.2rem; }
+/* A long conversation runs off the top, which is the end that has already been read. */
+.lock-note.expanded .lock-note-body {
+  max-height: 40vh;
+  overflow: hidden;
+}
+.lock-note.expanded .lock-note-body.runs-out { mask-image: linear-gradient(to bottom, transparent, #000 24px); }

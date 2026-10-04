@@ -1,4 +1,4 @@
-import { alertTouch, dashHolds, isAlertCentred, isAlertDashed, isAlertLive, layOutZone } from './alert.js';
+import { alertTouch, dashHolds, isAlertCentred, isAlertDashed, isAlertLive, layOutZone, setScreenDark } from './alert.js';
 import { fitLabels } from './labels.js';
 import { stirLiquid } from './liquid.js';
 import { mediaWindow, warmPlayer } from './mods/media.js';
@@ -6,13 +6,15 @@ import { show } from './mods/notification.js';
 import { timerWindow } from './mods/timer.js';
 import { nowOpen, nowOwnsClock, nowTouch } from './now.js';
 import { closeStatusPanel, openStatusPanel, statusHolds, statusOpen, statusPanelPush, statusPanelTarget, statusPill, statusTouch } from './status.js';
-import { clockHolds, clockPill, clockTouch, wakeClock } from './clock.js';
+import { clockHolds, clockPill, clockTouch, setDateFormat, wakeClock } from './clock.js';
 import { lockHolds, lockPill } from './lock.js';
 import { pillHolds } from './motion.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize, toClosed } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
 import { edgeTouch, refreshEdgeProxy } from './edge.js';
-import { openNotifications } from './tabs.js';
+import { cornerTouch, landscapeSlept, landscapeWoke, noteLandscapeTouch, revealThen, revealTouch, setLandscape } from './reveal.js';
+import { clearButton, clearHolds, openNotifications } from './tabs.js';
+import { dropFocus, notesTouch, refreshNotes, setNotesEnabled, setNotesHomeAnimated } from './notes.js';
 
 
 
@@ -78,6 +80,7 @@ function proxyEvent(type, target, x, y, isEnd) {
 
 function proxyPoint(x, y, source) {
   const hit = document.elementFromPoint(x, y);
+  if (clearHolds(x, y)) return clearButton;
   // A grown Main is drawn over the panel, and the Status proxy spans the panel from the screen's top edge down — so a touch on an Alert that arrived while the panel stood open was handed to the panel's own routing, which answered with the nearest quick toggle inside its grace radius or with the scrim. The bubble could be seen and not touched. Whatever the grown bubble covers is the grown bubble's, ahead of every panel that is open underneath it.
   if (mainHolds(x, y)) return pillTarget(x, y, hit);
   if (statusOpen && statusHolds(x, y)) return statusTarget(x, y, hit);
@@ -147,9 +150,15 @@ function statusTarget(x, y, hit) {
   return nearest || within || statusPill;
 }
 window.onProxyTouch = (action, x, y, source) => {
-  
-  
-  
+  if (source === 'reveal') {
+    revealTouch(action, x, y);
+    return;
+  }
+  if (source === 'corner') {
+    cornerTouch(action, x, y);
+    return;
+  }
+  if (action === 'down') noteLandscapeTouch();
   if (action === 'down') {
     shared.isTouchDown = true;
     // An outside report belonging to this same press reaches the page before this down does, so a bubble already closed by it hands this press a spent latch rather than a fresh one.
@@ -159,6 +168,10 @@ window.onProxyTouch = (action, x, y, source) => {
 
   if (source === 'edge-left' || source === 'edge-right') {
     edgeTouch(action, x, y, source);
+    return;
+  }
+  if (source === 'notes') {
+    notesTouch(action, x, y);
     return;
   }
   /* The Debug screen's note was written ahead of the press it describes — a forced layout, a hit test and a synchronous call into the host on every down and every lift, paid before the gesture had been answered at all. It is written once the frame is out of the way. */
@@ -264,6 +277,7 @@ window.setUnreadCount = count => {
   const badge = document.getElementById('unread');
   badge.textContent = count > 9 ? '9+' : String(count);
   badge.classList.toggle('present', count > 0);
+  refreshNotes();
 };
 
 /* Landscape, a fullscreen app and a dark screen all hide the stage, and the page was never told — so every ticker, every mirror frame and every measurement went on running against a surface nobody can see, which is most of a day of CPU for a phone that spends most of it in a pocket. The page sleeps with the stage and repaints what had gone stale on the way back. */
@@ -272,8 +286,10 @@ window.setStageHidden = hidden => {
   if (isHidden === shared.isStageHidden) return;
   shared.isStageHidden = isHidden;
   if (isHidden) {
+    landscapeSlept();
     /* A hidden stage takes its touch proxies NOT_TOUCHABLE with it, so a focused Alert, the Dashboard or the Notifications Menu left standing over a screen-off came back visible but deaf to every tap and stayed that way until the app restarted. */
     if (statusOpen) closeStatusPanel();
+    dropFocus();
     if (isAlertCentred() || isAlertDashed() || (shared.state === 'extended' && shared.size === 'notifications')) toClosed();
     return;
   }
@@ -281,7 +297,10 @@ window.setStageHidden = hidden => {
   fitLabels();
   stirLiquid(240);
   warmPlayer();
+  landscapeWoke();
 };
+
+window.setLandscape = isOn => setLandscape(Boolean(isOn));
 
 // Mirrors the FONT_STACKS array in panel.html — the index a preference holds has to mean the same face in both places.
 const FONT_STACKS = [
@@ -376,6 +395,10 @@ window.setAlertDwell = tenths => {
   shared.dwell = Math.max(500, (Number(tenths) || 50) * 100);
 };
 
+window.setNotificationsRise = rise => {
+  shared.notificationsRise = Math.min(100, Math.max(0, Number(rise))) / 100;
+};
+
 
 window.setQuickDividers = value => {
   root.classList.toggle('no-dividers', Number(value) === 0);
@@ -385,8 +408,17 @@ window.setDashAlertsDisabled = value => {
   shared.isDashAlertDisabled = Number(value) !== 0;
 };
 
+window.setScreenDark = value => setScreenDark(Number(value) !== 0);
+window.setLockNotes = value => setNotesEnabled(Number(value) !== 0);
+window.setLockNotesHome = value => setNotesHomeAnimated(Number(value) !== 0);
+
 window.setFastDashboard = value => {
   root.classList.toggle('fast-dashboard', Number(value) !== 0);
+};
+
+window.setNotificationsClearCorner = value => {
+  shared.isClearCornered = Number(value) !== 0;
+  root.classList.toggle('clear-corner', shared.isClearCornered);
 };
 
 window.setAlertZoneShown = value => {
@@ -403,6 +435,8 @@ window.setLabelSweep = value => {
   shared.labelSweep = Number(value) !== 0;
   root.classList.toggle('label-sweep', shared.labelSweep);
 };
+
+window.setDateFormat = value => setDateFormat(Number(value));
 
 window.setNowPushes = value => {
   shared.nowPushes = Number(value) !== 0;
@@ -428,11 +462,13 @@ window.setCameraActive = isActive =>
 
 
 window.onToggleStatusPanel = () => {
+  if (revealThen(openStatusPanel)) return;
   if (statusOpen) closeStatusPanel();
   else openStatusPanel();
 };
 
 window.onToggleNotifications = () => {
+  if (revealThen(openNotifications)) return;
   if (shared.state === 'extended' && shared.size === 'notifications') toClosed();
   else openNotifications();
 };

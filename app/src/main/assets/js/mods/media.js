@@ -1,9 +1,14 @@
 import { lockArt, lockPill, paintLock, paintLockProgress } from '../lock.js';
 import { becomeExtended, closedTarget, setSize, showFace, toClosed } from '../row.js';
 import { refreshDock } from '../status.js';
-import { bridge, mods, pill, root, shared } from '../state.js';
+import { bridge, faces, mods, pill, root, shared } from '../state.js';
 import { endHold } from '../motion.js';
 
+window.probeAt = 0; // PROBE
+window.probeMark = label => { if (window.probeAt && performance.now() - window.probeAt < 1500) console.log('[probe] ' + label + ' @' + Math.round(performance.now() - window.probeAt)); }; // PROBE
+let probeWarmAt = 0; // PROBE
+function probeFrames() { const deltas = []; const heaps = []; let last = performance.now(); const until = last + 900; const tick = now => { deltas.push(Math.round(now - last)); if (now - last > 20) window.probeMark('LONG FRAME ' + Math.round(now - last) + 'ms'); if (performance.memory) heaps.push(Math.round(performance.memory.usedJSHeapSize / 1024)); last = now; if (now < until) { requestAnimationFrame(tick); return; } console.log('[probe] deltas ' + deltas.join(',')); console.log('[probe] heapKB ' + heaps.filter((value, index) => index === 0 || value < heaps[index - 1] || index === heaps.length - 1).join(',')); }; requestAnimationFrame(tick); } // PROBE
+try { new PerformanceObserver(list => list.getEntries().forEach(entry => console.log('[probe] loaf ' + Math.round(entry.duration) + 'ms at ' + Math.round(entry.startTime - window.probeAt) + ' render@' + Math.round(entry.renderStart - entry.startTime) + ' style@' + Math.round(entry.styleAndLayoutStart - entry.startTime) + ' scripts ' + entry.scripts.map(script => script.invoker + ':' + script.sourceFunctionName + ':' + Math.round(script.duration) + ':forced' + Math.round(script.forcedStyleAndLayoutDuration)).join('|')))).observe({ type: 'long-animation-frame' }); } catch (error) { console.log('[probe] no loaf ' + error); } // PROBE
 const playerPosition = document.getElementById('player-position');
 
 
@@ -59,6 +64,7 @@ function paintArt(art) {
   }
   typeLabels('');
 
+  window.probeMark('paintArt NEW ART'); // PROBE
   const decoded = new Image();
   decoded.src = art;
   
@@ -254,6 +260,7 @@ export function livePosition() {
 }
 
 window.onMediaUpdate = payload => {
+  window.probeMark('onMediaUpdate art ' + Boolean(payload && payload.artBase64) + ' same ' + Boolean(payload && shared.media && payload.artBase64 === shared.media.artBase64)); // PROBE
   positionAt = performance.now();
   
   
@@ -268,6 +275,7 @@ window.onMediaUpdate = payload => {
   refreshDock();
   if (!shared.media) {
     mods.delete('media');
+    shared.clearedMods.delete('media');
     clearInterval(shared.mediaTicker);
     pill.classList.remove('sounding');
     if (shared.state === 'idle') toClosed();
@@ -280,7 +288,7 @@ window.onMediaUpdate = payload => {
   mods.add('media');
   paintMedia();
   runMediaClock();
-  runBars();
+  joinEqualizer();
   
   
   if (shared.state === 'idle') toClosed();
@@ -291,64 +299,6 @@ window.onMediaUpdate = payload => {
 
 
 
-
-
-
-
-
-
-const BARS = '#equalizer i';
-
-const BAR_REST = '0 calc(100% - 3px)';
-
-const lift = level => '0 ' + (100 - level).toFixed(1) + '%';
-
-let barRun = 0;
-
-function pulse(bar, from, run) {
-  const high = 62 + Math.random() * 38;
-
-
-  const low = 18 + Math.random() * 26;
-  const top = Math.random() < 0.2 ? low + 8 : high;
-  const swing = bar.animate(
-    [{ translate: from }, { translate: lift(top) }, { translate: lift(low) }],
-    { duration: 500 + Math.random() * 750, easing: 'ease-in-out' }
-  );
-  swing.onfinish = () => {
-    if (run !== barRun || !bar.isConnected) return;
-    bar.style.translate = lift(low);
-    pulse(bar, lift(low), run);
-  };
-}
-
-
-
-
-
-
-export function runBars() {
-  barRun += 1;
-  const run = barRun;
-  
-  
-  
-  if (!shared.media || !shared.media.isPlaying) {
-    document.querySelectorAll(BARS).forEach(bar => {
-      bar.getAnimations().forEach(existing => existing.cancel());
-      bar.animate(
-        [{ translate: bar.style.translate || lift(40) }, { translate: BAR_REST }],
-        { duration: 260, easing: 'ease-out' }
-      );
-      bar.style.translate = BAR_REST;
-    });
-    return;
-  }
-  document.querySelectorAll(BARS).forEach(bar => {
-    bar.getAnimations().forEach(existing => existing.cancel());
-    pulse(bar, bar.style.translate || lift(40), run);
-  });
-}
 
 
 
@@ -394,7 +344,9 @@ function buildWaveShape() {
 }
 
 function fitWave(canvas, canShrink) {
+  const probeStart = performance.now(); // PROBE
   const box = canvas.getBoundingClientRect();
+  window.probeMark('fitWave ' + canvas.id + ' rect ' + (performance.now() - probeStart).toFixed(1) + 'ms box ' + Math.round(box.width) + 'x' + Math.round(box.height) + ' has ' + canvas.width + 'x' + canvas.height); // PROBE
   if (!box.width || !box.height) return;
   const ratio = window.devicePixelRatio || 1;
   const width = Math.round(box.width * ratio);
@@ -423,16 +375,25 @@ const waveWatch = new ResizeObserver(entries => entries.forEach(entry => {
 // The beat is the song's, not the surface's, so the two places it is drawn are two surfaces reading one energy rather than two waves that happen to look alike. A surface says what keeps it alive instead of the loop testing for the player's own size, since the same loop now paints a canvas that stands at the foot of a panel the player face is never open behind.
 const waveSurfaces = new Map();
 
-export function joinWave(canvas, isWanted) {
+export function joinWave(canvas, isWanted, bars = 0) {
   const joined = waveSurfaces.get(canvas);
   if (joined) {
     joined.accent = null;
     return;
   }
-  waveSurfaces.set(canvas, { ink: canvas.getContext('2d'), isWanted, accent: null, fitTimer: 0 });
+  waveSurfaces.set(canvas, { ink: canvas.getContext('2d'), isWanted, bars, accent: null, fitTimer: 0 });
   waveWatch.observe(canvas);
   fitWave(canvas, false);
   runWave();
+}
+
+const equalizer = document.getElementById('equalizer');
+const EQUALIZER_BARS = 5;
+
+// The idle indicator stays joined past the pause only until the shared energy has settled, so a paused song leaves its bars at rest rather than frozen mid-swing.
+export function joinEqualizer() {
+  joinWave(equalizer, () => faces.media.classList.contains('showing')
+    && Boolean(shared.media && (shared.media.isPlaying || waveEnergy > WAVE_REST + 0.005)), EQUALIZER_BARS);
 }
 
 function leaveWave(canvas) {
@@ -483,16 +444,18 @@ function drawWave(canvas, surface, now, isPlaying) {
   }
   const accent = surface.accent;
   const middle = height / 2;
-  const step = width / WAVE_BARS;
+  const count = surface.bars || WAVE_BARS;
+  const isWhole = Boolean(surface.bars);
+  const step = width / count;
   const thickness = Math.max(2, step * 0.62);
   waveInk.clearRect(0, 0, width, height);
   const dot = Math.max(2, thickness * 0.7);
   const since = livePosition() % WAVE_BEAT_MILLIS;
   // Every bar moved as one swell, the unplayed ones included, so the wave read as a slab breathing. Only what has been played is live now: each bar has its own two rates, the beat ripples out from the bass end a few milliseconds a bar, and what is still to come is a row of dots waiting.
-  for (let index = 0; index < WAVE_BARS; index += 1) {
-    const share = (index + 0.5) / WAVE_BARS;
+  for (let index = 0; index < count; index += 1) {
+    const share = (index + 0.5) / count;
     const x = index * step + (step - thickness) / 2;
-    if (share > waveRatio) {
+    if (!isWhole && share > waveRatio) {
       waveBornAt[index] = 0;
       waveInk.fillStyle = 'rgba(255, 255, 255, 0.32)';
       waveInk.beginPath();
@@ -500,15 +463,15 @@ function drawWave(canvas, surface, now, isPlaying) {
       waveInk.fill();
       continue;
     }
-    const shape = waveShape[index];
+    const shape = waveShape[Math.floor(share * WAVE_BARS)] || 0.5;
     const ripple = isPlaying ? wavePulse((since - index * 7 + WAVE_BEAT_MILLIS) % WAVE_BEAT_MILLIS) : 0;
     const wobble = isPlaying
       ? 0.5 + 0.28 * Math.sin(now / (170 + shape * 90) + index * 2.1) + 0.22 * Math.sin(now / (95 + shape * 40) + index * 0.6)
       : 0;
     const bass = ripple * (0.35 + 0.65 * Math.pow(1 - share, 1.4));
     const level = Math.min(1, shape * (waveEnergy * 0.55 + wobble * 0.3 + bass * 0.45));
-    if (!waveBornAt[index]) waveBornAt[index] = now;
-    const grown = 1 - Math.pow(1 - Math.min(1, (now - waveBornAt[index]) / WAVE_GROW_MILLIS), 3);
+    if (!isWhole && !waveBornAt[index]) waveBornAt[index] = now;
+    const grown = isWhole ? 1 : 1 - Math.pow(1 - Math.min(1, (now - waveBornAt[index]) / WAVE_GROW_MILLIS), 3);
     const reach = dot / 2 + Math.max(0, level * (middle - 2) - dot / 2) * grown;
     waveInk.fillStyle = accent;
     waveInk.beginPath();
@@ -530,7 +493,9 @@ function runWave() {
     if (!waveSurfaces.size) return;
     if (!shared.isStageHidden) {
       const isPlaying = beatWave(now);
+      const probeStart = performance.now(); // PROBE
       for (const [canvas, surface] of waveSurfaces) drawWave(canvas, surface, now, isPlaying);
+      if (performance.now() - probeStart > 2 && window.probeMark) window.probeMark('drawWave ' + (performance.now() - probeStart).toFixed(1) + 'ms ' + waveCanvas.width + 'x' + waveCanvas.height); // PROBE
     }
     waveFrame = requestAnimationFrame(step);
   };
@@ -729,15 +694,22 @@ for (const type of ['touchend', 'touchcancel']) {
 }
 
 export function openPlayer() {
+  const probeTimes = [performance.now()]; window.probeAt = probeTimes[0]; console.log('[probe] OPEN warmedAgo ' + Math.round(probeTimes[0] - probeWarmAt) + ' canvas ' + waveCanvas.width + 'x' + waveCanvas.height + ' joined ' + waveSurfaces.has(waveCanvas)); // PROBE
   becomeExtended();
   paintMedia();
+  probeTimes.push(performance.now()); // PROBE
   showFace('player');
+  probeTimes.push(performance.now()); // PROBE
   setSize('player');
+  probeTimes.push(performance.now()); // PROBE
   const position = livePosition();
   paintProgress(position);
   runMediaClock(position);
   playEntrance();
+  probeTimes.push(performance.now()); // PROBE
   joinWave(waveCanvas, () => shared.size === 'player');
+  probeTimes.push(performance.now()); // PROBE
+  console.log('[probe] sync paintMedia/showFace/setSize/entrance/joinWave ' + probeTimes.slice(1).map((time, index) => (time - probeTimes[index]).toFixed(1)).join('/')); probeFrames(); // PROBE
 }
 
 const WARM_DELAY = 900;
@@ -749,7 +721,7 @@ export function warmPlayer() {
   clearTimeout(warmTimer);
   warmTimer = setTimeout(() => {
     if (shared.isStageHidden || shared.size === 'player') return;
-    playerFace.classList.add('warming');
+    playerFace.classList.add('warming'); probeWarmAt = performance.now(); // PROBE
     warmTimer = setTimeout(() => playerFace.classList.remove('warming'), WARM_HOLD);
   }, WARM_DELAY);
 }

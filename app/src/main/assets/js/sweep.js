@@ -105,7 +105,7 @@ export function sweepInto(element, next, force) {
   sweeping.set(element, state);
 
   state.cover = setTimeout(() => {
-    element.textContent = wanted;
+    element.textContent = state.wanted;
     showLabel(element);
     host.classList.add('swept');
   }, SWEEP_IN);
@@ -142,8 +142,10 @@ export function settleSweep(element) {
   if (wasHidden) hideLabel(element);
 }
 
-export function sweepLabel(element, next) {
-  if (shared.labelSweep) sweepInto(element, next);
+/* A reading that changed after its reveal swept a second time, and one that changed while the reveal was still running restarted it — a weather answer landing a moment after the dashboard settled was the reveal playing twice. The reveal is the one animation a reading gets per open, so a change takes over the running bar's text or is written plainly. */
+export function writeLabel(element, next) {
+  const running = sweeping.get(element);
+  if (running) running.wanted = next || '';
   else element.textContent = next || '';
 }
 

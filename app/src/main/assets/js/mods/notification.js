@@ -1,8 +1,9 @@
-import { dashAlert, fitAlert, isAlertCentred, isAlertDashed, layOutZone, recentreAlert, renewDashAlert, settleBox } from '../alert.js';
+import { dashAlert, fitAlert, isAlertCentred, isAlertDashed, isScreenDark, layOutZone, recentreAlert, renewDashAlert, settleBox } from '../alert.js';
 import { setSize, showFace, toClosed } from '../row.js';
 import { PICTURE_MAX_HEIGHT, bridge, pill, root, shared } from '../state.js';
 import { isChannelLive, refreshChannel } from '../channel.js';
 import { statusOpen } from '../status.js';
+import { alertArriving, isLandscape } from '../reveal.js';
 
 
 
@@ -246,9 +247,11 @@ export function show(notification) {
   clearTimeout(shared.dwellTimer);
   
   clearTimeout(goneTimer);
+  alertArriving();
 
   const picture = document.getElementById('picture');
-  const hasImage = Boolean(notification.imageBase64);
+  // In landscape an Alert has a sliver of the screen's height to stand in, so a photo is never drawn into it and the tap goes straight to the app.
+  const hasImage = Boolean(notification.imageBase64) && !isLandscape();
   
   
   
@@ -311,6 +314,13 @@ export function show(notification) {
 
   // The slung Alert's dwell is its own — it ends by flying home rather than by collapsing where it stands — and `dashAlert` has already set it.
   if (!isAlertCentred() && !isAlertDashed()) shared.dwellTimer = setTimeout(toClosed, shared.dwell);
+
+  if (isScreenDark()) {
+    if (!isAlertCentred() && !hasImage) recentreAlert();
+    bridge.setAlertOverlay(1);
+    clearTimeout(shared.dwellTimer);
+    shared.dwellTimer = setTimeout(toClosed, shared.dwell);
+  }
 }
 
 
@@ -336,8 +346,7 @@ export function openPicture() {
   const picture = document.getElementById('picture');
   const ratio = picture.naturalHeight / (picture.naturalWidth || 1);
   const height = Math.min(PICTURE_MAX_HEIGHT, Math.round(340 * ratio) + 64);
-  document.documentElement.style.setProperty('--picture-height', height + 'px');
-  setSize('picture', { width: 340, height });
+  setSize('picture', { width: 340, height, geometry: { '--picture-height': height + 'px' } });
 }
 
 export function openCurrent() {

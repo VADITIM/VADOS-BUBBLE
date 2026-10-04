@@ -2,13 +2,15 @@ import { stirLiquid } from './liquid.js';
 import { openPlayer } from './mods/media.js';
 import { openCurrent, openPicture } from './mods/notification.js';
 import { openTimer } from './mods/timer.js';
+import { openTrip } from './mods/trip.js';
 import { closeNowPanel, nowOpen } from './now.js';
 import { clockPill } from './clock.js';
 import { lockPill } from './lock.js';
 import { closeStatusPanel, statusOpen, statusPanelTarget, statusPill } from './status.js';
 import { abandonSwap, becomeExtended, applyClosedWindow, applyWindow, closedTarget, dragSwap, ensureClosedWindow, liveMods, releaseSwap, toClosed } from './row.js';
 import { CLOSED, HOLD_GRACE, HOLD_MILLIS, HOLD_SCALE, bridge, dragGate, pill, root, shared } from './state.js';
-import { MOD_FACES, leaveForMod, openNotifications, openMod } from './tabs.js';
+import { MOD_FACES, clearHolds, leaveForMod, openNotifications, openMod } from './tabs.js';
+import { leaveNotesOutside } from './notes.js';
 
 
 
@@ -573,6 +575,10 @@ pill.addEventListener('click', () => {
     openPlayer();
     return;
   }
+  if (owner === 'trip') {
+    openTrip();
+    return;
+  }
   
   
   
@@ -593,6 +599,7 @@ export function pillHolds(x, y) {
 
 
 window.onOutsideTap = (x, y) => {
+  leaveNotesOutside(x, y);
   
   
   
@@ -602,7 +609,7 @@ window.onOutsideTap = (x, y) => {
   
   
   const hit = document.elementFromPoint(x, y);
-  if (pillHolds(x, y) || (hit && (clockPill.contains(hit) || statusPill.contains(hit)))) return;
+  if (pillHolds(x, y) || clearHolds(x, y) || (hit && (clockPill.contains(hit) || statusPill.contains(hit)))) return;
   // Every press inside the open panel closed it: a proxy window reports a touch outside itself, so each of the other four called this with a point that was on a quick control, and a control is in none of the three bubbles named above. The panel answers for its own controls now, and a point between them still closes.
   if (statusPanelTarget(x, y)) return;
   if (statusOpen && hit && lockPill.contains(hit)) return;

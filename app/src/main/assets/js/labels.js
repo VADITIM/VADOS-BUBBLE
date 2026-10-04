@@ -31,6 +31,7 @@ const LABELS = [
   '#app-name', '#title',
   '#lock-title', '#lock-artist',
   '#timer-remaining', '#timer-label',
+  '#trip-remaining', '#trip-train', '#trip-route',
   '#transfer-name',
 ].join(', ');
 

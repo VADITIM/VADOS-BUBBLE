@@ -2,6 +2,7 @@ import { lockPill } from './lock.js';
 import { clockPill, isClockLit } from './clock.js';
 import { doublePill, isDoubleOut } from './double.js';
 import { statusPill } from './status.js';
+import { isNotesFocused, notePanes } from './notes.js';
 import { satellites } from './row.js';
 import { CLOSED, MELT_MAX, MELT_MIN, bridge, pill, root, shared } from './state.js';
 
@@ -49,7 +50,7 @@ const liquidLayers = {
 
 
 const BLUR_PANES = [
-  'main', 'left', 'right', 'lock', 'status', 'clock', 'double',
+  'main', 'left', 'right', 'lock', 'status', 'clock', 'double', 'clear',
 ];
 
 
@@ -62,6 +63,7 @@ const BLUR_PANES = [
 
 
 const scrim = document.getElementById('quick-scrim');
+const clearBubble = document.getElementById('notifications-clear');
 
 const blobs = BLUR_PANES.map(name => ({
   name,
@@ -83,6 +85,7 @@ function sourceOf(name) {
   if (name === 'status') return statusPill;
   if (name === 'clock') return clockPill;
   if (name === 'double') return doublePill;
+  if (name === 'clear') return clearBubble;
   if (name === 'lock') return lockPill;
   return satellites[name];
 }
@@ -112,6 +115,7 @@ function isSkinned(name) {
   if (name === 'status') return statusPill.classList.contains('lit');
   if (name === 'clock') return isClockLit();
   if (name === 'double') return isDoubleOut();
+  if (name === 'clear') return true;
 
 
   return CLOSED.has(shared.size) && Boolean(satellites[name].dataset.mod);
@@ -189,7 +193,7 @@ function mirrorFrame() {
     };
   });
 
-  sendBlurFrame(measured);
+  sendBlurFrame(measured.concat(notePanes()));
 
   blobs.forEach((blob, index) => {
     const seen = measured[index];
@@ -332,101 +336,40 @@ const FROST_STEPS = 12;
 /* `getComputedStyle` hands back a live declaration and allocating one per frame is a per-frame allocation for a value that is read once — the blobs already cache theirs against the element they belong to, and the scrim is the one that did not. */
 const scrimStyle = getComputedStyle(scrim);
 
-function scrimRegion() {
-  const frost = parseFloat(scrimStyle.getPropertyValue('--scrim-frost'));
-  if (!frost || frost < 0.01) return '';
-  const box = scrim.getBoundingClientRect();
-  return [
-    Math.round(box.left),
-    Math.round(box.top),
-    Math.round(box.width),
-    Math.round(box.height),
-    0,
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    (Math.round(frost * FROST_STEPS) / FROST_STEPS).toFixed(2),
-  ].join(',');
-}
+const FOCUS_RAMP = 240;
+export const FOCUS_FROST_MILLIS = FOCUS_RAMP;
 
-const HALO_RINGS = 6;
+let isFocusWanted = false;
+let focusFrom = 0;
+let focusStart = 0;
+let focusLevel = 0;
 
-
-const HALO_BASE = 0.55;
-
-
-const HALO_FALLOFF = 1.6;
-
-
-const HALO_DELAY = 0;
-
-
-const HALO_RAMP = 240;
-
-let haloFrom = 0;
-
-
-
-
-export function startHalo() {
-  haloFrom = performance.now();
-}
-
-
-export const HALO_MILLIS = HALO_DELAY + HALO_RAMP;
-
-
-
-
-
-
-
-
-
-
-function haloRegions() {
-  if (shared.size !== 'alertCentre') return [];
-  const box = pill.getBoundingClientRect();
-  if (!box.width) return [];
-  const since = performance.now() - haloFrom - HALO_DELAY;
-  const strength = Math.max(0, Math.min(1, since / HALO_RAMP));
-  if (strength <= 0) return [];
-  const eased = strength * strength * (3 - 2 * strength);
-  // The rings reach the screen's own edges rather than stopping a few hundred pixels out: a halo that falls away to nothing mid-screen reads as a patch of frost around the bubble, and the thing being asked for is the whole screen going back while the notification stands in front of it. What is left of the falloff is the middle being a little stronger than the edges.
-  const screenWidth = root.clientWidth;
-  const screenHeight = root.clientHeight;
-  const centreX = box.left + box.width / 2;
-  const centreY = box.top + box.height / 2;
-  const rings = [];
-  for (let ring = HALO_RINGS; ring >= 1; ring -= 1) {
-    const reach = ring / HALO_RINGS;
-    const width = box.width + reach * (screenWidth * 2 - box.width);
-    const height = box.height + reach * (screenHeight * 2 - box.height);
-    const share = (HALO_BASE + (1 - HALO_BASE) * Math.pow(1 - reach, HALO_FALLOFF)) * eased;
-    // The outermost ring is the screen itself rather than a stadium large enough to contain it — a stadium's own corner radius is read off its width, so one drawn twice the screen's size rounds its corners by a screen's width and leaves the four corners of the display unblurred.
-    const isScreen = ring === HALO_RINGS;
-    rings.push([
-      isScreen ? 0 : Math.round(centreX - width / 2),
-      isScreen ? 0 : Math.round(centreY - height / 2),
-      isScreen ? screenWidth : Math.round(width),
-      isScreen ? screenHeight : Math.round(height),
-      isScreen ? 0 : Math.round(Math.min(width, height) / 2),
-      (Math.round(share * FROST_STEPS) / FROST_STEPS).toFixed(2),
-    ].join(','));
+/* A centred Alert stood in six concentric panes, each a step weaker than the one inside it, and every step was a line: two blur radii meeting along a stadium's edge is a visible contour however small the difference, so the falloff read as rings drawn round the bubble — and it was six blurs of whatever was playing behind it where one does. A focused bubble frosts the screen evenly through the same pane the Dashboard does, and the Notifications menu is that same focus. */
+function focusFrost(now) {
+  const isWanted = shared.size === 'alertCentre' || (shared.state === 'extended' && shared.size === 'notifications') || isNotesFocused();
+  if (isWanted !== isFocusWanted) {
+    isFocusWanted = isWanted;
+    focusStart = focusLevel;
+    focusFrom = now;
   }
-  return rings;
+  const progress = Math.max(0, Math.min(1, (now - focusFrom) / FOCUS_RAMP));
+  const eased = progress * progress * (3 - 2 * progress);
+  focusLevel = focusStart + ((isWanted ? 1 : 0) - focusStart) * eased;
+  return focusLevel;
+}
+
+function scrimRegion() {
+  const frost = Math.max(parseFloat(scrimStyle.getPropertyValue('--scrim-frost')) || 0, focusFrost(performance.now()));
+  if (frost < 0.01) return '';
+  return [0, 0, root.clientWidth, root.clientHeight, 0, (Math.round(frost * FROST_STEPS) / FROST_STEPS).toFixed(2)].join(',');
 }
 
 function sendBlurFrame(measured) {
-  const spec = [scrimRegion()].concat(measured.map(seen => {
-    if (!seen || !seen.box.width) return '';
+  const scrimSpec = scrimRegion();
+  // The open Notifications menu stood its own 340x320 pane on top of the focus frost, so a video behind it was blurred twice over every frame it played — the double frost the Dashboard never had, because nothing grown there keeps a pane over its scrim. Every bubble hands its glass to the frost as the frost arrives, on the same ramp, and at rest sends none.
+  const glass = Math.round((1 - focusLevel) * FROST_STEPS) / FROST_STEPS;
+  const spec = [scrimSpec].concat(measured.map(seen => {
+    if (!seen || !seen.box.width || glass < 0.01) return '';
     
     
     const alpha = isNaN(seen.alpha) ? 1 : seen.alpha;
@@ -441,12 +384,14 @@ function sendBlurFrame(measured) {
       
       
       Math.round(Math.min(parseFloat(seen.radius) || 0, Math.min(width, height) / 2)),
-    ].join(',');
+    ].concat(glass < 1 ? [glass.toFixed(2)] : []).join(',');
     // The halo stands after the blobs so its rings are added over them, weakest first — a pane added later is drawn on top, and a wide weak ring laid over a narrow strong one would otherwise take the strength back off the middle.
-  })).concat(haloRegions()).join(';');
+  })).join(';');
   if (spec === blurSent) return;
   blurSent = spec;
+  const probeStart = performance.now(); // PROBE
   bridge.setBlurFrame(spec);
+  if (performance.now() - probeStart > 1 && window.probeMark) window.probeMark('setBlurFrame ' + (performance.now() - probeStart).toFixed(1) + 'ms'); // PROBE
 }
 
 
@@ -652,6 +597,7 @@ function flowLiquid() {
   paintLiquidFrame();
   const after = performance.now();
   const paint = after - before;
+  if (paint > 3 && window.probeMark) window.probeMark('mirror ' + paint.toFixed(1) + 'ms'); // PROBE
   const gap = lastFrameAt ? before - lastFrameAt : 0;
   lastFrameAt = before;
   if ((paint > FRAME_BUDGET || gap > FRAME_GAP) && after - lastJankAt > JANK_QUIET) {
