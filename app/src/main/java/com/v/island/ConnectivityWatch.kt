@@ -53,6 +53,12 @@ object ConnectivityWatch {
 
     private const val WIFI_SSID = "cmd -w wifi status | grep -m1 'Wifi is connected to'"
 
+    private val RUNTIME_GRANTS = listOf(
+        android.Manifest.permission.BLUETOOTH_CONNECT,
+        android.Manifest.permission.READ_PHONE_STATE,
+        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+    )
+
     private const val BLUETOOTH_BATTERY = "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
     private const val BLUETOOTH_BATTERY_EXTRA = "android.bluetooth.device.extra.BATTERY_LEVEL"
 
@@ -118,6 +124,7 @@ object ConnectivityWatch {
         }
         readZen(context)
         readConnected(context)
+        grantWhatIsMissing(context)
 
         val manager = context.getSystemService(ConnectivityManager::class.java)
         val callback = object : ConnectivityManager.NetworkCallback() {
@@ -288,6 +295,20 @@ object ConnectivityWatch {
         }
         runCatching { adapter.getProfileProxy(context, listener, android.bluetooth.BluetoothProfile.A2DP) }
         runCatching { adapter.getProfileProxy(context, listener, android.bluetooth.BluetoothProfile.HEADSET) }
+    }
+
+    // BLUETOOTH_CONNECT, READ_PHONE_STATE and the weather's ACCESS_COARSE_LOCATION were only ever granted by grant.ps1 over adb, so an install that had to uninstall first — a build signed by a different debug key — came back without them, and every connected device read back as nothing paired with no error anywhere. The shell grants what is missing itself, then the connected set is read again.
+    private fun grantWhatIsMissing(context: Context) {
+        ShizukuShell.onReady {
+            val missing = RUNTIME_GRANTS.filter {
+                context.checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+            if (missing.isEmpty()) return@onReady
+            missing.forEach { ShizukuShell.run("pm grant ${context.packageName} $it") }
+            android.os.Handler(context.mainLooper).post {
+                if (report != null) readConnected(context)
+            }
+        }
     }
 
     private fun nameOf(intent: Intent): String? {

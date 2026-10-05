@@ -22,7 +22,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # The action's default package list still asks for the legacy `tools` package, which the SDK repository no longer carries, so sdkmanager exited 1 before Gradle ever ran and every build since 2026-09-17 was red on setup.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
 
