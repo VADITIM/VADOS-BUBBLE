@@ -129,6 +129,10 @@ object Preferences {
 
     const val ALERT_ZONE_SHOWN = "alertZoneShown"
 
+    const val ALERT_ZONE_GLOW = "alertZoneGlow"
+
+    const val ALERT_ZONE_ARROW = "alertZoneArrow"
+
     // Mirrors DATE_FORMATS in js/clock.js and the Date format labels in panel.html: an index into that list, which is written once on the page's side.
     const val DATE_FORMAT = "dateFormat"
 
@@ -199,6 +203,8 @@ object Preferences {
         FAST_DASHBOARD to 0,
         NOTIFICATIONS_CLEAR_CORNER to 0,
         ALERT_ZONE_SHOWN to 0,
+        ALERT_ZONE_GLOW to 40,
+        ALERT_ZONE_ARROW to 55,
         DATE_FORMAT to 0,
 
         FONT_CLOCK to 0,

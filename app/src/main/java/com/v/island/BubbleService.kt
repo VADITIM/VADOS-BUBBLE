@@ -1512,6 +1512,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         push("window.setFastDashboard(${Preferences.get(preferences, Preferences.FAST_DASHBOARD)})")
         push("window.setNotificationsClearCorner(${Preferences.get(preferences, Preferences.NOTIFICATIONS_CLEAR_CORNER)})")
         push("window.setAlertZoneShown(${Preferences.get(preferences, Preferences.ALERT_ZONE_SHOWN)})")
+        push("window.setAlertZoneLook(${Preferences.get(preferences, Preferences.ALERT_ZONE_GLOW)},${Preferences.get(preferences, Preferences.ALERT_ZONE_ARROW)})")
         push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
         push("window.setLabelSweep(${Preferences.get(preferences, Preferences.LABEL_SWEEP)})")
         push("window.setDateFormat(${Preferences.get(preferences, Preferences.DATE_FORMAT)})")

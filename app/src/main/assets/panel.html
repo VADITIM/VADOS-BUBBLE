@@ -777,6 +777,10 @@
       labels: ['Off', 'On'] },
     { group: 'Alerts', key: 'lockNotesHome', name: 'Lock notifications on unlock', min: 0, max: 1,
       labels: ['Vanish', 'Fly to bubble'] },
+    { group: 'Alerts', key: 'alertZoneGlow', name: 'Pull zone glow', min: 0, max: 100, step: 5,
+      read: glow => glow === 0 ? 'Off' : glow + '%' },
+    { group: 'Alerts', key: 'alertZoneArrow', name: 'Pull zone arrow', min: 0, max: 100, step: 5,
+      read: arrow => arrow === 0 ? 'Off' : arrow + '%' },
     { group: 'Alerts', key: 'notificationsClearCorner', name: 'Delete all position', min: 0, max: 1,
       labels: ['Under menu', 'Bottom right'] },
 
