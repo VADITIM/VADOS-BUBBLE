@@ -91,9 +91,12 @@ export function sweepInto(element, next, force) {
   const running = sweeping.get(element);
   if (running && running.wanted === wanted) return;
   if (!running && !force && element.textContent === wanted) return;
+  // A change landing on a sweep that is already running used to restart it: the label went back under a bar growing from nothing, so values arriving faster than SWEEP_IN kept it invisible and the cover frame never came. The running bar takes the new text instead, and a label already uncovered shows it at once.
   if (running) {
-    clearTimeout(running.cover);
-    clearTimeout(running.clear);
+    running.wanted = wanted;
+    if (running.isCovered) element.textContent = wanted;
+    else placeBar(element, host, wanted);
+    return;
   }
 
   host.classList.add('sweep-host');
@@ -101,10 +104,11 @@ export function sweepInto(element, next, force) {
   hideLabel(element);
   host.classList.remove('swept');
   host.classList.add('sweeping');
-  const state = { wanted, host, cover: 0, clear: 0 };
+  const state = { wanted, host, cover: 0, clear: 0, isCovered: false };
   sweeping.set(element, state);
 
   state.cover = setTimeout(() => {
+    state.isCovered = true;
     element.textContent = state.wanted;
     showLabel(element);
     host.classList.add('swept');
@@ -145,8 +149,10 @@ export function settleSweep(element) {
 /* A reading that changed after its reveal swept a second time, and one that changed while the reveal was still running restarted it — a weather answer landing a moment after the dashboard settled was the reveal playing twice. The reveal is the one animation a reading gets per open, so a change takes over the running bar's text or is written plainly. */
 export function writeLabel(element, next) {
   const running = sweeping.get(element);
-  if (running) running.wanted = next || '';
-  else element.textContent = next || '';
+  if (running) {
+    running.wanted = next || '';
+    if (running.isCovered) element.textContent = running.wanted;
+  } else element.textContent = next || '';
 }
 
 // A dashboard reading is already standing at its final text when its bubble lands, so the reveal there is asked for rather than caused by a change — the bar is told to play over text it is not replacing.
