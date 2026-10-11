@@ -2,21 +2,26 @@
 
 A system-wide overlay pill for one Samsung Galaxy S25 (SM-S931B, Android 16 / SDK 36). Sideload only — no Play Store, no other devices, no API-level fallbacks for hardware this phone does not have. Kotlin services host WebViews; the interface itself is HTML and CSS.
 
-`INSTRUCTIONS.md` is the long form: what every state is, why each gesture belongs to the mod it belongs to, and what the platform forced. Read it before changing behaviour — most of what looks like an odd choice in the code is a workaround recorded there.
+[docs/decisions.md](docs/decisions.md) is the long form: what every state is, why each gesture belongs to the mod it belongs to, and what the platform forced. Read it before changing behaviour — most of what looks like an odd choice in the code is a workaround recorded there.
 
 ## The documents
 
-Four rule files in `.claude/rules/`, and each one owns a different question. A change touching an area updates its file in the same task.
+Everything agent-facing is in `.claude/docs/`; `docs/map.md` says where things are. Each file owns a different question, and a change touching an area updates its file in the same task.
 
-- `bubbles.md` — what every bubble is, whichever kind it is. Read before adding a bubble.
-- `states.md` — the state vocabulary: kinds, states, mods, tabs, and which of them are built.
-- `motion.md` — how anything is allowed to move: additive motion, the glyph-as-cause rule, liquid, the blur contract.
-- `architecture.md` — the Kotlin/WebView split, the watchers, the windows, the bridge.
-- `code-quality.md` — naming, comments, and what not to build.
+- `docs/rules/bubbles.md` — what every bubble is, whichever kind it is. Read before adding a bubble.
+- `docs/rules/states.md` — the state vocabulary: kinds, states, mods, tabs, and which of them are built.
+- `docs/rules/motion.md` — how anything is allowed to move: additive motion, the glyph-as-cause rule, liquid, the blur contract.
+- `docs/rules/code-quality.md` — naming, comments, and what not to build.
+- `docs/architecture.md` — the Kotlin/WebView split, the watchers, the windows, the bridge.
+- `docs/decisions.md`, `docs/quirks.md`, `docs/known-issues.md`, `docs/roadmap.md` — what was decided and why, the traps, the open bugs, the planned work.
+
+`states.md` and `motion.md` are over 100 KB each, so they are read on demand rather than imported; only the small one is always loaded:
+
+@docs/rules/code-quality.md
 
 ## How to work here
 
-1. **Read in this order:** this file, the rule file covering what is being touched, then the backlog note in the vault. Nothing about open work is written in this repository.
+1. **Read in this order:** this file, the rule file covering what is being touched, then the backlog note in the vault. Open work is tracked in the vault; `docs/roadmap.md` holds the phase plan only.
 2. **One backlog item at a time.** Tick it `[x]` in the vault only once it has been verified on the phone.
 3. **Name the contracts the change touches before editing** — state, motion, window, blur, mirrored constant. The glass is mirrored off the real boxes now rather than told where to go, so what a size change owes it is a `stirLiquid()` long enough to cover the transition.
 4. **Docs change in the same task**, never afterwards.
@@ -57,7 +62,9 @@ Nothing about open work belongs in this repository.
 
 ## Style
 
-The interface follows VAS — VADOS APPLICATION SYSTEMS, cloned into `.claude/skills/vas/`. Read its `SKILL.md` first; it is the source of truth for how this looks, moves and reads. Where a rule in `.claude/rules/` is more specific, the more specific one wins.
+The interface follows V/AS — VAD/OS APPLICATION SYSTEMS (<https://github.com/VADITIM/VADOS-APPLICATION-SYSTEMS>), a git-ignored local clone in `.claude/skills/vas/`, never committed with this project. Read its `SKILL.md` first; it is the source of truth for how this looks, moves and reads. Its foundations are in `architecture/`, its Android pitfalls in `platforms/`. Where a rule in `.claude/docs/rules/` is more specific, the more specific one wins.
+
+Two of its rules are broken most often here: text that runs out of room **fades out, never ellipsis**, and a size is never faked with `transform: scale()` — the layout box keeps its old size and the next transition overwrites the scale.
 
 ## Don'ts
 
@@ -66,6 +73,12 @@ The interface follows VAS — VADOS APPLICATION SYSTEMS, cloned into `.claude/sk
 - Never do hit-testing in Kotlin. The page is the only side that knows where anything is.
 - Never add a dependency, an abstraction layer or a settings toggle that was not asked for.
 - Never commit or push unless asked.
+
+## Releases
+
+Releases: on command
+
+Version: `versionName` in `app/build.gradle.kts`, `<major>.<minor>.<patch>`, bumped in the same commit as every change (V/AS `guides/release-pipeline.md`). `RELEASE_NOTES.md` holds the latest version's text. `.github/workflows/build.yml` publishes `v<version>` with `dynamic-bubble-v<version>.apk` attached, on a manual run only; the `RELEASE_ON_PUSH` repository variable mirrors this line.
 
 ## Output style
 

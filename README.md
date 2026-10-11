@@ -68,4 +68,4 @@ It is heavily animated on purpose. A phone gets glanced at for half a second, an
 
 ## Further reading
 
-[INSTRUCTIONS.md](INSTRUCTIONS.md) is the long form: every state, why each gesture belongs where it does, what the platform forced, the debug hooks, and the device measurements. The rules the code follows are in `.claude/rules/`.
+[decisions.md](.claude/docs/decisions.md) is the long form: every state, why each gesture belongs where it does, what the platform forced, the debug hooks, and the device measurements. The rules the code follows are in `.claude/docs/rules/`.

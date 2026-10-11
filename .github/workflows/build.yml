@@ -1,19 +1,20 @@
-name: Build debug APK
+name: Build
 
-# The JDK and the Android SDK exist only on the machine the phone is flashed from, so a checkout
-# anywhere else can read and edit but cannot build; this workflow is that missing check, and the
-# rolling latest-debug release is how the APK reaches the phone without a cable or a GitHub login.
 on:
   push:
-    branches: ['**']
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: write
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -22,29 +23,39 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # The action's default package list still asks for the legacy `tools` package, which the SDK repository no longer carries, so sdkmanager exited 1 before Gradle ever ran and every build since 2026-09-17 was red on setup.
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: assembleDebug
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log || { grep -E 'error:|^e: ' build.log; exit 1; }
+
+      - name: Name the build
+        run: |
+          VERSION=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          mkdir out
+          cp app/build/outputs/apk/debug/app-debug.apk "out/dynamic-bubble-v$VERSION.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: dynamic-bubble
+          path: out/
 
-      # Sideloading is the only way this app is installed, and a workflow artifact needs a signed-in
-      # browser to download; a prerelease asset does not, so the phone can fetch it directly.
-      - name: Publish to the rolling latest-debug release
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest-debug
-          name: Latest debug build
-          prerelease: true
-          body: "Debug APK from ${{ github.sha }} on ${{ github.ref_name }}. Sideload it; installing over an existing copy keeps the accessibility and notification-listener grants."
-          files: app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish release
+        if: >-
+          github.ref == 'refs/heads/main' &&
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event_name == 'push' && vars.RELEASE_ON_PUSH == 'true'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "v$VERSION" --cleanup-tag --yes || true
+          gh release create "v$VERSION" "out/dynamic-bubble-v$VERSION.apk" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file RELEASE_NOTES.md

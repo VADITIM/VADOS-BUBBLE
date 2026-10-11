@@ -110,10 +110,10 @@ Every surface is a WebView so the identity is one implementation, not several:
 The four identity fonts live in `assets/fonts/` and are registered once, in `dna.css`.
 
 This file is the long form of what the system *does*. The rules it has to obey while doing it are in
-`.claude/rules/`: [bubbles.md](.claude/rules/bubbles.md) for what every bubble is,
-[states.md](.claude/rules/states.md) for the state vocabulary,
-[motion.md](.claude/rules/motion.md) for how anything is allowed to move, and
-[architecture.md](.claude/rules/architecture.md) for the Kotlin/WebView split and the windows.
+`.claude/docs/rules/`: [bubbles.md](rules/bubbles.md) for what every bubble is,
+[states.md](rules/states.md) for the state vocabulary,
+[motion.md](rules/motion.md) for how anything is allowed to move, and
+[architecture.md](architecture.md) for the Kotlin/WebView split and the windows.
 
 ## The bubble
 
@@ -455,7 +455,7 @@ Next, in order — each of these is a phase, and each is why the one after it is
 
 After that: the lock-screen bubbles, the Discord video tab and
 the recording Now state — each one ordinary feature work standing on the contract in
-`.claude/rules/`.
+`.claude/docs/rules/`.
 
 The live backlog is a note in the Obsidian vault, not in this repository.
 
@@ -499,3 +499,9 @@ shade swipe cannot start on — a window wider than the bubble makes the top of 
 animation once the WebView has actually been re-laid out; animating before that ran the first frames
 against the old viewport, which dragged the bubble off centre. It calls `setWindowSize(-1, -1)` after
 the collapse ends, so the window shrinks only once the bubble has finished moving.
+
+## 2026-10-11 — `.claude` restructure and release workflow
+
+- This file is the former root `INSTRUCTIONS.md`, moved whole; it mixes decisions, device facts, debug hooks and layout notes and is to be split by job when next worked on.
+- `STYLE-DNA.md` is gone; its content is in `CLAUDE.md` § Style. The V/AS repository used to be a `vados-dna` skill inside the global config repo; that copy is dead, and `dna/` is now `architecture/`.
+- Releases are versioned (`v<version>`, `dynamic-bubble-v<version>.apk`) on a manual run, replacing the rolling `latest-debug` prerelease the phone used to fetch the APK from. Rejected: keeping both.

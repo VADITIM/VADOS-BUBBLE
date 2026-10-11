@@ -1,6 +1,6 @@
 # Dynamic Bubble — development plan
 
-Progress lives here. `SOURCE.md` is the backlog note verbatim; this file is what is being done
+Progress lives here. The backlog note lives in the vault; this file is what is being done
 about it, in order, with what is finished marked. Tick an item only once it has been walked on
 the phone.
 
@@ -52,7 +52,7 @@ mods and sit a few pixels shorter.
 
 ## Done
 
-- [x] **Backlog persisted** — `SOURCE.md`, this file. `cf44f17`
+- [x] **Backlog persisted** — this file. `cf44f17`
 - [x] **Skill library** — 44 skills vendored and pinned, `vados-dna` finally present. `50f4d52`
 - [x] **`bubbles.md` written** — the rule file every other doc linked to and which did not exist. `c4c59e9`
 - [x] **CI builds the APK** and publishes a rolling release. `6fd929a`, `62c9baf`

@@ -180,7 +180,7 @@ which none of the eight `AppStyles.of()` callers has to spare, so the object is 
 `settings put secure enabled_accessibility_services` (read and *appended to* — that key holds every
 accessibility service on the phone), the listener is `cmd notification allow_listener`, and
 `POST_NOTIFICATIONS` is `pm grant`; the settings deep link is the fallback for the one run before
-Shizuku exists. `HeadsUp` is no longer asked about at all — see `INSTRUCTIONS.md`.
+Shizuku exists. `HeadsUp` is no longer asked about at all — see `.claude/docs/decisions.md`.
 
 ## The page
 
