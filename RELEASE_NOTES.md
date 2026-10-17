@@ -1,8 +1,7 @@
-# 0.5.0
+# 0.5.3
 
-- Lock screen: notification groups on the keyguard, each with its own bubble and a delete-all bubble.
-- Stage reveal: hidden, alert, revealed and leaving stages, so an Alert can come down over a hidden bubble and go back up.
-- New DB Navigator trip mod; reworked call, media, timer and notification mods, the Status panel and the tabs.
-- Now bubble in the panel arrives cleanly and answers taps across its whole width.
-- Wireless ADB pairing from the app; runtime permissions granted through Shizuku.
-- Per-state launcher icons; live press feedback and a second motion pass.
+- Landscape: no bubbles; a double tap bottom-right opens the Dashboard.
+- Dashboard: smoother motion, toggle icons always show the phone's real state, and brightness lets go when the Dashboard closes.
+- Volume and brightness sliders are gentler at both ends, and 0 and 100 are still exactly reachable.
+- Alert: the sender's name stays in its place and fades out when it is too long; Discord alerts name only the person.
+- The status-bar battery shows a sweep while the phone is charging.

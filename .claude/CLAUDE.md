@@ -81,7 +81,7 @@ Every change is committed and pushed to GitHub as soon as it is written, in the 
 
 Releases: on command
 
-Version: `versionName` in `app/build.gradle.kts`, `<major>.<minor>.<patch>`, bumped in the same commit as every change (V/AS `guides/release-pipeline.md`). `RELEASE_NOTES.md` holds the latest version's text. `.github/workflows/build.yml` publishes `v<version>` with `dynamic-bubble-v<version>.apk` attached, on a manual run only; the `RELEASE_ON_PUSH` repository variable mirrors this line.
+Version: `versionName` in `app/build.gradle.kts`, `<major>.<minor>.<patch>`, bumped in the same commit as every change (V/AS `guides/release-pipeline.md`). `RELEASE_NOTES.md` holds the latest version's text; `Releases.md` keeps every feature version, with its patches folded in, as VADOS-GALLERY does. `.github/workflows/build.yml` publishes `v<version>` with `dynamic-bubble-v<version>.apk` attached, on a manual run only; the `RELEASE_ON_PUSH` repository variable mirrors this line.
 
 ## Output style
 
