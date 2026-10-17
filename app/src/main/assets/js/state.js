@@ -23,7 +23,7 @@ export const bridge = window.Android || {
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
   requestToggles() {}, setToggle() {}, setLevel() {}, settleLevel() {}, requestVitals() {}, requestWeather() {},
   recordingAction() {}, transferAction() {}, setNotesProxy() {}, mediaSpeed() {},
-  note() {}, wakeFrames() {}, setLandscapeStage() {}, passRevealTap() {},
+  note() {}, wakeFrames() {}, setLandscapeStage() {}, passCornerTap() {},
 };
 
 

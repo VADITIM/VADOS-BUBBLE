@@ -113,9 +113,6 @@ object Preferences {
 
     const val BAR_LOCKED = "barLocked"
 
-    // Mirrors the Landscape field's labels in panel.html: 0 a swipe down from the top edge, 1 a tap on the top-left corner, 2 either.
-    const val LANDSCAPE_REVEAL = "landscapeReveal"
-
     const val QUICK_DIVIDERS = "quickDividers"
 
     const val DASH_ALERTS_DISABLED = "dashAlertsDisabled"
@@ -195,7 +192,6 @@ object Preferences {
         STATUS_BATTERY_ICONS to 0,
         LOCK_X to 0,
         BAR_LOCKED to 0,
-        LANDSCAPE_REVEAL to 0,
         QUICK_DIVIDERS to 0,
         DASH_ALERTS_DISABLED to 1,
         LOCK_NOTES to 1,

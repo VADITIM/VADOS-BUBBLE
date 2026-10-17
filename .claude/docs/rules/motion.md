@@ -113,9 +113,9 @@ It was, and it is gone. Past a grab threshold the main bubble came off its spot,
 
 One threshold for all three now, and it is the block: under it the hold, over it the band, and the band always comes home. Anything that wants a bubble somewhere other than the punch hole is a settings offset, which is a number the user set rather than a place a gesture left it in.
 
-## The landscape reveal
+## Landscape
 
-The reveal is the bar's arrival and nothing else: Main opens out of a drop where it rests at the middle of the top edge (`scale` from `REVEAL_DROP` on `--ease-bubble`), the Clock and the Status bubble are slung out of it on `slingInto` — **flown whole** (`isWhole`) rather than as a ball, since a ball of their height was narrower than the reading and the text spilled out of it, and at `REVEAL_PACE` of the sling's own clock so the bar is there before a game has moved on — the satellites and dots grow in a beat behind. The leave is that backwards and faster: the Clock and the Status bubble travel into Main and shrink away on `--ease-leave`, Main closes to a drop after them, and only then is the bar parked and the stage let go — the host is told `3` at the start, so nothing is touchable while it leaves. `html.revealing` zeroes the carry on Main for the moment it is moved between its resting place and its parked one, because that move is a jump hidden inside a drop, not a travel. **The landscape Alert is the one arrival that does not come out of Main**: the bar is not on the screen, so it comes down from outside the top edge on Main's own translate, the same channel the drop into the centre uses.
+Landscape has no arrival of its own any more: the bar is never drawn there except as part of the Dashboard, so its bubbles do not travel in from the top edge. When the Dashboard opens, Main, the Clock, the Status bubble and the marks fade in on `ease-in` over `DASHBOARD_FADE` while the Dashboard's own entrance carries them to its corners and top; when it closes they fade out on `ease-out` while its leave carries them back, and the stage is only let go once the close has played (`dashboardLeaving`, handed the same length the close stirs the liquid for). The fades start from and end at the element's own opacity (an implicit keyframe), so a mark that has nothing to show stays at nothing rather than flashing in.
 
 ## The punch hole is the origin
 

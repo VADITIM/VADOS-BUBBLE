@@ -3,7 +3,7 @@ import { setSize, showFace, toClosed } from '../row.js';
 import { PICTURE_MAX_HEIGHT, bridge, pill, root, shared } from '../state.js';
 import { isChannelLive, refreshChannel } from '../channel.js';
 import { statusOpen } from '../status.js';
-import { alertArriving, isLandscape } from '../reveal.js';
+import { isLandscape } from '../reveal.js';
 
 
 
@@ -244,10 +244,11 @@ export function show(notification) {
     if (isChannelLive()) refreshChannel();
     return;
   }
+  // An Alert in landscape was a bubble coming down over a game or a video with nothing else of the bar there, and landscape now draws nothing but the Dashboard, so an Alert only stands inside an open one.
+  if (isLandscape() && !statusOpen) return;
   clearTimeout(shared.dwellTimer);
   
   clearTimeout(goneTimer);
-  alertArriving();
 
   const picture = document.getElementById('picture');
   // In landscape an Alert has a sliver of the screen's height to stand in, so a photo is never drawn into it and the tap goes straight to the app.

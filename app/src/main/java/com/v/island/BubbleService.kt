@@ -116,22 +116,16 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private const val ALERT_ZONE_WIDTH = 96
         private const val ALERT_ZONE_HEIGHT_PART = 0.30f
 
-        private const val REVEAL_STRIP = 14
-        private const val REVEAL_BAND = 56
-        private const val LANDSCAPE_REACH = 20
         private const val CORNER_TARGET = 40
-        // Mirrors CORNER_DOUBLE in js/reveal.js: the corner stays live this long after a reveal so a second tap can ask for the Dashboard.
-        private const val CORNER_DOUBLE = 300L
         private const val ROTATION_SETTLE = 600L
         private const val SUMMON_NONE = 0
         private const val SUMMON_STATUS = 1
         private const val SUMMON_NOTIFICATIONS = 2
 
-        // Mirrors STAGE_HIDDEN, STAGE_ALERT, STAGE_REVEALED and STAGE_LEAVING in assets/js/reveal.js.
+        // Mirrors STAGE_HIDDEN, STAGE_DASHBOARD and STAGE_LEAVING in assets/js/reveal.js.
         private const val STAGE_HIDDEN = 0
-        private const val STAGE_ALERT = 1
-        private const val STAGE_REVEALED = 2
-        private const val STAGE_LEAVING = 3
+        private const val STAGE_DASHBOARD = 1
+        private const val STAGE_LEAVING = 2
 
         const val PANEL_BROADCAST = "com.v.island.TOGGLE_STATUS_PANEL"
         const val NOTIFICATIONS_BROADCAST = "com.v.island.TOGGLE_NOTIFICATIONS"
@@ -316,16 +310,13 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private var alertTapX = 0f
     private var alertTapY = 0f
 
-    private lateinit var revealStrip: View
-    private lateinit var revealStripParams: WindowManager.LayoutParams
     private lateinit var cornerProxy: View
     private lateinit var cornerProxyParams: WindowManager.LayoutParams
 
-    private var stripTapX = 0f
-    private var stripTapY = 0f
+    private var cornerTapX = 0f
+    private var cornerTapY = 0f
 
     private var landscapeStage = STAGE_HIDDEN
-    private var cornerKeptUntil = 0L
 
     
 
@@ -728,19 +719,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             setCanPlayMoveAnimation(false)
         }
 
-        revealStrip = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) return false
-                stripTapX = event.rawX
-                stripTapY = event.rawY
-                forwardTouch(event, revealStripParams, "reveal")
-                return true
-            }
-        }
-        revealStripParams = edgeParams()
         cornerProxy = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) return false
+                cornerTapX = event.rawX
+                cornerTapY = event.rawY
                 forwardTouch(event, cornerProxyParams, "corner")
                 return true
             }
@@ -749,8 +732,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, params)
-        // Added before every proxy so the bubbles' own windows stand above it: windows of one type stack in the order they were added, and a strip added last would take the bubbles' touches.
-        windowManager.addView(revealStrip, revealStripParams)
         windowManager.addView(cornerProxy, cornerProxyParams)
         // Below every bubble's own window: the Dashboard and the Notifications menu stand over the list while they are open, and their proxies have to hear those touches rather than the list's.
         notesProxies.forEachIndexed { index, view -> windowManager.addView(view, notesProxyParams[index]) }
@@ -865,7 +846,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         webView.postDelayed({ readFullScreen(null) }, ROTATION_SETTLE)
     }
 
-    // In landscape the page decides whether anything is drawn — nothing, an Alert on its own, or the whole bar — and a fullscreen app is exactly where landscape is used, so it no longer hides the stage there.
+    // In landscape nothing is drawn but the Dashboard, and the page says when that is; a fullscreen app is exactly where landscape is used, so it does not hide the stage there.
     private fun isHidden() =
         isScreenOff || if (isLandscape) landscapeStage == STAGE_HIDDEN else isFullScreen && summoned == SUMMON_NONE
 
@@ -886,8 +867,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
     }
 
-    // Only the revealed bar may be touched in landscape: an Alert shown on its own answers through its own windows, and a bar that is leaving or parked off the screen answers nothing, so a tap near the top edge never lands on a bubble nobody can see.
-    private fun isBarTouchable() = !isLandscape || landscapeStage == STAGE_REVEALED
+    // A bubble left drawn but faded in landscape still held its window, so the first tap there woke a bar nobody could see and only the second one did anything: in landscape nothing may be touched but the open Dashboard.
+    private fun isBarTouchable() = !isLandscape || landscapeStage == STAGE_DASHBOARD
 
     private fun horizontalOffset() =
         if (isLandscape) 0 else Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET)
@@ -906,28 +887,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
         push("window.setLandscape($isLandscape)")
-        placeRevealWindows()
+        placeCornerWindow()
     }
 
-    private fun placeRevealWindows() {
-        if (!this::revealStrip.isInitialized) return
-        val mode = Preferences.get(preferences, Preferences.LANDSCAPE_REVEAL)
-        val isOpen = isLandscape && !isScreenOff && landscapeStage != STAGE_LEAVING
-        val hasStrip = isOpen && mode != 1
-        revealStripParams.x = 0
-        revealStripParams.y = 0
-        revealStripParams.width = if (hasStrip) screenWidth() else 0
-        revealStripParams.height =
-            if (hasStrip) dp(if (landscapeStage == STAGE_REVEALED) REVEAL_BAND else REVEAL_STRIP) else 0
-        revealStripParams.flags =
-            if (hasStrip) BASE_FLAGS else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        relayout(revealStrip, revealStripParams)
-
-        // The revealed Clock stands in this corner, so the target is given up to it while the bar is out.
-        val hasCorner = isOpen && mode != 0 &&
-            (landscapeStage != STAGE_REVEALED || android.os.SystemClock.uptimeMillis() < cornerKeptUntil)
-        cornerProxyParams.x = 0
-        cornerProxyParams.y = 0
+    private fun placeCornerWindow() {
+        if (!this::cornerProxy.isInitialized) return
+        val hasCorner = isLandscape && !isScreenOff && landscapeStage == STAGE_HIDDEN
+        cornerProxyParams.x = if (hasCorner) screenWidth() - dp(CORNER_TARGET) else 0
+        cornerProxyParams.y = if (hasCorner) screenHeight() - dp(CORNER_TARGET) else 0
         cornerProxyParams.width = if (hasCorner) dp(CORNER_TARGET) else 0
         cornerProxyParams.height = if (hasCorner) dp(CORNER_TARGET) else 0
         cornerProxyParams.flags =
@@ -1011,10 +978,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         setCanPlayMoveAnimation(false)
     }
 
-    private fun proxyFlags(isLive: Boolean, isAlertWindow: Boolean = false) =
-        if (isLive && !isHidden() &&
-            (isBarTouchable() || (isAlertWindow && landscapeStage == STAGE_ALERT))
-        ) BASE_FLAGS
+    private fun proxyFlags(isLive: Boolean) =
+        if (isLive && !isHidden() && isBarTouchable()) BASE_FLAGS
         else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
 
     private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
@@ -1053,7 +1018,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         if (isHidden) blurPanes.forEachIndexed { index, pane -> clearBlur(index, pane) } else repaintBlur()
         
         
-        proxyParams.flags = proxyFlags(true, true)
+        proxyParams.flags = proxyFlags(true)
 
 
 
@@ -1080,7 +1045,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         if (isHidden) setAlertBand(0)
         else {
-            alertOverlayParams.flags = proxyFlags(alertOverlayParams.width != 0, true)
+            alertOverlayParams.flags = proxyFlags(alertOverlayParams.width != 0)
             relayout(alertOverlay, alertOverlayParams)
             push("window.refitProxies()")
         }
@@ -1093,7 +1058,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
-        placeRevealWindows()
+        placeCornerWindow()
     }
 
     override fun onDestroy() {
@@ -1118,7 +1083,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.removeView(touchProxy) }
             notesProxies.forEach { view -> runCatching { windowManager.removeView(view) } }
             runCatching { windowManager.removeView(cornerProxy) }
-            runCatching { windowManager.removeView(revealStrip) }
             runCatching { windowManager.removeView(stage) }
             webView.destroy()
         }
@@ -1139,7 +1103,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
         applyBarLock()
-        placeRevealWindows()
+        placeCornerWindow()
         pushAppearance()
     }
 
@@ -1268,10 +1232,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         alertOverlayParams.height = if (wanted) height else 0
         alertOverlayParams.x = if (wanted) screenWidth() - width else 0
         alertOverlayParams.y = if (wanted) (screenHeight() - height) / 2 else 0
-        alertOverlayParams.flags = proxyFlags(wanted, true)
+        alertOverlayParams.flags = proxyFlags(wanted)
         relayout(alertOverlay, alertOverlayParams)
 
-        proxyParams.flags = proxyFlags(!(wanted && isWhole), true)
+        proxyParams.flags = proxyFlags(!(wanted && isWhole))
         relayout(touchProxy, proxyParams)
     }
 
@@ -1285,18 +1249,18 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         dispatchTap(x, y) {
             if (alertOverlayParams.width != 0) {
-                alertOverlayParams.flags = proxyFlags(true, true)
+                alertOverlayParams.flags = proxyFlags(true)
                 relayout(alertOverlay, alertOverlayParams)
             }
         }
     }
 
-    // The reveal strip spans the whole top edge in landscape, so every tap an app expects up there lands on it first; the page decides it was a tap rather than a pull and it is handed on exactly as the Alert's band hands its taps on.
-    private fun replayStripTap() {
-        if (revealStripParams.width == 0) return
-        revealStripParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        relayout(revealStrip, revealStripParams)
-        dispatchTap(stripTapX, stripTapY) { placeRevealWindows() }
+    // The corner stands over whatever an app keeps in its bottom-right corner, so a lone tap the page did not take as the first of a double is handed on exactly as the Alert's band hands its taps on.
+    private fun replayCornerTap() {
+        if (cornerProxyParams.width == 0) return
+        cornerProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        relayout(cornerProxy, cornerProxyParams)
+        dispatchTap(cornerTapX, cornerTapY) { placeCornerWindow() }
     }
 
     private fun dispatchTap(x: Float, y: Float, restore: () -> Unit) {
@@ -1600,9 +1564,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private fun topGrab(): Int = Preferences.get(preferences, Preferences.VERTICAL_OFFSET)
 
-    // In landscape a thumb reaching up to the bar lands below a bubble as often as on it, and that miss fell through to the reveal band and was replayed into the game, so the revealed bar's resting bubbles take a margin below them too.
-    private fun landscapeReach(): Int = if (isLandscape) LANDSCAPE_REACH else 0
-
     private fun dp(value: Int): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
     ).toInt()
@@ -1739,7 +1700,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 proxyParams.height =
                     dp(
                         if (isGrown) heightDp + topGrab()
-                        else compactHeight() + topGrab() + GRAB + landscapeReach()
+                        else compactHeight() + topGrab() + GRAB
                     )
                 
                 
@@ -1785,8 +1746,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         @JavascriptInterface
-        fun passRevealTap() {
-            webView.post { replayStripTap() }
+        fun passCornerTap() {
+            webView.post { replayCornerTap() }
         }
 
         @JavascriptInterface
@@ -1794,10 +1755,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             webView.post {
                 if (!isLandscape || stage == landscapeStage) return@post
                 landscapeStage = stage
-                if (stage == STAGE_REVEALED) {
-                    cornerKeptUntil = android.os.SystemClock.uptimeMillis() + CORNER_DOUBLE
-                    webView.postDelayed({ placeRevealWindows() }, CORNER_DOUBLE)
-                }
                 applyVisibility()
             }
         }
@@ -1918,7 +1875,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             webView.post {
                 val isLive = widthDp > 0
                 clockProxyParams.width = if (isLive) dp(widthDp) else 0
-                clockProxyParams.height = if (isLive) dp(heightDp + topGrab() + landscapeReach()) else 0
+                clockProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
                 clockProxyParams.x = params.x + dp(leftDp)
                 clockProxyParams.flags = proxyFlags(isLive)
                 relayout(clockProxy, clockProxyParams)
@@ -1932,7 +1889,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 // The open Dashboard asks for the whole screen and the settled bubble for its own box, so those two are its open and its shut; the zero in between is only the leave.
                 if (isLive) settleSummon(SUMMON_STATUS, dp(widthDp) >= screenWidth() - dp(1))
                 statusProxyParams.width = if (isLive) dp(widthDp) else 0
-                statusProxyParams.height = if (isLive) dp(heightDp + topGrab() + landscapeReach()) else 0
+                statusProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
                 statusProxyParams.x = params.x + dp(leftDp)
                 statusProxyParams.flags = proxyFlags(isLive)
                 relayout(statusProxy, statusProxyParams)

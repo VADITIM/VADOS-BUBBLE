@@ -30,7 +30,7 @@ It is heavily animated on purpose. A phone gets glanced at for half a second, an
 - **Dashboard.** Tap the Status bubble and it opens into the quick settings: brightness and volume, toggles for Wi-Fi, mobile data, Bluetooth, hotspot, GPS, airplane mode, power saving, rotation, microphone access and more, a battery reading to two decimals, weather, storage and memory.
 - **Notifications menu.** Swipe down on the main bubble and it opens into every notification the shade holds. Tap a row to open the app, swipe it sideways to dismiss it everywhere.
 - **Lock screen Now bubble.** Stands in for One UI's Now Bar, built from the same pieces as everything else, so the lock screen does not switch to a different design language.
-- **Landscape.** The bar stays out of the way in games and videos until you swipe down on the top edge or tap the top-left corner.
+- **Landscape.** No bubbles in games and videos; double-tap the bottom-right corner for the Dashboard.
 - **Screen off.** A notification wakes the screen long enough to play its arrival. Otherwise the bubbles disappear with the screen, so nothing burns into the OLED overnight.
 
 ## What you need

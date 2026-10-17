@@ -11,6 +11,7 @@ import { HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
 import { endSweep, holdLabel, revealLabel, settleSweep, sweepInto, writeLabel, hideLabel, showLabel } from './sweep.js';
 import { channelHolds, closeChannel, collapseSpread, dropChannel, isChannelLive, isSpreadOpen, openChannel, stepChannel } from './channel.js';
 import { refreshEdgeProxy } from './edge.js';
+import { dashboardLeaving } from './reveal.js';
 
 
 
@@ -1009,6 +1010,7 @@ export function closeStatusPanel() {
   
   
   stirLiquid(Math.max(STATUS_PANEL.ms, dropped, SCRIM_FROST_MS) + 160);
+  dashboardLeaving(Math.max(STATUS_PANEL.ms, dropped, SCRIM_FROST_MS) + 160);
   panelSettle = setTimeout(() => {
     
     

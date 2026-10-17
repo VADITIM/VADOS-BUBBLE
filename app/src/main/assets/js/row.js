@@ -1,5 +1,4 @@
 import { refreshEdgeProxy } from './edge.js';
-import { alertLeaving } from './reveal.js';
 import { leaveAlertCentre, leaveAlertDash, sleepDark } from './alert.js';
 import { refreshNotes } from './notes.js';
 import { catchInto, paintLiquidFrame, releaseCatch, stirLiquid, traceEvent } from './liquid.js';
@@ -1426,7 +1425,6 @@ export function toClosed() {
   const wasAlert = shared.state === 'alert';
   shared.state = 'idle';
   shared.current = null;
-  alertLeaving();
   refreshEdgeProxy();
   pill.classList.remove('alert', 'with-image', 'charging');
   leaveAlertCentre();

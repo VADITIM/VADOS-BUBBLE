@@ -12,7 +12,7 @@ import { pillHolds } from './motion.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize, toClosed } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
 import { edgeTouch, refreshEdgeProxy } from './edge.js';
-import { cornerTouch, landscapeSlept, landscapeWoke, noteLandscapeTouch, revealThen, revealTouch, setLandscape } from './reveal.js';
+import { cornerTouch, isLandscape, landscapeSlept, landscapeWoke, setLandscape, summonDashboard } from './reveal.js';
 import { clearButton, clearHolds, openNotifications } from './tabs.js';
 import { dropFocus, notesTouch, refreshNotes, setNotesEnabled, setNotesHomeAnimated } from './notes.js';
 
@@ -158,15 +158,10 @@ function statusTarget(x, y, hit) {
   return nearest || within || statusPill;
 }
 window.onProxyTouch = (action, x, y, source) => {
-  if (source === 'reveal') {
-    revealTouch(action, x, y);
-    return;
-  }
   if (source === 'corner') {
     cornerTouch(action, x, y);
     return;
   }
-  if (action === 'down') noteLandscapeTouch();
   if (action === 'down') {
     shared.isTouchDown = true;
     // An outside report belonging to this same press reaches the page before this down does, so a bubble already closed by it hands this press a spent latch rather than a fresh one.
@@ -481,13 +476,13 @@ window.setCameraActive = isActive =>
 
 
 window.onToggleStatusPanel = () => {
-  if (revealThen(openStatusPanel)) return;
   if (statusOpen) closeStatusPanel();
+  else if (isLandscape()) summonDashboard();
   else openStatusPanel();
 };
 
 window.onToggleNotifications = () => {
-  if (revealThen(openNotifications)) return;
+  if (isLandscape()) return;
   if (shared.state === 'extended' && shared.size === 'notifications') toClosed();
   else openNotifications();
 };

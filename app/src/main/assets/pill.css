@@ -190,7 +190,7 @@ html, body {
   
 
 
-  translate: var(--shift, 0px) calc(var(--alert-drop, 0px) + var(--notifications-drop, 0px) - var(--conceal-lift, 0px));
+  translate: var(--shift, 0px) calc(var(--alert-drop, 0px) + var(--notifications-drop, 0px));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4484,17 +4484,9 @@ html.spread-landing #channel-under { opacity: 0; }
 
 
 
-/* Landscape. The bar is not on the screen until it is asked for (js/reveal.js): everything but Main is faded to nothing, which also takes it out of the goo and the blur, and Main is parked above the top edge so an Alert can come down from outside the screen rather than out of a bubble nobody can see. */
-html.landscape.concealed :is(#clock, #status, #satellite-left, #satellite-right, #dots-left, #dots-right, #lock-stack, #double) {
+/* Landscape. Nothing of the bar is drawn outside the Dashboard (js/reveal.js): every bubble is faded to nothing, which also takes it out of the goo and the blur. */
+html.landscape.concealed :is(#pill, #clock, #status, #satellite-left, #satellite-right, #dots-left, #dots-right, #lock-stack, #double) {
   opacity: 0 !important;
-}
-html.landscape.concealed:not(.grown) #pill {
-  --conceal-lift: calc(var(--grab, 0px) + var(--pill-height) + 60px);
-}
-/* The reveal pops Main open where it rests and the leave parks it again once it is a drop, so the travel between the two places is a jump rather than a carry. */
-html.revealing #pill {
-  --carry-ms: 0ms;
-  --shift-delay: 0ms;
 }
 html.landscape #pill.alerting .message { -webkit-line-clamp: 1; }
 
