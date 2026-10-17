@@ -729,11 +729,7 @@ function playEntrance() {
   playerArt.style.transitionDuration = PLAYER_ART_MS + 'ms';
   playerArt.style.translate = '';
   playerArt.style.removeProperty('--art-exit');
-  playerArt.classList.remove('hidden-art', 'leaving-art');
-  playerArt.classList.add('entering-art');
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    playerArt.classList.remove('entering-art');
-  }));
+  playerArt.classList.remove('hidden-art', 'leaving-art', 'entering-art');
   
   document.getElementById('player-title').textContent = '';
   document.getElementById('player-artist').textContent = '';

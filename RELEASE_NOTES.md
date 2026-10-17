@@ -1,3 +1,3 @@
-# 0.5.7
+# 0.5.8
 
-- No fade-in when a bubble grows open: notifications, the media player, timer, trip, call, expanded Alerts, the Now bubble, and the slung Alert and Channel show their contents whole from the first frame. Leaves still fade.
+- Media player: opening it from the media bubble no longer lags. The player's contents stand at their open size and the growing bubble uncovers them; the cover flies in from the mod's art, and the frosted title and clock strips come on once the bubble has landed.

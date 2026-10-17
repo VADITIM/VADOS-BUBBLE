@@ -1531,6 +1531,23 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 
 
 
+/* Laid out against the face, every frame of the 460ms growth re-laid the cover, rescaled and re-masked it and re-ran four backdrop blurs over a box of a new size, which is the lag the player opened with. The contents stand at their open size from the first frame and the growing bubble uncovers them; mirrors #pill.player less its 1px border. */
+#player-stage {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 338px;
+  height: 302px;
+  translate: -50% 0;
+}
+/* The frost over a cover still flying in from the mod's art was re-blurred on every frame of the flight, so it comes on whole once the bubble has landed. */
+#pill.player :is(#player-meta, #player-clock)::before,
+#pill.player :is(#player-meta, #player-clock)::after {
+  animation: player-frost-in 1ms step-start var(--grow-ms) backwards;
+}
+@keyframes player-frost-in {
+  from { backdrop-filter: none; }
+}
 /* The blur is a backdrop of its own rather than the strip's own filter: a mask that softens the strip's inner edge also fades everything drawn in it, so the names went translucent along with the glass they stand on. */
 #player-meta {
   position: absolute;
