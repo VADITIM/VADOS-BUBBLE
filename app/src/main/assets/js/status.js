@@ -59,13 +59,21 @@ export function refreshDock() {
   if (statusOpen) paintTransferStrip();
 }
 
+let dataToday = '';
+
+// A blocking bridge read (two binder calls and a preferences read) sat on the open's first frame and on every media update, so the figure is read once the entrance has landed and painted from here in between.
+function readDataToday() {
+  dataToday = bridge.readDataToday() + ' today';
+  if (!transfer) setReading(transferReading, dataToday);
+}
+
 function paintTransferStrip() {
   const isLive = Boolean(transfer);
   transferStrip.classList.toggle('idle', !isLive);
   if (!isLive) {
     transferGlyph.innerHTML = GLYPHS.dataToday;
     transferName.textContent = '';
-    setReading(transferReading, bridge.readDataToday() + ' today');
+    setReading(transferReading, dataToday);
     return;
   }
   transferName.textContent = transfer.label || '';
@@ -912,7 +920,6 @@ export function openStatusPanel() {
   bridge.requestVitals();
   bridge.requestWeather();
   clearInterval(batteryFollow);
-  followBatteryReading();
   batteryFollow = setInterval(followBatteryReading, 1000);
 
 
@@ -948,12 +955,16 @@ export function openStatusPanel() {
   quickPanel.classList.add('showing');
   quickPanel.classList.add('entering');
   clearTimeout(quickEntering);
-  quickEntering = setTimeout(() => quickPanel.classList.remove('entering'), QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
+  quickEntering = setTimeout(() => {
+    quickPanel.classList.remove('entering');
+    releaseToggles();
+  }, QUICK_RANK_STEPS * QUICK_STAGGER + QUICK_JITTER + QUICK_POP);
   
   // A reading that swept while its bubble was still dropping was a bar moving under a box that was itself moving — the reveal is asked for once the quick panel has landed instead, over the text it is already standing on. Until then the reading is held out of sight and any answer arriving early only writes its text, so a weather reply landing mid-drop no longer plays a reveal of its own before the real one.
   hideLabel(weatherReading);
   hideLabel(transferReading);
   readingReveal = setTimeout(() => {
+    readDataToday();
     readingsHeld = false;
     revealLabel(weatherReading);
     revealLabel(transferReading);
@@ -970,6 +981,7 @@ export function closeStatusPanel() {
   // The channel stands in the stats section and nowhere else, so the section going takes it: there is nothing left for the card to be standing in, and its own flight home would be a journey out of a panel that had already gone.
   dropChannel();
   restoreStats();
+  endSolo();
   statusOpen = false;
   clearInterval(batteryFollow);
   refreshEdgeProxy();
@@ -997,7 +1009,6 @@ export function closeStatusPanel() {
   leaveCornerClock();
   shrinkCornerWidths();
   pill.classList.remove('panel-top');
-  quickPanel.classList.remove('level-solo');
   leavePanelNow();
   showFace(closedFace());
   applyClosedWindow();
@@ -1020,6 +1031,7 @@ export function closeStatusPanel() {
     quickPanel.classList.remove('leaving');
     releaseCornerWidths();
     fitStatusProxy();
+    releaseToggles();
   }, Math.max(STATUS_PANEL.ms, dropped) + 40);
   
   
@@ -1186,7 +1198,7 @@ function holdPairedSwap(count) {
     if (!pairedSwap) {
       pairedSwap = setInterval(() => {
         pairedTurn += 1;
-        paintModeLabels();
+        if (statusOpen) paintModeLabels();
       }, PAIRED_SWAP_MS);
     }
     return;
@@ -1421,7 +1433,24 @@ batteryBox.addEventListener('click', event => {
   batteryBox.classList.toggle('saving', saverSwitch().classList.contains('on'));
 });
 
-window.onTogglesChanged = paintToggles;
+let heldToggles = null;
+
+// A read-back landing while the panel was entering or leaving repainted its knobs, rings and level fills on whatever frame it arrived — after a brightness drag that was the panel's leave — so it is held until the motion has landed.
+window.onTogglesChanged = state => {
+  if (quickPanel.classList.contains('entering') || quickPanel.classList.contains('leaving')) {
+    heldToggles = state;
+    return;
+  }
+  heldToggles = null;
+  paintToggles(state);
+};
+
+function releaseToggles() {
+  if (!heldToggles || quickPanel.classList.contains('entering') || quickPanel.classList.contains('leaving')) return;
+  const state = heldToggles;
+  heldToggles = null;
+  paintToggles(state);
+}
 
 
 
@@ -2254,6 +2283,17 @@ function enterSolo(level) {
   }
   bridge.triggerHaptic('expand');
   stirLiquid(SOLO_OUT + SOLO_FROST + SOLO_TRAVEL);
+}
+
+// Letting go of the brightness bar leaves `solo-in` on the panel for SOLO_IN, and that rule outranks the leave's collapse: a close inside that window drew every module growing back over a panel that had gone, then replayed the collapse from full opacity when the class came off.
+function endSolo() {
+  clearTimeout(soloTimer);
+  clearTimeout(soloBackTimer);
+  soloLevel = null;
+  levelsRow.classList.remove('merged');
+  delete levelsRow.dataset.held;
+  levels.forEach(other => other.classList.remove('solo-hidden'));
+  quickPanel.classList.remove('level-solo', 'solo-out', 'solo-in');
 }
 
 function leaveSolo() {

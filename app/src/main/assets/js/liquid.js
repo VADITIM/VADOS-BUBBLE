@@ -389,9 +389,7 @@ function sendBlurFrame(measured) {
   })).join(';');
   if (spec === blurSent) return;
   blurSent = spec;
-  const probeStart = performance.now(); // PROBE
   bridge.setBlurFrame(spec);
-  if (performance.now() - probeStart > 1 && window.probeMark) window.probeMark('setBlurFrame ' + (performance.now() - probeStart).toFixed(1) + 'ms'); // PROBE
 }
 
 
@@ -597,7 +595,6 @@ function flowLiquid() {
   paintLiquidFrame();
   const after = performance.now();
   const paint = after - before;
-  if (paint > 3 && window.probeMark) window.probeMark('mirror ' + paint.toFixed(1) + 'ms'); // PROBE
   const gap = lastFrameAt ? before - lastFrameAt : 0;
   lastFrameAt = before;
   if ((paint > FRAME_BUDGET || gap > FRAME_GAP) && after - lastJankAt > JANK_QUIET) {
