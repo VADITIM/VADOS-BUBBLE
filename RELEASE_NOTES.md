@@ -1,3 +1,3 @@
-# 0.5.5
+# 0.5.6
 
-- Dashboard: the entrance fade starts climbing twice as early and rises half as steeply, so modules no longer pop in at the end of their motion.
+- Dashboard: no fade on entry; modules, bars and knobs are fully drawn from their first frame and only pop in.

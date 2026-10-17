@@ -70,8 +70,6 @@
 
   --ease-sling: cubic-bezier(0.1, 1.45, 0.3, 1);
 
-  /* The Dashboard's opacity rode each module's own overshooting pop, so it was fully there in the first fifth of the motion and the growth read as a box appearing and then wobbling; on an ease-in most of it arrives as the motion lands. */
-  --ease-fade-in: cubic-bezier(0.16, 0, 0.335, 0);
 
   /* Mirrors DASH_TRAVEL in js/alert.js — the Alert's sling into the dashboard and its sling home take the same clock. */
   --dash-ms: 300ms;
@@ -2673,7 +2671,7 @@ html.battery-percent-light .mini-battery-bolt {
   opacity: 0;
   transition: opacity 300ms ease;
 }
-#quick-panel.showing #quick-mark { opacity: 1; transition-delay: 220ms; transition-timing-function: var(--ease-fade-in); }
+#quick-panel.showing #quick-mark { opacity: 1; transition-delay: 220ms; transition-duration: 0ms; }
 
 
 
@@ -2741,7 +2739,7 @@ html.lock-live #system-section + .quick-divider {
 }
 html.lock-live { --quick-now-tall: var(--lock-compact-height); }
 html.lock-live.now-open { --quick-now-tall: var(--lock-height); }
-#quick-panel.showing .quick-divider { opacity: 0.5; transition-delay: 180ms; transition-timing-function: var(--ease-fade-in), var(--ease-grow); }
+#quick-panel.showing .quick-divider { opacity: 0.5; transition-delay: 180ms; transition-duration: 0ms, var(--grow-ms); }
 
 /* The line is hidden rather than taken out of the column: its margins are what hold the three sections apart, so removing the element would collapse the spacing the panel is laid out on. */
 html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
@@ -2779,7 +2777,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   opacity: 0;
   transition: opacity 200ms ease;
 }
-#quick-panel.showing #quick-weather { opacity: 1; transition-delay: 160ms; transition-timing-function: var(--ease-fade-in); }
+#quick-panel.showing #quick-weather { opacity: 1; transition-delay: 160ms; transition-duration: 0ms; }
 
 #quick-mods {
   position: absolute;
@@ -2801,7 +2799,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
 }
 #quick-mods[hidden] { display: none; }
 #quick-mods svg { width: 60%; height: 60%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-#quick-panel.showing #quick-mods { opacity: 0.32; pointer-events: auto; transition-delay: 160ms, 0ms; transition-timing-function: var(--ease-fade-in), var(--ease-split); }
+#quick-panel.showing #quick-mods { opacity: 0.32; pointer-events: auto; transition-delay: 160ms, 0ms; transition-duration: 0ms, 200ms; }
 #quick-panel.showing #quick-mods:active { opacity: 0.6; scale: 0.9; transition-delay: 0ms; }
 #weather-glyph svg { width: 16px; height: 16px; fill: currentColor; }
 
@@ -3057,7 +3055,7 @@ html.no-dividers #quick-panel.showing .quick-divider { opacity: 0; }
   opacity: 0;
   transition: opacity 200ms ease;
 }
-#quick-panel.showing #quick-transfer { opacity: 1; transition-delay: 200ms; transition-timing-function: var(--ease-fade-in); }
+#quick-panel.showing #quick-transfer { opacity: 1; transition-delay: 200ms; transition-duration: 0ms; }
 
 #transfer-head {
   display: flex;
@@ -3498,19 +3496,18 @@ html.now-open {
 #quick-panel.entering .quick-bubble {
   --enter-at: calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--pop-jitter, 0ms));
   animation:
-    bubble-grow var(--quick-pop) var(--ease-sling) var(--enter-at) backwards,
-    quick-contents-in var(--quick-pop) var(--ease-fade-in) var(--enter-at) backwards;
+    bubble-grow var(--quick-pop) var(--ease-sling) var(--enter-at) backwards;
 }
 /* The bars arrive from the other side of where they stand. Only the name is swapped, so the rank, the stagger and the easing are still the panel's — what changes is the direction of the pull, and it changes on the way in only: the leave keeps the travel `--pop-from` already describes, which is why this is a second set of keyframes rather than the token being negated on the element. */
 #quick-panel.entering .level {
-  animation-name: level-grow, quick-contents-in;
+  animation-name: level-grow;
 }
-/* Text inside a box scaling up from nothing is re-rasterised at each raster scale the compositor steps through, so the stats readings jumped in coarse steps while their bubbles grew; they wait out their own bubble's pop and fade in once it has landed. */
+/* Text inside a box scaling up from nothing is re-rasterised at each raster scale the compositor steps through, so the stats readings jumped in coarse steps while their bubbles grew; they wait out their own bubble's pop and appear once it has landed. */
 #quick-panel.entering :is(.vital-reading, .vital-gauge, .battery-remaining) {
   --rise-at: calc(var(--panel-at, 0ms) + var(--pop-rank, 0) * var(--pop-step, 42ms) + var(--quick-pop) + var(--rise-after, 0ms));
   animation:
     stat-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) var(--rise-at) backwards,
-    quick-contents-in 260ms var(--ease-fade-in) var(--rise-at) backwards;
+    quick-contents-in 1ms step-start var(--rise-at) backwards;
 }
 #quick-panel.entering .vital-gauge { --rise-after: 50ms; }
 #quick-panel.entering .vital[data-vital="ram"] { --rise-after: 70ms; }
@@ -3521,14 +3518,14 @@ html.now-open {
 }
 #quick-panel.entering .quick-knob {
   animation-duration: var(--throw-ms, var(--quick-pop));
-  animation-timing-function: var(--throw-ease, var(--ease-sling)), var(--ease-fade-in);
+  animation-timing-function: var(--throw-ease, var(--ease-sling));
 }
 /* Mirrors QUICK_FAST_SPREAD in js/status.js. */
 html.fast-dashboard #quick-panel.entering .quick-bubble {
   --enter-at: calc(var(--panel-at, 0ms) + var(--fast-at, 0ms));
   animation:
     fast-drop 220ms ease-out var(--enter-at) backwards,
-    quick-contents-in 220ms var(--ease-fade-in) var(--enter-at) backwards;
+    quick-contents-in 1ms step-start var(--enter-at) backwards;
 }
 html.fast-dashboard #quick-panel.entering :is(.vital-reading, .vital-gauge, .battery-remaining) { animation: none; }
 @keyframes fast-drop {
@@ -3540,7 +3537,7 @@ html.fast-dashboard #quick-panel.entering :is(.vital-reading, .vital-gauge, .bat
   to   { scale: 1; rotate: 0deg; translate: 0 0; }
 }
 
-/* Every direct child of every module carried its own 190ms opacity animation, so a panel of thirty modules entered with well over a hundred animations live at once — and each of them keeps its element's style dirty for every frame the liquid mirror forces layout on, which is the whole of the entrance. That is the stagger: not one hitch but a hundred animations' worth of style recalc under a per-frame getBoundingClientRect. The box's own opacity already covers everything standing inside it, so the fade is one animation per module rather than one per child, and the grow starts from nothing instead of from 0.2. */
+/* Every direct child of every module carried its own 190ms opacity animation, so a panel of thirty modules entered with well over a hundred animations live at once — and each of them keeps its element's style dirty for every frame the liquid mirror forces layout on, which is the whole of the entrance. That is the stagger: not one hitch but a hundred animations' worth of style recalc under a per-frame getBoundingClientRect. The grow starts from nothing, which already hides everything standing inside it, so nothing inside a module animates its own opacity. */
 @keyframes bubble-grow {
   from { scale: 0; rotate: var(--pop-turn, 0deg); translate: 0 var(--pop-from, 0px); }
   to   { scale: 1; rotate: 0deg; translate: 0 0; }
@@ -4498,8 +4495,7 @@ html.spread-landing #channel-under { opacity: 0; }
 #quick-panel.stats-in #stats-section .quick-bubble {
   --enter-at: calc(var(--pop-rank, 0) * var(--pop-step, 42ms));
   animation:
-    bubble-grow var(--quick-pop) var(--ease-sling) var(--enter-at) backwards,
-    quick-contents-in var(--quick-pop) var(--ease-fade-in) var(--enter-at) backwards;
+    bubble-grow var(--quick-pop) var(--ease-sling) var(--enter-at) backwards;
 }
 
 
