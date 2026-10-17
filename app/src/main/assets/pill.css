@@ -71,7 +71,7 @@
   --ease-sling: cubic-bezier(0.1, 1.45, 0.3, 1);
 
   /* The Dashboard's opacity rode each module's own overshooting pop, so it was fully there in the first fifth of the motion and the growth read as a box appearing and then wobbling; on an ease-in most of it arrives as the motion lands. */
-  --ease-fade-in: cubic-bezier(0.32, 0, 0.67, 0);
+  --ease-fade-in: cubic-bezier(0.16, 0, 0.335, 0);
 
   /* Mirrors DASH_TRAVEL in js/alert.js — the Alert's sling into the dashboard and its sling home take the same clock. */
   --dash-ms: 300ms;
