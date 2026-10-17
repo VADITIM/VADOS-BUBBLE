@@ -1,3 +1,3 @@
-# 0.5.6
+# 0.5.7
 
-- Dashboard: no fade on entry; modules, bars and knobs are fully drawn from their first frame and only pop in.
+- No fade-in when a bubble grows open: notifications, the media player, timer, trip, call, expanded Alerts, the Now bubble, and the slung Alert and Channel show their contents whole from the first frame. Leaves still fade.

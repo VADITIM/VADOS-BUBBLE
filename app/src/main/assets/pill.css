@@ -717,7 +717,7 @@ html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble
   /* The rise's offset is set and unset by a class while the box it is measured from eases over --grow-ms, so on leaving the dashboard the contents snapped up the moment the class dropped and were then carried back down by the height — the offset travels on its own clock instead, and the two clocks are ordered rather than run together: this one is the leave, where the contents lift out of the foot first and the bubble follows them home. */
   transition: opacity 160ms ease, top var(--content-drop-ms) var(--ease-grow);
 }
-.face.showing { opacity: 1; pointer-events: auto; }
+.face.showing { opacity: 1; pointer-events: auto; transition-duration: 0ms, var(--content-drop-ms); }
 /* A face losing `showing` fades while the bubble collapses under it, and its contents kept their open size — the player's artwork and labels hung outside the shrinking bubble for the whole fade. A face on its way out is cut to the bubble's own shape; a showing face stays unclipped because glyphs fly in from past its edge. */
 .face:not(.showing) { overflow: clip; border-radius: inherit; }
 
@@ -738,7 +738,7 @@ html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble
   transition: opacity var(--face-fade, 0ms) ease var(--face-delay, 0ms);
 }
 #equalizer, #timer-remaining, #call-time, #trip-remaining {
-  transition: opacity 380ms ease, transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
+  transition: transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
   transition-delay: var(--face-delay, 0ms);
 }
 
@@ -1165,7 +1165,7 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
 #pill.player, #pill.timer, #pill.trip,
 #pill.notifications, #pill.expanded, #pill.picture { --grow-ms: 460ms; }
 #pill.player .face.showing, #pill.timer .face.showing, #pill.trip .face.showing,
-#pill.notifications .face.showing, #pill.expanded .face.showing { transition-duration: 280ms; }
+#pill.notifications .face.showing, #pill.expanded .face.showing { transition-duration: 0ms, 280ms; overflow: clip; border-radius: inherit; }
 
 
 
@@ -1856,7 +1856,7 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
     translate 380ms var(--ease-split) 220ms,
     scale 320ms var(--ease-split) 220ms;
 }
-#pill.notifications ~ #notifications-clear svg { opacity: 1; transition-delay: 380ms; }
+#pill.notifications ~ #notifications-clear svg { opacity: 1; transition-delay: 380ms; transition-duration: 0ms; }
 #notifications-clear.pressing { --clear-press: 1.03; }
 #pill.notifications ~ #notifications-clear.pressing { transition-delay: 0ms; }
 
@@ -2089,7 +2089,7 @@ html.clear-corner #notifications-clear {
   letter-spacing: 0.02rem;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
-  transition: opacity 380ms ease, transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
+  transition: transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
 }
 
 
@@ -2102,6 +2102,7 @@ html.clear-corner #notifications-clear {
 
 #now-glyph { transition: opacity 200ms ease, translate 260ms var(--ease-split); }
 .now-face:not(.showing) #now-glyph { opacity: 0; translate: -12px 0; }
+.now-face.showing #now-glyph { transition-duration: 0ms, 260ms; }
 
 #now-label {
   font-size: calc((0.6rem) * var(--font-scale, 1));
@@ -4248,7 +4249,7 @@ html.swapping #double-reading {
 
 /* The arrival is no longer written here at all. It is the slingshot in js/sling.js — the same draw, arc and opening the Now bubble takes into this same panel — and every frame of it is a WAAPI translate away from the resting box above, which is why that box is a left and a top rather than a translate of its own. All this rule owes it is the reading, which appears on the frame the ball begins to open. */
 #dash.opening #alert-face {
-  animation: quick-contents-in 180ms ease var(--dash-open-delay, 0ms) backwards;
+  animation: quick-contents-in 1ms step-start var(--dash-open-delay, 0ms) backwards;
 }
 
 #dash.home { animation: dash-sling-home var(--dash-ms, 420ms) both; }
@@ -4400,11 +4401,11 @@ html.swapping #double-reading {
   scale: 0.98;
   transition: opacity 200ms var(--ease-grow), scale 200ms var(--ease-split);
 }
-#channel-under.live.showing { opacity: 0.5; scale: 1; }
+#channel-under.live.showing { opacity: 0.5; scale: 1; transition-duration: 0ms, 200ms; }
 
 /* The reading appears on the frame the ball begins to open, exactly as the slung Alert's does, and how long the ball was in the air is drawn per shot — so the delay is handed over rather than written here. */
 #channel.opening > * {
-  animation: quick-contents-in 180ms ease var(--channel-open-delay, 0ms) backwards;
+  animation: quick-contents-in 1ms step-start var(--channel-open-delay, 0ms) backwards;
 }
 
 /* Mirrors CHANNEL_HOME in js/channel.js. */

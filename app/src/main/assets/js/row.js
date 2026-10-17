@@ -689,7 +689,7 @@ function stageSplit(count) {
   root.style.setProperty('--width-delay', '0ms');
   
   
-  root.style.setProperty('--face-fade', arriving ? '260ms' : leaving ? '140ms' : '0ms');
+  root.style.setProperty('--face-fade', leaving ? '140ms' : '0ms');
 }
 
 
