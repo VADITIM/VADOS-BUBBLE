@@ -435,9 +435,8 @@ window.setAlertZoneShown = value => {
   root.classList.toggle('alert-zone-debug', Number(value) !== 0);
 };
 
-window.setAlertZoneLook = (glow, arrow) => {
+window.setAlertZoneGlow = glow => {
   root.style.setProperty('--alert-zone-glow', Number(glow) / 100);
-  root.style.setProperty('--alert-zone-arrow', Number(arrow) / 100);
 };
 
 window.setEdgeMerge = value => {

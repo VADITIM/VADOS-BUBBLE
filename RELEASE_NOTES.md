@@ -1,3 +1,3 @@
-# 0.5.9
+# 0.5.10
 
-- Media player: the frosted title and clock strips no longer pop in; once the bubble has landed the blur thickens to full strength over 1.5 seconds.
+- Alerts: the down-arrow in the pull zone at the right edge is gone; only the soft glow remains, and the "Pull zone arrow" setting with it.

@@ -1107,29 +1107,12 @@ html.alert-zone-debug #alert-zone { background: color-mix(in srgb, var(--app-acc
   filter: blur(calc(16px * var(--alert-zone-glow, 0.4)));
   animation: alert-zone-hint 2200ms var(--ease-sweep) infinite paused;
 }
-/* Running on the base rules these two loops ran from the page's first frame to its last behind a zone at opacity 0, and an opacity-0 ancestor stops nothing: the renderer built a main frame on every vsync of every idle minute, 120 a second, for an arrow nobody could see. Paused rather than removed, so the arrow holds where it stood while the zone fades instead of jumping home under the fade. */
-html.alert-zone-live :is(#alert-zone-glow, #alert-zone-arrow),
-html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-state: running; }
+/* Running on the base rule this loop ran from the page's first frame to its last behind a zone at opacity 0, and an opacity-0 ancestor stops nothing: the renderer built a main frame on every vsync of every idle minute, 120 a second, for a glow nobody could see. Paused rather than removed, so the glow holds where it stood while the zone fades instead of jumping home under the fade. */
+html.alert-zone-live #alert-zone-glow,
+html.alert-zone-debug #alert-zone-glow { animation-play-state: running; }
 
-/* Every inline svg here is given both axes: with a viewBox and a width alone Chromium resolves the height to nothing inside a centred flex box, which is what drew no arrow at all. */
-#alert-zone-arrow {
-  position: relative;
-  width: calc(30px * var(--alert-zone-arrow, 0.55));
-  height: calc(17px * var(--alert-zone-arrow, 0.55));
-  display: block;
-  fill: none;
-  stroke: #ffffff;
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  animation: alert-zone-mark 2200ms var(--ease-sweep) infinite paused;
-}
 @keyframes alert-zone-hint {
   0%, 100% { translate: 0 -3px; opacity: 0.55; }
-  50% { translate: 0 3px; opacity: 1; }
-}
-@keyframes alert-zone-mark {
-  0%, 100% { translate: 0 -3px; opacity: 0.8; }
   50% { translate: 0 3px; opacity: 1; }
 }
 
