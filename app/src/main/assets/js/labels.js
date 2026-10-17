@@ -28,7 +28,7 @@
 
 
 const LABELS = [
-  '#app-name', '#title',
+  '#app-name',
   '#lock-title', '#lock-artist',
   '#timer-remaining', '#timer-label',
   '#trip-remaining', '#trip-train', '#trip-route',
@@ -37,6 +37,8 @@ const LABELS = [
 
 
 const RUNS_OUT_SLACK = 2;
+
+const FADING = '#title';
 
 
 const SCROLL_SPEED = 22;
@@ -96,6 +98,10 @@ export function fitLabels() {
       }
       measure(label);
     }
+    for (const label of document.querySelectorAll(FADING)) {
+      boxes.observe(label);
+      label.classList.toggle('fades-out', label.scrollWidth - label.clientWidth > RUNS_OUT_SLACK);
+    }
   });
 }
 
@@ -112,7 +118,7 @@ new MutationObserver(records => {
       ? record.target.parentElement
       : record.target;
     if (!node || node.nodeType !== Node.ELEMENT_NODE) continue;
-    if (node.closest(LABELS) || node.querySelector(LABELS)) {
+    if (node.closest(LABELS) || node.querySelector(LABELS) || node.closest(FADING) || node.querySelector(FADING)) {
       fitLabels();
       return;
     }

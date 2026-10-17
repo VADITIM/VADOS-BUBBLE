@@ -243,8 +243,23 @@ class IslandNotificationListener : NotificationListenerService() {
         )
     }
 
+    private fun traceDiscord(notification: Notification) {
+        val extras = notification.extras
+        val messages = messages(notification)
+        android.util.Log.d(
+            "IslandBubble",
+            "discord extras: title=${extras.getCharSequence(Notification.EXTRA_TITLE)} " +
+                "titleBig=${extras.getCharSequence(Notification.EXTRA_TITLE_BIG)} " +
+                "subText=${extras.getCharSequence(Notification.EXTRA_SUB_TEXT)} " +
+                "conversationTitle=${extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)} " +
+                "isGroup=${extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)} " +
+                "lastSender=${messages.optJSONObject(messages.length() - 1)?.optString("sender")}"
+        )
+    }
+
     override fun onNotificationPosted(statusBarNotification: StatusBarNotification) {
         traceVerdict(statusBarNotification)
+        if (statusBarNotification.packageName == "com.discord") traceDiscord(statusBarNotification.notification)
         if (statusBarNotification.packageName == DbWatch.PACKAGE) DbWatch.dump(this, statusBarNotification)
         if (DbWatch.isTrip(statusBarNotification)) {
             publishTrip()

@@ -936,10 +936,10 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
   font-size: calc((0.68rem) * var(--font-scale, 1));
   letter-spacing: 0.04rem;
   color: var(--text-muted);
-  flex: 1 1 auto;
-  
-  mask-image: linear-gradient(90deg, transparent, #000 1.4rem);
+  flex: 1 1 0;
 }
+/* The sender ran the label marquee and took a content-sized share of the head, so a long name scrolled and squeezed the app name beside it; it now only ever gets the room left over, stands still in it, and fades out at its trailing edge. */
+#title.fades-out { text-align: left; mask-image: linear-gradient(90deg, #000 calc(100% - 1.4rem), transparent); }
 
 
 
@@ -2340,6 +2340,12 @@ html.clear-corner #notifications-clear {
 .battery-mark.charging { color: #5bfd5b; }
 .battery-mark.announcing { color: var(--status-announce, #5bfd5b); }
 .battery-mark svg { width: 100%; height: 100%; }
+.battery-mark.charging svg { animation: battery-charge-breathe 2.4s ease-in-out infinite paused; }
+#status.plugged .battery-mark.charging svg { animation-play-state: running; }
+@keyframes battery-charge-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
 
 
 
@@ -2448,9 +2454,30 @@ html.clear-corner #notifications-clear {
   bottom: 1px;
   width: var(--charge-width, 0%);
   max-width: calc(100% - 2px);
+  overflow: hidden;
   border-radius: max(1px, calc(var(--mod-glyph) * 0.17 - 2.5px));
   background: var(--charge-color, var(--text-faint));
   transition: background 500ms ease, width 500ms ease;
+}
+.mini-battery-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
+  opacity: 0;
+  translate: -100% 0;
+  transition: opacity 400ms ease;
+  animation: battery-charge-sweep 2.4s var(--ease-sweep) infinite paused;
+}
+#status.plugged .mini-battery-fill::after {
+  opacity: 1;
+  animation-play-state: running;
+}
+@keyframes battery-charge-sweep {
+  0%   { translate: -100% 0; }
+  70%  { translate: 100% 0; }
+  100% { translate: 100% 0; }
 }
 .mini-battery-reading {
   position: relative;
@@ -4024,7 +4051,6 @@ html:not(.grown) #pill.panel-top #indicators { top: calc(var(--edge-over) + 4px)
 
 
 #app-name:not(.runs-out),
-#title:not(.runs-out),
 #lock-title:not(.runs-out),
 #lock-artist:not(.runs-out),
 #timer-remaining:not(.runs-out),

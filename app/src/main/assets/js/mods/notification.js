@@ -232,6 +232,7 @@ function whoSent(notification) {
   const lines = notification.lines || [];
   const sender = lines.length ? lines[lines.length - 1].sender : '';
   if (!sender || sender === title) return title;
+  if (notification.package === 'com.discord') return sender;
   
   
   const bracketed = title.match(/\(([^)]+)\)\s*$/);

@@ -1132,8 +1132,18 @@ const quickKnobs = [...document.querySelectorAll('.quick-knob')];
 
 const faceOf = control => control.querySelector('.quick-icon') || control;
 
+const shownGlyphs = new WeakMap();
+const turnTimers = new WeakMap();
+
+function paintFace(control) {
+  const glyph = glyphFor(control.dataset.toggle, control.classList.contains('on'));
+  if (shownGlyphs.get(control) === glyph) return;
+  shownGlyphs.set(control, glyph);
+  faceOf(control).innerHTML = glyph;
+}
+
 [...quickModes, ...quickKnobs].forEach(control => {
-  faceOf(control).innerHTML = glyphFor(control.dataset.toggle, false);
+  paintFace(control);
   const ring = control.querySelector('.quick-ring');
   if (ring) drawDots(ring);
 });
@@ -1250,10 +1260,7 @@ function paintModeLabels() {
   };
   quickModes.forEach(button => {
     const name = button.dataset.toggle;
-    if (name === 'wifi') {
-      const glyph = glyphFor('wifi', button.classList.contains('on'));
-      if (faceOf(button).innerHTML !== glyph) faceOf(button).innerHTML = glyph;
-    }
+    if (name === 'wifi' && !turnTimers.has(button)) paintFace(button);
 
 
     const ring = button.querySelector('.quick-ring');
@@ -1483,6 +1490,28 @@ const LEVEL_STEP = 1;
 
 
 
+// A bar's position is not its value: a straight line spent as many pixels on the last few percent of brightness and volume as on the middle, and those ends are where a person is fine-tuning. Half smoothstep and half straight keeps the ends at 0.4x the middle's travel without ever going flat, and still lands on 0 and 100 exactly.
+const LEVEL_EASE = 0.6;
+
+function valueAt(position) {
+  const unit = position / 100;
+  const smooth = unit * unit * (3 - 2 * unit);
+  return 100 * (unit + LEVEL_EASE * (smooth - unit));
+}
+
+function positionOf(value) {
+  if (value <= 0) return 0;
+  if (value >= 100) return 100;
+  let low = 0;
+  let high = 100;
+  for (let step = 0; step < 20; step++) {
+    const middle = (low + high) / 2;
+    if (valueAt(middle) < value) low = middle;
+    else high = middle;
+  }
+  return (low + high) / 2;
+}
+
 function paintLevel(level, share) {
   level.style.setProperty('--level', share + '%');
   level.classList.toggle('lit', share > 0);
@@ -1504,7 +1533,7 @@ levels.forEach(level => {
     // The bar's height was read on every move, and a getBoundingClientRect in a touchmove forces the layout the whole panel's transitions are mid-way through — the drag only got as many frames as that recalc left it. The box cannot change under the finger, so it is read once.
     tall = level.getBoundingClientRect().height;
     share = parseFloat(level.style.getPropertyValue('--level')) || 0;
-    sent = share;
+    sent = Math.round(valueAt(share));
     clearTimeout(soloTimer);
     soloTimer = setTimeout(() => enterSolo(level), SOLO_HOLD);
   }, { passive: true });
@@ -1523,19 +1552,19 @@ levels.forEach(level => {
     }
     
     
-    const next = Math.round(share + (travelled / tall) * 100);
-    const clamped = Math.max(0, Math.min(100, next));
-    paintLevel(level, clamped);
-    if (Math.abs(clamped - sent) < LEVEL_STEP && clamped !== 0 && clamped !== 100) return;
-    sent = clamped;
-    bridge.setLevel(name, clamped);
+    const position = Math.max(0, Math.min(100, share + (travelled / tall) * 100));
+    paintLevel(level, position);
+    const value = Math.round(valueAt(position));
+    if (Math.abs(value - sent) < LEVEL_STEP && value !== 0 && value !== 100) return;
+    sent = value;
+    bridge.setLevel(name, value);
   }, { passive: true });
 
   ['touchend', 'touchcancel'].forEach(type => {
     level.addEventListener(type, () => {
       from = null;
       // The step gate above lets the last few percent of a drag go unsent, and a drag's frames may only be temporary on the phone's side, so the value under the finger is always settled on release.
-      const settled = Math.round(parseFloat(level.style.getPropertyValue('--level')) || 0);
+      const settled = Math.round(valueAt(parseFloat(level.style.getPropertyValue('--level')) || 0));
       if (level.classList.contains('dragging')) {
         sent = settled;
         bridge.settleLevel(name, settled);
@@ -1562,7 +1591,7 @@ window.setCallDebug = isLive => {
   root.classList.toggle('call-live', Boolean(toggles && toggles.call) || isCallDebugged);
   const bar = levels.find(level => level.dataset.level === 'callVolume');
   if (isCallDebugged && bar && !(toggles && typeof toggles.callVolume === 'number')) {
-    paintLevel(bar, CALL_DEBUG_LEVEL);
+    paintLevel(bar, positionOf(CALL_DEBUG_LEVEL));
   }
 };
 
@@ -1571,7 +1600,7 @@ function paintLevels(state) {
     const value = state[level.dataset.level];
     
     
-    if (typeof value === 'number' && !level.classList.contains('dragging')) paintLevel(level, value);
+    if (typeof value === 'number' && !level.classList.contains('dragging')) paintLevel(level, positionOf(value));
   });
 }
 
@@ -1587,17 +1616,14 @@ const KNOB_TURN = 460;
 
 
 
-const turnTimers = new WeakMap();
-
 function setControl(control, isOn, isTurning) {
-  const wasOn = control.classList.contains('on');
   control.classList.toggle('on', isOn);
-  // Each turn armed its own timer to swap the glyph half a rotation later, so tapping faster than a rotation left several of them queued and the last to fire wrote whichever face it had been told about, not the one the control had settled on.
-  clearTimeout(turnTimers.get(control));
+  // A read-back landing inside a tap's half turn cancelled the turn's glyph swap and then skipped its own, because it judged "changed" off the `on` class the tap had already flipped — so the face kept the old glyph for good, a live microphone wearing the struck-through one. The glyph is judged against what the face actually shows, and a pending turn is left to swap it from the live class.
   if (!isTurning) {
-    if (wasOn !== isOn) faceOf(control).innerHTML = glyphFor(control.dataset.toggle, isOn);
+    if (!turnTimers.has(control)) paintFace(control);
     return;
   }
+  clearTimeout(turnTimers.get(control));
   
   
   
@@ -1612,7 +1638,8 @@ function setControl(control, isOn, isTurning) {
     );
   });
   turnTimers.set(control, setTimeout(() => {
-    faceOf(control).innerHTML = glyphFor(control.dataset.toggle, control.classList.contains('on'));
+    turnTimers.delete(control);
+    paintFace(control);
   }, KNOB_TURN / 2));
 }
 
