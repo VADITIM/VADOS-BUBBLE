@@ -72,7 +72,10 @@ Two of its rules are broken most often here: text that runs out of room **fades 
 - Never resize the WebView itself to animate something — resizing it reallocates its surface, which reads as the interface blinking out for a frame. The WebView is a fixed stage; the window clips it.
 - Never do hit-testing in Kotlin. The page is the only side that knows where anything is.
 - Never add a dependency, an abstraction layer or a settings toggle that was not asked for.
-- Never commit or push unless asked.
+
+## Git
+
+Every change is committed and pushed to GitHub as soon as it is written, in the same task — not batched with later work, not left local for the user to push, not held for a review nobody asked for (V/AS `MAINTAINING.md` § Repository). Everything goes straight onto `main`: no new branches, no pull requests. Commits are authored by the user alone — no `Co-Authored-By` trailer, no session link, no "Generated with Claude Code" line. The commit message names the change, not the version.
 
 ## Releases
 
