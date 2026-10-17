@@ -79,7 +79,7 @@ Every change is committed and pushed to GitHub as soon as it is written, in the 
 
 ## Releases
 
-Releases: on command
+Releases: on command, except in a cloud session — there every change is committed, pushed to `main` and released in the same task, without being asked. A cloud session cannot build, so the release run is its build; it triggers `build.yml` on `main` by hand and confirms the release and its APK landed.
 
 Version: `versionName` in `app/build.gradle.kts`, `<major>.<minor>.<patch>`, bumped in the same commit as every change (V/AS `guides/release-pipeline.md`). `RELEASE_NOTES.md` holds the latest version's text; `Releases.md` keeps every feature version, with its patches folded in, as VADOS-GALLERY does. `.github/workflows/build.yml` publishes `v<version>` with `dynamic-bubble-v<version>.apk` attached, on a manual run only; the `RELEASE_ON_PUSH` repository variable mirrors this line.
 
