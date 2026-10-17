@@ -1,3 +1,3 @@
-# 0.5.8
+# 0.5.9
 
-- Media player: opening it from the media bubble no longer lags. The player's contents stand at their open size and the growing bubble uncovers them; the cover flies in from the mod's art, and the frosted title and clock strips come on once the bubble has landed.
+- Media player: the frosted title and clock strips no longer pop in; once the bubble has landed the blur thickens to full strength over 1.5 seconds.

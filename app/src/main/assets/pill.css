@@ -1540,13 +1540,13 @@ html.alert-zone-debug :is(#alert-zone-glow, #alert-zone-arrow) { animation-play-
   height: 302px;
   translate: -50% 0;
 }
-/* The frost over a cover still flying in from the mod's art was re-blurred on every frame of the flight, so it comes on whole once the bubble has landed. */
+/* The frost over a cover still flying in from the mod's art was re-blurred on every frame of the flight, so it waits for the bubble to land; popping on whole there read as a switch, so it thickens to full strength over 1.5s. */
 #pill.player :is(#player-meta, #player-clock)::before,
 #pill.player :is(#player-meta, #player-clock)::after {
-  animation: player-frost-in 1ms step-start var(--grow-ms) backwards;
+  animation: player-frost-in 1500ms ease-out var(--grow-ms) backwards;
 }
 @keyframes player-frost-in {
-  from { backdrop-filter: none; }
+  from { backdrop-filter: blur(0px) saturate(1); }
 }
 /* The blur is a backdrop of its own rather than the strip's own filter: a mask that softens the strip's inner edge also fades everything drawn in it, so the names went translucent along with the glass they stand on. */
 #player-meta {
