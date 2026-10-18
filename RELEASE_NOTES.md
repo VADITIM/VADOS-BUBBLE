@@ -1,3 +1,3 @@
-# 0.5.10
+# 0.5.11
 
-- Alerts: the down-arrow in the pull zone at the right edge is gone; only the soft glow remains, and the "Pull zone arrow" setting with it.
+- Lock screen: the Now bubble sits lower, 16px off the bottom edge, so it no longer covers the fingerprint sensor. The Now bubble in the Dashboard stays where it was.
