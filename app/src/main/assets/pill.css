@@ -293,8 +293,8 @@ html.grown #pill {
   --quick-foot: 10px;
   /* One number for both sides of the Now bubble in the dashboard: the room under it to the toggle row, and the room over it to the system section. Equal is the whole point — the bubble stands between the two sections rather than in one of them. */
   --quick-now-gap: 16px;
-  /* The bubble stood at 70px with its body over the under-display fingerprint sensor; it sits low at the screen's foot instead. The dashboard overrides this below, so it is the lock screen's number alone. */
-  --lock-bottom: 16px;
+  /* The bubble stood at 70px with its body over the under-display fingerprint sensor; it sits lower, at 40px — 16px was too far down. The dashboard overrides this below, so it is the lock screen's number alone. */
+  --lock-bottom: 40px;
   /* The toggle band is a share of the panel's own height, so it is a bare number multiplied by the px the host measured rather than a percentage: the knob row's lift off the foot has to be worked out from it, and a percentage padding resolves against width. */
   --quick-toggle-band: calc(var(--quick-height, 0px) * var(--quick-toggle-share));
   /* How far the knob row stands off the panel's foot. At rest it is exactly what centring the row in its band gave it, so the row does not move for a bubble arriving above it; expanded, the row gives that room up and travels down to the foot. */

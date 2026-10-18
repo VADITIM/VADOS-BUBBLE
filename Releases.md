@@ -2,7 +2,7 @@
 
 What changed in each feature version. Planned work is in `.claude/docs/roadmap.md`. Patch versions (x.x.1, x.x.2 …) are fixes and small adjustments; they are folded into the feature version they belong to. `RELEASE_NOTES.md` holds only the text of the latest release.
 
-## 0.5: lock screen, stages and the Dashboard (0.5.0 – 0.5.11)
+## 0.5: lock screen, stages and the Dashboard (0.5.0 – 0.5.12)
 
 - **Lock screen:** notification groups on the keyguard, each with its own bubble and a delete-all bubble.
 - **Stage reveal:** hidden, alert, revealed and leaving stages, so an Alert can come down over a hidden bubble and go back up.

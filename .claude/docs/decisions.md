@@ -464,7 +464,7 @@ The live backlog is a note in the Obsidian vault, not in this repository.
 - Display 1080x2340, density 480dpi (3.0x).
 - The lock screen's fingerprint guide is a device setting, not something an overlay can cover: it is
   turned off with `adb shell settings put secure fingerprint_screen_on_icon_lock 0`, and `2` puts it
-  back. The Now bubble used to stand on the sensor; since 0.5.11 it sits 16px off the bottom edge on the lock screen to stay clear of it.
+  back. The Now bubble used to stand on the sensor; since 0.5.12 it sits 40px off the bottom edge on the lock screen to stay clear of it.
 - Cutout bounding rect `Rect(511, 0 - 569, 103)` px = 58x103 px = ~19.3 x 34.3 dp, horizontally
   centred (centre x = 540 px). The default pill height of 34 dp matches it.
 
