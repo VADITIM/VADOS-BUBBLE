@@ -664,16 +664,18 @@ html.dark-alert-live #dark-alert { opacity: 1; transition: none; }
   font-family: var(--font-notification-heading);
   font-size: 24px;
   line-height: 1.25;
+  color: rgba(255, 255, 255, 0.62);
   overflow-wrap: anywhere;
 }
 #dark-alert-text {
   font-family: var(--font-notification-content);
   font-size: 18px;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.46);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+#dark-alert .untyped { opacity: 0; }
 
 
 

@@ -43,7 +43,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     companion object {
         
         private const val WAKE_MILLIS = 6_000L
-        private const val DARK_BRIGHTNESS = 0.1f
+        private const val DARK_BRIGHTNESS = 0.07f
 
         
 

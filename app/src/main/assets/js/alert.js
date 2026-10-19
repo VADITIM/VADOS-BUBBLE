@@ -168,21 +168,34 @@ export function paintDarkAlert(appName, title, text, appending) {
     typeOut([[darkText, text]], 0);
     return;
   }
-  endSweep(darkApp, '');
+  // Swept into an empty label the bar was measured off a span with no line box, so it had no height and the reveal never showed; the head also grew a line when the name landed. The name stands in place first and the bar plays over it.
+  endSweep(darkApp, appName);
   sweepInto(darkApp, appName, true);
   typeOut([[darkTitle, title], [darkText, text]], TYPE_DELAY);
 }
 
+// Typing into an empty box grew it a line at a time, and the band centres its content, so the whole text slid upwards as it was written. The full text is laid out from the first frame and only uncovered.
 function typeOut(parts, delay) {
-  for (const [element] of parts) element.textContent = '';
+  const nodes = parts.map(([element, text]) => {
+    const typed = document.createTextNode('');
+    const untyped = document.createElement('span');
+    untyped.className = 'untyped';
+    untyped.textContent = text;
+    element.replaceChildren(typed, untyped);
+    return { typed, untyped, text };
+  });
   const total = parts.reduce((sum, [, text]) => sum + text.length, 0);
   const step = Math.min(TYPE_STEP, TYPE_CEILING / Math.max(total, 1));
   const start = performance.now() + delay;
   const tick = now => {
     let count = Math.max(0, Math.floor((now - start) / step));
-    for (const [element, text] of parts) {
-      element.textContent = text.slice(0, count);
-      count = Math.max(0, count - text.length);
+    for (const { typed, untyped, text } of nodes) {
+      const shown = Math.min(count, text.length);
+      if (typed.data.length !== shown) {
+        typed.data = text.slice(0, shown);
+        untyped.textContent = text.slice(shown);
+      }
+      count -= shown;
     }
     if ((now - start) / step < total) typeFrame = requestAnimationFrame(tick);
   };
