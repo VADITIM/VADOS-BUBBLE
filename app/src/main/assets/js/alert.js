@@ -6,6 +6,7 @@ import { FOCUS_FROST_MILLIS, stirLiquid } from './liquid.js';
 import { slingInto } from './sling.js';
 import { statsBox, statsIn, statsOut } from './status.js';
 import { isLandscape } from './reveal.js';
+import { endSweep, sweepInto } from './sweep.js';
 import { SIZES, bridge, dragGate, faces, pill, root, shared } from './state.js';
 
 
@@ -59,6 +60,16 @@ let hasActed = false;
 let alertDrag = null;
 let isBandWanted = false;
 let isDark = false;
+let isDarkSimulated = false;
+
+const darkAlert = document.getElementById('dark-alert');
+const darkApp = document.getElementById('dark-alert-app');
+const darkTitle = document.getElementById('dark-alert-title');
+const darkText = document.getElementById('dark-alert-text');
+const TYPE_STEP = 9;
+const TYPE_CEILING = 520;
+const TYPE_DELAY = 140;
+let typeFrame = 0;
 
 document.getElementById('picture').addEventListener('load', () => {
   if (isAlertCentred() && pill.classList.contains('with-image')) recentreAlert();
@@ -125,7 +136,7 @@ export function alertTouch(action, x, y) {
   }
   if (action !== 'up' || hasActed) return;
   if (Math.hypot(x - startX, y - startY) > ALERT_TAP_SLOP) return;
-  if (pillHolds(x, y)) {
+  if (isDark ? darkHolds(x, y) : pillHolds(x, y)) {
     liftDark();
     openCurrent();
   }
@@ -139,10 +150,48 @@ export function isScreenDark() {
   return isDark;
 }
 
-export function setScreenDark(isOn) {
+export function setScreenDark(isOn, isSimulated = false) {
   isDark = isOn;
+  isDarkSimulated = isOn && isSimulated;
   clearTimeout(sleepTimer);
+  if (!isOn) {
+    cancelAnimationFrame(typeFrame);
+    root.classList.remove('dark-alert-live');
+  }
   root.classList.toggle('screen-dark', isOn);
+}
+
+export function paintDarkAlert(appName, title, text, appending) {
+  root.classList.add('dark-alert-live');
+  cancelAnimationFrame(typeFrame);
+  if (appending) {
+    typeOut([[darkText, text]], 0);
+    return;
+  }
+  endSweep(darkApp, '');
+  sweepInto(darkApp, appName, true);
+  typeOut([[darkTitle, title], [darkText, text]], TYPE_DELAY);
+}
+
+function typeOut(parts, delay) {
+  for (const [element] of parts) element.textContent = '';
+  const total = parts.reduce((sum, [, text]) => sum + text.length, 0);
+  const step = Math.min(TYPE_STEP, TYPE_CEILING / Math.max(total, 1));
+  const start = performance.now() + delay;
+  const tick = now => {
+    let count = Math.max(0, Math.floor((now - start) / step));
+    for (const [element, text] of parts) {
+      element.textContent = text.slice(0, count);
+      count = Math.max(0, count - text.length);
+    }
+    if ((now - start) / step < total) typeFrame = requestAnimationFrame(tick);
+  };
+  typeFrame = requestAnimationFrame(tick);
+}
+
+function darkHolds(x, y) {
+  const box = darkAlert.getBoundingClientRect();
+  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 }
 
 function liftDark() {
@@ -153,8 +202,9 @@ function liftDark() {
 
 export function sleepDark() {
   if (!isDark) return;
+  root.classList.remove('dark-alert-live');
   clearTimeout(sleepTimer);
-  sleepTimer = setTimeout(() => bridge.sleepScreen(), HOME_TRAVEL);
+  sleepTimer = setTimeout(() => isDarkSimulated ? liftDark() : bridge.sleepScreen(), HOME_TRAVEL);
 }
 
 export function isAlertCentred() {

@@ -1,3 +1,4 @@
-# 0.5.12
+# 0.5.13
 
-- Lock screen: the Now bubble comes back up a little, to 40px off the bottom edge; 16px was too far down. The Now bubble in the Dashboard stays where it was.
+- Always-on alerts: a message that wakes the dark screen is no longer a bubble with a coloured border. It is plain text across the middle 40% of the screen: the app name in its own colour, revealed by the label sweep, then the sender and message typed out fast. The dimmed screen is a little brighter.
+- Debug: *Simulate always-on alert* shows one over the unlocked screen.

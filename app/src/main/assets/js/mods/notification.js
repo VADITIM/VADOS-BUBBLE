@@ -1,4 +1,4 @@
-import { dashAlert, fitAlert, isAlertCentred, isAlertDashed, isScreenDark, layOutZone, recentreAlert, renewDashAlert, settleBox } from '../alert.js';
+import { dashAlert, fitAlert, isAlertCentred, isAlertDashed, isScreenDark, layOutZone, paintDarkAlert, recentreAlert, renewDashAlert, settleBox } from '../alert.js';
 import { setSize, showFace, toClosed } from '../row.js';
 import { PICTURE_MAX_HEIGHT, bridge, pill, root, shared } from '../state.js';
 import { isChannelLive, refreshChannel } from '../channel.js';
@@ -318,6 +318,8 @@ export function show(notification) {
   if (!isAlertCentred() && !isAlertDashed()) shared.dwellTimer = setTimeout(toClosed, shared.dwell);
 
   if (isScreenDark()) {
+    const lines = linesOf(notification);
+    paintDarkAlert(notification.appName || '', whoSent(notification), lines[lines.length - 1] || '', appending);
     if (!isAlertCentred() && !hasImage) recentreAlert();
     bridge.setAlertOverlay(1);
     clearTimeout(shared.dwellTimer);

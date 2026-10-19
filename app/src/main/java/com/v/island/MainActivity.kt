@@ -267,6 +267,16 @@ class MainActivity : Activity() {
         fun testNotification() = runOnUiThread { pushToIsland(testPayload()) }
 
         @JavascriptInterface
+        fun simulateDarkAlert() = runOnUiThread {
+            BubbleService.deliverDark(
+                testPayload()
+                    .put("key", "test-dark")
+                    .put("title", "Always-on alert")
+                    .put("text", "This is how a message reads when it wakes a dark screen: the app name sweeps in, and the rest types out.")
+            )
+        }
+
+        @JavascriptInterface
         fun sendDebugNotifications() = runOnUiThread { DebugNotifications.send(this@MainActivity, 5) }
 
         

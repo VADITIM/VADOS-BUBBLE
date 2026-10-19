@@ -2,9 +2,10 @@
 
 What changed in each feature version. Planned work is in `.claude/docs/roadmap.md`. Patch versions (x.x.1, x.x.2 …) are fixes and small adjustments; they are folded into the feature version they belong to. `RELEASE_NOTES.md` holds only the text of the latest release.
 
-## 0.5: lock screen, stages and the Dashboard (0.5.0 – 0.5.12)
+## 0.5: lock screen, stages and the Dashboard (0.5.0 – 0.5.13)
 
 - **Lock screen:** notification groups on the keyguard, each with its own bubble and a delete-all bubble.
+- **Always-on alerts:** a message that wakes the dark screen is plain text rather than a bubble — the app name in its colour on the label sweep, the message typed out — slightly brighter, and can be simulated from Debug.
 - **Stage reveal:** hidden, alert, revealed and leaving stages, so an Alert can come down over a hidden bubble and go back up.
 - **Mods:** new DB Navigator trip mod; reworked call, media, timer and notification mods, the Status panel and the tabs.
 - **Now bubble:** arrives cleanly in the panel and answers taps across its whole width; on the lock screen it sits low, clear of the fingerprint sensor.

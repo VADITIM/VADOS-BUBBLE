@@ -417,7 +417,7 @@ window.setDashAlertsDisabled = value => {
   shared.isDashAlertDisabled = Number(value) !== 0;
 };
 
-window.setScreenDark = value => setScreenDark(Number(value) !== 0);
+window.setScreenDark = value => setScreenDark(Number(value) !== 0, Number(value) === 2);
 window.setLockNotes = value => setNotesEnabled(Number(value) !== 0);
 window.setLockNotesHome = value => setNotesHomeAnimated(Number(value) !== 0);
 

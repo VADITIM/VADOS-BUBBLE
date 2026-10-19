@@ -631,9 +631,49 @@ html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #notif
   transition: opacity 360ms var(--ease-leave);
 }
 html.screen-dark #screen-dark { opacity: 1; transition: none; }
-html.screen-dark #pill { z-index: 51; }
-/* The skin is drawn in #liquid, which the dark covers, so over it the Alert wears its own box the way it did before the goo existed. */
-html.liquid.screen-dark #pill.alert { background: var(--pill-background); border-color: var(--app-accent); }
+
+#dark-alert {
+  position: fixed;
+  left: 36px;
+  right: 36px;
+  top: 30%;
+  height: 40%;
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  gap: 10px;
+  overflow: hidden;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 360ms var(--ease-leave);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+}
+html.dark-alert-live #dark-alert { opacity: 1; transition: none; }
+#dark-alert-head { align-self: flex-start; --section-color: var(--app-accent); }
+#dark-alert-app {
+  font-family: var(--font-notification-heading);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--app-accent);
+}
+#dark-alert-title {
+  font-family: var(--font-notification-heading);
+  font-size: 24px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+#dark-alert-text {
+  font-family: var(--font-notification-content);
+  font-size: 18px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 
 
@@ -4162,10 +4202,10 @@ html.lock-incoming .face.showing > * { opacity: 0; transition: opacity 160ms eas
 
 /* The Labelset reveal from PORTFOLIO25: the bar grows across the label, the label is shown in the one frame the bar is full, and the bar retracts off the far edge. The two halves are separate classes rather than one animation because the reveal and the origin flip have to land on the same frame — given a duration, either one lets the reveal be caught mid-state and the text tears. */
 /* The bar belongs to the label's parent, not to the label: the label carries opacity 0 for the whole growth, and a bar that was the label's own pseudo-element went invisible along with it. The glyph beside the reading is part of the label: the bar starts at its left edge and both are uncovered on the same frame. */
-html.label-sweep .sweep-host {
+html.label-sweep .sweep-host, #dark-alert .sweep-host {
   position: relative;
 }
-html.label-sweep .sweep-host::after {
+html.label-sweep .sweep-host::after, #dark-alert .sweep-host::after {
   content: '';
   position: absolute;
   left: var(--sweep-left, 0);
@@ -4178,16 +4218,16 @@ html.label-sweep .sweep-host::after {
   transform-origin: left center;
   pointer-events: none;
 }
-html.label-sweep .sweep-host.sweeping::after {
+html.label-sweep .sweep-host.sweeping::after, #dark-alert .sweep-host.sweeping::after {
   transform: scaleX(1);
   transition: transform 300ms var(--ease-sweep);
 }
-html.label-sweep .sweep-host.swept::after {
+html.label-sweep .sweep-host.swept::after, #dark-alert .sweep-host.swept::after {
   transform: scaleX(0);
   transform-origin: right center;
   transition: transform 340ms var(--ease-sweep);
 }
-html.label-sweep .sweep-hidden { opacity: 0; }
+html.label-sweep .sweep-hidden, #dark-alert .sweep-hidden { opacity: 0; }
 #label-ruler {
 
   position: absolute;
