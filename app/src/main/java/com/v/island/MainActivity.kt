@@ -281,6 +281,15 @@ class MainActivity : Activity() {
         fun simulateMessaging() = runOnUiThread { MessagingWatch.simulate(this@MainActivity) }
 
         @JavascriptInterface
+        fun simulateMessagingReply() = runOnUiThread { MessagingWatch.simulate(this@MainActivity, isSelf = true) }
+
+        @JavascriptInterface
+        fun clearMessaging() = runOnUiThread { MessagingWatch.clear(this@MainActivity) }
+
+        @JavascriptInterface
+        fun readMessaging(): String = MessagingWatch.report(this@MainActivity)
+
+        @JavascriptInterface
         fun allowConversation(id: String, isAllowed: Boolean) = runOnUiThread {
             MessagingWatch.allow(this@MainActivity, id, isAllowed)
             repaint()

@@ -44,6 +44,7 @@ object MessagingWatch {
     }
 
     private val conversations = LinkedHashMap<String, Conversation>()
+    private var lastDump = "no Telegram message seen yet"
 
     fun isMessaging(statusBarNotification: StatusBarNotification): Boolean {
         val notification = statusBarNotification.notification
@@ -210,26 +211,47 @@ object MessagingWatch {
             })
     }
 
-    fun simulate(context: Context) {
+    fun simulate(context: Context, isSelf: Boolean = false) {
         synchronized(this) {
             val conversation = conversations.getOrPut(SIMULATED) { Conversation(SIMULATED, TELEGRAM) }
             val now = System.currentTimeMillis()
             conversation.title = "Simulated chat"
             conversation.messages.add(
                 Message(
-                    sender = "Simulated chat",
-                    text = "Message ${conversation.messages.size + 1}, sent at " +
+                    sender = if (isSelf) "" else "Simulated chat",
+                    text = (if (isSelf) "Reply " else "Message ") + "${conversation.messages.size + 1}, sent at " +
                         android.text.format.DateFormat.format("HH:mm:ss", now),
                     time = now,
-                    isSelf = false,
+                    isSelf = isSelf,
                     type = null
                 )
             )
             while (conversation.messages.size > MESSAGES_KEPT) conversation.messages.removeAt(0)
-            conversation.unread += 1
+            if (!isSelf) conversation.unread += 1
             conversation.updatedAt = now
         }
         publish(context)
+    }
+
+    fun clear(context: Context) {
+        synchronized(this) { conversations.clear() }
+        lastDump = "cleared"
+        publish(context)
+    }
+
+    fun report(context: Context): String {
+        val allowed = allowedOf(context)
+        return synchronized(this) {
+            val lines = conversations.values.sortedByDescending { it.updatedAt }.map {
+                val last = it.messages.lastOrNull()
+                (if (it.id == SIMULATED || allowed.has(it.id)) "[bubble] " else "[not allowed] ") +
+                    "${it.title.ifBlank { it.id }}: ${it.messages.size} kept, ${it.unread} unread, " +
+                    (if (it.key != null) "notification standing" else "notification gone") +
+                    ", reply=${it.reply != null} markRead=${it.markRead != null} avatar=${it.avatar != null}" +
+                    (last?.let { message -> "\n    last: ${if (message.isSelf) "me" else message.sender}: ${message.text.take(60)}" } ?: "")
+            }
+            (if (lines.isEmpty()) "no conversation yet" else lines.joinToString("\n")) + "\n" + lastDump
+        }
     }
 
     fun dump(statusBarNotification: StatusBarNotification) {
@@ -252,15 +274,14 @@ object MessagingWatch {
             .joinToString(" | ") { action ->
                 "${action.title} inputs=" + action.remoteInputs.orEmpty().joinToString(",") { it.resultKey }
             }
-        android.util.Log.d(
-            "IslandBubble",
-            "telegram extras: shortcut=${notification.shortcutId} " +
+        val dump = "telegram extras: shortcut=${notification.shortcutId} " +
                 "isGroup=${extras.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)} " +
                 "conversationTitle=${extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null} " +
                 "conversationIcon=${extras.getParcelable(CONVERSATION_ICON, Icon::class.java)?.type} " +
                 "largeIcon=${notification.getLargeIcon()?.type} " +
                 "bubble=${notification.bubbleMetadata != null} " +
                 "messages=${messages.size} [$people] actions=[$actions] wearable=[$wearable]"
-        )
+        lastDump = dump
+        android.util.Log.d("IslandBubble", dump)
     }
 }
