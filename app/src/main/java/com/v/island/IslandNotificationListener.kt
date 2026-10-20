@@ -333,7 +333,8 @@ class IslandNotificationListener : NotificationListenerService() {
         
         
         val key = statusBarNotification.key
-        handler.postDelayed({ if (isStillShowable(key)) pushToIsland(payload) }, KILL_GRACE)
+        val arrivedDark = BubbleService.isDarkArrival()
+        handler.postDelayed({ if (isStillShowable(key)) pushToIsland(payload, arrivedDark) }, KILL_GRACE)
     }
 
     // A summary standing alone is announced, so the grace re-asks whether its children have landed since — a summary posted a moment before its child would otherwise announce the same message twice.

@@ -15,6 +15,7 @@ import android.graphics.PixelFormat
 import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.util.TypedValue
@@ -44,6 +45,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     companion object {
         
         private const val WAKE_MILLIS = 6_000L
+        private const val SYSTEM_WAKE_MILLIS = 1_500L
         private const val DARK_BRIGHTNESS = 0.07f
 
         
@@ -198,9 +200,15 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         
-        fun deliver(payload: JSONObject) {
+        // Samsung wakes the screen for a lock-screen notification during the listener's KILL_GRACE, so by delivery `isInteractive` is already true and the Alert played in full instead of the always-on text; the listener asks at the moment of posting and passes the answer along.
+        fun isDarkArrival(): Boolean = instance?.isDarkArrival() == true
+
+        fun deliver(payload: JSONObject, arrivedDark: Boolean = false) {
             val service = instance ?: return
-            if (service.wakeScreen()) service.darken()
+            if (arrivedDark || service.isDarkArrival()) {
+                service.wakeScreen()
+                service.darken()
+            }
             service.push("window.onNotificationUpdate($payload)")
             service.push("window.setUnreadCount(${IslandNotificationListener.count()})")
         }
@@ -413,6 +421,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
     private var isScreenOff = false
+    private var isUserPresent = false
+    private var screenOnAt = 0L
     private var screenWatch: BroadcastReceiver? = null
     private var panelWatch: BroadcastReceiver? = null
 
@@ -839,6 +849,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         screenWatch = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action != Intent.ACTION_SCREEN_ON) lightUp()
+                if (intent.action == Intent.ACTION_SCREEN_ON) screenOnAt = SystemClock.elapsedRealtime()
+                if (intent.action == Intent.ACTION_USER_PRESENT) isUserPresent = true
+                if (intent.action == Intent.ACTION_SCREEN_OFF) isUserPresent = false
                 if (intent.action != Intent.ACTION_USER_PRESENT) {
                     isScreenOff = intent.action == Intent.ACTION_SCREEN_OFF
                     if (isScreenOff) landscapeStage = STAGE_HIDDEN
@@ -1635,8 +1648,15 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         return true
     }
 
+    // The screen counts as dark when it is off, or when it came on a moment ago over a locked keyguard without anyone unlocking it — that is the system lighting it for this notification.
+    private fun isDarkArrival(): Boolean {
+        if (!getSystemService(PowerManager::class.java).isInteractive) return true
+        return !isUserPresent &&
+            SystemClock.elapsedRealtime() - screenOnAt < SYSTEM_WAKE_MILLIS &&
+            getSystemService(KeyguardManager::class.java).isKeyguardLocked
+    }
+
     private fun darken() {
-        if (!getSystemService(KeyguardManager::class.java).isKeyguardLocked) return
         push("window.setScreenDark(1)")
         setStageBrightness(DARK_BRIGHTNESS)
     }
@@ -2278,4 +2298,4 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
 
-fun Context.pushToIsland(payload: JSONObject) = BubbleService.deliver(payload)
+fun Context.pushToIsland(payload: JSONObject, arrivedDark: Boolean = false) = BubbleService.deliver(payload, arrivedDark)

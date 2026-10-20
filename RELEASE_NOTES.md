@@ -1,5 +1,3 @@
-# 0.6.2
+# 0.6.3
 
-- Messaging bubbles, part two: the bubble is drawn. Drag the Clock down to pull the leading conversation out of it; it follows the finger and stays where you let go. Drag it back onto the Clock and it melts into it. It shows the conversation's picture, or its initial on Telegram's colour.
-- New launcher entry *VADOS Messaging*, for a Good Lock gesture: it pulls the bubble out under the Clock, or puts it back.
-- Debug: *Simulate messaging bubble* is enough to have one to pull out.
+- Always-on alerts: a notification that woke the screen (the system lighting it itself, or arriving before the keyguard locked) played the normal bubble Alert instead of the always-on text. The screen state is now read when the notification is posted, and a screen that is off is always dark.
