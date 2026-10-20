@@ -92,6 +92,7 @@ class MainActivity : Activity() {
         .put("statusBar", StatusBarPolicy.read())
         .put("preferences", Preferences.asJson(preferences).put("appIcon", currentIconIndex()))
         .put("defaults", JSONObject(Preferences.defaults as Map<*, *>))
+        .put("conversations", MessagingWatch.candidates(this))
 
     
     private fun iconComponent(index: Int) = ComponentName(this, "$packageName.${ICON_ALIASES[index]}")
@@ -274,6 +275,15 @@ class MainActivity : Activity() {
                     .put("title", "Always-on alert")
                     .put("text", "This is how a message reads when it wakes a dark screen: the app name sweeps in, and the rest types out.")
             )
+        }
+
+        @JavascriptInterface
+        fun simulateMessaging() = runOnUiThread { MessagingWatch.simulate(this@MainActivity) }
+
+        @JavascriptInterface
+        fun allowConversation(id: String, isAllowed: Boolean) = runOnUiThread {
+            MessagingWatch.allow(this@MainActivity, id, isAllowed)
+            repaint()
         }
 
         @JavascriptInterface

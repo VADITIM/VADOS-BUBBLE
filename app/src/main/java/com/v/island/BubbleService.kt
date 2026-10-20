@@ -25,6 +25,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import org.json.JSONArray
 import org.json.JSONObject
 
 
@@ -210,6 +211,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         fun deliverCount(count: Int) {
             instance?.push("window.setUnreadCount($count)")
+        }
+
+        fun deliverMessaging(conversations: JSONArray) {
+            instance?.push("window.onMessaging($conversations)")
         }
 
         
@@ -1503,6 +1508,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         
         IslandNotificationListener.publishCall()
         IslandNotificationListener.publishTrip()
+        MessagingWatch.publish(this)
     }
 
     private fun push(js: String) {

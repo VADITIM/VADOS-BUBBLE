@@ -28,6 +28,7 @@ One file per source of truth, each pushing a JSON payload or `null`:
 | `AlarmWatch` | an alarm ringing, told apart by its full-screen intent — recognised only so that nothing is drawn for it |
 | `BatteryWatch`, `MicrophoneAccess` | charge, sensor privacy |
 | `ConnectivityWatch` | the default network and its name, USB, tethering, and what is paired over bluetooth |
+| `MessagingWatch` | Telegram's conversation notifications, kept as one thread per conversation in memory; only the conversations allowed in Settings reach the page |
 
 **A notification is listed and announced if the shade would draw words for it.** Its title and text are read through every field a style may carry them in — big title, conversation title, big text, inbox lines, the last message, sub-text, ticker — not only `EXTRA_TITLE`/`EXTRA_TEXT`, and a group summary is skipped only while a child of its group is standing; a summary alone is the notification (Reddit posts some that way). The `KILL_GRACE` re-check asks the same question again, so a summary whose child landed during the grace is not announced twice.
 
@@ -212,6 +213,7 @@ Every lit thing on the bar reads its colour through the one `--section-color` to
 | `now.js`, `lock.js`, `status.js`, `clock.js` | the Now mods and the bubble they open into, the lock screen's bubble, the one at the right end of the bar, and the time at the left — `clock.js` owns the box and the hand, `now.js` owns what is standing in it |
 | `mods/*.js` | one file per mod: `media`, `timer`, `call`, `trip`, `notification` |
 | `double.js` | the `#double` element's handle, read by the mirror |
+| `messaging.js` | the messaging bubbles' threads, as `window.onMessaging` delivers them |
 | `tabs.js` | the Tabs that are nobody's mod. Notifications, now that the quick settings have gone to the Status bubble's own panel |
 | `labels.js` | which readings have run out of room, for every bubble at once — the one answer the masks and the scroll both hang off |
 | `bridge.js` | the `window.on…` / `set…` entry points and forwarded touch |

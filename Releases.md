@@ -2,6 +2,10 @@
 
 What changed in each feature version. Planned work is in `.claude/docs/roadmap.md`. Patch versions (x.x.1, x.x.2 …) are fixes and small adjustments; they are folded into the feature version they belong to. `RELEASE_NOTES.md` holds only the text of the latest release.
 
+## 0.6: messaging bubbles (0.6.0)
+
+- **Messaging bubbles:** Telegram conversations collected into threads, with a hand-set list of the conversations allowed to bubble (Settings), and a Debug button that simulates one.
+
 ## 0.5: lock screen, stages and the Dashboard (0.5.0 – 0.5.13)
 
 - **Lock screen:** notification groups on the keyguard, each with its own bubble and a delete-all bubble.

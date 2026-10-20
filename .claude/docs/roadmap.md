@@ -454,6 +454,18 @@ One step each, one push each, naming the feature.
       **Not walked on the phone, and this is the item that most needs it**: the threshold, the
       one-to-one follow and how a carried bubble sits over a real app are all feel.
 
+## Phase M — messaging bubbles
+
+A V/AS replica of Android's conversation bubbles, Telegram first, built only from what the notification listener can see. One phase per session, each walked on the phone before the next.
+
+- [x] **M1. Data** — `MessagingWatch` collects Telegram conversations into a thread per shortcut id, in memory, and pushes the allowed ones to the page (`window.onMessaging`). The allow-list is set by hand in Settings → Messaging bubbles; Debug → *Simulate messaging bubble* adds a message to a fake conversation. Every Telegram message logs `telegram extras:` (Person icons, RemoteInput keys, wearable actions). **Not walked on the phone.**
+- [ ] **M2. Keyboard spike** — whether the IME reaches the canvas once it drops `FLAG_NOT_FOCUSABLE`, and whether the IME insets reach an overlay. Decides M7's design.
+- [ ] **M3. Bubble and Clock** — the messaging bubble in `pill.html`, pulled out of the Clock by a drag down and merged back in, as liquid.
+- [ ] **M4. Free drag** — momentum edge snap, the dismiss target, the overflow.
+- [ ] **M5. Stack** — several conversations with one leading, the unread badge, a new message bringing its bubble up.
+- [ ] **M6. Thread** — the history, open in Telegram, mark as read, collapse on back, home or outside.
+- [ ] **M7. Reply** — RemoteInput send with the keyboard; the sent message joins the thread.
+
 ## Content marking
 
 Added 2026-08-28.

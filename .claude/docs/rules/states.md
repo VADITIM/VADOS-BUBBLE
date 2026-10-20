@@ -20,6 +20,7 @@ Rows are tagged **built** (on the phone now) or **planned** (specified, not writ
 | **Hidden** | Past the second satellite: a coloured dot, not a bubble face. | built | none; it is a count |
 | **Now** | At the bottom of the lock screen, where a thumb reaches. Replaces One UI's Now Bar, and the lock screen is the only place it stands. | built, partly | Mod, Extended, Haptic; Pull and Push planned |
 | **Note** | The lock screen's notification list, where One UI draws its own, above the Now bubble. One per app. | built | Idle, Haptic, Pull, Push |
+| **Messaging** | Docked inside the Clock, or free at a screen edge. One per allowed conversation, stacked. | planned — data built | Docked, Idle, Haptic, Extended (the Thread Tab) |
 
 While a Now mod is standing in the clock the row is allowed **one** satellite, not two: the bar left over is not wide enough for a second, and a row that overflows into the punch hole is worse than a row that counts. A satellite losing its place is not hidden — it is run into the bubble, which takes the knock, and it comes back as the first dot.
 
@@ -321,6 +322,19 @@ Its proxy is placed on exactly the box, whatever the box is at that moment — t
 The clock used to have to *leave* whenever the Now bubble came out, because the two wanted the same corner and no width was both legible and clear of it: it took `lit` off, went small, and came back when the light did, watched with a `MutationObserver` on the other bubble's class. All of that is gone with the bubble it was avoiding. There is one shape at that end of the bar now and it is never not there, which is also one less thing for the skin to mirror and one less departure to sequence.
 
 It reads hours, minutes and seconds. **On the bar** the seconds stand to the right of the minutes, smaller and stacked on their baseline: they are the same reading at a finer grain rather than a third field, and five digits at one size read as a number instead of as a clock. **Grown into the dashboard's corner they are the third field**, in line with the hours and minutes at their size with a colon of their own before them — the corner has the room a bar does not, and the thing being read there is the whole time rather than a glance at it. They change between the two while standing at nothing, in the gap the handover leaves; see [motion.md](motion.md#a-bubbles-contents-are-handed-over-part-by-part-never-crossed-whole). **The date under it is a setting** (`dateFormat`, fifteen formats in `DATE_FORMATS` in `clock.js`, mirrored in order by the panel's swipe strip), and every one of them reads day, then month, then year — the order is not the choice, only the spelling is. They are tabular, so the sixty repaints a minute cost the bubble no width and the whole thing does not shift sideways as they run. The minute is still the only turn the bubble *moves* for — a swell every second is a bubble that never stops twitching — and it is the only turn that refits the proxy, since the seconds are two digits wide for the whole of it. The tick is scheduled to the next second boundary rather than every 1,000ms. A repeating interval drifts against the wall clock and eventually turns over late, which on a clock is the whole of what it had to get right.
+
+## Messaging
+
+**Planned; the data is built** (`MessagingWatch`, `js/messaging.js`). A replica of Android's conversation bubbles, built from nothing but what the notification listener sees — a third-party app cannot host Telegram's own bubble activity, and Telegram posts no bubble metadata anyway (`mAllowBubble=false`).
+
+- **Only conversations set by hand bubble.** Settings → Messaging bubbles lists every Telegram conversation seen since the service started; one button each, wearing its state. Nothing becomes a bubble on its own. The list is a JSON string under `messagingAllowed`, the one string in the store.
+- **A conversation is its shortcut id** (`ndid_<dialog>`), prefixed with the package. A notification counts when it is `category=msg`, MessagingStyle and carries a shortcut id.
+- **The thread is what has been collected, never the history.** Telegram's notification carries only the unread messages — one, often — so the thread is every message seen since the service started, deduplicated by time, sender and text, `MESSAGES_KEPT` deep, in memory only. A conversation outlives its notification: Telegram cancels it once read or replied to, and the thread stays with `isLive` false.
+- **A bubbled conversation still alerts.** The Alert plays as for any message; the bubble is a second place the same conversation lives, not a replacement for the pop-up.
+- **Avatar:** `largeIcon` is null on Telegram, so the avatar is the conversation icon or the last sender's `Person` icon, and the initial on the app's accent where neither exists.
+- **Actions:** the reply is the action carrying a RemoteInput ("Antworten"), mark as read the one marked `SEMANTIC_ACTION_MARK_AS_READ` or the other one ("Als gelesen markieren"), open is `contentIntent`.
+- **Out of reach and out of scope:** voice and media playback (a voice note is the text "Sprachnachricht" with a `content://` uri), stickers, reactions, typing, calls, edits, anything before the bubble was there.
+- **The clock bubble is the Clock kind.** A drag down on the Clock pulls the stack out; dragged back onto the Clock, it is caught (`catchInto`) and disappears inside it.
 
 ## Lock screen
 
