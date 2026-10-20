@@ -96,7 +96,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
         // Mirrors BLUR_PANES in assets/js/liquid.js plus the scrim, plus NOTE_PANES.
-        private const val BLUR_PANES = 9 + 5
+        private const val BLUR_PANES = 10 + 5
 
         // Mirrors NOTES_PROXIES in assets/js/notes.js: one window per lock-screen notification group and one for its delete-all bubble.
         private const val NOTES_PROXIES = 4
@@ -177,6 +177,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.push("window.onToggleStatusPanel()")
         }
 
+
+        fun toggleMessaging() {
+            instance?.push("window.onToggleMessaging()")
+        }
 
         fun toggleNotifications() {
             instance?.summon(SUMMON_NOTIFICATIONS)
@@ -336,6 +340,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
 
     private lateinit var clockProxy: View
+    private lateinit var messagingProxy: View
+    private lateinit var messagingProxyParams: WindowManager.LayoutParams
     private lateinit var clockProxyParams: WindowManager.LayoutParams
 
     
@@ -639,6 +645,28 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
+        messagingProxy = object : View(this) {
+            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, messagingProxyParams, "messaging")
+                return true
+            }
+        }
+        messagingProxyParams = WindowManager.LayoutParams(
+            0, 0,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
         lockProxy = object : View(this) {
             override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
                 if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
@@ -749,6 +777,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         notesProxies.forEachIndexed { index, view -> windowManager.addView(view, notesProxyParams[index]) }
 
 
+        windowManager.addView(messagingProxy, messagingProxyParams)
         windowManager.addView(touchProxy, proxyParams)
         windowManager.addView(lockProxy, lockProxyParams)
         windowManager.addView(statusProxy, statusProxyParams)
@@ -961,6 +990,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         applyVisibility()
         
         (notesProxies.zip(notesProxyParams) + listOf(
+            messagingProxy to messagingProxyParams,
             touchProxy to proxyParams,
             lockProxy to lockProxyParams,
             statusProxy to statusProxyParams,
@@ -1046,6 +1076,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             relayout(statusProxy, statusProxyParams)
             clockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             relayout(clockProxy, clockProxyParams)
+            messagingProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            relayout(messagingProxy, messagingProxyParams)
             edgeLeftParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             relayout(edgeLeftProxy, edgeLeftParams)
             edgeRightParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -1090,6 +1122,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.removeView(edgeLeftProxy) }
             runCatching { windowManager.removeView(alertOverlay) }
             runCatching { windowManager.removeView(clockProxy) }
+            runCatching { windowManager.removeView(messagingProxy) }
             runCatching { windowManager.removeView(statusProxy) }
             runCatching { windowManager.removeView(lockProxy) }
             runCatching { windowManager.removeView(touchProxy) }
@@ -1892,6 +1925,19 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 clockProxyParams.x = params.x + dp(leftDp)
                 clockProxyParams.flags = proxyFlags(isLive)
                 relayout(clockProxy, clockProxyParams)
+            }
+        }
+
+        @JavascriptInterface
+        fun setMessagingProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {
+            webView.post {
+                val isLive = widthDp > 0
+                messagingProxyParams.width = if (isLive) dp(widthDp) else 0
+                messagingProxyParams.height = if (isLive) dp(heightDp) else 0
+                messagingProxyParams.x = params.x + dp(leftDp)
+                messagingProxyParams.y = dp(topDp)
+                messagingProxyParams.flags = proxyFlags(isLive)
+                relayout(messagingProxy, messagingProxyParams)
             }
         }
 

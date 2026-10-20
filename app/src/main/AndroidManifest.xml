@@ -115,6 +115,20 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".MessagingPanelActivity"
+            android:label="VADOS Messaging"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=".messaging"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".BubbleService"
             android:label="VAD/OS - Bubble"

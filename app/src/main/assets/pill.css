@@ -614,7 +614,7 @@ html.notifications-homing #pill {
 
 
 html.liquid #pill, html.liquid .satellite, html.liquid #lock-now,
-html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #notifications-clear {
+html.liquid #status, html.liquid #clock, html.liquid #double, html.liquid #notifications-clear, html.liquid #messaging {
   background: transparent;
   border-color: transparent;
 }
@@ -3686,7 +3686,9 @@ html.fast-dashboard #quick-panel.entering :is(.vital-reading, .vital-gauge, .bat
   
 
   translate: var(--clock-fly, 0px) 0;
-  transform: translate(var(--clock-drag-x, 0px), var(--clock-drag-y, 0px));
+  transform:
+    translate(var(--clock-drag-x, 0px), var(--clock-drag-y, 0px))
+    scale(calc(1 + var(--absorb, 0)), calc(1 - var(--absorb, 0) * 0.62));
   scale: var(--clock-pop, 0.5);
   transition:
     opacity 200ms ease,
@@ -4832,3 +4834,51 @@ html.landscape #pill.notifications ~ #notifications-clear { translate: 0 0; }
   overflow: hidden;
 }
 .lock-note.expanded .lock-note-body.runs-out { mask-image: linear-gradient(to bottom, transparent, #000 24px); }
+
+:root { --messaging-size: 46px; --messaging-drop: 12px; }
+#messaging {
+  position: absolute;
+  z-index: 2;
+  left: var(--messaging-x, 0px);
+  top: var(--messaging-y, 0px);
+  width: var(--messaging-drop);
+  height: var(--messaging-drop);
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--pill-background);
+  border: 1px solid var(--border);
+  overflow: visible;
+  opacity: 0;
+  translate: -50% -50%;
+  transition:
+    width 320ms var(--ease-bubble),
+    height 320ms var(--ease-bubble),
+    scale 320ms var(--ease-split);
+}
+#messaging.showing { opacity: 1; width: var(--messaging-size); height: var(--messaging-size); }
+#messaging.showing.docking { width: var(--messaging-drop); height: var(--messaging-drop); }
+#messaging.pressing { scale: 1.03; }
+html.locked #messaging, html.landscape #messaging { opacity: 0; }
+#messaging-avatar {
+  position: absolute;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  border-radius: 50%;
+  object-fit: cover;
+}
+#messaging-initial {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--messaging-accent, var(--section-color));
+  color: #fff;
+  font-family: var(--font-main);
+  font-size: calc(1rem * var(--font-size-main, 1));
+  overflow: hidden;
+}
+#messaging.has-avatar #messaging-initial, #messaging:not(.has-avatar) #messaging-avatar { display: none; }
+#messaging.docking #messaging-avatar, #messaging.docking #messaging-initial { opacity: 0; transition: opacity 120ms ease; }

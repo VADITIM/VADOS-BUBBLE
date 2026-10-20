@@ -20,7 +20,7 @@ Rows are tagged **built** (on the phone now) or **planned** (specified, not writ
 | **Hidden** | Past the second satellite: a coloured dot, not a bubble face. | built | none; it is a count |
 | **Now** | At the bottom of the lock screen, where a thumb reaches. Replaces One UI's Now Bar, and the lock screen is the only place it stands. | built, partly | Mod, Extended, Haptic; Pull and Push planned |
 | **Note** | The lock screen's notification list, where One UI draws its own, above the Now bubble. One per app. | built | Idle, Haptic, Pull, Push |
-| **Messaging** | Docked inside the Clock, or free at a screen edge. One per allowed conversation, stacked. | planned — data built | Docked, Idle, Haptic, Extended (the Thread Tab) |
+| **Messaging** | Docked inside the Clock, or free where it was let go. One per allowed conversation, stacked. | built, partly | Docked, Idle, Haptic, Extended (the Thread Tab) |
 
 While a Now mod is standing in the clock the row is allowed **one** satellite, not two: the bar left over is not wide enough for a second, and a row that overflows into the punch hole is worse than a row that counts. A satellite losing its place is not hidden — it is run into the bubble, which takes the knock, and it comes back as the first dot.
 
@@ -336,7 +336,8 @@ It reads hours, minutes and seconds. **On the bar** the seconds stand to the rig
 - **Avatar:** `largeIcon` is null on Telegram, so the avatar is the conversation icon or the last sender's `Person` icon, and the initial on the app's accent where neither exists.
 - **Actions:** the reply is the action carrying a RemoteInput ("Antworten"), mark as read the one marked `SEMANTIC_ACTION_MARK_AS_READ` or the other one ("Als gelesen markieren"), open is `contentIntent`.
 - **Out of reach and out of scope:** voice and media playback (a voice note is the text "Sprachnachricht" with a `content://` uri), stickers, reactions, typing, calls, edits, anything before the bubble was there.
-- **The clock bubble is the Clock kind.** A drag down on the Clock pulls the stack out; dragged back onto the Clock, it is caught (`catchInto`) and disappears inside it.
+- **The clock bubble is the Clock kind.** A drag down on the Clock — its time or a Now mod's resting face, not an open Now panel and not the Dashboard's corner — past `CLOCK_PULL` hands the band over: the Clock springs home and the leading conversation is born out of its middle as a `--messaging-drop`, growing to `--messaging-size` while it catches up with the finger (an additive `transform` journey over the drag's `translate`). Let go within `DOCK_REACH` of the Clock and it docks: it shrinks back to a drop, travels into the Clock and is caught (`catchInto`), the Clock's `--absorb` swelling as it goes in. Let go anywhere else and it rests there, kept `BAR_CLEAR` under the bar and `SCREEN_MARGIN` off the edges; from there it is dragged again on its own proxy and docked the same way. Built in 0.6.2; momentum, the edge snap, the dismiss target and stacking are M4–M5.
+- **Docked** is the resting state: nothing drawn, no proxy, no pane. The bubble is hidden on the keyguard and in landscape. "VADOS Messaging" (`MessagingPanelActivity`) toggles it from a launcher gesture: out to just under the Clock, or back in.
 
 ## Lock screen
 

@@ -460,7 +460,7 @@ A V/AS replica of Android's conversation bubbles, Telegram first, built only fro
 
 - [x] **M1. Data** — `MessagingWatch` collects Telegram conversations into a thread per shortcut id, in memory, and pushes the allowed ones to the page (`window.onMessaging`). The allow-list is set by hand in Settings → Messaging bubbles; Debug → *Simulate messaging bubble* adds a message to a fake conversation. Every Telegram message logs `telegram extras:` (Person icons, RemoteInput keys, wearable actions). **Not walked on the phone.**
 - [ ] **M2. Keyboard spike** — whether the IME reaches the canvas once it drops `FLAG_NOT_FOCUSABLE`, and whether the IME insets reach an overlay. Decides M7's design.
-- [ ] **M3. Bubble and Clock** — the messaging bubble in `pill.html`, pulled out of the Clock by a drag down and merged back in, as liquid.
+- [x] **M3. Bubble and Clock** — the messaging bubble in `pill.html`, pulled out of the Clock by a drag down and merged back in, as liquid; its own proxy and pane; the "VADOS Messaging" launcher entry toggles it. Taken before M2. **Not walked on the phone.**
 - [ ] **M4. Free drag** — momentum edge snap, the dismiss target, the overflow.
 - [ ] **M5. Stack** — several conversations with one leading, the unread badge, a new message bringing its bubble up.
 - [ ] **M6. Thread** — the history, open in Telegram, mark as read, collapse on back, home or outside.

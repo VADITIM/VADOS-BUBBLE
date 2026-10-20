@@ -14,6 +14,7 @@ import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
 import { edgeTouch, refreshEdgeProxy } from './edge.js';
 import { cornerTouch, isLandscape, landscapeSlept, landscapeWoke, setLandscape, summonDashboard } from './reveal.js';
 import { clearButton, clearHolds, openNotifications } from './tabs.js';
+import { messagingTouch } from './messaging.js';
 import { dropFocus, notesTouch, refreshNotes, setNotesEnabled, setNotesHomeAnimated } from './notes.js';
 
 
@@ -175,6 +176,10 @@ window.onProxyTouch = (action, x, y, source) => {
   }
   if (source === 'notes') {
     notesTouch(action, x, y);
+    return;
+  }
+  if (source === 'messaging') {
+    messagingTouch(action, x, y);
     return;
   }
   /* The Debug screen's note was written ahead of the press it describes — a forced layout, a hit test and a synchronous call into the host on every down and every lift, paid before the gesture had been answered at all. It is written once the frame is out of the way. */

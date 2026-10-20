@@ -50,7 +50,7 @@ const liquidLayers = {
 
 
 const BLUR_PANES = [
-  'main', 'left', 'right', 'lock', 'status', 'clock', 'double', 'clear',
+  'main', 'left', 'right', 'lock', 'status', 'clock', 'double', 'clear', 'messaging',
 ];
 
 
@@ -64,6 +64,7 @@ const BLUR_PANES = [
 
 const scrim = document.getElementById('quick-scrim');
 const clearBubble = document.getElementById('notifications-clear');
+const messagingPill = document.getElementById('messaging');
 
 const blobs = BLUR_PANES.map(name => ({
   name,
@@ -87,6 +88,7 @@ function sourceOf(name) {
   if (name === 'double') return doublePill;
   if (name === 'clear') return clearBubble;
   if (name === 'lock') return lockPill;
+  if (name === 'messaging') return messagingPill;
   return satellites[name];
 }
 
@@ -116,6 +118,7 @@ function isSkinned(name) {
   if (name === 'clock') return isClockLit();
   if (name === 'double') return isDoubleOut();
   if (name === 'clear') return true;
+  if (name === 'messaging') return messagingPill.classList.contains('showing') && !root.classList.contains('locked') && !root.classList.contains('landscape');
 
 
   return CLOSED.has(shared.size) && Boolean(satellites[name].dataset.mod);

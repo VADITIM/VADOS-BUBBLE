@@ -1,5 +1,5 @@
-# 0.6.1
+# 0.6.2
 
-- Messaging bubbles, part one: Telegram conversations are collected into threads in the background. Settings → Messaging bubbles lists the conversations seen so far; set the ones that should bubble. Nothing is drawn yet.
-- Debug: *Simulate messaging bubble* adds a message to a fake conversation.
-- Debug: a Messaging module with *Simulate my reply*, *Clear all threads* and a live readout of every conversation (kept, unread, notification standing, reply and mark-as-read found, avatar found) plus the last Telegram extras line.
+- Messaging bubbles, part two: the bubble is drawn. Drag the Clock down to pull the leading conversation out of it; it follows the finger and stays where you let go. Drag it back onto the Clock and it melts into it. It shows the conversation's picture, or its initial on Telegram's colour.
+- New launcher entry *VADOS Messaging*, for a Good Lock gesture: it pulls the bubble out under the Clock, or puts it back.
+- Debug: *Simulate messaging bubble* is enough to have one to pull out.

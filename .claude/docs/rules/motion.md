@@ -115,6 +115,8 @@ It was, and it is gone. Past a grab threshold the main bubble came off its spot,
 
 One threshold for all three now, and it is the block: under it the hold, over it the band, and the band always comes home. Anything that wants a bubble somewhere other than the punch hole is a settings offset, which is a number the user set rather than a place a gesture left it in.
 
+**The messaging bubble is the one exception, and it is one because it has no home on the bar.** It lives docked inside the Clock and is carried wherever it is let go — Android's conversation bubbles are exactly that, so a band that springs home would be a different feature. The drag writes `translate` alone, and every journey (out of the Clock, the settle into the screen, back into the Clock) is an additive `transform` animation over it; its rest is a `left` and a `top` (`--messaging-x`, `--messaging-y`), the centre, with the box centred on it by the `translate`'s own `-50%`. See [states.md](states.md#messaging).
+
 ## Landscape
 
 Landscape has no arrival of its own any more: the bar is never drawn there except as part of the Dashboard, so its bubbles do not travel in from the top edge. When the Dashboard opens, Main, the Clock, the Status bubble and the marks fade in on `ease-in` over `DASHBOARD_FADE` while the Dashboard's own entrance carries them to its corners and top; when it closes they fade out on `ease-out` while its leave carries them back, and the stage is only let go once the close has played (`dashboardLeaving`, handed the same length the close stirs the liquid for). The fades start from and end at the element's own opacity (an implicit keyframe), so a mark that has nothing to show stays at nothing rather than flashing in.

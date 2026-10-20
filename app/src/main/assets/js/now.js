@@ -1,6 +1,7 @@
 import { PROXY_TAP_SLOP } from './bridge.js';
-import { clockPill, fitClockProxy } from './clock.js';
+import { CLOCK_PULL, clockPill, fitClockProxy } from './clock.js';
 import { stirLiquid, traceEvent } from './liquid.js';
+import { dragMessaging, pullMessagingOut, releaseMessaging } from './messaging.js';
 import { toClosed } from './row.js';
 import { closeStatusPanel, refreshDock, setTransfer, statusOpen } from './status.js';
 import { HOLD_MILLIS, bridge, root, shared } from './state.js';
@@ -539,9 +540,12 @@ export function restoreNowMods() {
   keepTorchOpen();
 }
 
+let isPullingMessaging = false;
+
 export function nowTouch(action, x, y) {
   if (action === 'down') {
     nowHeld = false;
+    isPullingMessaging = false;
     nowDownAt = { x, y };
     // The panel hears this flick too and closes on the move that crosses its own threshold, so by the lift `statusOpen` already says no — whether the Dashboard owned this touch is the down's answer, not the up's.
     startedUnderPanel = statusOpen;
@@ -560,7 +564,17 @@ export function nowTouch(action, x, y) {
     return;
   }
   if (action === 'move') {
-    
+    if (isPullingMessaging) {
+      dragMessaging(x, y);
+      return;
+    }
+    const down = nowDownAt ? y - nowDownAt.y : 0;
+    if (!nowOpen && down > CLOCK_PULL && down > Math.abs(x - nowDownAt.x) && pullMessagingOut(x, y)) {
+      isPullingMessaging = true;
+      clearTimeout(nowHoldTimer);
+      clockPill.classList.remove('pressing');
+      return;
+    }
     if (nowDownAt && Math.hypot(x - nowDownAt.x, y - nowDownAt.y) > PROXY_TAP_SLOP) {
       clearTimeout(nowHoldTimer);
       clockPill.classList.remove('pressing');
@@ -569,6 +583,12 @@ export function nowTouch(action, x, y) {
   }
   clearTimeout(nowHoldTimer);
   clockPill.classList.remove('pressing');
+  if (isPullingMessaging) {
+    isPullingMessaging = false;
+    nowDownAt = null;
+    releaseMessaging(x, y);
+    return;
+  }
   const travelled = nowDownAt ? Math.hypot(x - nowDownAt.x, y - nowDownAt.y) : Infinity;
   const lifted = nowDownAt ? nowDownAt.y - y : 0;
   nowDownAt = null;

@@ -19,7 +19,7 @@ export const bridge = window.Android || {
   mediaControl() {}, mediaSeek() {}, readMicrophoneAccess() { return 'unavailable'; }, readTorchLit() { return false; }, readDataToday() { return '0 MB'; }, readBatteryExact() { return -1; }, setTorchLit() {},
   setMicrophoneAccess() {}, readNotifications() { return '[]'; }, readUnreadCount() { return 0; }, setAlertOverlay() {}, passAlertTap() {}, liftScreenDark() {}, sleepScreen() {},
   openNotification() {}, dismissNotification() {}, timerAction() {}, tripAction() {},
-  setTorch() {}, setLockProxy() {}, setEdgeProxy() {}, setStatusProxy() {}, setClockProxy() {},
+  setTorch() {}, setLockProxy() {}, setEdgeProxy() {}, setStatusProxy() {}, setClockProxy() {}, setMessagingProxy() {},
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
   requestToggles() {}, setToggle() {}, setLevel() {}, settleLevel() {}, requestVitals() {}, requestWeather() {},
   recordingAction() {}, transferAction() {}, setNotesProxy() {}, mediaSpeed() {},

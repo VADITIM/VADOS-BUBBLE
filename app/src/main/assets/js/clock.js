@@ -1,6 +1,7 @@
 import { stirLiquid } from './liquid.js';
 import { POP_IN, popIn, popOut, rubberBandPast, toy, untoy } from './motion.js';
 import { HOLD_MILLIS, bridge, root, shared } from './state.js';
+import { dragMessaging, pullMessagingOut, releaseMessaging } from './messaging.js';
 
 
 
@@ -60,7 +61,7 @@ export function setDateFormat(index) {
 const CLOCK_LEFT = 14;
 
 
-const CLOCK_PULL = 34;
+export const CLOCK_PULL = 34;
 
 
 const CLOCK_TRAVEL = 420;
@@ -321,6 +322,7 @@ export function clockHolds(x, y) {
     y >= box.top && y <= box.bottom;
 }
 
+let isPullingMessaging = false;
 let clockHeld = false;
 let clockDownAt = null;
 let clockHoldTimer = 0;
@@ -338,6 +340,7 @@ let clockHoldTimer = 0;
 export function clockTouch(action, x, y) {
   if (action === 'down') {
     clockHeld = false;
+    isPullingMessaging = false;
     clockDownAt = { x, y };
     clockPill.classList.add('pressing');
     clearTimeout(clockHoldTimer);
@@ -351,8 +354,19 @@ export function clockTouch(action, x, y) {
   }
   if (action === 'move') {
     if (!clockDownAt) return;
+    if (isPullingMessaging) {
+      dragMessaging(x, y);
+      return;
+    }
     const across = x - clockDownAt.x;
     const down = y - clockDownAt.y;
+    if (down > CLOCK_PULL && down > Math.abs(across) && pullMessagingOut(x, y)) {
+      isPullingMessaging = true;
+      clearTimeout(clockHoldTimer);
+      clockPill.classList.remove('pressing');
+      untoy(clockPill, '--clock-drag');
+      return;
+    }
     toy(clockPill, '--clock-drag', across, down);
     if (rubberBandPast(across, down) || down > CLOCK_PULL) {
       clearTimeout(clockHoldTimer);
@@ -364,6 +378,10 @@ export function clockTouch(action, x, y) {
   clockPill.classList.remove('pressing');
   untoy(clockPill, '--clock-drag');
   clockDownAt = null;
+  if (isPullingMessaging) {
+    isPullingMessaging = false;
+    releaseMessaging(x, y);
+  }
   
   
   

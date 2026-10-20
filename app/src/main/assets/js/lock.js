@@ -2,6 +2,7 @@ import { catchInto, releaseCatch, resendBlur, reserveRegion, stirLiquid } from '
 import { blankLockLabels, clock, flipPlaying, joinWave, livePosition, setWaveRatio, songSwapping, throwLockArt, typeLabels } from './mods/media.js';
 import { cancelSpring, HOLD_BLOCK, rubberBandPast, toy, untoy } from './motion.js';
 import { fitClockProxy } from './clock.js';
+import { fitMessagingProxy } from './messaging.js';
 import { closeStatusPanel, fitStatusProxy, setPanelNowOpen } from './status.js';
 import { ensureClosedWindow, isLive, paintSatellites, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, pill, root, shared } from './state.js';
@@ -348,6 +349,7 @@ window.refitProxies = () => {
   fitLockProxy();
   fitStatusProxy();
   fitClockProxy();
+  fitMessagingProxy();
   forgetNotesProxies();
   fitNotesProxies();
 };
@@ -690,6 +692,7 @@ window.onLock = next => {
   
   root.classList.toggle('locked', next);
   refreshEdgeProxy();
+  fitMessagingProxy();
   paintNotes(next);
 
   

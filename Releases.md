@@ -2,9 +2,9 @@
 
 What changed in each feature version. Planned work is in `.claude/docs/roadmap.md`. Patch versions (x.x.1, x.x.2 …) are fixes and small adjustments; they are folded into the feature version they belong to. `RELEASE_NOTES.md` holds only the text of the latest release.
 
-## 0.6: messaging bubbles (0.6.0 – 0.6.1)
+## 0.6: messaging bubbles (0.6.0 – 0.6.2)
 
-- **Messaging bubbles:** Telegram conversations collected into threads, with a hand-set list of the conversations allowed to bubble (Settings), and a Debug module that simulates a message or a reply, clears the threads and reads out each conversation.
+- **Messaging bubbles:** Telegram conversations collected into threads, with a hand-set list of the conversations allowed to bubble (Settings), and a Debug module that simulates a message or a reply, clears the threads and reads out each conversation. The bubble is pulled out of the Clock by a drag down, carried, and melts back into it; *VADOS Messaging* toggles it from a launcher gesture.
 
 ## 0.5: lock screen, stages and the Dashboard (0.5.0 – 0.5.13)
 
