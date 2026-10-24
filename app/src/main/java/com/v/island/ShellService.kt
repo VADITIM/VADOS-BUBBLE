@@ -1,6 +1,6 @@
 package com.v.island
 
-import android.net.wifi.SoftApConfiguration
+import android.util.Log
 import rikka.shizuku.SystemServiceHelper
 import java.io.BufferedReader
 
@@ -20,12 +20,29 @@ class ShellService : IShellService.Stub() {
         return output
     }
 
-    // The hotspot went through the AOSP tethering binder, and this phone's radio does not declare station-and-AP concurrency to AOSP — so starting it tore the Wi-Fi connection down, and the request died with it. One UI's own tile goes through ISemWifiManager instead, which is the path that honours Wi-Fi sharing and keeps the station up.
-    override fun setHotspot(isOn: Boolean): Boolean = runCatching {
-        semWifiManager.javaClass
-            .getMethod("setWifiApEnabled", SoftApConfiguration::class.java, Boolean::class.javaPrimitiveType)
-            .invoke(semWifiManager, null, isOn) as Boolean
-    }.getOrDefault(false)
+    // The AOSP tethering binder tore the Wi-Fi connection down on this radio, so One UI's own ISemWifiManager path is taken; it was looked up by one exact signature with every failure swallowed, which left the button doing nothing at all — each overload is tried now and each refusal is logged.
+    override fun setHotspot(isOn: Boolean): Boolean {
+        val candidates = runCatching {
+            semWifiManager.javaClass.methods.filter { it.name == "setWifiApEnabled" }
+        }.onFailure { Log.w(TAG, "no sem_wifi binder", it) }.getOrDefault(emptyList())
+        if (candidates.isEmpty()) Log.w(TAG, "sem_wifi has no setWifiApEnabled")
+        for (method in candidates) {
+            val arguments = method.parameterTypes.map { type ->
+                when (type) {
+                    Boolean::class.javaPrimitiveType -> isOn
+                    String::class.java -> SHELL_PACKAGE
+                    else -> null
+                }
+            }
+            val signature = method.parameterTypes.joinToString { it.simpleName }
+            val answer = runCatching { method.invoke(semWifiManager, *arguments.toTypedArray()) }
+                .onFailure { Log.w(TAG, "setWifiApEnabled($signature) refused", it) }
+            if (answer.isFailure) continue
+            if (answer.getOrNull() != false) return true
+            Log.w(TAG, "setWifiApEnabled($signature) answered false")
+        }
+        return false
+    }
 
     private val semWifiManager: Any by lazy {
         Class.forName("com.samsung.android.wifi.ISemWifiManager\$Stub")
@@ -56,5 +73,7 @@ class ShellService : IShellService.Stub() {
         const val DISPLAY_SERVICE = "display"
         const val DEFAULT_DISPLAY = 0
         const val SEM_WIFI_SERVICE = "sem_wifi"
+        const val SHELL_PACKAGE = "com.android.shell"
+        const val TAG = "IslandBubble"
     }
 }

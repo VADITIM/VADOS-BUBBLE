@@ -1,6 +1,8 @@
 package com.v.island
 
 import android.app.PendingIntent
+import android.content.Context
+import android.os.Bundle
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -41,11 +43,9 @@ object NotificationLog {
     fun lastOf(styleKey: String): JSONObject? =
         entries.firstOrNull { it.payload.optString("app") == styleKey }?.payload
 
-    fun open(key: String): Boolean {
+    fun open(key: String, context: Context, options: Bundle): Boolean {
         val intent = entries.firstOrNull { it.key == key }?.intent ?: return false
-        
-        
-        return runCatching { intent.send() }.isSuccess
+        return runCatching { intent.send(context, 0, null, null, null, null, options) }.isSuccess
     }
 
     fun forget(key: String) {

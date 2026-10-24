@@ -2112,7 +2112,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         @JavascriptInterface
         fun openNotification(key: String) {
-            IslandNotificationListener.open(key)
+            if (!IslandNotificationListener.open(key)) android.util.Log.w("IslandBubble", "nothing opened for $key")
         }
 
         
@@ -2224,7 +2224,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         fun setToggle(name: String, isOn: Boolean) {
             toggleIntents[name] = isOn to
                 (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
-            queueToggleWork { SystemToggles.set(name, isOn) }
+            if (SystemToggles.setDirect(name, isOn)) queueToggleWork {}
+            else queueToggleWork { SystemToggles.set(name, isOn) }
         }
 
         // A drag asks far faster than a shell command can answer, so each frame only leaves its value behind: the first queued run takes the newest one and the runs behind it find nothing left and cost nothing.

@@ -3503,8 +3503,8 @@ html.call-live .level[data-level="volume"] { top: calc(50% + var(--quick-level-s
   transition: width var(--grow-ms) var(--ease-grow), height var(--grow-ms) var(--ease-grow);
 }
 .quick-knob.on .record-dot { fill: #e5342b; }
-/* Measured, the comdirect mark's box already sits a hair right of its viewBox centre — what reads as left is the C's open side putting all its weight there, so the correction is optical and has to be larger than the geometry suggests. */
-.quick-knob[data-toggle="comdirect"] .quick-icon svg { transform: translateX(2px); }
+/* The C's open side reads as the mark standing left, but the 2px that corrected it read as standing right instead — the optical centre is between the two. */
+.quick-knob[data-toggle="comdirect"] .quick-icon svg { transform: translateX(1px); }
 
 #quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
 #quick-panel.showing .quick-mode.turning .quick-icon { animation: mode-turn 460ms var(--ease-enter); }

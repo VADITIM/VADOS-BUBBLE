@@ -208,7 +208,42 @@ object SystemToggles {
 
     private var callVolumeTop = 0
 
-    
+    // One UI's motion smoothness: 0 is Standard, which holds the panel at 60Hz.
+    private const val REFRESH_MODE = "refresh_rate_mode"
+    private const val REFRESH_STANDARD = 0
+
+    // Extra dim waited on a forked shell, and behind whatever read was already on the toggle queue, which is most of a second before the screen changed; the app holds WRITE_SECURE_SETTINGS, so it is one binder call written straight from the tap.
+    fun setDirect(name: String, isOn: Boolean): Boolean {
+        val context = host ?: return false
+        val resolver = context.contentResolver
+        val one = if (isOn) 1 else 0
+        return runCatching {
+            when (name) {
+                "dim" -> Settings.Secure.putInt(resolver, "reduce_bright_colors_activated", one)
+                "saver" -> {
+                    holdRefreshRate(context, isOn)
+                    Settings.Global.putInt(resolver, "low_power", one)
+                }
+                else -> false
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun holdRefreshRate(context: Context, isSaving: Boolean) {
+        val resolver = context.contentResolver
+        val preferences = Preferences.of(context)
+        if (isSaving) {
+            val mode = Settings.Secure.getInt(resolver, REFRESH_MODE, REFRESH_STANDARD)
+            if (mode == REFRESH_STANDARD) return
+            preferences.edit().putInt(Preferences.REFRESH_BEFORE_SAVER, mode).apply()
+            Settings.Secure.putInt(resolver, REFRESH_MODE, REFRESH_STANDARD)
+            return
+        }
+        if (!preferences.contains(Preferences.REFRESH_BEFORE_SAVER)) return
+        Settings.Secure.putInt(resolver, REFRESH_MODE, preferences.getInt(Preferences.REFRESH_BEFORE_SAVER, REFRESH_STANDARD))
+        preferences.edit().remove(Preferences.REFRESH_BEFORE_SAVER).apply()
+    }
+
     fun set(name: String, isOn: Boolean): Boolean {
         val one = if (isOn) "1" else "0"
         val command = when (name) {
