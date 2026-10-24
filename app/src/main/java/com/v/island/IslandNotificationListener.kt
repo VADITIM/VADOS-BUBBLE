@@ -90,9 +90,10 @@ class IslandNotificationListener : NotificationListenerService() {
         fun open(key: String): Boolean {
             val service = instance ?: return false
             val posted = service.activeNotifications?.firstOrNull { it.key == key }
+            // On SDK 36 `MODE_BACKGROUND_ACTIVITY_START_ALLOWED` means allow-if-visible, so whether a tapped notification opened hung on which of this app's windows were standing at that instant, and a refused start is silent — the menu closed and nothing opened.
             val options = ActivityOptions.makeBasic()
                 .setPendingIntentBackgroundActivityStartMode(
-                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
                 )
                 .toBundle()
 
@@ -102,7 +103,7 @@ class IslandNotificationListener : NotificationListenerService() {
                 val sent = runCatching { intent.send(service, 0, null, null, null, null, options) }
                 if (sent.isSuccess) return true
             }
-            if (NotificationLog.open(key)) return true
+            if (NotificationLog.open(key, service, options)) return true
             return service.launch(posted?.packageName)
         }
 
