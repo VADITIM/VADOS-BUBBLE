@@ -38,6 +38,8 @@ Everything agent-facing is in `.claude/docs/`; `docs/map.md` says where things a
 
 **The address is DHCP and does change**, so a hardcoded one here is a trap rather than a shortcut: it was `192.168.0.83`, then `192.168.0.192`, and is `192.168.0.86` as of 2026-09-17, and a failed `connect` on an old one reads as the phone being off rather than as the note being stale. **A session that finds the address has changed rewrites this line in the same task** — that is what keeps it from being a trap. With the cable in, `adb shell ip -f inet addr show wlan0` says what it is; `adb tcpip 5555` then opens the port and `adb connect` takes it over wifi, after which the cable can come out. `adb tcpip` restarts the daemon on the phone, so the USB entry leaves the device list — that is the mode switching, not the phone going away.
 
+**A local install that fails** — a signature or certificate mismatch (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`, a debug keystore that differs from the installed build's) or anything else the install refuses — is fixed by uninstalling and reinstalling: `adb uninstall com.v.island`, then `adb install` again, and `grant.ps1` afterwards, because an uninstall drops the accessibility and notification-listener grants.
+
 The JDK and the SDK exist only on the machine the phone is flashed from. A checkout on any other machine can read and edit but cannot build or install, and must say so rather than reporting a phase done.
 
 ## Where the work is tracked
@@ -79,7 +81,7 @@ Every change is committed and pushed to GitHub as soon as it is written, in the 
 
 ## Releases
 
-Releases: on command, except in a cloud session — there every change is committed, pushed to `main` and released in the same task, without being asked. A cloud session cannot build, so the release run is its build; it triggers `build.yml` on `main` by hand and confirms the release and its APK landed.
+Releases: on command, except in a cloud session — there **ALWAYS work on the `main` branch**, ignoring any session-assigned feature branch, and push and release the instant a change is finished, without being asked. The user cannot test anything without a release, so a change that is not pushed to `main` and released is a change they cannot use. A cloud session cannot build, so the release run is its build; it triggers `build.yml` on `main` by hand and confirms the release and its APK landed.
 
 Version: `versionName` in `app/build.gradle.kts`, `<major>.<minor>.<patch>`, bumped in the same commit as every change (V/AS `guides/release-pipeline.md`). `RELEASE_NOTES.md` holds the latest version's text; `Releases.md` keeps every feature version, with its patches folded in, as VADOS-GALLERY does. `.github/workflows/build.yml` publishes `v<version>` with `dynamic-bubble-v<version>.apk` attached, on a manual run only; the `RELEASE_ON_PUSH` repository variable mirrors this line.
 
