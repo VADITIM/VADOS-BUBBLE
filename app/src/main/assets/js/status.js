@@ -1157,7 +1157,8 @@ function paintToggles(state) {
   toggles = state;
   quickModes.forEach(button => {
     const name = button.dataset.toggle;
-    setControl(button, Boolean(state[name]), false);
+    // The hotspot is read from the tether broadcast (`attached.hotspot`), not from the shell, so the shell's read never carries it — painting it from here switched the button off on the read-back of its own tap, before the broadcast could say it had come on.
+    if (name !== 'hotspot') setControl(button, Boolean(state[name]), false);
     
     
     

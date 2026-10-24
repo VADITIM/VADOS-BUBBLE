@@ -25,7 +25,13 @@ class ShellService : IShellService.Stub() {
         val candidates = runCatching {
             semWifiManager.javaClass.methods.filter { it.name == "setWifiApEnabled" }
         }.onFailure { Log.w(TAG, "no sem_wifi binder", it) }.getOrDefault(emptyList())
-        if (candidates.isEmpty()) Log.w(TAG, "sem_wifi has no setWifiApEnabled")
+        if (candidates.isEmpty()) {
+            val related = runCatching {
+                semWifiManager.javaClass.methods.filter { it.name.contains("Ap") || it.name.contains("otspot") || it.name.contains("ether") }
+                    .joinToString { it.name + "(" + it.parameterTypes.joinToString { type -> type.simpleName } + ")" }
+            }.getOrDefault("unreadable")
+            Log.w(TAG, "sem_wifi has no setWifiApEnabled; related: $related")
+        }
         for (method in candidates) {
             val arguments = method.parameterTypes.map { type ->
                 when (type) {

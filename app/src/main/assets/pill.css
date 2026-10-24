@@ -3503,8 +3503,8 @@ html.call-live .level[data-level="volume"] { top: calc(50% + var(--quick-level-s
   transition: width var(--grow-ms) var(--ease-grow), height var(--grow-ms) var(--ease-grow);
 }
 .quick-knob.on .record-dot { fill: #e5342b; }
-/* The C's open side reads as the mark standing left, but the 2px that corrected it read as standing right instead — the optical centre is between the two. */
-.quick-knob[data-toggle="comdirect"] .quick-icon svg { transform: translateX(1px); }
+/* The mark's own box is centred a hair right of its viewBox (the path spans 34 to 164 of 192), and every nudge past that read as the C standing right — 2px, then 1px — so the correction is the box's own 0.35px, to the left. */
+.quick-knob[data-toggle="comdirect"] .quick-icon svg { transform: translateX(-0.4px); }
 
 #quick-panel.showing .quick-knob.turning .quick-icon { animation: knob-turn 460ms var(--ease-enter); }
 #quick-panel.showing .quick-mode.turning .quick-icon { animation: mode-turn 460ms var(--ease-enter); }
