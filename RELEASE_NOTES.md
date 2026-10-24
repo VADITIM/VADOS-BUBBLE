@@ -1,4 +1,3 @@
-# 0.6.6
+# 0.6.7
 
-- Comdirect toggle: the icon is centred in its circle; the earlier nudge still left it to the right.
-- Hotspot: the button no longer switches itself off when the shell's read-back of its own tap arrives; the hotspot's state comes only from the tether broadcast. When One UI's hotspot call is not found, every related method name is logged under `IslandBubble`.
+- Hotspot: when One UI's own hotspot call is refused, Android's tethering service is asked instead. This path turns Wi-Fi off while the hotspot runs. If both refuse, the reasons appear on the Debug screen under the touch trace.

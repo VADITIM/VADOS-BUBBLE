@@ -180,6 +180,9 @@ object SystemToggles {
 
     private var host: Context? = null
 
+    var hotspotRefusal = ""
+        private set
+
     private var isTemporaryBrightnessLive = false
 
     // A temporary brightness is ignored under auto brightness, so the first frame of a drag still goes through settings and flips the mode, and the frames after it are temporary.
@@ -273,7 +276,10 @@ object SystemToggles {
             
             
             
-            "hotspot" -> return ShizukuShell.setHotspot(isOn)
+            "hotspot" -> {
+                hotspotRefusal = ShizukuShell.setHotspot(isOn)
+                return hotspotRefusal.isEmpty()
+            }
             
             
             // The recorder tile was addressed as smartcapture.screenrecorder.ScreenRecorderTileService, a class this build does not have, and `cmd statusbar click-tile` answers an unknown component with silence and a zero exit — so the button did nothing while reporting success. The component One UI 8 registers is the one `settings get secure sysui_qs_tiles` lists.

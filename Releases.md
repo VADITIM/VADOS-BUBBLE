@@ -2,13 +2,13 @@
 
 What changed in each feature version. Planned work is in `.claude/docs/roadmap.md`. Patch versions (x.x.1, x.x.2 …) are fixes and small adjustments; they are folded into the feature version they belong to. `RELEASE_NOTES.md` holds only the text of the latest release.
 
-## 0.6: messaging bubbles (0.6.0 – 0.6.6)
+## 0.6: messaging bubbles (0.6.0 – 0.6.7)
 
 - **Messaging bubbles:** Telegram conversations collected into threads, with a hand-set list of the conversations allowed to bubble (Settings), and a Debug module that simulates a message or a reply, clears the threads and reads out each conversation. The bubble is pulled out of the Clock by a drag down, carried, and melts back into it; *VADOS Messaging* toggles it from a launcher gesture.
 - **Always-on alert fix:** a notification the system lit the screen for, or that arrived before the keyguard had locked, played the normal bubble Alert instead of the always-on text; the screen state is now read when the notification is posted.
 - **Charging sweep:** the battery sweep in the Status bubble is brighter and continuous, with no idle gap between passes.
 - **Dashboard taps and toggles:** a hold on a connection button no longer leaves the bottom row of toggles deaf; the battery module opens the battery page; the energy saver holds the screen at 60Hz; extra dim and the saver apply from the tap; the hotspot tries every One UI overload; a tapped notification opens with this app's start rights regardless of which windows are standing.
-- **Comdirect and hotspot buttons:** the Comdirect icon is centred; the hotspot button is no longer switched off by the read-back of its own tap.
+- **Comdirect and hotspot buttons:** the Comdirect icon is centred; the hotspot button is no longer switched off by the read-back of its own tap. A refused One UI hotspot call falls back to Android's tethering service, and what both refused is shown on the Debug screen.
 
 ## 0.5: lock screen, stages and the Dashboard (0.5.0 – 0.5.13)
 

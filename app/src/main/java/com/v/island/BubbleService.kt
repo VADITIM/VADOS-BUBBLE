@@ -196,7 +196,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
         fun trace(): String {
             val service = instance ?: return "the bubble is not running"
-            return service.lastTouch + "\n" + service.lastNote
+            val hotspot = SystemToggles.hotspotRefusal.takeIf { it.isNotEmpty() }?.let { "\nhotspot refused:\n$it" }.orEmpty()
+            return service.lastTouch + "\n" + service.lastNote + hotspot
         }
 
         
