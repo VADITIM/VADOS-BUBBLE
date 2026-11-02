@@ -106,12 +106,8 @@ export const SWAP_DISTANCE = 80;
 
 
 
-export const BUMP_MIN = 3;
-export const BUMP_MAX = 14;
 
-export const SWAP_FLICK = 1.4;
 
-export const SWAP_STILL = 90;
 
 export const HOLD_GRACE = 140;
 document.documentElement.style.setProperty('--hold-scale', HOLD_SCALE);

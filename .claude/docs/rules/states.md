@@ -72,7 +72,7 @@ The condition is the count of messages, not a measurement of whether they fit, a
 
 An arriving line grows its own height from nothing, and that *is* the push: everything above it moves up because it is getting taller. Animated separately they read as a fade standing next to a jump. A photo is not a line in a conversation — the image alert is a different face at a different height with nowhere for a stack to grow — so a picture always arrives as its own alert.
 
-**Merge** is not a state of its own — it is the transition a mod's arrival or departure runs *between* two structural states (Idle↔Mod, Mod↔Mod). The glyph is the cause and travels first; width is the consequence and follows once it lands. `mergeHold` holds the bubble genuinely Idle for the length of that flight so a mod's face never shows before the mod has actually arrived — see [motion.md](motion.md) for the glyph-as-cause rule this transition is built on.
+**Merge** is not a state of its own — it is the transition a mod's arrival or departure runs *between* two structural states (Idle↔Mod, Mod↔Mod). The glyph is the cause and turns in first; width is the consequence and follows once it has. `mergeHold` holds the bubble genuinely Idle for the length of that arrival so a mod's face never shows before the mod has actually arrived — see [motion.md](motion.md) for the glyph-as-cause rule this transition is built on.
 
 ## Mods
 

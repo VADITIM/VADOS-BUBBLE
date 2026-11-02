@@ -101,9 +101,6 @@
 
 
   --glyph-inset: calc((var(--pill-height) - var(--mod-glyph)) / 2 - 1px);
-  --enter-from: calc(
-    var(--main-width) / 2 - var(--glyph-inset) - var(--mod-glyph) / 2
-  );
   
 
 
@@ -761,8 +758,10 @@ html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble
   transition: opacity 160ms ease, top var(--content-drop-ms) var(--ease-grow);
 }
 .face.showing { opacity: 1; pointer-events: auto; transition-duration: 0ms, var(--content-drop-ms); }
-/* A face losing `showing` fades while the bubble collapses under it, and its contents kept their open size — the player's artwork and labels hung outside the shrinking bubble for the whole fade. A face on its way out is cut to the bubble's own shape; a showing face stays unclipped because glyphs fly in from past its edge. */
+/* A face losing `showing` fades while the bubble collapses under it, and its contents kept their open size — the player's artwork and labels hung outside the shrinking bubble for the whole fade. A face on its way out is cut to the bubble's own shape. */
 .face:not(.showing) { overflow: clip; border-radius: inherit; }
+/* A part shaken out keeps `popping` after its face has gone, and a face shown again by a plain repaint rather than a handover brought it back at nothing — the unread count, or a reading carried home by a satellite, stayed invisible until something next popped it in. */
+.face.showing > .popping { animation: none; }
 
 
 
@@ -780,23 +779,6 @@ html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble
 #media-face, #timer-face, #call-face, #trip-face {
   transition: opacity var(--face-fade, 0ms) ease var(--face-delay, 0ms);
 }
-#equalizer, #timer-remaining, #call-time, #trip-remaining {
-  transition: transform 560ms cubic-bezier(0.16, 0.8, 0.3, 1);
-  transition-delay: var(--face-delay, 0ms);
-}
-
-
-
-
-
-
-
-.face:not(.showing) #equalizer, .face:not(.showing) #timer-remaining,
-.face:not(.showing) #call-time, .face:not(.showing) #trip-remaining {
-  opacity: 0;
-  transform: translateX(30px);
-  transition: none;
-}
 
 
 
@@ -808,31 +790,6 @@ html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble
 
 
 
-.glyph.entering { animation: glyph-enter var(--enter-ms, 300ms) var(--ease-split); }
-
-
-
-
-
-
-
-
-
-
-.glyph.bumping { animation: glyph-bump var(--enter-ms, 300ms) var(--ease-grow); }
-@keyframes glyph-bump {
-  0% { transform: translateX(0); }
-  30% { transform: translateX(var(--bump, 14px)); }
-  100% { transform: translateX(0); }
-}
-@keyframes glyph-enter {
-  from {
-    transform: translateX(var(--enter-from)) scale(0.66);
-    opacity: 0;
-  }
-  35% { opacity: 1; }
-  to { transform: translateX(0) scale(1); opacity: 1; }
-}
 
 
 
@@ -844,21 +801,29 @@ html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble
 
 
 
-.glyph.leaving { animation: glyph-leave var(--leave-ms, 260ms) var(--ease-grow) forwards; }
-@keyframes glyph-leave {
-  from { transform: translateX(0) scale(1); opacity: 1; }
-  to { transform: translateX(calc(-1 * var(--enter-from))) scale(0.66); opacity: 0; }
-}
 
 
 
 
-html.entering .face.showing > :not(.glyph) { opacity: 0; transition: none; }
 
 
-html.leaving .face.showing > :not(.glyph) { opacity: 0; transition: opacity 140ms ease; }
-/* A mod leaving keeps `showing` until its glyph has gone into the hole, so the out-clip above never reached it and its glyph and reading faded outside the bubble while it shrank to idle. */
-html.leaving .face.showing { overflow: clip; border-radius: inherit; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2281,7 +2246,7 @@ html.clear-corner #notifications-clear {
     scale 300ms var(--ease-split);
 }
 .status-face.showing { opacity: 1; scale: 1; pointer-events: auto; }
-.status-face.popping-away { opacity: 1; scale: 1; transition: none; }
+.status-face.popping-away, .face.popping-away { opacity: 1; scale: 1; transition: none; }
 
 .status-face > * {
   rotate: -26deg;

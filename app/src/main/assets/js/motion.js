@@ -66,6 +66,14 @@ export function popIn(parts, after = 0) {
   return after + parts.length * POP_IN_STAGGER + POP_IN;
 }
 
+export function popFaceOut(face, parts = [...face.children]) {
+  const emptyAt = popOut(parts);
+  // A face handed over loses its `showing` in the same frame the pop starts, and the 160ms opacity fade cut the stagger off before the last part had shaken: the face is held lit for exactly as long as its own pop runs instead, so every part gets to leave.
+  face.classList.add('popping-away');
+  setTimeout(() => face.classList.remove('popping-away'), emptyAt);
+  return emptyAt;
+}
+
 export const HOLD_BLOCK = 18;
 
 

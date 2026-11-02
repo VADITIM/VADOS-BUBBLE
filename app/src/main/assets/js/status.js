@@ -2,7 +2,7 @@ import { PROXY_TAP_SLOP } from './bridge.js';
 import { isAlertDashed } from './alert.js';
 import { clockPill, enterCornerClock, leaveCornerClock } from './clock.js';
 import { stirLiquid } from './liquid.js';
-import { popIn, popOut, rubberBandPast, toy, untoy } from './motion.js';
+import { popFaceOut, popIn, rubberBandPast, toy, untoy } from './motion.js';
 import { clearNowMods, closeNowPanel, hasDismissedNowMods, hasNowMods, nowOpen, restoreNowMods } from './now.js';
 import { closePanelNow, lockHolds, lockPill, openPanelNow, paintLock } from './lock.js';
 import { throwOf } from './sling.js';
@@ -574,13 +574,6 @@ function paintStatus() {
 
 
 /* The faces here hand over a whole row at a time, so they wrap the shared pair rather than owning a copy of it. */
-function popFaceOut(face) {
-  const emptyAt = popOut([...face.children]);
-  // A face handed over loses its `showing` in the same frame the pop starts, and the 160ms opacity fade cut the stagger off before the last part had shaken: the face is held lit for exactly as long as its own pop runs instead, so every part gets to leave.
-  face.classList.add('popping-away');
-  setTimeout(() => face.classList.remove('popping-away'), emptyAt);
-  return emptyAt;
-}
 
 function popFaceIn(face) {
   return popIn([...face.children]);

@@ -1,3 +1,3 @@
-# 0.6.3
+# 0.6.4
 
-- Always-on alerts: a notification that woke the screen (the system lighting it itself, or arriving before the keyguard locked) played the normal bubble Alert instead of the always-on text. The screen state is now read when the notification is posted, and a screen that is off is always dark.
+- Main bubble: the mod icon and its reading (equalizer, timer, call time, trip time) no longer slide in and out sideways — what stands there shakes out first, then what replaces it turns in, the same handover as the Status bubble. The equalizer no longer draws outside the bubble on the way back from the player.

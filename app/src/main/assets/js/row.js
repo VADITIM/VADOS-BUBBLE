@@ -8,10 +8,10 @@ import { paintAvatar, paintCall } from './mods/call.js';
 import { carryArt, joinEqualizer, mediaWindow, paintMedia } from './mods/media.js';
 import { paintTimer, timerWindow } from './mods/timer.js';
 import { paintTrip } from './mods/trip.js';
-import { endHold } from './motion.js';
+import { POP_IN, endHold, popFaceOut, popIn } from './motion.js';
 import { closeNowPanel, nowOpen } from './now.js';
 import { closeStatusPanel, statusOpen } from './status.js';
-import { BUMP_MAX, BUMP_MIN, CHIP_ROOM, CLOSED, GROWN_PAD, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, SWAP_FLICK, SWAP_STILL, bridge, faces, mods, pill, root, setSweepPhase, shared } from './state.js';
+import { CHIP_ROOM, CLOSED, GROWN_PAD, SAT_GAP, SAT_GAP_ASIDE, SIZES, SPLIT_SHRINK, SWAP_DISTANCE, bridge, faces, mods, pill, root, setSweepPhase, shared } from './state.js';
 
 
 
@@ -260,11 +260,6 @@ const SWAP_PRESS = 5;
 
 
 let swapPassed = false;
-
-
-let swapSpeed = 0;
-let swapTravelled = 0;
-let swapMovedAt = 0;
 
 
 export function isLive(mod) {
@@ -633,7 +628,6 @@ const MERGE_EXPAND = 300;
 
 
 
-const MOD_ENTER = 300;
 
 
 
@@ -909,20 +903,6 @@ export function dragSwap(travelled) {
   
   
   
-  const now = performance.now();
-  if (!root.classList.contains('dragging')) {
-    swapSpeed = 0;
-    swapMovedAt = 0;
-  }
-  if (swapMovedAt && now > swapMovedAt) {
-    const rate = Math.abs(travelled - swapTravelled) / (now - swapMovedAt);
-    swapSpeed = swapMovedAt ? swapSpeed * 0.6 + rate * 0.4 : rate;
-  }
-  swapMovedAt = now;
-  swapTravelled = travelled;
-  
-  
-  
   const towards = satSide === 'right' ? -travelled : travelled;
   let progress = swapDir > 0 ? towards : -towards;
   if (progress < 0 && live.length > 2) {
@@ -980,9 +960,6 @@ export function releaseSwap() {
   if (!root.classList.contains('dragging')) return;
   const committed = swap > 0.5;
   swapPassed = false;
-  
-  
-  if (performance.now() - swapMovedAt > SWAP_STILL) swapSpeed = 0;
   if (!committed) {
     root.classList.remove('dragging');
     swap = 0;
@@ -994,10 +971,6 @@ export function releaseSwap() {
   const box = layout();
   const flanked = liveMods().length > 2;
   const dir = swapDir;
-  
-  
-  
-  enterFrom(flanked ? box.inSide : satSide);
   swap = 0;
   swapDir = 1;
   
@@ -1216,44 +1189,21 @@ const MOD_CLOSED = {
 
 
 
-let enterSide = 'hole';
-function enterFrom(side) {
-  enterSide = side;
-}
-
-
-
-
-
-
-const MOD_LEAVE = 260;
-const MOD_LEAVE_WAIT = 340 * LAND;
 let leaveTimer = null;
-
-
-
-
-
-
-
-function flyGlyphOut(name) {
-  const glyph = faces[name] && faces[name].querySelector('.glyph');
-  if (!glyph) {
-    showFace('idle');
-    return;
-  }
-  root.classList.add('leaving');
-  stirLiquid(MOD_LEAVE_WAIT + MOD_LEAVE + 200);
-  leaveTimer = setTimeout(() => {
-    glyph.classList.add('leaving');
-    leaveTimer = setTimeout(() => {
-      glyph.classList.remove('leaving');
-      root.classList.remove('leaving');
-      leaveTimer = null;
-      showFace('idle');
-      root.style.removeProperty('--app-accent');
-    }, MOD_LEAVE);
-  }, MOD_LEAVE_WAIT);
+// The glyph flew in from the hole and the reading slid in from 30px past the right edge at full opacity, on a showing face that is left unclipped — so every arrival of a reading (and the Media equalizer most visibly, on the way back from the player) was drawn outside the bubble while it resized. Both now shake out and turn in where they stand, the reading only once the width it stands in has been asked for.
+function popFaceTo(name) {
+  clearTimeout(leaveTimer);
+  leaveTimer = null;
+  const arriving = faces[name];
+  const standing = Object.values(faces).find(face => face.classList.contains('showing'));
+  const emptyAt = standing && standing !== arriving
+    ? popFaceOut(standing, [...standing.children].filter(part => part.getClientRects().length))
+    : 0;
+  showFace(name);
+  const [glyph, ...reading] = arriving.children;
+  popIn([glyph], emptyAt);
+  popIn(reading, emptyAt + POP_IN * LAND);
+  return emptyAt;
 }
 
 
@@ -1274,7 +1224,7 @@ let returnTimer = null;
 
 function faceAfterCollapse(name) {
   clearTimeout(returnTimer);
-  stirLiquid(COLLAPSE + MOD_ENTER + 200);
+  stirLiquid(COLLAPSE + POP_IN + 200);
   returnTimer = setTimeout(() => {
     returnTimer = null;
     
@@ -1293,37 +1243,8 @@ function faceAfterCollapse(name) {
     }
     
     if (!owner || MOD_CLOSED[owner].face !== name) return;
-    showFace(name);
-    enterFrom('hole');
-    flyGlyphIn(name);
+    popFaceTo(name);
   }, COLLAPSE * LAND);
-}
-
-
-function flyGlyphIn(name) {
-  const glyph = faces[name] && faces[name].querySelector('.glyph');
-  if (!glyph) return;
-  
-  clearTimeout(leaveTimer);
-  root.classList.remove('leaving');
-  glyph.classList.remove('entering', 'bumping', 'leaving');
-  
-  
-  void glyph.offsetWidth;
-  
-  
-  
-  const side = enterSide;
-  enterSide = 'hole';
-  if (side === 'hole') {
-    glyph.classList.add('entering');
-    return;
-  }
-  const thrown = BUMP_MIN + (BUMP_MAX - BUMP_MIN) * Math.min(1, swapSpeed / SWAP_FLICK);
-  glyph.style.setProperty(
-    '--bump', (side === 'left' ? thrown : -thrown).toFixed(1) + 'px'
-  );
-  glyph.classList.add('bumping');
 }
 
 
@@ -1355,8 +1276,7 @@ function claimRoom(owner) {
 
 function handOver() {
   mergeHold = false;
-  root.classList.remove('entering');
-  
+
   
   if (shared.state !== 'idle') return;
   
@@ -1466,15 +1386,10 @@ export function toClosed() {
     mergeHold = true;
     paintSatellites();
     MOD_CLOSED[owner].paint();
-    showFace(MOD_CLOSED[owner].face);
-    root.classList.add('entering');
-    
-    
-    enterFrom('hole');
-    flyGlyphIn(MOD_CLOSED[owner].face);
+    const emptyAt = popFaceTo(MOD_CLOSED[owner].face);
     setSize(MOD_CLOSED[owner].size, { width: -1, height: -1, shift: 0 }, true);
     claimRoom(owner);
-    handOverAfter(MOD_ENTER * LAND);
+    handOverAfter(emptyAt + POP_IN * LAND);
     return;
   }
 
@@ -1505,10 +1420,10 @@ export function toClosed() {
       lastOwner = owner;
       return;
     }
-    showFace(mod.face);
-    
-    
-    if (!settling && owner !== lastOwner) flyGlyphIn(mod.face);
+    const isArriving = !faces[mod.face].classList.contains('showing');
+    if (!settling && owner !== lastOwner) popFaceTo(mod.face);
+    else showFace(mod.face);
+    if (settling && isArriving) popIn([...faces[mod.face].children].slice(1));
     setSize(mod.size, mod.room(), true);
     lastOwner = owner;
     return;
@@ -1518,26 +1433,26 @@ export function toClosed() {
   
   const leaving = lastOwner;
   lastOwner = null;
-  ensureClosedWindow();
-  setSize('idle');
-  if (!leaving) {
-    
-    
-    
-    if (leaveTimer !== null) return;
-    
-    
-    
-    
-    
-    if (wasOpen) {
-      showFace(null);
-      faceAfterCollapse('idle');
-      return;
-    }
-    showFace('idle');
-    root.style.removeProperty('--app-accent');
+  if (leaving) {
+    const emptyAt = popFaceTo('idle');
+    stirLiquid(emptyAt + HOME_TRAVEL + 200);
+    leaveTimer = setTimeout(() => {
+      leaveTimer = null;
+      if (shared.state !== 'idle') return;
+      ensureClosedWindow();
+      setSize('idle');
+      root.style.removeProperty('--app-accent');
+    }, emptyAt);
     return;
   }
-  flyGlyphOut(MOD_CLOSED[leaving].face);
+  if (leaveTimer !== null) return;
+  ensureClosedWindow();
+  setSize('idle');
+  if (wasOpen) {
+    showFace(null);
+    faceAfterCollapse('idle');
+    return;
+  }
+  showFace('idle');
+  root.style.removeProperty('--app-accent');
 }
