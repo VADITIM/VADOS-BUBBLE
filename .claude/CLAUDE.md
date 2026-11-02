@@ -21,8 +21,8 @@ Everything agent-facing is in `.claude/docs/`; `docs/map.md` says where things a
 
 ## How to work here
 
-1. **Read in this order:** this file, the rule file covering what is being touched, then the backlog note in the vault. Open work is tracked in the vault; `docs/roadmap.md` holds the phase plan only.
-2. **One backlog item at a time.** Tick it `[x]` in the vault only once it has been verified on the phone.
+1. **Read in this order:** this file, the rule file covering what is being touched, then the item in `docs/roadmap.md`. Open work is tracked there.
+2. **One roadmap item at a time.** Tick it `[x]` only once it has been verified on the phone.
 3. **Name the contracts the change touches before editing** — state, motion, window, blur, mirrored constant. The glass is mirrored off the real boxes now rather than told where to go, so what a size change owes it is a `stirLiquid()` long enough to cover the transition.
 4. **Docs change in the same task**, never afterwards.
 5. **The check is the phone, and the phone is the user's to check.** Build and install over wifi, then say what changed — never poke at the UI with `adb shell input`/screenshots to verify it yourself. A blind tap can land in whatever the user has open (a call, a chat, another app) and that is worse than not verifying at all. Say plainly that it was installed and is unverified on-device, and let the user walk it.
@@ -42,15 +42,11 @@ The JDK and the SDK exist only on the machine the phone is flashed from. A check
 
 ## Where the work is tracked
 
-The folder `DYNAMIC BUBBLE/` in the user's Obsidian vault, which is a configured working directory for this session. The two notes this section used to name — `Dynamic Bubble.md` and `Dynamic Bubble Stability & Improvements.md` — no longer exist; the folder replaced them.
+`docs/roadmap.md` — **the ledger, and the only file a session ticks.** Its phases are batches that each fit one session: every item names its files, the contracts it touches and a recommended model. Take one item, `/compact` after it, and tick `[x]` only once the user has walked it on the phone. The vault ledger this section used to name (`Improvements Working.md`) never existed on this PC.
 
-- `Improvements Working.md` — **the ledger, and the only file a session ticks.** It is `Improvements.md` regrouped into batches that each fit one session: every batch names its files, the contracts it touches and a recommended model. Take one batch, `/compact` after it, and tick `[x]` only once the user has walked it on the phone. Items the user has added to `Improvements.md` since get folded into the right batch when that batch is next picked up.
-  Its full path is `C:\Users\vadim\Documents\Obsidian\Vault\DYNAMIC BUBBLE\Improvements Working.md` — open it directly rather than searching for it.
-  **Exclamation marks count iterations.** Each `!` on an item records one more round it took before it was right; a session appends a `!` whenever it has to return to an item it already reported done, so the ledger keeps track of what kept coming back.
-- `Improvements.md` — the raw braindump the user writes into directly. Never edited by a session, and never worked top-to-bottom; read it only to fold new items into the ledger.
-- `Battery overhaul.md`, `Screen Off Alerts - AOD.md`, `Unlock to Access - One Hand Operations +.md` — feature notes, each its own piece of work, outside the ledger.
+**Exclamation marks count iterations.** Each `!` on an item records one more round it took before it was right; a session appends a `!` whenever it has to return to an item it already reported done, so the ledger keeps track of what kept coming back.
 
-Nothing about open work belongs in this repository.
+The user's braindump, `Improvements.md` in the `DYNAMIC BUBBLE/` folder of their Obsidian vault when there is one, is never edited by a session and never worked top-to-bottom; it is read only to fold new items into the roadmap.
 
 ## Key decisions
 

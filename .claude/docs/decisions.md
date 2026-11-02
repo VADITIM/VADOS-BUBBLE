@@ -457,7 +457,7 @@ After that: the lock-screen bubbles, the Discord video tab and
 the recording Now state — each one ordinary feature work standing on the contract in
 `.claude/docs/rules/`.
 
-The live backlog is a note in the Obsidian vault, not in this repository.
+The live backlog is `roadmap.md`.
 
 ## Device facts measured on-device
 
