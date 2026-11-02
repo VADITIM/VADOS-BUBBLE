@@ -1190,19 +1190,26 @@ const MOD_CLOSED = {
 
 
 let leaveTimer = null;
-// The glyph flew in from the hole and the reading slid in from 30px past the right edge at full opacity, on a showing face that is left unclipped — so every arrival of a reading (and the Media equalizer most visibly, on the way back from the player) was drawn outside the bubble while it resized. Both now shake out and turn in where they stand, the reading only once the width it stands in has been asked for.
-function popFaceTo(name) {
-  clearTimeout(leaveTimer);
-  leaveTimer = null;
+// A mod face is laid out `space-between` across the hole's corridor, so it is wider than the idle bubble it arrives in: the reading turned in while the box was still growing to hold it — the equalizer most visibly, back from the dashboard's Now bubble — and stood past the edge. It waits for the glyph to land and the box to finish growing.
+function readingWait() {
+  return POP_IN * LAND + HOME_TRAVEL;
+}
+// The glyph flew in from the hole and the reading slid in from 30px past the right edge at full opacity, on a showing face that is left unclipped — so every arrival of a reading (and the Media equalizer most visibly, on the way back from the player) was drawn outside the bubble while it resized. Both now shake out and turn in where they stand.
+export function popFaceTo(name) {
   const arriving = faces[name];
   const standing = Object.values(faces).find(face => face.classList.contains('showing'));
-  const emptyAt = standing && standing !== arriving
+  if (standing === arriving) return 0;
+  if (name !== 'idle') {
+    clearTimeout(leaveTimer);
+    leaveTimer = null;
+  }
+  const emptyAt = standing
     ? popFaceOut(standing, [...standing.children].filter(part => part.getClientRects().length))
     : 0;
   showFace(name);
   const [glyph, ...reading] = arriving.children;
   popIn([glyph], emptyAt);
-  popIn(reading, emptyAt + POP_IN * LAND);
+  popIn(reading, emptyAt + readingWait());
   return emptyAt;
 }
 
@@ -1237,7 +1244,7 @@ function faceAfterCollapse(name) {
     
     if (name === 'idle') {
       if (owner) return;
-      showFace('idle');
+      popFaceTo('idle');
       root.style.removeProperty('--app-accent');
       return;
     }
@@ -1365,7 +1372,7 @@ export function toClosed() {
   if (!settling && owner && live.length < lastLive) {
     mergeHold = true;
     paintSatellites();
-    showFace('idle');
+    popFaceTo('idle');
     root.style.removeProperty('--app-accent');
     setSize('idle');
     claimRoom(owner);
@@ -1421,9 +1428,9 @@ export function toClosed() {
       return;
     }
     const isArriving = !faces[mod.face].classList.contains('showing');
-    if (!settling && owner !== lastOwner) popFaceTo(mod.face);
+    if (isArriving && !settling) popFaceTo(mod.face);
     else showFace(mod.face);
-    if (settling && isArriving) popIn([...faces[mod.face].children].slice(1));
+    if (isArriving && settling) popIn([...faces[mod.face].children].slice(1), readingWait());
     setSize(mod.size, mod.room(), true);
     lastOwner = owner;
     return;

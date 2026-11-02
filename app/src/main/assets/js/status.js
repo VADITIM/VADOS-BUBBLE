@@ -6,7 +6,7 @@ import { popFaceOut, popIn, rubberBandPast, toy, untoy } from './motion.js';
 import { clearNowMods, closeNowPanel, hasDismissedNowMods, hasNowMods, nowOpen, restoreNowMods } from './now.js';
 import { closePanelNow, lockHolds, lockPill, openPanelNow, paintLock } from './lock.js';
 import { throwOf } from './sling.js';
-import { applyClosedWindow, isLive, liveMods, showFace, toClosed } from './row.js';
+import { applyClosedWindow, isLive, liveMods, popFaceTo, toClosed } from './row.js';
 import { HOLD_MILLIS, bridge, dragGate, pill, root, shared } from './state.js';
 import { endSweep, holdLabel, revealLabel, settleSweep, sweepInto, writeLabel, hideLabel, showLabel } from './sweep.js';
 import { channelHolds, closeChannel, collapseSpread, dropChannel, isChannelLive, isSpreadOpen, openChannel, stepChannel } from './channel.js';
@@ -93,7 +93,7 @@ function paintTransferStrip() {
 function raiseMain() {
   pill.classList.add('panel-top');
   // An Alert standing when the panel opens is grown, and handing it the closed face left the notification's box wearing the row's contents until its dwell ran out. The rise is a closed bubble's shape, so it only repaints a bubble that is in one.
-  if (!root.classList.contains('grown')) showFace(closedFace());
+  if (!root.classList.contains('grown')) popFaceTo(closedFace());
   stirLiquid(320);
 }
 
@@ -1003,7 +1003,7 @@ export function closeStatusPanel() {
   shrinkCornerWidths();
   pill.classList.remove('panel-top');
   leavePanelNow();
-  showFace(closedFace());
+  popFaceTo(closedFace());
   applyClosedWindow();
 
   fitStatusProxy();

@@ -779,6 +779,8 @@ html.dragging #pill { transition: scale 350ms var(--hold-ease, var(--ease-bubble
 #media-face, #timer-face, #call-face, #trip-face {
   transition: opacity var(--face-fade, 0ms) ease var(--face-delay, 0ms);
 }
+/* Only a face on its way out was cut to the bubble, so a mod's reading stood past the edge whenever the box was narrower than the row it lays out — on every growth into a mod, and back from the dashboard's Now bubble. A mod's face is cut to the bubble's own shape while it shows as well. */
+#media-face.showing, #timer-face.showing, #call-face.showing, #trip-face.showing { overflow: clip; border-radius: inherit; }
 
 
 
