@@ -1,3 +1,3 @@
-# 0.6.7
+# 0.6.8
 
-- Hotspot: when One UI's own hotspot call is refused, Android's tethering service is asked instead. This path turns Wi-Fi off while the hotspot runs. If both refuse, the reasons appear on the Debug screen under the touch trace.
+- New app icon: the status row itself, a clock bubble, the activity bubble with live bars and a mobile-signal bubble, on the rounded VAD/OS ground.
