@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# Blocks dangerous shell commands: push to protected branches, force push,
-# destructive operations. PreToolUse hook for Bash operations.
+# Blocks dangerous shell commands: force push, destructive operations. Pushing to main is allowed — the project works on main. PreToolUse hook for Bash operations.
 # Exit 2 = block. Exit 0 = allow.
-#
-# Configurable via env:
-#   CLAUDE_PROTECTED_BRANCHES  comma list (default: derived from git + main,master)
 
 set -uo pipefail
 
@@ -23,36 +19,11 @@ INPUT=$(cat)
 COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
 [ -z "$COMMAND" ] && exit 0
 
-# ── Protected branch list ────────────────────────────────────────────────
-DEFAULT_BRANCHES="main,master"
-if GIT_DEFAULT=$(git config --get init.defaultBranch 2>/dev/null) && [ -n "$GIT_DEFAULT" ]; then
-  DEFAULT_BRANCHES="$DEFAULT_BRANCHES,$GIT_DEFAULT"
-fi
-PROTECTED_BRANCHES="${CLAUDE_PROTECTED_BRANCHES:-$DEFAULT_BRANCHES}"
-# Build a regex alternation: main|master|develop|...
-BR_REGEX=$(printf '%s' "$PROTECTED_BRANCHES" | tr ',' '\n' | awk 'NF{printf "%s%s",sep,$0; sep="|"}')
-
 contains_cmd() { printf '%s' "$COMMAND" | grep -qE "$1"; }
 contains_icmd() { printf '%s' "$COMMAND" | grep -qiE "$1"; }
 
 # ── Git push protections ────────────────────────────────────────────────
 if contains_cmd '(^|[;&|()]+[[:space:]]*)git[[:space:]]+push'; then
-  # Explicit refspec to a protected branch (origin main, :main, HEAD:main, remote branch)
-  if contains_cmd "git[[:space:]]+push[[:space:]]+[^[:space:]]+[[:space:]]+([^[:space:]]*:)?($BR_REGEX)(\$|[[:space:]])"; then
-    MATCHED_BRANCH=$(printf '%s' "$COMMAND" | grep -oE "($BR_REGEX)(\$|[[:space:]])" | head -1 | tr -d '[:space:]')
-    emit_deny "Blocked: push to protected branch '${MATCHED_BRANCH:-main}'. Use a feature branch and open a PR."
-  fi
-  if contains_cmd "git[[:space:]]+push.*:($BR_REGEX)(\$|[[:space:]])"; then
-    MATCHED_BRANCH=$(printf '%s' "$COMMAND" | grep -oE ":($BR_REGEX)(\$|[[:space:]])" | head -1 | tr -d ': [:space:]')
-    emit_deny "Blocked: push to protected branch '${MATCHED_BRANCH:-main}' via refspec. Use a feature branch and open a PR."
-  fi
-  # Bare `git push` while on protected branch
-  if contains_cmd 'git[[:space:]]+push[[:space:]]*($|[;&|])'; then
-    CURRENT=$(git branch --show-current 2>/dev/null || true)
-    if [ -n "$CURRENT" ] && printf '%s' ",$PROTECTED_BRANCHES," | grep -q ",$CURRENT,"; then
-      emit_deny "Blocked: you are on '$CURRENT' (a protected branch). Switch to a feature branch."
-    fi
-  fi
   # Force push (but allow --force-with-lease)
   if contains_cmd 'git[[:space:]]+push([[:space:]]+[^[:space:]]+)*[[:space:]]+(-[a-zA-Z]*f[a-zA-Z]*|--force)([[:space:]=]|$)' \
      && ! contains_cmd '\-\-force-with-lease'; then

@@ -227,6 +227,9 @@ object Preferences {
     const val DATA_DAY = "dataDay"
     const val DATA_BASE = "dataBaseBytes"
 
+    // Outside `defaults` for the same reason: it is One UI's own refresh mode held while the energy saver has the screen at 60Hz, not a setting of this app's.
+    const val REFRESH_BEFORE_SAVER = "refreshBeforeSaver"
+
     fun of(context: Context): SharedPreferences =
         context.getSharedPreferences(STORE, Context.MODE_PRIVATE)
 

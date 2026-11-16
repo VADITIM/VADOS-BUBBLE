@@ -1,3 +1,3 @@
-# 0.6.5
+# 0.6.7
 
-- Main bubble: closing the Dashboard with media playing no longer shows the equalizer outside the bubble while it grows back. Every change of what Main shows — the Dashboard opening and closing, a mod merging home, a panel closing — now uses the shake-out / turn-in handover, the reading turns in only once the bubble has finished growing, and a mod's contents are clipped to the bubble.
+- Hotspot: when One UI's own hotspot call is refused, Android's tethering service is asked instead. This path turns Wi-Fi off while the hotspot runs. If both refuse, the reasons appear on the Debug screen under the touch trace.

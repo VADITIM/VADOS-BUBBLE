@@ -1150,7 +1150,8 @@ function paintToggles(state) {
   toggles = state;
   quickModes.forEach(button => {
     const name = button.dataset.toggle;
-    setControl(button, Boolean(state[name]), false);
+    // The hotspot is read from the tether broadcast (`attached.hotspot`), not from the shell, so the shell's read never carries it — painting it from here switched the button off on the read-back of its own tap, before the broadcast could say it had come on.
+    if (name !== 'hotspot') setControl(button, Boolean(state[name]), false);
     
     
     
@@ -1400,8 +1401,6 @@ window.setStatusBatteryPercentLight = value => {
 };
 
 
-const saverSwitch = () => document.querySelector('.quick-knob[data-toggle=saver]');
-
 let batteryHeld = false;
 let batteryHoldTimer = 0;
 
@@ -1429,8 +1428,9 @@ batteryBox.addEventListener('click', event => {
   event.stopPropagation();
   
   if (batteryHeld) return;
-  pressToggle('saver', saverSwitch());
-  batteryBox.classList.toggle('saving', saverSwitch().classList.contains('on'));
+  bridge.triggerHaptic('expand');
+  bridge.openConnectionSettings('battery');
+  closeStatusPanel();
 });
 
 let heldToggles = null;
@@ -1651,7 +1651,7 @@ const HOLD_OPENS = {
   gps: 'com.life360.android.safetymapd',
 };
 
-let modeHeld = false;
+let heldMode = null;
 let modeHoldTimer = 0;
 let modeDownAt = null;
 
@@ -1662,12 +1662,12 @@ function releaseModeHold() {
 
 quickModes.forEach(control => {
   control.addEventListener('touchstart', event => {
-    modeHeld = false;
+    heldMode = null;
     // Every forwarded move is dispatched whether or not the finger travelled, so cancelling the hold on the first of them let the timer expire only under a hand that never moved a pixel — which is no hand.
     modeDownAt = { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY };
     clearTimeout(modeHoldTimer);
     modeHoldTimer = setTimeout(() => {
-      modeHeld = true;
+      heldMode = control;
       const name = control.dataset.toggle;
       bridge.triggerHaptic('expand');
       if (HOLD_OPENS[name]) bridge.openApp(HOLD_OPENS[name]);
@@ -1688,7 +1688,8 @@ quickModes.forEach(control => {
   control.addEventListener('click', event => {
     event.stopPropagation();
     // `knobSwiped` is one latch for the whole panel and is cleared only by the next touch on the knob row, so a drag of that row left every connection button dead until the row had been touched again — the latch belongs to the row that was dragged, not to the controls standing beside it.
-    if (control.classList.contains('unavailable') || modeHeld) return;
+    // One latch for every control was set by holding a connection button and cleared only by the next touch on one, so after a hold opened its settings every toggle in the bottom row was dead until a connection button had been pressed again — the hold belongs to the button that was held.
+    if (control.classList.contains('unavailable') || heldMode === control) return;
     if (knobSwiped && knobRow.contains(control)) return;
     if (control.dataset.open) {
       bridge.triggerHaptic('tap');

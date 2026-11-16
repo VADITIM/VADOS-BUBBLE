@@ -228,7 +228,7 @@ object MediaControl {
     fun open(context: Context): Boolean {
         val options = ActivityOptions.makeBasic()
             .setPendingIntentBackgroundActivityStartMode(
-                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
             )
             .toBundle()
         controller?.sessionActivity?.let { intent ->

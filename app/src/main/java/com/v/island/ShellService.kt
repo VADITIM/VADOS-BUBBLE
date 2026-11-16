@@ -1,6 +1,6 @@
 package com.v.island
 
-import android.net.wifi.SoftApConfiguration
+import android.util.Log
 import rikka.shizuku.SystemServiceHelper
 import java.io.BufferedReader
 
@@ -20,12 +20,97 @@ class ShellService : IShellService.Stub() {
         return output
     }
 
-    // The hotspot went through the AOSP tethering binder, and this phone's radio does not declare station-and-AP concurrency to AOSP — so starting it tore the Wi-Fi connection down, and the request died with it. One UI's own tile goes through ISemWifiManager instead, which is the path that honours Wi-Fi sharing and keeps the station up.
-    override fun setHotspot(isOn: Boolean): Boolean = runCatching {
-        semWifiManager.javaClass
-            .getMethod("setWifiApEnabled", SoftApConfiguration::class.java, Boolean::class.javaPrimitiveType)
-            .invoke(semWifiManager, null, isOn) as Boolean
-    }.getOrDefault(false)
+    // One UI's own ISemWifiManager call keeps the Wi-Fi station up, but it answered shell with a refusal nobody could see, so the button did nothing; the AOSP tethering service, which shell holds TETHER_PRIVILEGED for, is the fallback, and whatever both refused is handed back for the Debug screen.
+    override fun setHotspot(isOn: Boolean): String {
+        val refusals = mutableListOf<String>()
+        if (setSemHotspot(isOn, refusals)) return ""
+        if (setTethering(isOn, refusals)) return ""
+        refusals.forEach { Log.w(TAG, it) }
+        return refusals.joinToString("\n")
+    }
+
+    private fun setSemHotspot(isOn: Boolean, refusals: MutableList<String>): Boolean {
+        val candidates = runCatching {
+            semWifiManager.javaClass.methods.filter { it.name == "setWifiApEnabled" }
+        }.getOrElse {
+            refusals += "sem_wifi: ${it.reason()}"
+            return false
+        }
+        if (candidates.isEmpty()) refusals += "sem_wifi has no setWifiApEnabled"
+        for (method in candidates) {
+            val arguments = method.parameterTypes.map { type ->
+                when (type) {
+                    Boolean::class.javaPrimitiveType -> isOn
+                    String::class.java -> SHELL_PACKAGE
+                    else -> null
+                }
+            }
+            val signature = method.parameterTypes.joinToString { it.simpleName }
+            val answer = runCatching { method.invoke(semWifiManager, *arguments.toTypedArray()) }
+            if (answer.isFailure) {
+                refusals += "sem setWifiApEnabled($signature): ${answer.exceptionOrNull()!!.reason()}"
+                continue
+            }
+            if (answer.getOrNull() != false) return true
+            refusals += "sem setWifiApEnabled($signature) answered false"
+        }
+        return false
+    }
+
+    private fun setTethering(isOn: Boolean, refusals: MutableList<String>): Boolean {
+        val answer = java.util.concurrent.LinkedBlockingQueue<Int>()
+        val listener = object : android.os.Binder() {
+            override fun onTransact(code: Int, data: android.os.Parcel, reply: android.os.Parcel?, flags: Int): Boolean {
+                if (code != android.os.IBinder.FIRST_CALL_TRANSACTION) return super.onTransact(code, data, reply, flags)
+                data.enforceInterface(RESULT_LISTENER)
+                answer.offer(data.readInt())
+                return true
+            }
+        }
+        val result = runCatching {
+            val connector = Class.forName("android.net.ITetheringConnector\$Stub")
+                .getMethod("asInterface", android.os.IBinder::class.java)
+                .invoke(null, SystemServiceHelper.getSystemService(TETHERING_SERVICE))!!
+            val proxy = Class.forName("$RESULT_LISTENER\$Stub")
+                .getMethod("asInterface", android.os.IBinder::class.java)
+                .invoke(null, listener)
+            val name = if (isOn) "startTethering" else "stopTethering"
+            val method = connector.javaClass.methods.first { it.name == name }
+            var strings = 0
+            val arguments = method.parameterTypes.map { type ->
+                when {
+                    type == Int::class.javaPrimitiveType -> TETHERING_WIFI
+                    type == String::class.java -> if (strings++ == 0) SHELL_PACKAGE else null
+                    type.name.endsWith("IIntResultListener") -> proxy
+                    else -> tetheringRequest(type)
+                }
+            }
+            method.invoke(connector, *arguments.toTypedArray())
+            answer.poll(TETHERING_WAIT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+        }
+        val code = result.getOrElse {
+            refusals += "tethering: ${it.reason()}"
+            return false
+        }
+        if (code == 0) return true
+        refusals += if (code == null) "tethering never answered" else "tethering answered error $code"
+        return false
+    }
+
+    // Android 16 takes the TetheringRequest itself where older releases took its parcel, so the parameter's own type says which one is wanted.
+    private fun tetheringRequest(type: Class<*>): Any {
+        val request = Class.forName("android.net.TetheringManager\$TetheringRequest\$Builder")
+            .getConstructor(Int::class.javaPrimitiveType)
+            .newInstance(TETHERING_WIFI)
+            .let { it.javaClass.getMethod("build").invoke(it)!! }
+        if (type.isInstance(request)) return request
+        return request.javaClass.getMethod("getParcel").invoke(request)!!
+    }
+
+    private fun Throwable.reason(): String {
+        val cause = (this as? java.lang.reflect.InvocationTargetException)?.targetException ?: this
+        return cause.javaClass.simpleName + (cause.message?.let { ": $it" } ?: "")
+    }
 
     private val semWifiManager: Any by lazy {
         Class.forName("com.samsung.android.wifi.ISemWifiManager\$Stub")
@@ -56,5 +141,11 @@ class ShellService : IShellService.Stub() {
         const val DISPLAY_SERVICE = "display"
         const val DEFAULT_DISPLAY = 0
         const val SEM_WIFI_SERVICE = "sem_wifi"
+        const val SHELL_PACKAGE = "com.android.shell"
+        const val TETHERING_SERVICE = "tethering"
+        const val TETHERING_WIFI = 0
+        const val TETHERING_WAIT_SECONDS = 5L
+        const val RESULT_LISTENER = "android.net.IIntResultListener"
+        const val TAG = "IslandBubble"
     }
 }
