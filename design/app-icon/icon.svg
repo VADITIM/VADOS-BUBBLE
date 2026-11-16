@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 432 432" width="1024" height="1024">
+  <rect width="432" height="432" fill="#181818"/>
+  <path d="M126,137 H304 A44,44 0 0 1 304,225 H260 Q250,225 246,240 Q238,262 216,262 Q194,262 186,240 Q182,225 172,225 H126 A44,44 0 0 1 126,137 Z" fill="#efefef"/>
+  <circle cx="216" cy="293" r="6" fill="#e6e6e6"/>
+  <text x="168" y="195" text-anchor="middle" font-family="Chakra Petch, Arial, sans-serif" font-size="46" font-weight="800" fill="#181818">V/AS</text>
+  <circle cx="292" cy="181" r="17" fill="#181818"/>
+  <circle cx="292" cy="181" r="9" fill="#444"/>
+</svg>
