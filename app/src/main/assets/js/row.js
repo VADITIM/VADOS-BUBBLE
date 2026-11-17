@@ -1349,6 +1349,7 @@ export function toClosed() {
   
   const wasOpen = !CLOSED.has(shared.size);
   if (wasOpen) shared.closedInTouch = shared.isTouchDown;
+  if (shared.size === 'notifications') shared.notificationsClosedAt = performance.now();
   const wasAlert = shared.state === 'alert';
   shared.state = 'idle';
   shared.current = null;

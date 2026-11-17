@@ -9,7 +9,7 @@ import { lockPill } from './lock.js';
 import { closeStatusPanel, statusOpen, statusPanelTarget, statusPill } from './status.js';
 import { abandonSwap, becomeExtended, applyClosedWindow, applyWindow, closedTarget, dragSwap, ensureClosedWindow, liveMods, releaseSwap, toClosed } from './row.js';
 import { CLOSED, HOLD_GRACE, HOLD_MILLIS, HOLD_SCALE, bridge, dragGate, pill, root, shared } from './state.js';
-import { MOD_FACES, clearHolds, leaveForMod, openNotifications, openMod } from './tabs.js';
+import { MOD_FACES, clearHolds, isNotificationsSettling, leaveForMod, notificationsRest, openNotifications, openMod } from './tabs.js';
 import { leaveNotesOutside } from './notes.js';
 
 
@@ -477,7 +477,7 @@ pill.addEventListener('touchmove', event => {
   
   
   
-  if (!hasPulled && shared.state !== 'extended' && CLOSED.has(shared.size) && !hasSwiped &&
+  if (!hasPulled && shared.state !== 'extended' && CLOSED.has(shared.size) && !hasSwiped && !isNotificationsSettling() &&
       !dragging && verticalTravel > PULL_TRIGGER && verticalTravel > horizontalTravel) {
     hasPulled = true;
     hasMoved = true;
@@ -529,7 +529,7 @@ pill.addEventListener('touchcancel', () => {
   
   
   
-  if (!hasPulled && !shared.hasHeld && !shared.closedInTouch && shared.state !== 'extended' &&
+  if (!hasPulled && !shared.hasHeld && !shared.closedInTouch && shared.state !== 'extended' && !isNotificationsSettling() &&
       CLOSED.has(shared.size) && pullDrop > PULL_STOLEN) {
     hasPulled = true;
     endHold();
@@ -566,6 +566,8 @@ pill.addEventListener('click', () => {
     return;
   }
 
+  // A tap landing on the bubble while it was still collapsing home out of the menu read as a tap on a bare Main and opened the menu straight back up.
+  if (isNotificationsSettling()) return;
   
   
   
@@ -601,7 +603,7 @@ pill.addEventListener('click', () => {
 
 // Mirrors `clockHolds` and `statusHolds`: the one reading of whether a point belongs to the main bubble, off its own rect. It used to be asked twice and answered differently — the bridge routed the touch by the pill's box, this by `elementFromPoint` — so any point the bridge called the bubble and the DOM called something else was closed by one half and clicked by the other, which is the open-close-open. A rect also spares it the two things `elementFromPoint` cannot see past: anything drawn over the bubble, and the bubble's own corner radius, which Blink clips hit testing to.
 export function pillHolds(x, y) {
-  const box = pill.getBoundingClientRect();
+  const box = notificationsRest() || pill.getBoundingClientRect();
   return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 }
 
@@ -624,8 +626,7 @@ window.onOutsideTap = (x, y) => {
   if (shared.state === 'extended') {
     toClosed();
     // Windows of one type stack in the order they were added and the row's own proxy went up first, so every proxy above it hears this press as an outside touch before the row's proxy hears the down — `toClosed` armed `closedInTouch` off `isTouchDown`, which is still false here, and the down that arrived a moment later handed the press a click that reopened what the press had just closed. The press is spent at the close. The latch lives one frame, which is long enough for the down belonging to this same press and short enough that a press landing in another app entirely never reaches the next one.
-    shared.closedOutside = true;
-    requestAnimationFrame(() => { shared.closedOutside = false; });
+    shared.closedOutsideAt = performance.now();
   }
   
   

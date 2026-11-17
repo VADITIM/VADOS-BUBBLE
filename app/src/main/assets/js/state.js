@@ -23,7 +23,7 @@ export const bridge = window.Android || {
   openConnectionSettings() {}, openClock() {}, openControlPanel() {}, openPowerMenu() {},
   requestToggles() {}, setToggle() {}, setLevel() {}, settleLevel() {}, requestVitals() {}, requestWeather() {},
   recordingAction() {}, transferAction() {}, setNotesProxy() {}, mediaSpeed() {},
-  note() {}, wakeFrames() {}, setLandscapeStage() {}, passCornerTap() {},
+  note() {}, wakeFrames() {}, setLandscapeStage() {},
 };
 
 
@@ -148,7 +148,9 @@ export const shared = {
   
   closedInTouch: false,
 
-  closedOutside: false,
+  closedOutsideAt: -Infinity,
+
+  notificationsClosedAt: -Infinity,
 
 
 

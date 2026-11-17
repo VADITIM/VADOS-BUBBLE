@@ -12,8 +12,8 @@ import { pillHolds } from './motion.js';
 import { ensureClosedWindow, paintSatellites, paintShift, setSize, toClosed } from './row.js';
 import { bridge, CLOSED, MELT_MAX, pill, root, shared } from './state.js';
 import { edgeTouch, refreshEdgeProxy } from './edge.js';
-import { cornerTouch, isLandscape, landscapeSlept, landscapeWoke, setLandscape, summonDashboard } from './reveal.js';
-import { clearButton, clearHolds, openNotifications } from './tabs.js';
+import { isLandscape, landscapeSlept, landscapeWoke, setLandscape, summonDashboard } from './reveal.js';
+import { clearButton, clearHolds, notificationsRest, openNotifications, restingRowAt } from './tabs.js';
 import { messagingTouch } from './messaging.js';
 import { dropFocus, notesTouch, refreshNotes, setNotesEnabled, setNotesHomeAnimated } from './notes.js';
 
@@ -45,9 +45,10 @@ export const PROXY_TAP_SLOP = 22;
 
 
 const PILL_GRACE = 22;
+const OUTSIDE_LATCH = 150;
 const PILL_CONTROLS = '.transport, .timer-button, .notification-row';
 
-const PRESSABLE = '.quick-mode, .quick-knob, .status-action, .timer-button, #now-stop';
+const PRESSABLE = '.quick-mode, .quick-knob, .status-action, .timer-button, #now-stop, .notification-row';
 let pressed = null;
 
 function letGoOfPress() {
@@ -108,12 +109,14 @@ function proxyPoint(x, y, source) {
 
 
 function mainHolds(x, y) {
-  return root.classList.contains('grown') && pillHolds(x, y);
+  return (root.classList.contains('grown') || !!notificationsRest()) && pillHolds(x, y);
 }
 
 
 // A near miss on a control inside the expanded bubble answered with the bubble itself, and the bubble's own click closes it, so a button missed by two pixels read as a tap to dismiss rather than as a button that was hard to hit.
 function pillTarget(x, y, hit) {
+  // The rows were hit-tested where they stood mid-growth, so a tap on the menu while it was still opening missed its row, closed the menu, and the click that followed opened it again from the start.
+  if (notificationsRest()) return restingRowAt(x, y) || pill;
   const inside = pillHolds(x, y);
   const within = inside && !!hit && pill.contains(hit) ? hit : null;
   const under = within ? within.closest(PILL_CONTROLS) : null;
@@ -159,14 +162,11 @@ function statusTarget(x, y, hit) {
   return nearest || within || statusPill;
 }
 window.onProxyTouch = (action, x, y, source) => {
-  if (source === 'corner') {
-    cornerTouch(action, x, y);
-    return;
-  }
   if (action === 'down') {
     shared.isTouchDown = true;
     // An outside report belonging to this same press reaches the page before this down does, so a bubble already closed by it hands this press a spent latch rather than a fresh one.
-    shared.closedInTouch = shared.closedOutside;
+    // The outside report and this down are two separate posts into the page, and a frame could fall between them, so a one-frame latch let the click through and the menu reopened under the tap that had closed it.
+    shared.closedInTouch = performance.now() - shared.closedOutsideAt < OUTSIDE_LATCH;
   }
   else if (action === 'up' || action === 'cancel') shared.isTouchDown = false;
 
@@ -244,6 +244,14 @@ window.onProxyTouch = (action, x, y, source) => {
   if (clockOwnsTouch) {
     clockTouch(action, x, y);
     if (action === 'up' || action === 'cancel') clockOwnsTouch = false;
+    return;
+  }
+  // The main proxy reaches from the screen's top edge down to the menu, so a tap above the menu landed inside it, where no other proxy heard it as outside and nothing closed the menu.
+  if (action === 'down' && source === 'main' && shared.state === 'extended' && shared.size === 'notifications' &&
+      !pillHolds(x, y) && !clearHolds(x, y)) {
+    proxyTarget = null;
+    toClosed();
+    shared.closedInTouch = true;
     return;
   }
   if (action === 'down') {

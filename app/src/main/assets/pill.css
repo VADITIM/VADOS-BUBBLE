@@ -1739,27 +1739,35 @@ html.alert-zone-debug #alert-zone-glow { animation-play-state: running; }
 
 .notification-row {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  column-gap: 0.8rem;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 0.85rem;
   align-items: start;
-  margin: 0 0.35rem;
-  padding: 0.8rem 0.55rem;
-  border-bottom: 1px solid var(--border);
+  margin: 0 0.35rem 0.4rem;
+  padding: 0.8rem 0.75rem;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--text-bright) 5%, transparent);
+  transition: background-color 160ms ease;
+  animation: notification-row-in 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94) backwards;
+  animation-delay: var(--row-delay, 0ms);
 }
-.notification-row:last-child { border-bottom: 0; }
+.notification-row:last-child { margin-bottom: 0; }
+.notification-row.pressing { background: color-mix(in srgb, var(--text-bright) 11%, transparent); }
+@keyframes notification-row-in { from { opacity: 0; translate: 0 10px; } }
 .notification-row[data-gradient] .notification-mark { background-image: var(--row-gradient); }
-.notification-row[data-gradient] .notification-name {
+.notification-row[data-gradient] .notification-name .reveal-text {
   background-image: var(--row-gradient);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
 }
 .notification-icon, .notification-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 30%;
-  corner-shape: squircle;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  animation: notification-icon-in 360ms var(--ease-enter) backwards;
+  animation-delay: var(--row-delay, 0ms);
 }
+@keyframes notification-icon-in { from { scale: 0; rotate: -200deg; } }
 .notification-icon { object-fit: cover; }
 .notification-mark {
   display: grid;
@@ -1776,8 +1784,11 @@ html.alert-zone-debug #alert-zone-glow { animation-play-state: running; }
   --font-scale: var(--font-size-notification-heading, 1);
 }
 .notification-name {
+  --reveal-delay: calc(var(--row-delay, 0ms) + 80ms);
+  position: relative;
   min-width: 0;
   overflow: hidden;
+  font-weight: 700;
   white-space: nowrap;
   font-size: calc((0.68rem) * var(--font-scale, 1));
   letter-spacing: 0.14rem;
@@ -1818,6 +1829,7 @@ html.alert-zone-debug #alert-zone-glow { animation-play-state: running; }
 }
 .notification-text { overflow-wrap: anywhere; }
 .notification-text + .notification-text { margin-top: 0.2rem; }
+.typing-rest { color: transparent; }
 /* Mirrors CLEAR_SIZE, CLEAR_GAP and NOTIFICATIONS_FOOT in js/tabs.js, which ask the proxy window for the room beneath the menu this bubble stands in. */
 #notifications-clear {
   --clear-size: 44px;

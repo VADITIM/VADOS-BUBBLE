@@ -1,4 +1,3 @@
-import { PROXY_TAP_SLOP } from './bridge.js';
 import { toClosed } from './row.js';
 import { closeStatusPanel, openStatusPanel, statusOpen } from './status.js';
 import { bridge, root, shared } from './state.js';
@@ -9,8 +8,6 @@ const STAGE_HIDDEN = 0;
 const STAGE_DASHBOARD = 1;
 const STAGE_LEAVING = 2;
 
-const CORNER_DOUBLE = 300;
-const CORNER_PRESS = 220;
 const DASHBOARD_FADE = 300;
 
 const faded = ['pill', 'clock', 'status', 'satellite-left', 'satellite-right', 'dots-left', 'dots-right']
@@ -20,8 +17,6 @@ let stage = STAGE_HIDDEN;
 let isDashboardPending = false;
 let leaveTimer = null;
 let running = [];
-let cornerStart = null;
-let cornerTappedAt = -Infinity;
 
 
 export function isLandscape() {
@@ -104,26 +99,4 @@ export function setLandscape(isOn) {
   if (wasOn === isOn) return;
   if (statusOpen) closeStatusPanel();
   if (shared.state !== 'idle') toClosed();
-}
-
-export function cornerTouch(action, x, y) {
-  if (action === 'down') {
-    cornerStart = { x, y, at: performance.now() };
-    return;
-  }
-  if (action === 'move' || !cornerStart) return;
-  const travel = Math.hypot(x - cornerStart.x, y - cornerStart.y);
-  const held = performance.now() - cornerStart.at;
-  cornerStart = null;
-  // A thumb resting on the corner mid-game is a long, sliding press, so only a short, still tap is read as asking for the Dashboard.
-  if (action !== 'up' || travel >= PROXY_TAP_SLOP || held > CORNER_PRESS) return;
-  const now = performance.now();
-  if (now - cornerTappedAt < CORNER_DOUBLE) {
-    cornerTappedAt = -Infinity;
-    summonDashboard();
-    return;
-  }
-  cornerTappedAt = now;
-  // A hidden page's timers are throttled to about a second, so the first tap cannot wait to learn whether a second follows: it is handed on to the app at once, and only the second is kept.
-  bridge.passCornerTap();
 }

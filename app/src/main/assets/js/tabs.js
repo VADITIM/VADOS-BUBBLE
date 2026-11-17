@@ -3,7 +3,7 @@ import { isLandscape } from './reveal.js';
 import { markUp } from './mods/notification.js';
 import { becomeExtended, setSize, showFace, toClosed } from './row.js';
 import { swipeToDismiss } from './swipeDismiss.js';
-import { GROWN_PAD, SIZES, bridge, root, shared } from './state.js';
+import { GROWN_PAD, SIZES, bridge, pill, root, shared } from './state.js';
 
 
 function afterRowRemoved(below, gap) {
@@ -120,7 +120,39 @@ export function agoText(postedAt) {
   return Math.floor(hours / 24) + 'd';
 }
 
+export function isNotificationsSettling() {
+  return performance.now() - shared.notificationsClosedAt < NOTIFICATIONS_HOMING;
+}
+
+// Where the open menu comes to rest, read off the same geometry its window was asked for, so a tap while it is still growing is answered against the menu it is becoming.
+export function notificationsRest() {
+  if (shared.state !== 'extended' || shared.size !== 'notifications') return null;
+  const style = getComputedStyle(root);
+  const grab = parseFloat(style.getPropertyValue('--grab')) || 0;
+  const drop = parseFloat(root.style.getPropertyValue('--notifications-drop')) || 0;
+  const height = parseFloat(root.style.getPropertyValue('--notifications-height')) || SIZES.notifications.height;
+  const left = (root.clientWidth - SIZES.notifications.width) / 2;
+  const top = grab + GROWN_PAD + drop;
+  return { left, top, right: left + SIZES.notifications.width, bottom: top + height };
+}
+
+export function restingRowAt(x, y) {
+  const rest = notificationsRest();
+  if (!rest) return null;
+  const box = pill.getBoundingClientRect();
+  const atX = x - rest.left + box.left;
+  const atY = y - rest.top + box.top;
+  const list = document.getElementById('notifications-list').getBoundingClientRect();
+  const listBottom = list.top + (rest.bottom - rest.top) - (list.top - box.top);
+  if (atY < list.top || atY > listBottom) return null;
+  return [...document.querySelectorAll('.notification-row')].find(row => {
+    const rowBox = row.getBoundingClientRect();
+    return atX >= rowBox.left && atX <= rowBox.right && atY >= rowBox.top && atY <= rowBox.bottom;
+  }) || null;
+}
+
 export function openNotifications() {
+  if (isNotificationsSettling()) return;
   const list = document.getElementById('notifications-list');
   list.textContent = '';
 
@@ -134,10 +166,14 @@ export function openNotifications() {
     list.appendChild(empty);
   }
 
-  for (const group of grouped(entries)) {
+  const bodies = [];
+  grouped(entries).forEach((group, index) => {
     const entry = group.head;
     const row = document.createElement('div');
     row.className = 'notification-row';
+    const rowDelay = ROW_ENTER_DELAY + Math.min(index, ROW_STAGGER_LIMIT) * ROW_STAGGER;
+    row.style.setProperty('--row-delay', rowDelay + 'ms');
+    row.style.setProperty('--accent', entry.accent || '#ffffff');
     
     
     row.dataset.count = String(group.entries.length);
@@ -168,7 +204,12 @@ export function openNotifications() {
     const name = document.createElement('div');
     name.className = 'notification-name';
     name.style.color = entry.accent || '#ffffff';
-    name.textContent = entry.appName || entry.app || '';
+    const nameText = document.createElement('span');
+    nameText.className = 'reveal-text';
+    nameText.textContent = entry.appName || entry.app || '';
+    const nameBar = document.createElement('span');
+    nameBar.className = 'reveal-bar';
+    name.append(nameText, nameBar);
     head.appendChild(name);
     if (group.entries.length > 1) {
       const tally = document.createElement('div');
@@ -219,6 +260,7 @@ export function openNotifications() {
         body.appendChild(text);
       }
       copy.appendChild(body);
+      bodies.push({ body, delay: rowDelay + BODY_TYPE_AFTER });
     }
 
     // The large icon a messenger posts is whoever wrote the message, not the app, so a list read at a glance says which app it came from and falls back to the notification's own icon where an app has none.
@@ -243,20 +285,67 @@ export function openNotifications() {
       toClosed();
     });
     list.appendChild(row);
-  }
+  });
 
   becomeExtended();
   showFace('notifications');
   setSize('notifications', notificationsWindow());
   stirLiquid(760);
+  bodies.forEach(({ body, delay }) => typeBody(body, delay));
 }
+
+// The menu's height is measured off its rows the moment it opens, so a body typed in by writing its text would grow the row under a menu already sized for it; every character is laid out from the start and the untyped rest is only uncoloured.
+function typeBody(body, delay) {
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const parts = [];
+  while (walker.nextNode()) parts.push({ node: walker.currentNode, full: walker.currentNode.nodeValue });
+  const total = parts.reduce((sum, part) => sum + part.full.length, 0);
+  if (!total) return;
+  for (const part of parts) {
+    part.rest = document.createElement('span');
+    part.rest.className = 'typing-rest';
+    part.rest.textContent = part.full;
+    part.node.nodeValue = '';
+    part.node.after(part.rest);
+  }
+  const interval = Math.min(TYPE_CHARACTER, TYPE_BUDGET / total);
+  const start = performance.now() + delay;
+  const step = now => {
+    if (!body.isConnected) return;
+    let shown = Math.max(0, Math.floor((now - start) / interval));
+    for (const part of parts) {
+      const typed = Math.min(part.full.length, shown);
+      shown -= typed;
+      if (part.node.nodeValue.length === typed) continue;
+      part.node.nodeValue = part.full.slice(0, typed);
+      part.rest.textContent = part.full.slice(typed);
+    }
+    if (shown <= 0 && parts[parts.length - 1].rest.textContent) {
+      requestAnimationFrame(step);
+      return;
+    }
+    for (const part of parts) part.rest.remove();
+  };
+  requestAnimationFrame(step);
+}
+
+// Mirrors SHELL's Motion.notifications: rows 34ms apart, ten at most, characters 12ms apart; the budget keeps a long message from typing for seconds.
+const ROW_ENTER_DELAY = 120;
+const ROW_STAGGER = 34;
+const ROW_STAGGER_LIMIT = 10;
+const BODY_TYPE_AFTER = 200;
+const TYPE_CHARACTER = 12;
+const TYPE_BUDGET = 700;
 
 export function retireNotifications() {
   if (!root.style.getPropertyValue('--notifications-drop')) return;
   root.style.removeProperty('--notifications-drop');
   root.classList.add('notifications-homing');
-  setTimeout(() => root.classList.remove('notifications-homing'), 460);
+  setTimeout(() => root.classList.remove('notifications-homing'), NOTIFICATIONS_HOMING);
 }
+
+// Mirrors html.notifications-homing's 460ms in pill.css.
+const NOTIFICATIONS_HOMING = 460;
 
 // How far the lowest notifications menu stands off the bottom edge of the screen.
 const NOTIFICATIONS_FOOT = 16;

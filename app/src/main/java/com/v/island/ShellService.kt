@@ -51,8 +51,12 @@ class ShellService : IShellService.Stub() {
                 refusals += "sem setWifiApEnabled($signature): ${answer.exceptionOrNull()!!.reason()}"
                 continue
             }
-            if (answer.getOrNull() != false) return true
-            refusals += "sem setWifiApEnabled($signature) answered false"
+            if (answer.getOrNull() == false) {
+                refusals += "sem setWifiApEnabled($signature) answered false"
+                continue
+            }
+            if (reachesApState(isOn)) return true
+            refusals += "sem setWifiApEnabled($signature) returned but the hotspot never moved"
         }
         return false
     }
@@ -75,26 +79,57 @@ class ShellService : IShellService.Stub() {
                 .getMethod("asInterface", android.os.IBinder::class.java)
                 .invoke(null, listener)
             val name = if (isOn) "startTethering" else "stopTethering"
-            val method = connector.javaClass.methods.first { it.name == name }
-            var strings = 0
-            val arguments = method.parameterTypes.map { type ->
-                when {
-                    type == Int::class.javaPrimitiveType -> TETHERING_WIFI
-                    type == String::class.java -> if (strings++ == 0) SHELL_PACKAGE else null
-                    type.name.endsWith("IIntResultListener") -> proxy
-                    else -> tetheringRequest(type)
+            val methods = connector.javaClass.methods.filter { it.name == name }
+                .sortedBy { method -> method.parameterTypes.count { it.name.contains("TetheringRequest") } }
+            var code: Int? = null
+            for (method in methods) {
+                var strings = 0
+                val arguments = method.parameterTypes.map { type ->
+                    when {
+                        type == Int::class.javaPrimitiveType -> TETHERING_WIFI
+                        type == Boolean::class.javaPrimitiveType -> false
+                        type == String::class.java -> if (strings++ == 0) SHELL_PACKAGE else null
+                        type.name.endsWith("IIntResultListener") -> proxy
+                        type.name.contains("TetheringRequest") -> tetheringRequest(type)
+                        else -> null
+                    }
                 }
+                val signature = method.parameterTypes.joinToString { it.simpleName }
+                val call = runCatching { method.invoke(connector, *arguments.toTypedArray()) }
+                if (call.isFailure) {
+                    refusals += "$name($signature): ${call.exceptionOrNull()!!.reason()}"
+                    continue
+                }
+                code = answer.poll(TETHERING_WAIT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+                if (code == 0) break
+                refusals += "$name($signature) answered " + (code ?: "nothing")
             }
-            method.invoke(connector, *arguments.toTypedArray())
-            answer.poll(TETHERING_WAIT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
+            code
         }
         val code = result.getOrElse {
             refusals += "tethering: ${it.reason()}"
             return false
         }
-        if (code == 0) return true
-        refusals += if (code == null) "tethering never answered" else "tethering answered error $code"
+        return code == 0
+    }
+
+    // One UI 9 answers shell's setWifiApEnabled with a plain return and leaves the hotspot where it was, and a void return was read as success, so the tethering fallback that does work was never reached; the AP state is what says whether it moved.
+    private fun reachesApState(isOn: Boolean): Boolean {
+        val wanted = if (isOn) setOf(WIFI_AP_ENABLING, WIFI_AP_ENABLED) else setOf(WIFI_AP_DISABLING, WIFI_AP_DISABLED)
+        val deadline = System.currentTimeMillis() + AP_STATE_WAIT_MILLISECONDS
+        while (System.currentTimeMillis() < deadline) {
+            val state = runCatching { wifiManager.javaClass.getMethod("getWifiApEnabledState").invoke(wifiManager) as Int }
+                .getOrElse { return true }
+            if (state in wanted) return true
+            Thread.sleep(AP_STATE_POLL_MILLISECONDS)
+        }
         return false
+    }
+
+    private val wifiManager: Any by lazy {
+        Class.forName("android.net.wifi.IWifiManager\$Stub")
+            .getMethod("asInterface", android.os.IBinder::class.java)
+            .invoke(null, SystemServiceHelper.getSystemService(WIFI_SERVICE))
     }
 
     // Android 16 takes the TetheringRequest itself where older releases took its parcel, so the parameter's own type says which one is wanted.
@@ -145,6 +180,13 @@ class ShellService : IShellService.Stub() {
         const val TETHERING_SERVICE = "tethering"
         const val TETHERING_WIFI = 0
         const val TETHERING_WAIT_SECONDS = 5L
+        const val WIFI_SERVICE = "wifi"
+        const val WIFI_AP_DISABLING = 10
+        const val WIFI_AP_DISABLED = 11
+        const val WIFI_AP_ENABLING = 12
+        const val WIFI_AP_ENABLED = 13
+        const val AP_STATE_WAIT_MILLISECONDS = 2500L
+        const val AP_STATE_POLL_MILLISECONDS = 100L
         const val RESULT_LISTENER = "android.net.IIntResultListener"
         const val TAG = "IslandBubble"
     }

@@ -119,7 +119,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private const val ALERT_ZONE_WIDTH = 96
         private const val ALERT_ZONE_HEIGHT_PART = 0.30f
 
-        private const val CORNER_TARGET = 40
         private const val ROTATION_SETTLE = 600L
         private const val SUMMON_NONE = 0
         private const val SUMMON_STATUS = 1
@@ -334,12 +333,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private var alertTapX = 0f
     private var alertTapY = 0f
-
-    private lateinit var cornerProxy: View
-    private lateinit var cornerProxyParams: WindowManager.LayoutParams
-
-    private var cornerTapX = 0f
-    private var cornerTapY = 0f
 
     private var landscapeStage = STAGE_HIDDEN
 
@@ -770,20 +763,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             setCanPlayMoveAnimation(false)
         }
 
-        cornerProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) return false
-                cornerTapX = event.rawX
-                cornerTapY = event.rawY
-                forwardTouch(event, cornerProxyParams, "corner")
-                return true
-            }
-        }
-        cornerProxyParams = edgeParams()
-
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, params)
-        windowManager.addView(cornerProxy, cornerProxyParams)
         // Below every bubble's own window: the Dashboard and the Notifications menu stand over the list while they are open, and their proxies have to hear those touches rather than the list's.
         notesProxies.forEachIndexed { index, view -> windowManager.addView(view, notesProxyParams[index]) }
 
@@ -942,19 +923,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
         push("window.setLandscape($isLandscape)")
-        placeCornerWindow()
-    }
-
-    private fun placeCornerWindow() {
-        if (!this::cornerProxy.isInitialized) return
-        val hasCorner = isLandscape && !isScreenOff && landscapeStage == STAGE_HIDDEN
-        cornerProxyParams.x = if (hasCorner) screenWidth() - dp(CORNER_TARGET) else 0
-        cornerProxyParams.y = if (hasCorner) screenHeight() - dp(CORNER_TARGET) else 0
-        cornerProxyParams.width = if (hasCorner) dp(CORNER_TARGET) else 0
-        cornerProxyParams.height = if (hasCorner) dp(CORNER_TARGET) else 0
-        cornerProxyParams.flags =
-            if (hasCorner) BASE_FLAGS else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        relayout(cornerProxy, cornerProxyParams)
     }
 
     
@@ -1116,7 +1084,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
-        placeCornerWindow()
     }
 
     override fun onDestroy() {
@@ -1141,7 +1108,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             runCatching { windowManager.removeView(lockProxy) }
             runCatching { windowManager.removeView(touchProxy) }
             notesProxies.forEach { view -> runCatching { windowManager.removeView(view) } }
-            runCatching { windowManager.removeView(cornerProxy) }
             runCatching { windowManager.removeView(stage) }
             webView.destroy()
         }
@@ -1162,7 +1128,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         relayout(stage, params)
         relayout(touchProxy, proxyParams)
         applyBarLock()
-        placeCornerWindow()
         pushAppearance()
     }
 
@@ -1312,14 +1277,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 relayout(alertOverlay, alertOverlayParams)
             }
         }
-    }
-
-    // The corner stands over whatever an app keeps in its bottom-right corner, so a lone tap the page did not take as the first of a double is handed on exactly as the Alert's band hands its taps on.
-    private fun replayCornerTap() {
-        if (cornerProxyParams.width == 0) return
-        cornerProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        relayout(cornerProxy, cornerProxyParams)
-        dispatchTap(cornerTapX, cornerTapY) { placeCornerWindow() }
     }
 
     private fun dispatchTap(x: Float, y: Float, restore: () -> Unit) {
@@ -1810,11 +1767,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         @JavascriptInterface
         fun sleepScreen() {
             performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
-        }
-
-        @JavascriptInterface
-        fun passCornerTap() {
-            webView.post { replayCornerTap() }
         }
 
         @JavascriptInterface
