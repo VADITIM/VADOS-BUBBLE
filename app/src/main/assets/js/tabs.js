@@ -167,6 +167,7 @@ export function openNotifications() {
   }
 
   const bodies = [];
+  const titles = [];
   grouped(entries).forEach((group, index) => {
     const entry = group.head;
     const row = document.createElement('div');
@@ -239,6 +240,7 @@ export function openNotifications() {
       who.className = 'notification-who';
       who.textContent = entry.title;
       copy.appendChild(who);
+      titles.push({ who, delay: rowDelay + BODY_TYPE_AFTER });
     }
     
     
@@ -260,7 +262,7 @@ export function openNotifications() {
         body.appendChild(text);
       }
       copy.appendChild(body);
-      bodies.push({ body, delay: rowDelay + BODY_TYPE_AFTER });
+      bodies.push({ body, row, delay: rowDelay + BODY_TYPE_AFTER });
     }
 
     // The large icon a messenger posts is whoever wrote the message, not the app, so a list read at a glance says which app it came from and falls back to the notification's own icon where an app has none.
@@ -291,7 +293,9 @@ export function openNotifications() {
   showFace('notifications');
   setSize('notifications', notificationsWindow());
   stirLiquid(760);
-  bodies.forEach(({ body, delay }) => typeBody(body, delay));
+  const typedFor = new Map();
+  titles.forEach(({ who, delay }) => typedFor.set(who.parentNode, typeBody(who, delay)));
+  bodies.forEach(({ body, delay }) => typeBody(body, delay + (typedFor.get(body.parentNode) || 0)));
 }
 
 // The menu's height is measured off its rows the moment it opens, so a body typed in by writing its text would grow the row under a menu already sized for it; every character is laid out from the start and the untyped rest is only uncoloured.
@@ -300,7 +304,7 @@ function typeBody(body, delay) {
   const parts = [];
   while (walker.nextNode()) parts.push({ node: walker.currentNode, full: walker.currentNode.nodeValue });
   const total = parts.reduce((sum, part) => sum + part.full.length, 0);
-  if (!total) return;
+  if (!total) return 0;
   for (const part of parts) {
     part.rest = document.createElement('span');
     part.rest.className = 'typing-rest';
@@ -327,15 +331,16 @@ function typeBody(body, delay) {
     for (const part of parts) part.rest.remove();
   };
   requestAnimationFrame(step);
+  return interval * total;
 }
 
-// Mirrors SHELL's Motion.notifications: rows 34ms apart, ten at most, characters 12ms apart; the budget keeps a long message from typing for seconds.
-const ROW_ENTER_DELAY = 120;
-const ROW_STAGGER = 34;
+// Mirrors SHELL's Motion.notifications: rows 30ms apart, ten at most, characters 10ms apart; the budget keeps a long message from typing for seconds.
+const ROW_ENTER_DELAY = 104;
+const ROW_STAGGER = 30;
 const ROW_STAGGER_LIMIT = 10;
-const BODY_TYPE_AFTER = 200;
-const TYPE_CHARACTER = 12;
-const TYPE_BUDGET = 700;
+const BODY_TYPE_AFTER = 174;
+const TYPE_CHARACTER = 10;
+const TYPE_BUDGET = 610;
 
 export function retireNotifications() {
   if (!root.style.getPropertyValue('--notifications-drop')) return;
