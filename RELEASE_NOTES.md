@@ -1,4 +1,4 @@
-# 0.6.9
+# 0.7.0
 
 - Hotspot button works on One UI 9 again: when Samsung's own hotspot call is silently ignored, Android's tethering service is used instead.
 - Fullscreen: the bottom-right corner no longer opens the Dashboard.

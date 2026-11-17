@@ -11,8 +11,8 @@ android {
         applicationId = "com.v.island"
         minSdk = 31
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.6.9"
+        versionCode = 10
+        versionName = "0.7.0"
     }
 
     buildTypes {
