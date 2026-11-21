@@ -1,160 +1,58 @@
 package com.v.island
 
-import android.app.KeyguardManager
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.GestureDescription
-import android.graphics.Path
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.Configuration
-import android.graphics.Color
 import android.graphics.PixelFormat
-import android.media.AudioManager
-import android.os.Build
 import android.os.PowerManager
-import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.VibratorManager
-import android.util.TypedValue
+import android.view.Choreographer
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
-import android.webkit.JavascriptInterface
-import android.webkit.WebView
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.v.island.bubble.Appearance
+import com.v.island.bubble.BlobShape
+import com.v.island.bubble.HostActions
+import com.v.island.bubble.Island
+import com.v.island.bubble.IslandStage
+import com.v.island.bubble.Notice
+import com.v.island.bubble.Payloads
+import com.v.island.bubble.Region
+import com.v.island.vas.Haptics
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
-
-
-
-
-
-
-
-
-
-
-
-class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferenceChangeListener {
+class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferenceChangeListener, HostActions {
 
     companion object {
-        
         private const val WAKE_MILLIS = 6_000L
-        private const val SYSTEM_WAKE_MILLIS = 1_500L
-        private const val DARK_BRIGHTNESS = 0.07f
-
-        
-
-
-
-
-        private const val GRAB = 8
-
-        
-
-
-
-
-
-
-
-
-
-
-        private const val BLEED = 14
-
-
         private const val SHADE_STRIP = 48
-
-
-
-        private const val TAP_MILLIS = 40L
-
-        
-        private const val GROWN_CORNER = 26
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // Mirrors BLUR_PANES in assets/js/liquid.js plus the scrim, plus NOTE_PANES.
-        private const val BLUR_PANES = 10 + 5
-
-        // Mirrors NOTES_PROXIES in assets/js/notes.js: one window per lock-screen notification group and one for its delete-all bubble.
-        private const val NOTES_PROXIES = 4
-
-        
-
-
-
-
-
-
-        private const val EDGE_WIDTH = 18
-        private const val EDGE_TOP = 0.14f
-        private const val EDGE_BOTTOM = 0.78f
-        private const val SCRIM_PANE = 0
-
-        // Mirrors #alert-zone in pill.css — the strip a pull-to-focus is heard on, standing at the right edge across the middle of the screen.
-        private const val ALERT_ZONE_WIDTH = 96
-        private const val ALERT_ZONE_HEIGHT_PART = 0.30f
-
         private const val ROTATION_SETTLE = 600L
-        private const val SUMMON_NONE = 0
-        private const val SUMMON_STATUS = 1
-        private const val SUMMON_NOTIFICATIONS = 2
-
-        // Mirrors STAGE_HIDDEN, STAGE_DASHBOARD and STAGE_LEAVING in assets/js/reveal.js.
-        private const val STAGE_HIDDEN = 0
-        private const val STAGE_DASHBOARD = 1
-        private const val STAGE_LEAVING = 2
-
+        /* Mirrors the liquid layer's MAXIMUM_BLOBS: one blur pane per blob it can draw. */
+        private const val BLUR_PANES = 16
         const val PANEL_BROADCAST = "com.v.island.TOGGLE_STATUS_PANEL"
         const val NOTIFICATIONS_BROADCAST = "com.v.island.TOGGLE_NOTIFICATIONS"
-
-        
-        private const val LOCK_AWAKE = 15_000L
-
-        
-        private const val WAKE_FRAMES_EVERY = 150L
 
         private const val BASE_FLAGS =
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                
-                
-                
-                
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-
-        
-
-
-
-
-
-
 
         private const val CANVAS_FLAGS =
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -162,322 +60,204 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
 
-        
         private var instance: BubbleService? = null
 
         val isRunning: Boolean get() = instance != null
 
-        
         fun stopBubbles() {
             instance?.disableSelf()
         }
 
-        
-        fun toggleStatusPanel() {
-            instance?.summon(SUMMON_STATUS)
-            instance?.push("window.onToggleStatusPanel()")
+        fun toggleStatusPanel() = Island.post { instance?.openQuickSettings() }
+
+        fun toggleMessaging() = Unit
+
+        fun toggleNotifications() = Island.post {
+            if (instance == null) return@post
+            if (Island.bubble.size == com.v.island.bubble.Size.Notifications) Island.bubble.toClosed()
+            else Island.bubble.openNotifications()
         }
-
-
-        fun toggleMessaging() {
-            instance?.push("window.onToggleMessaging()")
-        }
-
-        fun toggleNotifications() {
-            instance?.summon(SUMMON_NOTIFICATIONS)
-            instance?.push("window.onToggleNotifications()")
-        }
-
-        
-
-
-
 
         fun trace(): String {
             val service = instance ?: return "the bubble is not running"
             val hotspot = SystemToggles.hotspotRefusal.takeIf { it.isNotEmpty() }?.let { "\nhotspot refused:\n$it" }.orEmpty()
-            return service.lastTouch + "\n" + service.lastNote + hotspot
+            return service.lastTouch + hotspot
         }
 
-        
-        // Samsung wakes the screen for a lock-screen notification during the listener's KILL_GRACE, so by delivery `isInteractive` is already true and the Alert played in full instead of the always-on text; the listener asks at the moment of posting and passes the answer along.
-        fun isDarkArrival(): Boolean = instance?.isDarkArrival() == true
+        fun isDarkArrival(): Boolean = instance?.let { !it.getSystemService(PowerManager::class.java).isInteractive } == true
 
         fun deliver(payload: JSONObject, arrivedDark: Boolean = false) {
-            val service = instance ?: return
-            if (arrivedDark || service.isDarkArrival()) {
-                service.wakeScreen()
-                service.darken()
+            val notice = Payloads.notice(payload)
+            Island.post {
+                val service = instance ?: return@post
+                if (arrivedDark || isDarkArrival()) service.wakeScreen()
+                Island.unread = IslandNotificationListener.count()
+                Island.bubble.onNotice(notice)
             }
-            service.push("window.onNotificationUpdate($payload)")
-            service.push("window.setUnreadCount(${IslandNotificationListener.count()})")
         }
 
-        fun deliverDark(payload: JSONObject) {
-            val service = instance ?: return
-            service.push("window.setScreenDark(2)")
-            service.setStageBrightness(DARK_BRIGHTNESS)
-            service.push("window.onNotificationUpdate($payload)")
-        }
+        fun deliverDark(payload: JSONObject) = deliver(payload)
 
-        
-        fun deliverCount(count: Int) {
-            instance?.push("window.setUnreadCount($count)")
-        }
+        fun deliverCount(count: Int) = Island.post { Island.unread = count }
 
         fun deliverMessaging(conversations: JSONArray) {
-            instance?.push("window.onMessaging($conversations)")
+            val parsed = Payloads.conversations(conversations)
+            Island.post { Island.conversations = parsed }
         }
 
-        
         fun deliverTimer(timer: JSONObject?) {
-            instance?.push("window.onTimerUpdate(${timer ?: "null"})")
+            val parsed = Payloads.timer(timer)
+            Island.post {
+                Island.timer = parsed
+                Island.bubble.onModsChanged()
+            }
         }
 
-        
         fun deliverTrip(trip: JSONObject?) {
-            instance?.push("window.onTripUpdate(${trip ?: "null"})")
+            val parsed = Payloads.trip(trip)
+            Island.post {
+                Island.trip = parsed
+                Island.bubble.onModsChanged()
+            }
         }
 
-        fun deliverGone(key: String) {
-            instance?.push("window.onNotificationGone(${JSONObject.quote(key)})")
-        }
+        fun deliverGone(key: String) = Island.post { Island.bubble.onNoticeGone(key) }
 
-        
         fun deliverCall(call: JSONObject?) {
-            instance?.push("window.onCallUpdate(${call ?: "null"})")
+            val parsed = Payloads.call(call)
+            Island.post {
+                Island.call = parsed
+                Island.bubble.onModsChanged()
+            }
         }
 
-        
-        // The call bar answers AudioManager's mode, and there is no way to put the phone in a call to look at it, so Debug stands the bar up on its own with a value of its own.
-        fun deliverCallVolume(isLive: Boolean) {
-            instance?.push("window.setCallDebug($isLive)")
-        }
+        fun deliverCallVolume(isLive: Boolean) = Unit
 
         fun deliverMedia(media: JSONObject?) {
-            instance?.push("window.onMediaUpdate(${media ?: "null"})")
+            val parsed = Payloads.media(media)
+            Island.post {
+                val previous = Island.media
+                Island.media = if (parsed != null && parsed.art == null && media?.has("artBase64") != true && previous != null) parsed.copy(art = previous.art) else parsed
+                Island.bubble.onModsChanged()
+            }
         }
 
-        
         fun deliverBattery(battery: JSONObject) {
-            instance?.push("window.onBattery($battery)")
+            val event = Payloads.batteryEvent(battery) ?: return
+            Island.post { Island.status.announce(event) }
         }
 
-        
+        fun stageLock(locked: Boolean) = Island.post { Island.isLocked = locked }
 
-
-
-
-
-
-
-
-        fun stageLock(locked: Boolean) {
-            instance?.push("window.onLock($locked)")
-        }
-
-        
         fun deliverNowMods(mods: JSONObject) {
-            instance?.push("window.onNowMods($mods)")
+            val recording = Payloads.recording(mods.optJSONObject("recording"))
+            val transfer = Payloads.transfer(mods.optJSONObject("transfer"))
+            Island.post {
+                Island.recording = recording
+                Island.transfer = transfer
+                Island.bubble.onModsChanged()
+            }
         }
 
-        
         fun deliverConnectivity(state: JSONObject) {
-            instance?.push("window.onConnectivity($state)")
+            val parsed = Payloads.connectivity(state)
+            Island.post { Island.connectivity = parsed }
         }
-
-        
-
-
-
-
 
         fun deliverTorch(torch: JSONObject?) {
-            instance?.push("window.onTorchUpdate(${torch ?: "null"})")
-            
-            
-            
-            
+            val parsed = Payloads.torch(torch)
+            Island.post {
+                Island.torch = parsed
+                Island.bubble.onModsChanged()
+            }
+        }
+    }
+
+    private inner class Proxy(val region: Region) {
+        val params = WindowManager.LayoutParams(
+            0, 0,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
+        }
+        var pending: Rect? = null
+        var placed: Rect? = null
+        val view = object : View(this@BubbleService) {
+            override fun onTouchEvent(event: MotionEvent): Boolean {
+                if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+                    reportOutside(event)
+                    return false
+                }
+                forwardTouch(event, region)
+                return true
+            }
         }
 
+        fun place(rect: Rect?) {
+            val isShrinking = rect == null || placed?.let { old -> !(rect.left <= old.left && rect.top <= old.top && rect.right >= old.right && rect.bottom >= old.bottom) } == true
+            if (isShrinking && Island.isTouchDown) {
+                pending = rect ?: Rect.Zero
+                return
+            }
+            pending = null
+            placed = rect
+            val density = Island.density
+            if (rect == null || rect.width <= 0f) {
+                params.width = 0
+                params.height = 0
+                params.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            } else {
+                params.x = (rect.left * density).roundToInt() + canvasParams.x
+                params.y = (rect.top * density).roundToInt()
+                params.width = (rect.width * density).roundToInt()
+                params.height = (rect.height * density).roundToInt()
+                params.flags = proxyFlags()
+            }
+            relayout(view, params)
+        }
 
+        fun settle() {
+            val waiting = pending ?: return
+            place(waiting.takeIf { it.width > 0f })
+        }
     }
 
     private lateinit var windowManager: WindowManager
-
-    
-    private lateinit var stage: FrameLayout
-    private lateinit var webView: WebView
-
-    
-    private lateinit var touchProxy: View
-    private lateinit var proxyParams: WindowManager.LayoutParams
-
-    
-    private lateinit var lockProxy: View
-    private lateinit var lockProxyParams: WindowManager.LayoutParams
-    private lateinit var notesProxies: List<View>
-    private lateinit var notesProxyParams: List<WindowManager.LayoutParams>
-    private lateinit var edgeLeftProxy: View
-    private lateinit var edgeLeftParams: WindowManager.LayoutParams
-    private lateinit var edgeRightProxy: View
-    private lateinit var edgeRightParams: WindowManager.LayoutParams
-
-
-    private lateinit var statusProxy: View
-    private lateinit var statusProxyParams: WindowManager.LayoutParams
-
-
-    private lateinit var alertOverlay: View
-    private lateinit var alertOverlayParams: WindowManager.LayoutParams
-
-    private var alertTapX = 0f
-    private var alertTapY = 0f
-
-    private var landscapeStage = STAGE_HIDDEN
-
-    
-
-
-
-
-    private lateinit var clockProxy: View
-    private lateinit var messagingProxy: View
-    private lateinit var messagingProxyParams: WindowManager.LayoutParams
-    private lateinit var clockProxyParams: WindowManager.LayoutParams
-
-    
-
-
-
-
-    private var shadeGuard: View? = null
-
-
-    private var shadeGuardParams: WindowManager.LayoutParams? = null
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    private lateinit var blurPanes: List<View>
-
-    
-    private val paneCorners = FloatArray(BLUR_PANES)
-
-    
-
-
-
-
-
-
-    
-    private val paneSpec = arrayOfNulls<String>(BLUR_PANES)
-
-    private val paneBlurRadius = IntArray(BLUR_PANES) { -1 }
-    private val paneBlurCorner = FloatArray(BLUR_PANES) { -1f }
-
-    
-    private val paneShares = FloatArray(BLUR_PANES) { 1f }
-
-    
-    private var blurRadius = 0
-
-    
-    private var scrimBlurRadius = 0
-    private lateinit var params: WindowManager.LayoutParams
     private lateinit var preferences: SharedPreferences
-    private var pageReady = false
-    private val pending = ArrayDeque<String>()
-
-    
+    private lateinit var stage: FrameLayout
+    private lateinit var composeView: ComposeView
+    private lateinit var canvasParams: WindowManager.LayoutParams
+    private lateinit var proxies: Map<Region, Proxy>
+    private lateinit var blurPanes: List<View>
+    private val owner = OverlayOwner()
+    private val paneRadius = IntArray(BLUR_PANES) { -1 }
+    private val paneCorner = FloatArray(BLUR_PANES) { -1f }
+    private var shadeGuard: View? = null
+    private var shadeGuardParams: WindowManager.LayoutParams? = null
     private var isFullScreen = false
     private var isLandscape = false
-    private var isGrown = false
-    private var summoned = SUMMON_NONE
-    private var hasSummonGrown = false
-
-    
-
-
-
-
-
-
     private var isScreenOff = false
-    private var isUserPresent = false
-    private var screenOnAt = 0L
+    private var isBarOurs = false
     private var screenWatch: BroadcastReceiver? = null
     private var panelWatch: BroadcastReceiver? = null
+    private var outsideReportedAt = -1L
+    private var lastTouch = ""
+    private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
+    private var isPaneSyncQueued = false
 
-    
-
-
-
-
-
-
-
-    private var isLocked = false
-
-    
-
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    private var isBarOurs = false
-
-    private fun readBarPolicy() {
-        val value = runCatching {
-            android.provider.Settings.Global.getString(contentResolver, "policy_control")
-        }.getOrNull().orEmpty()
-        isBarOurs = value.contains("immersive.status") || value.contains("immersive.full")
+    private val paneSync = Choreographer.FrameCallback {
+        isPaneSyncQueued = false
+        syncPanes()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (instance !== this) return
-        readFullScreen(event)
-    }
-
-    private fun readFullScreen(event: AccessibilityEvent?) {
-        val isBarHidden = !windowManager.currentWindowMetrics.windowInsets
-            .isVisible(android.view.WindowInsets.Type.statusBars()) && !isBarOurs
-        
-        
-        
-        android.util.Log.i(
-            "IslandBubble",
-            "statusBar event=${event?.eventType} isBarHidden=$isBarHidden wasFullScreen=$isFullScreen"
-        )
-        if (isBarHidden == isFullScreen) return
-        isFullScreen = isBarHidden
-        applyVisibility()
+        readFullScreen()
     }
 
     override fun onInterrupt() = Unit
@@ -485,605 +265,121 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     override fun onServiceConnected() {
         super.onServiceConnected()
         if (instance != null) return
-
-        
         AppStyles.learnFrom(this)
+        Haptics.attach(this)
         preferences = Preferences.of(this)
         preferences.registerOnSharedPreferenceChangeListener(this)
-        blurRadius = Preferences.get(preferences, Preferences.BLUR)
-        scrimBlurRadius = Preferences.get(preferences, Preferences.SCRIM_BLUR)
         windowManager = getSystemService(WindowManager::class.java)
-
-        webView = WebView(this).apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            isVerticalScrollBarEnabled = false
-            isHorizontalScrollBarEnabled = false
-            overScrollMode = View.OVER_SCROLL_NEVER
-            
-            
-            webChromeClient = object : android.webkit.WebChromeClient() {
-                override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
-                    android.util.Log.i("IslandBubble", "${message.message()} @${message.lineNumber()}")
-                    return true
-                }
-            }
-            addJavascriptInterface(bubbleBridge, "Android")
-            webViewClient = AssetOrigin.client(this@BubbleService)
-            loadUrl(AssetOrigin.ROOT + "pill.html")
-        }
-
-        stage = FrameLayout(this).apply {
-            
-            
-            setOnApplyWindowInsetsListener { _, _ -> android.view.WindowInsets.CONSUMED }
-            
-            
-            
-            
-            blurPanes = List(BLUR_PANES) { View(this@BubbleService).apply { visibility = View.GONE } }
-            blurPanes.forEach { pane ->
-                addView(
-                    pane,
-                    FrameLayout.LayoutParams(0, 0, Gravity.TOP or Gravity.START)
-                )
-            }
-            addView(
-                webView,
-                FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    stageHeight(),
-                    Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                )
-            )
-        }
-
-        
-        
-        
-        touchProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, proxyParams, "main")
-                return true
-            }
-        }
-
         isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        Island.start(this)
+        readScreen()
+        Island.appearance = Appearance.read(preferences)
+        Island.onBlobsDrawn = ::requestPaneSync
 
-        params = WindowManager.LayoutParams(
-            screenWidth(),
-            stageHeight(),
+        owner.start()
+        composeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent { IslandStage() }
+        }
+        stage = FrameLayout(this).apply {
+            setOnApplyWindowInsetsListener { _, _ -> android.view.WindowInsets.CONSUMED }
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+            blurPanes = List(BLUR_PANES) { View(this@BubbleService).apply { visibility = View.GONE } }
+            blurPanes.forEach { addView(it, FrameLayout.LayoutParams(0, 0, Gravity.TOP or Gravity.START)) }
+            addView(composeView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        }
+        canvasParams = WindowManager.LayoutParams(
+            screenWidth(), screenHeight(),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             CANVAS_FLAGS,
-            PixelFormat.TRANSLUCENT
+            PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.TOP or Gravity.START
             x = dp(horizontalOffset())
-
-
-
-            y = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            
-            
-            
-            
-            
-            
-            
-            
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             preferredRefreshRate = fastestRefreshRate()
             windowAnimations = 0
             setCanPlayMoveAnimation(false)
         }
-
-        
-        
-        proxyParams = WindowManager.LayoutParams(
-            dp(compactWidth() + (GRAB + BLEED) * 2),
-            dp(compactHeight() + topGrab() + GRAB),
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            x = dp(horizontalOffset())
-            y = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-        statusProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, statusProxyParams, "status")
-                return true
-            }
-        }
-        
-        
-        
-        statusProxyParams = WindowManager.LayoutParams(
-            0, 0,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            y = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-        clockProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, clockProxyParams, "clock")
-                return true
-            }
-        }
-        clockProxyParams = WindowManager.LayoutParams(
-            0, 0,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            y = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-        messagingProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, messagingProxyParams, "messaging")
-                return true
-            }
-        }
-        messagingProxyParams = WindowManager.LayoutParams(
-            0, 0,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-        lockProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, lockProxyParams, "lock")
-                return true
-            }
-        }
-        
-        
-        
-        
-        lockProxyParams = WindowManager.LayoutParams(
-            0, 0,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-        
-        
-        
-        
-        notesProxyParams = List(NOTES_PROXIES) { edgeParams() }
-        notesProxies = notesProxyParams.map { notesParams ->
-            object : View(this) {
-                override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                    if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                        reportOutside(event)
-                        return false
-                    }
-                    forwardTouch(event, notesParams, "notes")
-                    return true
-                }
-            }
-        }
-        edgeLeftProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, edgeLeftParams, "edge-left")
-                return true
-            }
-        }
-        edgeLeftParams = edgeParams()
-        edgeRightProxy = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                forwardTouch(event, edgeRightParams, "edge-right")
-                return true
-            }
-        }
-        edgeRightParams = edgeParams()
-        alertOverlay = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-                if (event.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-                    reportOutside(event)
-                    return false
-                }
-                alertTapX = event.rawX
-                alertTapY = event.rawY
-                forwardTouch(event, alertOverlayParams, "alert")
-                return true
-            }
-        }
-        alertOverlayParams = WindowManager.LayoutParams(
-            0, 0,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 0
-            y = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
-        windowManager.addView(stage, params)
-        // Below every bubble's own window: the Dashboard and the Notifications menu stand over the list while they are open, and their proxies have to hear those touches rather than the list's.
-        notesProxies.forEachIndexed { index, view -> windowManager.addView(view, notesProxyParams[index]) }
-
-
-        windowManager.addView(messagingProxy, messagingProxyParams)
-        windowManager.addView(touchProxy, proxyParams)
-        windowManager.addView(lockProxy, lockProxyParams)
-        windowManager.addView(statusProxy, statusProxyParams)
-        windowManager.addView(clockProxy, clockProxyParams)
-        windowManager.addView(edgeLeftProxy, edgeLeftParams)
-        windowManager.addView(edgeRightProxy, edgeRightParams)
-        windowManager.addView(alertOverlay, alertOverlayParams)
+        windowManager.addView(stage, canvasParams)
+        proxies = listOf(Region.Clear, Region.Main, Region.Status, Region.Clock).associateWith { Proxy(it) }
+        proxies.values.forEach { windowManager.addView(it.view, it.params) }
         applyBarLock()
+        instance = this
+
+        Island.scope.launch {
+            snapshotFlow { Island.regions.toMap() }.collect { regions ->
+                proxies.forEach { (region, proxy) -> proxy.place(regions[region]) }
+            }
+        }
+
         readBarPolicy()
-        
-        
         contentResolver.registerContentObserver(
             android.provider.Settings.Global.getUriFor("policy_control"),
             false,
             object : android.database.ContentObserver(android.os.Handler(mainLooper)) {
                 override fun onChange(selfChange: Boolean) {
                     readBarPolicy()
-                    
-                    
-                    
                     if (isBarOurs && isFullScreen) {
                         isFullScreen = false
                         applyVisibility()
                     }
                 }
-            }
+            },
         )
-        fitCanvas()
         applyVisibility()
         ShizukuShell.bind(this)
         ShizukuShell.watch(this)
         SystemToggles.attach(this)
-        /* Nothing else asks the panel to read itself again while it stands open, and a call beginning is exactly when the levels row has to change shape — so the one event that says so pushes a fresh read. It fires a handful of times a day. */
-        getSystemService(AudioManager::class.java)?.addOnModeChangedListener(mainExecutor) {
-            bubbleBridge.requestToggles()
-        }
-        instance = this
-
         MediaControl.start(this) { media -> deliverMedia(media) }
-
-        
-        
-        
         BatteryWatch.start(
             this,
             { battery -> deliverBattery(battery) },
-            { percent, exact, plugged, remainingMinutes -> instance?.push("window.onCharge($percent, $plugged, $remainingMinutes, $exact)") }
+            { percent, exact, plugged, remainingMinutes ->
+                Island.post { Island.charge = com.v.island.bubble.Charge(percent, exact, plugged, remainingMinutes) }
+            },
         )
-
-        
-        
         TorchWatch.start(this) { torch -> deliverTorch(torch) }
-
-        
-        
         ConnectivityWatch.start(this) { state -> deliverConnectivity(state) }
-
         isScreenOff = !getSystemService(PowerManager::class.java).isInteractive
         screenWatch = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action != Intent.ACTION_SCREEN_ON) lightUp()
-                if (intent.action == Intent.ACTION_SCREEN_ON) screenOnAt = SystemClock.elapsedRealtime()
-                if (intent.action == Intent.ACTION_USER_PRESENT) isUserPresent = true
-                if (intent.action == Intent.ACTION_SCREEN_OFF) isUserPresent = false
                 if (intent.action != Intent.ACTION_USER_PRESENT) {
                     isScreenOff = intent.action == Intent.ACTION_SCREEN_OFF
-                    if (isScreenOff) landscapeStage = STAGE_HIDDEN
                     applyVisibility()
                 }
                 reportLock()
             }
         }.also {
-            registerReceiver(
-                it,
-                IntentFilter(Intent.ACTION_SCREEN_OFF).apply {
-                    addAction(Intent.ACTION_SCREEN_ON)
-                    
-                    
-                    
-                    
-                    addAction(Intent.ACTION_USER_PRESENT)
-                }
-            )
+            registerReceiver(it, IntentFilter(Intent.ACTION_SCREEN_OFF).apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            })
         }
-        /* A gesture host asked to "open an app" refuses to launch one over a secure keyguard, so both panel activities were unreachable on the lock screen even though the service drawing the panels was running and visible there the whole time. The panels answer a broadcast as well, which keyguard has no say over: am broadcast -a com.v.island.TOGGLE_STATUS_PANEL, and TOGGLE_NOTIFICATIONS beside it. */
         panelWatch = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == PANEL_BROADCAST) toggleStatusPanel()
                 if (intent.action == NOTIFICATIONS_BROADCAST) toggleNotifications()
             }
         }.also {
-            registerReceiver(
-                it,
-                IntentFilter(PANEL_BROADCAST).apply { addAction(NOTIFICATIONS_BROADCAST) },
-                Context.RECEIVER_EXPORTED
-            )
+            registerReceiver(it, IntentFilter(PANEL_BROADCAST).apply { addAction(NOTIFICATIONS_BROADCAST) }, Context.RECEIVER_EXPORTED)
         }
-
         reportLock()
     }
 
     override fun onConfigurationChanged(configuration: Configuration) {
         super.onConfigurationChanged(configuration)
         isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        landscapeStage = STAGE_HIDDEN
-        summoned = SUMMON_NONE
-        fitCanvas()
+        readScreen()
+        canvasParams.width = screenWidth()
+        canvasParams.height = screenHeight()
+        canvasParams.x = dp(horizontalOffset())
+        relayout(stage, canvasParams)
         applyVisibility()
-        // A landscape game hides the status bar, and the fullscreen reading was only taken again on the next accessibility event, so back in portrait the stage stayed hidden until something was touched. It is read again once the rotation has settled.
-        webView.postDelayed({ readFullScreen(null) }, ROTATION_SETTLE)
-    }
-
-    // In landscape nothing is drawn but the Dashboard, and the page says when that is; a fullscreen app is exactly where landscape is used, so it does not hide the stage there.
-    private fun isHidden() =
-        isScreenOff || if (isLandscape) landscapeStage == STAGE_HIDDEN else isFullScreen && summoned == SUMMON_NONE
-
-    // The Dashboard and Notifications launchers toggled a panel on a stage a fullscreen app had hidden, so it opened where nobody could see it: the stage is held out for as long as the panel it was summoned for stands.
-    private fun summon(panel: Int) {
-        if (isLandscape || isScreenOff || !isFullScreen || summoned != SUMMON_NONE) return
-        summoned = panel
-        hasSummonGrown = false
-        applyVisibility()
-    }
-
-    private fun settleSummon(panel: Int, isOpen: Boolean) {
-        if (summoned != panel) return
-        if (isOpen) hasSummonGrown = true
-        else if (hasSummonGrown) {
-            summoned = SUMMON_NONE
-            applyVisibility()
-        }
-    }
-
-    // A bubble left drawn but faded in landscape still held its window, so the first tap there woke a bar nobody could see and only the second one did anything: in landscape nothing may be touched but the open Dashboard.
-    private fun isBarTouchable() = !isLandscape || landscapeStage == STAGE_DASHBOARD
-
-    private fun horizontalOffset() =
-        if (isLandscape) 0 else Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET)
-
-    // The canvas was sized once, at the orientation the service started in, so a rotation left it a portrait-shaped window across a landscape screen. It is resized here and only here — once per rotation, while the landscape stage is still hidden — which is the one exception to never resizing the WebView.
-    private fun fitCanvas() {
-        params.width = screenWidth()
-        params.height = stageHeight()
-        params.x = dp(horizontalOffset())
-        proxyParams.x = params.x
-        val stageLayout = webView.layoutParams as FrameLayout.LayoutParams
-        if (stageLayout.height != stageHeight()) {
-            stageLayout.height = stageHeight()
-            webView.layoutParams = stageLayout
-        }
-        relayout(stage, params)
-        relayout(touchProxy, proxyParams)
-        push("window.setLandscape($isLandscape)")
-    }
-
-    
-
-
-
-
-
-
-
-
-
-    
-
-
-    private fun applyBarLock() {
-        val wanted = Preferences.get(preferences, Preferences.BAR_LOCKED) == 1
-        if (wanted == (shadeGuard != null)) return
-        if (!wanted) {
-            runCatching { windowManager.removeView(shadeGuard) }
-            shadeGuard?.let { appliedLayouts.remove(it) }
-            shadeGuard = null
-            shadeGuardParams = null
-            return
-        }
-        val guard = object : View(this) {
-            override fun onTouchEvent(event: android.view.MotionEvent): Boolean = true
-        }
-        val guardParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            dp(SHADE_STRIP),
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = 0
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-        runCatching { windowManager.addView(guard, guardParams) }
-        shadeGuard = guard
-        shadeGuardParams = guardParams
-        
-        applyVisibility()
-        
-        (notesProxies.zip(notesProxyParams) + listOf(
-            messagingProxy to messagingProxyParams,
-            touchProxy to proxyParams,
-            lockProxy to lockProxyParams,
-            statusProxy to statusProxyParams,
-            clockProxy to clockProxyParams,
-            edgeLeftProxy to edgeLeftParams,
-            edgeRightProxy to edgeRightParams,
-            alertOverlay to alertOverlayParams,
-        )).forEach { (view, viewParams) ->
-            runCatching {
-                windowManager.removeView(view)
-                windowManager.addView(view, viewParams)
-            }
-            appliedLayouts.remove(view)
-        }
-    }
-
-    private fun edgeParams() = WindowManager.LayoutParams(
-        0, 0,
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-        PixelFormat.TRANSLUCENT
-    ).apply {
-        gravity = Gravity.TOP or Gravity.START
-        layoutInDisplayCutoutMode =
-            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-        windowAnimations = 0
-        setCanPlayMoveAnimation(false)
-    }
-
-    private fun proxyFlags(isLive: Boolean) =
-        if (isLive && !isHidden() && isBarTouchable()) BASE_FLAGS
-        else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-
-    private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
-
-    private var outsideReportedAt = -1L
-    private var isHiddenOutsideSpent = false
-
-    /* `updateViewLayout` marks the window changed whatever it is handed, so every call was a traversal and a synchronous relayout into the window manager on the thread that also paces the WebView's frames — and the page re-sends its proxies on every minute turn, every size change and every repaint, mostly unchanged. A window is only laid out again when its params differ from the ones it last got. */
-    private fun relayout(view: View?, layout: WindowManager.LayoutParams) {
-        if (view == null) return
-        val applied = appliedLayouts.getOrPut(view) { WindowManager.LayoutParams() }
-        if (applied.copyFrom(layout) == 0) return
-        runCatching { windowManager.updateViewLayout(view, layout) }
-            .onFailure { appliedLayouts.remove(view) }
-    }
-
-    
-
-
-
-    private fun applyVisibility() {
-        val isHidden = isHidden()
-        
-        /* `alpha = 0f` left the WebView visible to Chromium, so every animation and every rAF in the page went on running through a screen-off night at the high frame rate the stage had asked for and never given back. INVISIBLE stops the page drawing while leaving its timers and the bridge alone, and the frame rate drops back until something wakes it. */
-        stage.visibility = if (isHidden) View.INVISIBLE else View.VISIBLE
-        if (!isHidden) isHiddenOutsideSpent = false
-        push("window.setStageHidden($isHidden)")
-        if (isHidden) {
-            stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_LOW
-            webView.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_LOW
-            framesWokeAt = 0L
-        }
-        
-        
-        
-        if (isHidden) blurPanes.forEachIndexed { index, pane -> clearBlur(index, pane) } else repaintBlur()
-        
-        
-        proxyParams.flags = proxyFlags(true)
-
-
-
-
-
-
-
-
-        if (isHidden || !isBarTouchable()) {
-            lockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            relayout(lockProxy, lockProxyParams)
-            statusProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            relayout(statusProxy, statusProxyParams)
-            clockProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            relayout(clockProxy, clockProxyParams)
-            messagingProxyParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            relayout(messagingProxy, messagingProxyParams)
-            edgeLeftParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            relayout(edgeLeftProxy, edgeLeftParams)
-            edgeRightParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            relayout(edgeRightProxy, edgeRightParams)
-            notesProxies.forEachIndexed { index, view ->
-                notesProxyParams[index].flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                relayout(view, notesProxyParams[index])
-            }
-        }
-        if (isHidden) setAlertBand(0)
-        else {
-            alertOverlayParams.flags = proxyFlags(alertOverlayParams.width != 0)
-            relayout(alertOverlay, alertOverlayParams)
-            push("window.refitProxies()")
-        }
-
-        shadeGuardParams?.let { guardParams ->
-            guardParams.flags =
-                if (isHidden || isLandscape) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                else BASE_FLAGS
-            relayout(shadeGuard, guardParams)
-        }
-        relayout(stage, params)
-        relayout(touchProxy, proxyParams)
+        stage.postDelayed({ readFullScreen() }, ROTATION_SETTLE)
     }
 
     override fun onDestroy() {
@@ -1094,1162 +390,270 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             ConnectivityWatch.stop(this)
             TorchWatch.stop()
             screenWatch?.let { runCatching { unregisterReceiver(it) } }
-            screenWatch = null
             panelWatch?.let { runCatching { unregisterReceiver(it) } }
-            panelWatch = null
-            awake.removeCallbacks(sleepAgain)
             preferences.unregisterOnSharedPreferenceChangeListener(this)
-            runCatching { windowManager.removeView(edgeRightProxy) }
-            runCatching { windowManager.removeView(edgeLeftProxy) }
-            runCatching { windowManager.removeView(alertOverlay) }
-            runCatching { windowManager.removeView(clockProxy) }
-            runCatching { windowManager.removeView(messagingProxy) }
-            runCatching { windowManager.removeView(statusProxy) }
-            runCatching { windowManager.removeView(lockProxy) }
-            runCatching { windowManager.removeView(touchProxy) }
-            notesProxies.forEach { view -> runCatching { windowManager.removeView(view) } }
+            Choreographer.getInstance().removeFrameCallback(paneSync)
+            Island.onBlobsDrawn = {}
+            Island.stop()
+            proxies.values.forEach { runCatching { windowManager.removeView(it.view) } }
+            shadeGuard?.let { runCatching { windowManager.removeView(it) } }
             runCatching { windowManager.removeView(stage) }
-            webView.destroy()
+            owner.stop()
         }
         super.onDestroy()
     }
 
     override fun onSharedPreferenceChanged(changed: SharedPreferences, key: String?) {
-        
-        
-        params.x = dp(horizontalOffset())
-        proxyParams.width = dp(compactWidth() + (GRAB + BLEED) * 2)
-        proxyParams.height = dp(compactHeight() + topGrab() + GRAB)
-        proxyParams.x = params.x
-        proxyParams.y = 0
-        blurRadius = Preferences.get(preferences, Preferences.BLUR)
-        scrimBlurRadius = Preferences.get(preferences, Preferences.SCRIM_BLUR)
-        repaintBlur()
-        relayout(stage, params)
-        relayout(touchProxy, proxyParams)
+        Island.appearance = Appearance.read(preferences)
+        Island.bubble.onAppearanceChanged()
+        canvasParams.x = dp(horizontalOffset())
+        relayout(stage, canvasParams)
+        proxies.values.forEach { it.place(it.placed) }
+        paneRadius.fill(-1)
+        requestPaneSync()
         applyBarLock()
-        pushAppearance()
     }
 
-    
+    private fun readScreen() {
+        val bounds = windowManager.currentWindowMetrics.bounds
+        Island.density = resources.displayMetrics.density
+        Island.screenWidth = bounds.width() / Island.density
+        Island.screenHeight = bounds.height() / Island.density
+        Island.isLandscape = isLandscape
+    }
 
+    private fun readBarPolicy() {
+        val value = runCatching { android.provider.Settings.Global.getString(contentResolver, "policy_control") }.getOrNull().orEmpty()
+        isBarOurs = value.contains("immersive.status") || value.contains("immersive.full")
+    }
 
+    private fun readFullScreen() {
+        val isBarHidden = !windowManager.currentWindowMetrics.windowInsets
+            .isVisible(android.view.WindowInsets.Type.statusBars()) && !isBarOurs
+        if (isBarHidden == isFullScreen) return
+        isFullScreen = isBarHidden
+        applyVisibility()
+    }
 
+    private fun isHidden() = isScreenOff || isLandscape || isFullScreen
 
+    private fun proxyFlags() =
+        if (isHidden()) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else BASE_FLAGS
 
+    private fun applyVisibility() {
+        val isHidden = isHidden()
+        stage.visibility = if (isHidden) View.INVISIBLE else View.VISIBLE
+        stage.requestedFrameRate = if (isHidden) View.REQUESTED_FRAME_RATE_CATEGORY_LOW else View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
+        Island.isStageHidden = isHidden
+        if (isHidden) {
+            blurPanes.forEachIndexed { index, pane -> clearPane(index, pane) }
+            Island.bubble.toClosedIfExtended()
+        } else requestPaneSync()
+        proxies.values.forEach { proxy ->
+            proxy.placed?.let { proxy.params.flags = proxyFlags() }
+            relayout(proxy.view, proxy.params)
+        }
+        shadeGuardParams?.let { guardParams ->
+            guardParams.flags = if (isHidden) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else BASE_FLAGS
+            relayout(shadeGuard, guardParams)
+        }
+    }
 
-
-
-
-
-    private fun applyBlur(index: Int, view: View, corner: Float, resized: Boolean = false) {
-        
-        
-        if (isHidden()) {
-            clearBlur(index, view)
+    private fun applyBarLock() {
+        val isWanted = Preferences.get(preferences, Preferences.BAR_LOCKED) == 1
+        if (isWanted == (shadeGuard != null)) return
+        if (!isWanted) {
+            runCatching { windowManager.removeView(shadeGuard) }
+            shadeGuard?.let { appliedLayouts.remove(it) }
+            shadeGuard = null
+            shadeGuardParams = null
             return
         }
-        
-        
-        
-        
-        
-        
-        val radius = Math.round((if (index == SCRIM_PANE) scrimBlurRadius else blurRadius) * paneShares[index])
-        if (radius == 0) {
-            params.flags = params.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
-            params.blurBehindRadius = 0
-            clearBlur(index, view)
-            return
+        val guard = object : View(this) {
+            override fun onTouchEvent(event: MotionEvent): Boolean = true
         }
-        
-        
-        
-        
-        /* The guard compared a corner that arrives as a fraction of a pixel, so it never matched twice running and every frame of a transition re-applied a blur identical to the one already on the pane. A corner is compared at whole-pixel grain, which is the grain the blur is built at. */
-        val edge = Math.round(corner).toFloat()
-        if (!resized && paneBlurRadius[index] == radius && paneBlurCorner[index] == edge) return
-        if (SamsungBlur.apply(view, dp(radius), edge)) {
-            paneBlurRadius[index] = radius
-            paneBlurCorner[index] = edge
-            return
+        val guardParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT, dp(SHADE_STRIP),
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, BASE_FLAGS, PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            windowAnimations = 0
+            setCanPlayMoveAnimation(false)
         }
-
-        
-        
-        params.flags = params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-        params.blurBehindRadius = dp(radius)
-        if (!windowManager.isCrossWindowBlurEnabled) {
-            android.util.Log.i("IslandBubble", "blur asked for but disabled system-wide")
+        runCatching { windowManager.addView(guard, guardParams) }
+        shadeGuard = guard
+        shadeGuardParams = guardParams
+        proxies.values.forEach { proxy ->
+            runCatching {
+                windowManager.removeView(proxy.view)
+                windowManager.addView(proxy.view, proxy.params)
+            }
+            appliedLayouts.remove(proxy.view)
         }
     }
 
-    
-    private fun clearBlur(index: Int, view: View) {
-        
-        
-        paneSpec[index] = null
-        if (paneBlurRadius[index] == -1) return
-        SamsungBlur.clear(view)
-        paneBlurRadius[index] = -1
-        paneSpec[index] = null
+    private fun relayout(view: View?, layout: WindowManager.LayoutParams) {
+        if (view == null) return
+        val applied = appliedLayouts.getOrPut(view) { WindowManager.LayoutParams() }
+        if (applied.copyFrom(layout) == 0) return
+        runCatching { windowManager.updateViewLayout(view, layout) }.onFailure { appliedLayouts.remove(view) }
     }
 
-    
-    private fun repaintBlur() = blurPanes.forEachIndexed { index, pane ->
-        if (pane.visibility == View.VISIBLE) applyBlur(index, pane, paneCorners[index])
+    private fun reportOutside(event: MotionEvent) {
+        if (event.eventTime == outsideReportedAt) return
+        outsideReportedAt = event.eventTime
+        if (isHidden()) return
+        val density = Island.density
+        val x = (event.rawX - canvasParams.x) / density
+        val y = event.rawY / density
+        Island.post { Island.onOutsideTap(x, y) }
     }
 
-    
-
-
-
-
-
-
-
-
-
-
-
-    private val awake = android.os.Handler(android.os.Looper.getMainLooper())
-    private val sleepAgain = Runnable {
-        params.flags = params.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON.inv()
-        relayout(stage, params)
-    }
-
-    private fun keepAwake() {
-        
-        
-        
-        
-        
-        
-        if (!isLocked) return
-        awake.removeCallbacks(sleepAgain)
-        if (params.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON == 0) {
-            params.flags = params.flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            relayout(stage, params)
+    private fun forwardTouch(event: MotionEvent, region: Region) {
+        val action = event.actionMasked
+        if (action == MotionEvent.ACTION_DOWN) Island.onTouch(isDown = true, isCancel = false)
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            Island.onTouch(isDown = false, isCancel = action == MotionEvent.ACTION_CANCEL)
         }
-        awake.postDelayed(sleepAgain, LOCK_AWAKE)
+        if (action != MotionEvent.ACTION_MOVE) {
+            lastTouch = "$region proxy heard ${MotionEvent.actionToString(action)} at ${(event.rawX / Island.density).toInt()}, ${(event.rawY / Island.density).toInt()}"
+        }
+        val forwarded = MotionEvent.obtain(event)
+        forwarded.setLocation(event.rawX - canvasParams.x, event.rawY - canvasParams.y)
+        if (action == MotionEvent.ACTION_CANCEL) forwarded.action = MotionEvent.ACTION_UP
+        composeView.dispatchTouchEvent(forwarded)
+        forwarded.recycle()
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            proxies.values.forEach { it.settle() }
+        }
     }
 
-    
+    private fun requestPaneSync() {
+        if (isPaneSyncQueued || !::stage.isInitialized) return
+        isPaneSyncQueued = true
+        Choreographer.getInstance().postFrameCallback(paneSync)
+    }
+
+    private fun syncPanes() {
+        if (isHidden()) return
+        val shapes: List<BlobShape> = Island.liquid.shapes()
+        val radius = Island.appearance.blurRadius
+        blurPanes.forEachIndexed { index, pane ->
+            val shape = shapes.getOrNull(index)
+            if (shape == null || radius == 0) {
+                if (pane.visibility != View.GONE) pane.visibility = View.GONE
+                clearPane(index, pane)
+                return@forEachIndexed
+            }
+            val left = shape.rect.left.roundToInt()
+            val top = shape.rect.top.roundToInt()
+            val right = shape.rect.right.roundToInt()
+            val bottom = shape.rect.bottom.roundToInt()
+            val isResized = pane.left != left || pane.top != top || pane.right != right || pane.bottom != bottom
+            if (pane.visibility != View.VISIBLE) pane.visibility = View.VISIBLE
+            (pane.layoutParams as FrameLayout.LayoutParams).apply {
+                width = right - left
+                height = bottom - top
+                leftMargin = left
+                topMargin = top
+            }
+            pane.left = left
+            pane.top = top
+            pane.right = right
+            pane.bottom = bottom
+            val corner = shape.radius.roundToInt().toFloat()
+            val wanted = (radius * shape.opacity).roundToInt()
+            if (!isResized && paneRadius[index] == wanted && paneCorner[index] == corner) return@forEachIndexed
+            if (SamsungBlur.apply(pane, dp(wanted), corner)) {
+                paneRadius[index] = wanted
+                paneCorner[index] = corner
+            }
+        }
+    }
+
+    private fun clearPane(index: Int, pane: View) {
+        if (paneRadius[index] == -1) return
+        SamsungBlur.clear(pane)
+        paneRadius[index] = -1
+    }
+
+    private fun reportLock() {
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        Island.isLocked = keyguard?.isKeyguardLocked == true
+    }
+
+    private fun wakeScreen() {
+        val power = getSystemService(PowerManager::class.java)
+        if (power.isInteractive) return
+        @Suppress("DEPRECATION")
+        power.newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            "island:arrival",
+        ).acquire(WAKE_MILLIS)
+        isScreenOff = false
+        applyVisibility()
+    }
+
     private fun screenWidth(): Int = windowManager.currentWindowMetrics.bounds.width()
 
     private fun screenHeight(): Int = windowManager.currentWindowMetrics.bounds.height()
 
+    private fun horizontalOffset() = if (isLandscape) 0 else Preferences.get(preferences, Preferences.HORIZONTAL_OFFSET)
 
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 
-
-
-
-    private fun setAlertBand(mode: Int) {
-        if (!this::alertOverlay.isInitialized) return
-        val wanted = mode != 0 && !isHidden()
-        // An Alert standing on the bar asks for one named strip — the right edge, across the middle, where the indicator is drawn — because the whole display taken for every arrival is every pixel dead to the app underneath and a dispatched replay for most taps made while a notification stands. Focused, the Alert *is* what the screen is for: its gestures are made anywhere and its tap opens the app, so it takes the display back and the main proxy stands down for the length of it rather than the two being stacked and their order reasoned about.
-        val isWhole = mode > 0
-        val width = if (isWhole) screenWidth() else dp(ALERT_ZONE_WIDTH)
-        val height =
-            if (isWhole) screenHeight() else (screenHeight() * ALERT_ZONE_HEIGHT_PART).toInt()
-        alertOverlayParams.width = if (wanted) width else 0
-        alertOverlayParams.height = if (wanted) height else 0
-        alertOverlayParams.x = if (wanted) screenWidth() - width else 0
-        alertOverlayParams.y = if (wanted) (screenHeight() - height) / 2 else 0
-        alertOverlayParams.flags = proxyFlags(wanted)
-        relayout(alertOverlay, alertOverlayParams)
-
-        proxyParams.flags = proxyFlags(!(wanted && isWhole))
-        relayout(touchProxy, proxyParams)
-    }
-
-    // The Alert's window covers the screen while it stands, and a window that hears a press is the only window that hears it — a tap the page has decided is not for the bubble would simply be eaten. It is handed on instead: the overlay goes untouchable for as long as the replay takes, the tap is dispatched where the finger actually was, and the window is touchable again on the way out.
-    private fun replayAlertTap() {
-        if (!this::alertOverlay.isInitialized || alertOverlayParams.width == 0) return
-        val x = alertTapX
-        val y = alertTapY
-        alertOverlayParams.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        relayout(alertOverlay, alertOverlayParams)
-
-        dispatchTap(x, y) {
-            if (alertOverlayParams.width != 0) {
-                alertOverlayParams.flags = proxyFlags(true)
-                relayout(alertOverlay, alertOverlayParams)
-            }
-        }
-    }
-
-    private fun dispatchTap(x: Float, y: Float, restore: () -> Unit) {
-        val path = Path().apply { moveTo(x, y) }
-        val stroke = GestureDescription.StrokeDescription(path, 0, TAP_MILLIS)
-        val sent = runCatching {
-            dispatchGesture(
-                GestureDescription.Builder().addStroke(stroke).build(),
-                object : GestureResultCallback() {
-                    override fun onCompleted(description: GestureDescription?) = restore()
-                    override fun onCancelled(description: GestureDescription?) = restore()
-                },
-                null
-            )
-        }.getOrDefault(false)
-        if (!sent) restore()
-    }
-
-    
-
-
-
-
-
-
-
-
-
-
-    private fun stageHeight(): Int = windowManager.currentWindowMetrics.bounds.height()
-
-    
-
-
-
-
-    private fun reportLock() {
-        isLocked = getSystemService(KeyguardManager::class.java).isKeyguardLocked
-        
-        
-        if (!isLocked) { awake.removeCallbacks(sleepAgain); sleepAgain.run() }
-        push("window.onLock($isLocked)")
-    }
-
-    @Volatile
-    private var lastTouch = "nothing has been touched yet"
-
-    @Volatile
-    private var lastNote = ""
-
-
-    
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-    /* Every proxy watching outside touches reports the same press, and every press on the phone is one — so each tap in any app was several scripts into the page, each a forced layout and a hit test, and in a landscape game with the stage hidden it went on at the rate of the game's own taps, 28 in 15 seconds, for a page with nothing left to close after the first. One report per press, and only the first while the stage is hidden. */
-    private fun reportOutside(event: android.view.MotionEvent) {
-        if (event.eventTime == outsideReportedAt) return
-        outsideReportedAt = event.eventTime
-        if (isHidden()) {
-            if (isHiddenOutsideSpent) return
-            isHiddenOutsideSpent = true
-        }
-        val density = resources.displayMetrics.density
-        
-        
-        val x = (event.rawX - params.x) / density
-        val y = event.rawY / density
-        push("window.onOutsideTap($x, $y)")
-    }
-
-    private fun forwardTouch(
-        event: android.view.MotionEvent,
-        proxy: WindowManager.LayoutParams,
-        source: String
-    ) {
-        val density = resources.displayMetrics.density
-        val centred = proxy.gravity and Gravity.CENTER_HORIZONTAL == Gravity.CENTER_HORIZONTAL
-        val proxyLeft =
-            if (centred) (screenWidth() - proxy.width) / 2f + proxy.x else proxy.x.toFloat()
-        val x = (proxyLeft - params.x + event.x) / density
-        
-        
-        
-        val y = (proxy.y + event.y) / density
-        
-        /* The high frame rate was voted for once, on the touch down, and `REQUESTED_FRAME_RATE_CATEGORY_HIGH` is a vote that expires — so a drag that sends nothing back to the service, which is every drag inside the Dashboard, dropped the window to the display's default part-way through and finished at 60Hz under a finger still moving at 120. The vote is renewed off every forwarded touch; `wakeFrames` already throttles itself to one call per 150ms, which is far inside the vote's own life. */
-        wakeFrames()
-        if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) keepAwake()
-        val action = when (event.actionMasked) {
-            android.view.MotionEvent.ACTION_DOWN -> "down"
-            android.view.MotionEvent.ACTION_MOVE -> "move"
-            android.view.MotionEvent.ACTION_UP -> "up"
-            else -> "cancel"
-        }
-        if (action != "move") {
-            lastTouch = "$source proxy heard $action at ${x.toInt()}, ${y.toInt()}" +
-                " — window at ${(proxy.x / density).toInt()}, ${(proxy.width / density).toInt()} wide"
-        }
-        push("window.onProxyTouch('$action', $x, $y, '$source')")
-    }
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /* Splitting each region on its commas and mapping it to a list of boxed floats allocated some ninety short-lived objects per frame across the panes, all of it on the UI thread at the display's full rate — garbage a frame budget cannot afford and a cost that grew with every pane added. The numbers are scanned straight out of the string into one array that is reused for the life of the service. */
-    private val regionNumbers = FloatArray(8)
-
-    private fun readRegion(region: String): Int {
-        var count = 0
-        var from = 0
-        while (from <= region.length && count < regionNumbers.size) {
-            var to = region.indexOf(',', from)
-            if (to < 0) to = region.length
-            val value = region.substring(from, to).toFloatOrNull() ?: return count
-            regionNumbers[count] = value
-            count += 1
-            from = to + 1
-        }
-        return count
-    }
-
-    private fun placeBlurFrame(spec: String) {
-        val density = resources.displayMetrics.density
-        val regions = spec.split(';')
-        blurPanes.forEachIndexed { index, pane ->
-            val region = regions.getOrNull(index).orEmpty()
-            
-            
-            
-            
-            
-            
-            if (paneSpec[index] == region) return@forEachIndexed
-            paneSpec[index] = region
-            val count = readRegion(region)
-            val numbers = regionNumbers
-            if (count < 5 || numbers[2] < 1f || numbers[3] < 1f) {
-                if (pane.visibility != View.GONE) {
-                    pane.visibility = View.GONE
-                    clearBlur(index, pane)
-                }
-                return@forEachIndexed
-            }
-            val bounds = pane.layoutParams as FrameLayout.LayoutParams
-            val width = (numbers[2] * density).toInt()
-            val height = (numbers[3] * density).toInt()
-
-
-            /* Assigning `layoutParams` calls `requestLayout`, and a pane resizes on every frame of every growth — so each of those frames scheduled a full traversal of the stage, remeasuring the WebView beside the panes to arrive at the size it already had. `right` and `bottom` set the same box without a traversal; the params are still mutated in place so a real layout, when one finally comes, lands where the pane already is. */
-            val resized = bounds.width != width || bounds.height != height
-            if (resized) {
-                bounds.width = width
-                bounds.height = height
-                pane.right = pane.left + width
-                pane.bottom = pane.top + height
-            }
-            pane.translationX = numbers[0] * density
-            pane.translationY = numbers[1] * density
-            pane.visibility = View.VISIBLE
-            
-            
-            paneCorners[index] = numbers[4] * density
-            
-            
-            
-            
-            paneShares[index] = if (count > 5) numbers[5] else 1f
-            applyBlur(index, pane, paneCorners[index], resized)
-        }
-    }
-
-    private fun pushAppearance() {
-        push("window.setPillBackground('${Preferences.backgroundCss(preferences)}')")
-        push("window.setAccent('${Preferences.accentCss(preferences)}')")
-        push("window.setCompactSize(${Preferences.get(preferences, Preferences.WIDTH)},${Preferences.get(preferences, Preferences.HEIGHT)})")
-        push("window.setGrab(${topGrab()})")
-        push("window.setNotificationIdentity(${Preferences.get(preferences, Preferences.NOTIFICATION_IDENTITY)})")
-        push("window.setGoo(${Preferences.get(preferences, Preferences.GOO)})")
-        push("window.setModWidth(${Preferences.get(preferences, Preferences.MOD_WIDTH)})")
-        push("window.setNowPushes(${Preferences.get(preferences, Preferences.NOW_PUSHES)})")
-        push("window.setAlertDwell(${Preferences.get(preferences, Preferences.ALERT_DWELL)})")
-        push("window.setNotificationsRise(${Preferences.get(preferences, Preferences.NOTIFICATIONS_RISE)})")
-        push("window.setQuickDividers(${Preferences.get(preferences, Preferences.QUICK_DIVIDERS)})")
-        push("window.setDashAlertsDisabled(${Preferences.get(preferences, Preferences.DASH_ALERTS_DISABLED)})")
-        push("window.setLockNotes(${Preferences.get(preferences, Preferences.LOCK_NOTES)})")
-        push("window.setLockNotesHome(${Preferences.get(preferences, Preferences.LOCK_NOTES_HOME)})")
-        push("window.setFastDashboard(${Preferences.get(preferences, Preferences.FAST_DASHBOARD)})")
-        push("window.setNotificationsClearCorner(${Preferences.get(preferences, Preferences.NOTIFICATIONS_CLEAR_CORNER)})")
-        push("window.setAlertZoneShown(${Preferences.get(preferences, Preferences.ALERT_ZONE_SHOWN)})")
-        push("window.setAlertZoneGlow(${Preferences.get(preferences, Preferences.ALERT_ZONE_GLOW)})")
-        push("window.setEdgeMerge(${Preferences.get(preferences, Preferences.EDGE_MERGE)})")
-        push("window.setLabelSweep(${Preferences.get(preferences, Preferences.LABEL_SWEEP)})")
-        push("window.setDateFormat(${Preferences.get(preferences, Preferences.DATE_FORMAT)})")
-        push("window.setStatusBatteryPercent(${Preferences.get(preferences, Preferences.STATUS_BATTERY_PERCENT)})")
-        push("window.setStatusBatteryPercentLight(${Preferences.get(preferences, Preferences.STATUS_BATTERY_PERCENT_LIGHT)})")
-        push("window.setStatusBatteryIcons(${Preferences.get(preferences, Preferences.STATUS_BATTERY_ICONS)})")
-        push("window.setFonts(${Preferences.get(preferences, Preferences.FONT_CLOCK)},${Preferences.get(preferences, Preferences.FONT_MAIN)},${Preferences.get(preferences, Preferences.FONT_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_STATUS)},${Preferences.get(preferences, Preferences.FONT_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_BATTERY)},${Preferences.get(preferences, Preferences.FONT_STATS)},${Preferences.get(preferences, Preferences.FONT_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_NOTIFICATION_CONTENT)})")
-        push("window.setFontSizes(${Preferences.get(preferences, Preferences.FONT_SIZE_CLOCK)},${Preferences.get(preferences, Preferences.FONT_SIZE_MAIN)},${Preferences.get(preferences, Preferences.FONT_SIZE_SATELLITE)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATUS)},${Preferences.get(preferences, Preferences.FONT_SIZE_OVERLAY)},${Preferences.get(preferences, Preferences.FONT_SIZE_BATTERY)},${Preferences.get(preferences, Preferences.FONT_SIZE_STATS)},${Preferences.get(preferences, Preferences.FONT_SIZE_CONNECTORS)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_HEADING)},${Preferences.get(preferences, Preferences.FONT_SIZE_NOTIFICATION_CONTENT)})")
-        push("window.setLockShift(${Preferences.get(preferences, Preferences.LOCK_X)})")
-        push("window.setUnreadCount(${IslandNotificationListener.count()})")
-        
-        
-        MediaControl.refresh()
-        IslandNotificationListener.publishTimer()
-        
-        
-        
-        IslandNotificationListener.publishCall()
-        IslandNotificationListener.publishTrip()
-        MessagingWatch.publish(this)
-    }
-
-    private fun push(js: String) {
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        webView.post {
-            wakeFrames()
-            if (pageReady) webView.evaluateJavascript(js, null) else pending.addLast(js)
-        }
-    }
-
-    
-    private var framesWokeAt = 0L
-
-    
-
-
-
-
-
-    private fun wakeFrames() {
-        if (isHidden()) return
-        val now = android.os.SystemClock.uptimeMillis()
-        if (now - framesWokeAt < WAKE_FRAMES_EVERY) return
-        framesWokeAt = now
-        stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
-        webView.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
-        stage.invalidate()
-        webView.invalidate()
-    }
-
-    
-
-
-
-    private fun compactHeight(): Int = Preferences.get(preferences, Preferences.HEIGHT)
-
-    private fun compactWidth(): Int = Preferences.get(preferences, Preferences.WIDTH)
-
-    
     private fun fastestRefreshRate(): Float =
-        getSystemService(android.hardware.display.DisplayManager::class.java)
-            ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
-            ?.supportedModes
-            ?.maxOfOrNull { it.refreshRate }
-            ?: 0f
+        windowManager.defaultDisplay.supportedModes.maxOfOrNull { it.refreshRate } ?: 60f
 
-    
-
-
-
-
-
-
-    private fun topGrab(): Int = Preferences.get(preferences, Preferences.VERTICAL_OFFSET)
-
-    private fun dp(value: Int): Int = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
-    ).toInt()
-
-    
-
-
-
-
-    private fun wakeScreen(): Boolean {
-        val power = getSystemService(PowerManager::class.java)
-        if (power.isInteractive) return false
-        @Suppress("DEPRECATION")
-        power.newWakeLock(
-            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-            "island:notification"
-        ).acquire(WAKE_MILLIS)
-        
-        
-        
-        isScreenOff = false
-        applyVisibility()
-        return true
+    override fun openNotification(key: String) {
+        if (!IslandNotificationListener.open(key)) android.util.Log.w("IslandBubble", "nothing opened for $key")
     }
 
-    // The screen counts as dark when it is off, or when it came on a moment ago over a locked keyguard without anyone unlocking it — that is the system lighting it for this notification.
-    private fun isDarkArrival(): Boolean {
-        if (!getSystemService(PowerManager::class.java).isInteractive) return true
-        return !isUserPresent &&
-            SystemClock.elapsedRealtime() - screenOnAt < SYSTEM_WAKE_MILLIS &&
-            getSystemService(KeyguardManager::class.java).isKeyguardLocked
+    override fun openApp(packageName: String) {
+        if (packageName == MediaControl.packageName && MediaControl.open(this)) return
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(intent) }.onFailure { android.util.Log.w("IslandBubble", "cannot open $packageName", it) }
     }
 
-    private fun darken() {
-        push("window.setScreenDark(1)")
-        setStageBrightness(DARK_BRIGHTNESS)
+    override fun openClock() {
+        val alarms = Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
+        val clockPackage = packageManager.resolveActivity(alarms, 0)?.activityInfo?.packageName
+        val launch = clockPackage?.let { packageManager.getLaunchIntentForPackage(it) }
+        runCatching { startActivity((launch ?: alarms).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { android.util.Log.w("IslandBubble", "no clock app", it) }
     }
 
-    private fun lightUp() {
-        push("window.setScreenDark(0)")
-        setStageBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+    override fun openControlPanel() {
+        runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
-    private fun setStageBrightness(brightness: Float) {
-        if (params.screenBrightness == brightness) return
-        params.screenBrightness = brightness
-        relayout(stage, params)
+    override fun openPowerMenu() {
+        performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
     }
 
-    private fun vibrate(effect: Int) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-        getSystemService(VibratorManager::class.java).defaultVibrator
-            .vibrate(VibrationEffect.createPredefined(effect))
+    override fun openQuickSettings() {
+        performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
     }
 
-    /* TrafficStats counts from boot, not from midnight, so the day's figure is the total minus a stamp taken at the first read of each day; a total below the stamp is the counters having restarted with the phone and re-stamps rather than reporting a negative day. */
-    private fun dataUsedToday(): String {
-        val total = android.net.TrafficStats.getTotalRxBytes() + android.net.TrafficStats.getTotalTxBytes()
-        val store = Preferences.of(this)
-        val day = java.time.LocalDate.now().toEpochDay()
-        var base = store.getLong(Preferences.DATA_BASE, total)
-        if (day != store.getLong(Preferences.DATA_DAY, -1L) || total < base) {
-            base = total
-            store.edit().putLong(Preferences.DATA_DAY, day).putLong(Preferences.DATA_BASE, base).apply()
-        }
-        val used = total - base
-        val megabytes = used / 1024.0 / 1024.0
-        return if (megabytes >= 1024) String.format("%.1f GB", megabytes / 1024)
-        else String.format("%.0f MB", megabytes)
-    }
+    override fun readNotifications(): List<Notice> = Payloads.notices(IslandNotificationListener.shade())
 
-    private fun vibrate(effect: VibrationEffect) {
-        getSystemService(VibratorManager::class.java).defaultVibrator.vibrate(effect)
-    }
+    override fun dismissNotification(key: String) = IslandNotificationListener.dismiss(key)
 
-    private val togglesWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
-    // A level shared the toggles' worker, so a drag begun as the dashboard opened waited behind the panel's whole read-back — a dozen shell commands — and every recheck after it; the bar under the finger ran a few hundred milliseconds behind and then caught up in a jump. A level is one in-process call and never waits on the shell.
-    private val levelsWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
-    private val togglesQueued = java.util.concurrent.atomic.AtomicInteger(0)
-    private val levelTargets = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    override fun mediaControl(action: String) = MediaControl.command(action)
 
-    // A level the phone has just been given reads back at whatever it stood at a moment ago — the same lag the switches have — so a report landing right after a drag painted the bar back to where the drag started. What was asked is held over the read the same way, until the phone answers with it or the settle runs out.
-    private val levelIntents = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Long>>()
+    override fun mediaSeek(milliseconds: Long) = MediaControl.seek(milliseconds)
 
-    // How far the phone's own answer may sit from what was asked and still count as agreement: brightness and volume are both stored in steps of their own and come back rounded to a percent.
-    private val LEVEL_SETTLE_SLACK = 3
+    override fun mediaSpeed(rate: Float) = MediaControl.setSpeed(rate)
 
-    // `svc wifi enable` and its siblings hand the ask to a system service and return before it has landed, so the read taken straight afterwards still says what the switch was a moment ago — which is the switch turning on, falling back off under the read, and coming on again at the next one. What was asked for is held over the read until the phone agrees with it.
-    private val toggleIntents = java.util.concurrent.ConcurrentHashMap<String, Pair<Boolean, Long>>()
+    override fun timerAction(index: Int) = IslandNotificationListener.timerAction(index)
 
-    // How long a switch may stand for what was asked before the phone's own answer wins instead. Past it, a command the shell refused is a switch that goes back rather than one that lies.
-    private val TOGGLE_SETTLE_MILLIS = 2_500L
+    override fun tripAction(index: Int) = IslandNotificationListener.tripAction(index)
 
-    // How soon after a switch the phone is asked again, for as long as one is still standing for an ask nothing has confirmed.
-    private val TOGGLE_RECHECK_MILLIS = 400L
+    override fun recordingAction(index: Int) = IslandNotificationListener.recordingAction(index)
 
-    private val bubbleBridge = Bridge()
-
-    inner class Bridge {
-        @JavascriptInterface
-        fun ready() {
-            webView.post {
-                pageReady = true
-                pushAppearance()
-                
-                
-                
-                
-                webView.post {
-                    while (pending.isNotEmpty()) webView.evaluateJavascript(pending.removeFirst(), null)
-                }
-            }
-        }
-
-        
-
-
-
-
-
-        @JavascriptInterface
-        fun setWindowSize(widthDp: Int, heightDp: Int) =
-            setWindowBounds(widthDp, heightDp, 0, 0)
-
-        
-
-
-
-
-
-
-        @JavascriptInterface
-        fun setWindowBounds(widthDp: Int, heightDp: Int, riseDp: Int, shiftDp: Int) {
-            webView.post {
-                
-                isGrown = heightDp >= 0
-                settleSummon(SUMMON_NOTIFICATIONS, isGrown)
-                proxyParams.width =
-                    dp((if (widthDp < 0) compactWidth() else widthDp) + (GRAB + BLEED) * 2)
-                // The proxy ended a grace margin below the bubble's own bottom edge, and every point in that margin routes to the bubble, so a tap aimed at the app underneath opened the bubble and a tap under a closing one reopened it. The margin is sideways and upward now: a grown state ends at its own bottom edge, the compact bubble GRAB past its.
-                proxyParams.height =
-                    dp(
-                        if (isGrown) heightDp + topGrab()
-                        else compactHeight() + topGrab() + GRAB
-                    )
-                
-                
-                
-                proxyParams.y = 0
-                
-                
-                
-                proxyParams.x = dp(horizontalOffset() + shiftDp)
-                relayout(touchProxy, proxyParams)
-            }
-        }
-
-        
-
-
-
-
-
-
-
-
-
-
-        @JavascriptInterface
-        fun setAlertOverlay(heightDp: Int) {
-            webView.post { setAlertBand(heightDp) }
-        }
-
-        @JavascriptInterface
-        fun passAlertTap() {
-            webView.post { replayAlertTap() }
-        }
-
-        @JavascriptInterface
-        fun liftScreenDark() {
-            webView.post { setStageBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE) }
-        }
-
-        @JavascriptInterface
-        fun sleepScreen() {
-            performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
-        }
-
-        @JavascriptInterface
-        fun setLandscapeStage(stage: Int) {
-            webView.post {
-                if (!isLandscape || stage == landscapeStage) return@post
-                landscapeStage = stage
-                applyVisibility()
-            }
-        }
-
-        @JavascriptInterface
-        fun setBlurFrame(spec: String) {
-            webView.post { placeBlurFrame(spec) }
-        }
-
-        
-
-
-
-
-        @JavascriptInterface
-        fun wakeFrames() {
-            webView.post { this@BubbleService.wakeFrames() }
-        }
-
-        
-
-
-
-        
-        @JavascriptInterface
-        fun note(text: String) {
-            lastNote = text
-        }
-
-        
-
-
-
-
-
-                @JavascriptInterface
-        fun setEdgeProxy(isLive: Boolean) {
-            webView.post {
-                val height = screenHeight()
-                val width = if (isLive) dp(EDGE_WIDTH) else 0
-                val top = (height * EDGE_TOP).toInt()
-                val span = (height * EDGE_BOTTOM).toInt() - top
-                edgeLeftParams.width = width
-                edgeLeftParams.height = if (isLive) span else 0
-                edgeLeftParams.x = 0
-                edgeLeftParams.y = top
-                edgeLeftParams.flags = proxyFlags(isLive)
-                edgeRightParams.width = width
-                edgeRightParams.height = if (isLive) span else 0
-                edgeRightParams.x = screenWidth() - width
-                edgeRightParams.y = top
-                edgeRightParams.flags = proxyFlags(isLive)
-                relayout(edgeLeftProxy, edgeLeftParams)
-                relayout(edgeRightProxy, edgeRightParams)
-            }
-        }
-
-        @JavascriptInterface
-        fun setNotesProxies(spec: String) {
-            webView.post {
-                val boxes = spec.split(';')
-                notesProxyParams.forEachIndexed { index, notesParams ->
-                    val box = boxes.getOrNull(index).orEmpty().split(',').mapNotNull { it.toIntOrNull() }
-                    val isLive = box.size == 4 && box[2] > 0 && box[3] > 0
-                    notesParams.width = if (isLive) dp(box[2]) else 0
-                    notesParams.height = if (isLive) dp(box[3]) else 0
-                    notesParams.x = if (isLive) params.x + dp(box[0]) else 0
-                    notesParams.y = if (isLive) dp(box[1]) else 0
-                    notesParams.flags = proxyFlags(isLive)
-                    relayout(notesProxies[index], notesParams)
-                }
-            }
-        }
-
-        @JavascriptInterface
-        fun setLockProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {
-            webView.post {
-                val isLive = widthDp > 0
-                lockProxyParams.width = if (isLive) dp(widthDp) else 0
-                lockProxyParams.height = if (isLive) dp(heightDp) else 0
-                
-                
-                
-                lockProxyParams.x = params.x + dp(leftDp)
-                lockProxyParams.y = dp(topDp)
-                lockProxyParams.flags = proxyFlags(isLive)
-                relayout(lockProxy, lockProxyParams)
-            }
-        }
-
-        
-
-
-
-
-        
-        @JavascriptInterface
-        fun mediaSpeed(rate: String) {
-            MediaControl.setSpeed(rate.toFloatOrNull() ?: 1f)
-        }
-
-
-        
-        @JavascriptInterface
-        fun recordingAction(index: Int) {
-            IslandNotificationListener.recordingAction(index)
-        }
-
-
-        @JavascriptInterface
-        fun transferAction(index: Int) {
-            IslandNotificationListener.transferAction(index)
-        }
-
-        
-        @JavascriptInterface
-        fun setClockProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
-            webView.post {
-                val isLive = widthDp > 0
-                clockProxyParams.width = if (isLive) dp(widthDp) else 0
-                clockProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
-                clockProxyParams.x = params.x + dp(leftDp)
-                clockProxyParams.flags = proxyFlags(isLive)
-                relayout(clockProxy, clockProxyParams)
-            }
-        }
-
-        @JavascriptInterface
-        fun setMessagingProxy(widthDp: Int, heightDp: Int, leftDp: Int, topDp: Int) {
-            webView.post {
-                val isLive = widthDp > 0
-                messagingProxyParams.width = if (isLive) dp(widthDp) else 0
-                messagingProxyParams.height = if (isLive) dp(heightDp) else 0
-                messagingProxyParams.x = params.x + dp(leftDp)
-                messagingProxyParams.y = dp(topDp)
-                messagingProxyParams.flags = proxyFlags(isLive)
-                relayout(messagingProxy, messagingProxyParams)
-            }
-        }
-
-        @JavascriptInterface
-        fun setStatusProxy(widthDp: Int, heightDp: Int, leftDp: Int) {
-            webView.post {
-                val isLive = widthDp > 0
-                // The open Dashboard asks for the whole screen and the settled bubble for its own box, so those two are its open and its shut; the zero in between is only the leave.
-                if (isLive) settleSummon(SUMMON_STATUS, dp(widthDp) >= screenWidth() - dp(1))
-                statusProxyParams.width = if (isLive) dp(widthDp) else 0
-                statusProxyParams.height = if (isLive) dp(heightDp + topGrab()) else 0
-                statusProxyParams.x = params.x + dp(leftDp)
-                statusProxyParams.flags = proxyFlags(isLive)
-                relayout(statusProxy, statusProxyParams)
-            }
-        }
-
-        
-
-
-
-
-        @JavascriptInterface
-        fun openConnectionSettings(kind: String) {
-            val action = when (kind) {
-                "bluetooth" -> android.provider.Settings.ACTION_BLUETOOTH_SETTINGS
-                "wifi" -> android.provider.Settings.ACTION_WIFI_SETTINGS
-                "mobile" -> android.provider.Settings.ACTION_DATA_ROAMING_SETTINGS
-                "plane" -> android.provider.Settings.ACTION_AIRPLANE_MODE_SETTINGS
-                "hotspot" -> "com.android.settings.WIFI_TETHER_SETTINGS"
-                "usb" -> "android.settings.USB_SETTINGS"
-
-                "battery" -> android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
-                "vitals" -> android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS
-                else -> android.provider.Settings.ACTION_SETTINGS
-            }
-            if (kind == "battery" && runCatching {
-                    startActivity(
-                        Intent(Intent.ACTION_MAIN)
-                            .setClassName(
-                                "com.samsung.android.lool",
-                                "com.samsung.android.sm.battery.ui.BatteryActivity"
-                            )
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                    true
-                }.getOrDefault(false)
-            ) return
-            // Device Care's own dashboard is storage, RAM and battery in one screen with Optimise now on it — the closest thing this phone has to "the vitals card's own settings". Asked for by action rather than by class: SmartManagerDashBoardActivity is an older One UI's name for it, resolves to nothing here, and the silent fallback landed on Manage storage instead.
-            if (kind == "vitals" && runCatching {
-                    startActivity(
-                        Intent("com.samsung.android.sm.ACTION_DASHBOARD")
-                            .setPackage("com.samsung.android.lool")
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                    true
-                }.getOrDefault(false)
-            ) return
-            val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            
-            
-            if (!runCatching { startActivity(intent); true }.getOrDefault(false)) {
-                runCatching {
-                    startActivity(
-                        Intent(android.provider.Settings.ACTION_SETTINGS)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                }
-            }
-        }
-
-        
-
-
-        @JavascriptInterface
-        fun openClock() {
-            val alarms = Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
-            val clockPackage = packageManager.resolveActivity(alarms, 0)?.activityInfo?.packageName
-            val launch = clockPackage?.let { packageManager.getLaunchIntentForPackage(it) }
-            val intent = (launch ?: alarms)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { startActivity(intent) }
-                .onFailure { android.util.Log.w("IslandBubble", "no clock app", it) }
-        }
-
-        @JavascriptInterface
-        fun openControlPanel() {
-            val intent = Intent(this@BubbleService, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { startActivity(intent) }
-                .onFailure { android.util.Log.w("IslandBubble", "no control panel", it) }
-        }
-
-        @JavascriptInterface
-        fun openPowerMenu() {
-            performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
-        }
-
-        
-
-
-
-
-
-
-
-
-
-        @JavascriptInterface
-        fun triggerHaptic(type: String) {
-            if (type == "toggle") {
-                vibrate(
-                    VibrationEffect.startComposition()
-                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.45f)
-                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 40)
-                        .compose()
-                )
-                return
-            }
-            vibrate(
-                when (type) {
-                    "tap" -> VibrationEffect.EFFECT_CLICK
-                    "expand" -> VibrationEffect.EFFECT_HEAVY_CLICK
-                    "dismiss" -> VibrationEffect.EFFECT_DOUBLE_CLICK
-                    "release" -> VibrationEffect.EFFECT_TICK
-                    else -> VibrationEffect.EFFECT_TICK
-                }
-            )
-        }
-
-        
-
-
-
-        @JavascriptInterface
-        fun onSwipeDismiss() = Unit
-
-        
-        @JavascriptInterface
-        fun readNotifications(): String = IslandNotificationListener.shade().toString()
-
-        @JavascriptInterface
-        fun dismissNotification(key: String) = IslandNotificationListener.dismiss(key)
-
-        @JavascriptInterface
-        fun readUnreadCount(): Int = IslandNotificationListener.count()
-
-        
-
-
-
-
-        @JavascriptInterface
-        fun openNotification(key: String) {
-            if (!IslandNotificationListener.open(key)) android.util.Log.w("IslandBubble", "nothing opened for $key")
-        }
-
-        
-        @JavascriptInterface
-        fun readMicrophoneAccess(): String = MicrophoneAccess.read()
-
-        
-        @JavascriptInterface
-        fun readTorchLit(): Boolean = TorchWatch.isLit
-
-        @JavascriptInterface
-        fun readDataToday(): String = dataUsedToday()
-
-        
-
-
-
-
-        @JavascriptInterface
-        fun setTorchLit(isLit: Boolean) {
-            TorchWatch.set(if (isLit) TorchWatch.lastStep else 0)
-        }
-
-        @JavascriptInterface
-        fun setMicrophoneAccess(isAllowed: Boolean) {
-            MicrophoneAccess.set(isAllowed)
-            
-            
-            push("window.onMicrophoneAccessChanged('${MicrophoneAccess.read()}')")
-        }
-
-        
-
-
-
-
-
-
-        @JavascriptInterface
-        fun requestToggles() {
-            queueToggleWork { }
-        }
-
-        @JavascriptInterface
-        fun readBatteryExact(): Double = BatteryWatch.readExact(this@BubbleService)
-
-        @JavascriptInterface
-        fun requestVitals() {
-            val context = this@BubbleService
-            Thread { push("window.onVitals(${VitalsWatch.read(context)})") }.start()
-        }
-
-        @JavascriptInterface
-        fun requestWeather() {
-            WeatherWatch.request(this@BubbleService) { weather ->
-                push("window.onWeather(${weather ?: "null"})")
-            }
-        }
-
-        // Every setToggle and setLevel used to start its own thread, so a fast run of taps or a single drag put a dozen concurrent binder calls into the Shizuku shell and whichever landed last, rather than whichever was asked last, decided the state; one worker now runs them in the order they were asked.
-        private fun queueToggleWork(work: () -> Unit) {
-            togglesQueued.incrementAndGet()
-            togglesWorker.execute {
-                work()
-                // Reading the whole of system settings costs a dozen shell commands and would answer with a half-applied state anyway, so only the last piece of queued work reports back.
-                if (togglesQueued.decrementAndGet() == 0) reportToggles()
-            }
-        }
-
-        private fun reportToggles() {
-            val state = SystemToggles.read()
-            var isWaiting = false
-            val now = android.os.SystemClock.uptimeMillis()
-            for ((name, intent) in toggleIntents) {
-                val (wanted, deadline) = intent
-                // A switch the read cannot see at all — the hotspot and the recorder are asked for by tapping a system tile — has nothing that could ever confirm it, and a name written in here would make the page believe the panel reports it.
-                if (!state.has(name) || state.optBoolean(name) == wanted || now > deadline) {
-                    toggleIntents.remove(name)
-                    continue
-                }
-                state.put(name, wanted)
-                isWaiting = true
-            }
-            for ((name, intent) in levelIntents) {
-                val (wanted, deadline) = intent
-                val answer = if (state.has(name)) state.optInt(name) else wanted
-                if (kotlin.math.abs(answer - wanted) <= LEVEL_SETTLE_SLACK || now > deadline) {
-                    levelIntents.remove(name)
-                    continue
-                }
-                state.put(name, wanted)
-                isWaiting = true
-            }
-            push("window.onTogglesChanged($state)")
-            // Nothing else asks again, so a switch still standing for an unconfirmed ask has to bring the next read with it — otherwise it holds that ask until someone reopens the panel.
-            if (isWaiting) {
-                togglesWorker.schedule(
-                    { reportToggles() }, TOGGLE_RECHECK_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS
-                )
-            }
-        }
-
-        
-
-
-
-
-        @JavascriptInterface
-        fun setToggle(name: String, isOn: Boolean) {
-            toggleIntents[name] = isOn to
-                (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
-            if (SystemToggles.setDirect(name, isOn)) queueToggleWork {}
-            else queueToggleWork { SystemToggles.set(name, isOn) }
-        }
-
-        // A drag asks far faster than a shell command can answer, so each frame only leaves its value behind: the first queued run takes the newest one and the runs behind it find nothing left and cost nothing.
-        @JavascriptInterface
-        fun setLevel(name: String, percent: Int) {
-            levelTargets[name] = percent
-            levelIntents[name] = percent to
-                (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
-            levelsWorker.execute {
-                val target = levelTargets.remove(name) ?: return@execute
-                SystemToggles.setLevel(name, target, false)
-            }
-        }
-
-        // The lift is the one write that persists: a drag's frames may be temporary, and a temporary brightness is let go of the moment anything else touches the display.
-        @JavascriptInterface
-        fun settleLevel(name: String, percent: Int) {
-            levelTargets.remove(name)
-            levelIntents[name] = percent to
-                (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
-            levelsWorker.execute { SystemToggles.setLevel(name, percent, true) }
-        }
-
-        
-
-
-
-
-        @JavascriptInterface
-        fun openApp(packageName: String) {
-            
-            
-            
-            
-            
-            if (packageName == MediaControl.packageName &&
-                MediaControl.open(this@BubbleService)
-            ) return
-            val intent = packageManager.getLaunchIntentForPackage(packageName)
-            if (intent == null) {
-                android.util.Log.w("IslandBubble", "no launcher intent for $packageName")
-                return
-            }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { startActivity(intent) }
-                .onFailure { android.util.Log.w("IslandBubble", "cannot open $packageName", it) }
-        }
-
-        
-        @JavascriptInterface
-        fun setTorch(step: Int) = TorchWatch.set(step)
-
-        @JavascriptInterface
-        fun mediaControl(action: String) = MediaControl.command(action)
-
-        
-        @JavascriptInterface
-        fun timerAction(index: Int) = IslandNotificationListener.timerAction(index)
-
-        @JavascriptInterface
-        fun tripAction(index: Int) = IslandNotificationListener.tripAction(index)
-
-        @JavascriptInterface
-        fun mediaSeek(milliseconds: String) {
-            MediaControl.seek(milliseconds.toLongOrNull() ?: return)
-        }
-    }
+    override fun setTorch(step: Int) = TorchWatch.set(step)
 }
-
-
-
-
 
 fun Context.pushToIsland(payload: JSONObject, arrivedDark: Boolean = false) = BubbleService.deliver(payload, arrivedDark)
