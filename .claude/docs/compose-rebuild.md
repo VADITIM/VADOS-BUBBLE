@@ -1,0 +1,40 @@
+# Compose rebuild
+
+The `compose` branch replaces the WebView canvas (`pill.html`, `pill.css`, `js/`) with Jetpack Compose. `main` keeps the WebView app and its releases until this branch reaches parity; then it merges. Each push to `compose` builds in CI and attaches the APK as a workflow artifact (no release). Same application id, so installing it replaces the WebView build and keeps its grants.
+
+## What changed in the foundation
+
+| WebView | Compose |
+|---|---|
+| `pill.html` in one full-screen untouchable WebView | `IslandStage` in one full-screen untouchable `ComposeView` (`BubbleService`, `OverlayOwner` gives it a lifecycle) |
+| SVG goo filter (`feGaussianBlur` + `feColorMatrix`) | `LiquidLayer`: an AGSL shader drawing every registered blob as one smooth-min signed distance field, fill and hairline border in the same pass (`bubble/Liquid.kt`) |
+| `window.on…` JSON pushes | watchers still build JSON; `BubbleService.deliver*` decodes it once into typed models (`bubble/Models.kt`) held as snapshot state on `Island` |
+| `@JavascriptInterface` bridge | `HostActions`, implemented by `BubbleService` |
+| proxies forward coordinates, the page hit-tests | proxies forward the raw `MotionEvent` into the `ComposeView`; Compose hit-tests. Each bubble's touch pad stands at its *target* box plus the grace margin, and that same rect is the proxy (`Island.regions`) |
+| `dna.css` tokens | `vas/`: `Palette`, `Faces`, `Curves`/`Durations` (the CSS cubic-beziers), `SquircleShape`, `Haptics`, `pressable` |
+| blur panes from `setBlurFrame` strings | panes follow the liquid's blobs once per frame (`syncPanes`) |
+
+Rules carried over unchanged: one surface draws everything; proxies come down at the start of a collapse except under a live finger (`Proxy.place` defers until the lift); grace is sideways and upward; untouchable while hidden; the shade swipe keeps every pixel no window needs.
+
+## Parity ledger
+
+Ported (unverified on the phone):
+
+- [ ] Main bubble states: idle with unread count, closed mods (media, timer, call, trip), satellites, dots, sideways swap and rotation, hold to open the mod's app, pull down for notifications, swipe up to dismiss, rubber band
+- [ ] Alert with dwell, conversation appending, keyword/time/money/link marking, picture state, gone grace
+- [ ] Player (cover swipe for next/previous, tap play/pause, wave scrub, speed for talkers), timer panel, trip panel
+- [ ] Notifications menu: grouping, reveal labels, typed bodies, swipe to dismiss, scroll band, delete-all bubble
+- [ ] Clock with hold to open the clock app; torch step panel; recording face and panel
+- [ ] Status bubble readings (USB, transfer, modus, link, battery, paired charge) and the charge announcement
+- [ ] Liquid merge between every bubble; Samsung blur behind each blob
+
+Not ported yet, in order:
+
+1. The Dashboard (status.js: quick toggles, levels, vitals, weather, battery cell) — the Status bubble opens One UI's quick settings until then
+2. The Alert band window, pull-to-focus and the slung dashboard alert
+3. The lock screen: Now bubble, notification stacks and their proxies, edge proxies
+4. Messaging bubbles and the pull out of the Clock
+5. Landscape stage and the summoned panels; screen-dark arrival (fake AOD)
+6. Morphs between faces, pop stagger per part, label masks, minute tick on the clock
+7. The control panel (`panel.html`, `MainActivity`) — still a WebView; then `dna.css`, `fonts/` and `icons/` leave `assets/`
+8. Watchers emitting typed models directly instead of JSON, and bitmaps instead of data URIs

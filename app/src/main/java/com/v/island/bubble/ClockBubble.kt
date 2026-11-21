@@ -47,18 +47,18 @@ class ClockBubble {
 
     val isOpen: Boolean get() = owner == NowMod.Torch || (owner == NowMod.Recording && isRecordingOpen)
 
-    fun target(): Box {
+    fun target(): Frame {
         val appearance = Island.appearance
         if (isOpen) {
             val left = Island.screenWidth / 2f - NOW_PANEL_WIDTH / 2f
-            return Box(NOW_PANEL_WIDTH, NOW_PANEL_HEIGHT, 26f, appearance.grab, left)
+            return Frame(NOW_PANEL_WIDTH, NOW_PANEL_HEIGHT, 26f, appearance.grab, left)
         }
         val width = when (owner) {
             NowMod.Recording -> RECORDING_WIDTH
             NowMod.Torch -> TORCH_WIDTH
             null -> timeWidth
         }
-        return Box(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, CLOCK_LEFT)
+        return Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, CLOCK_LEFT)
     }
 
     fun closePanel() {

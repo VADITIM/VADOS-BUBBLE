@@ -39,7 +39,7 @@ enum class Size(val isClosed: Boolean) {
 
 enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications }
 
-data class Box(val width: Float, val height: Float, val radius: Float, val top: Float, val shift: Float)
+data class Frame(val width: Float, val height: Float, val radius: Float, val top: Float, val shift: Float)
 
 data class RowLayout(
     val main: Float,
@@ -228,22 +228,22 @@ class MainBubble {
         }
     }
 
-    fun target(): Box {
+    fun target(): Frame {
         val grab = appearance.grab
         val grown = grab + GROWN_PAD
         return when (size) {
-            Size.Idle -> Box(appearance.compactWidth, appearance.compactHeight, appearance.compactHeight / 2f, grab, layout().mainX)
+            Size.Idle -> Frame(appearance.compactWidth, appearance.compactHeight, appearance.compactHeight / 2f, grab, layout().mainX)
             Size.Playing, Size.Timing, Size.Calling, Size.Travelling -> {
                 val box = layout()
-                Box(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
+                Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
             }
-            Size.Alert -> Box(ALERT_WIDTH, ALERT_HEIGHT, 24f, grab, 0f)
-            Size.Image -> Box(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grab, 0f)
-            Size.Picture -> Box(GROWN_WIDTH, pictureHeight, 26f, grown, 0f)
-            Size.Player -> Box(GROWN_WIDTH, 304f, 34f, grown, 0f)
-            Size.TimerPanel -> Box(GROWN_WIDTH, 132f, 26f, grown, 0f)
-            Size.TripPanel -> Box(GROWN_WIDTH, 232f, 26f, grown, 0f)
-            Size.Notifications -> Box(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
+            Size.Alert -> Frame(ALERT_WIDTH, ALERT_HEIGHT, 24f, grab, 0f)
+            Size.Image -> Frame(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grab, 0f)
+            Size.Picture -> Frame(GROWN_WIDTH, pictureHeight, 26f, grown, 0f)
+            Size.Player -> Frame(GROWN_WIDTH, 304f, 34f, grown, 0f)
+            Size.TimerPanel -> Frame(GROWN_WIDTH, 132f, 26f, grown, 0f)
+            Size.TripPanel -> Frame(GROWN_WIDTH, 232f, 26f, grown, 0f)
+            Size.Notifications -> Frame(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
         }
     }
 

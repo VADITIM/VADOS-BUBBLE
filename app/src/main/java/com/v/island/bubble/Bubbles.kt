@@ -59,7 +59,7 @@ import kotlin.math.roundToInt
 @Composable
 private fun FloatingBubble(
     region: Region,
-    target: Box,
+    target: Frame,
     border: Color,
     scale: Float,
     drag: () -> Offset,
@@ -288,7 +288,7 @@ private fun TorchSlider(clock: ClockBubble) {
 fun StatusView(status: StatusBubble) {
     val appearance = Island.appearance
     val width = status.contentWidth + 17.6f
-    val target = Box(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, Island.screenWidth - StatusBubble.STATUS_RIGHT - width)
+    val target = Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, Island.screenWidth - StatusBubble.STATUS_RIGHT - width)
     FloatingBubble(
         Region.Status, target, status.modusColour() ?: Palette.border,
         if (status.isPressing) 1.03f else 1f, { Offset.Zero },
@@ -424,7 +424,7 @@ fun SatellitesView(bubble: MainBubble) {
 
 @Composable
 fun ClearButton(bubble: MainBubble) {
-    val isShown = bubble.size == Size.Notifications && bubble.groups.isNotEmpty()
+    val isShown = bubble.size == com.v.island.bubble.Size.Notifications && bubble.groups.isNotEmpty()
     val box = bubble.target()
     val top = box.top + box.height + MainBubble.CLEAR_GAP
     val left = Island.screenWidth / 2f - MainBubble.CLEAR_SIZE / 2f

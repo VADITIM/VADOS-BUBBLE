@@ -23,6 +23,7 @@ Where everything is. To change X, look in Y.
 | `docs/decisions.md` | The long form: what every state is, why each gesture lives where it does, what the platform forced, debug hooks, device facts |
 | `docs/quirks.md`, `docs/known-issues.md` | Traps; open bugs and debt |
 | `docs/roadmap.md` | The phase plan with what is done |
+| `docs/compose-rebuild.md` | The Compose rebuild on the `compose` branch: what replaced the WebView, and the parity ledger |
 | `docs/rules/` | Bubbles, states, motion, code quality |
 | `hooks/` | Shell hooks wired in `settings.json` |
 | `skills/` | Vendored skills (provenance in `skills/SOURCES.md`); `skills/vas/` is the git-ignored V/AS clone |
