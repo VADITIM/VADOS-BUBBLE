@@ -1191,7 +1191,7 @@ private fun KnobRow(dashboard: Dashboard, geometry: PanelGeometry, appearance: A
                         lastX = x
                         lastAt = change.uptimeMillis
                         change.consume()
-                        dashboard.setKnobShift(start + (x - from) / density)
+                        dashboard.shiftKnobs(start + (x - from) / density)
                     }
                     if (isSwiped) dashboard.glideKnobs(speed)
                 }

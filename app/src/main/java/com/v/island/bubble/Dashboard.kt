@@ -223,7 +223,7 @@ class Dashboard {
         isSoloOut = false
     }
 
-    fun setKnobShift(value: Float) {
+    fun shiftKnobs(value: Float) {
         var shift = value % KNOB_CYCLE
         if (shift > 0f) shift -= KNOB_CYCLE
         knobShift = shift
@@ -243,7 +243,7 @@ class Dashboard {
                 val now = withFrameMillis { it }
                 val step = minOf(32L, now - last).toFloat()
                 last = now
-                setKnobShift(knobShift + velocity * step)
+                shiftKnobs(knobShift + velocity * step)
                 velocity *= KNOB_FRICTION.pow(step / 16f)
             }
         }
