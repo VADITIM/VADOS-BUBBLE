@@ -65,7 +65,7 @@ fun MainBubbleView(bubble: MainBubble) {
         val grownWidth = width.value * scale.value
         val grownHeight = height.value * scale.value
         val left = centre + shift.value - grownWidth / 2f + bubble.drag.x
-        val upper = top.value + bubble.drag.y
+        val upper = top.value + bubble.drag.y + bubble.bumpLift
         BlobShape(
             Rect(left * density, upper * density, (left + grownWidth) * density, (upper + grownHeight) * density),
             radius.value * scale.value * density,
@@ -119,7 +119,7 @@ fun MainBubbleView(bubble: MainBubble) {
                     scaleY = scale.value
                     transformOrigin = TransformOrigin(0.5f, 0f)
                     translationX = bubble.drag.x * Island.density
-                    translationY = bubble.drag.y * Island.density
+                    translationY = (bubble.drag.y + bubble.bumpLift) * Island.density
                     clip = true
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(radius.value.dp)
                 },

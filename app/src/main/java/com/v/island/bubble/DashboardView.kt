@@ -91,10 +91,11 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-private class PanelGeometry(screenWidth: Float, screenHeight: Float) {
+private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Float) {
     val left = Dashboard.MARGIN
     val top = Dashboard.CORNER_INSET + Dashboard.CORNER_TALL + Dashboard.QUICK_CLEARANCE
     val width = screenWidth - Dashboard.MARGIN * 2f
@@ -104,12 +105,14 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float) {
     val lift = max(0f, (band - Dashboard.KNOB_SIZE) / 2f)
     val firstDivider = statsTall + Dashboard.GAP + DIVIDER_SHIFT
     val systemTop = firstDivider + 1f + DIVIDER_ROOM + Dashboard.GAP
-    val secondDivider = height - band - Dashboard.GAP - DIVIDER_SHIFT - 1f
+    val knobTop = height - lift - Dashboard.KNOB_SIZE
+    /* Mirrors html.lock-live in pill.css: with the Now bubble standing over the toggles the lower divider sits a gap above it, so the room over the bubble and under it are one measurement. */
+    val secondDivider = if (nowTall > 0f) min(height - band - Dashboard.GAP - DIVIDER_SHIFT, knobTop - NowBubble.PANEL_GAP * 2f - nowTall) - 1f
+    else height - band - Dashboard.GAP - DIVIDER_SHIFT - 1f
     val systemBottom = secondDivider - DIVIDER_ROOM - Dashboard.GAP
     val systemTall = systemBottom - systemTop
     val gridTop = systemTop + (systemTall - GRID_TALL) / 2f
     val gridRow = (GRID_TALL - Dashboard.GAP * 2f) / 3f
-    val knobTop = height - lift - Dashboard.KNOB_SIZE
     val vitalsCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP + VITALS_TALL / 2f
     val transferCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP * 2f + VITALS_TALL + TRANSFER_TALL / 2f
     val levelsCentre = systemTop + systemTall / 2f
@@ -269,11 +272,13 @@ private suspend fun PointerInputScope.ground(dashboard: Dashboard) = awaitEachGe
     val isFromLevel = dashboard.isLevelTouch
     var isPushed = false
     var travel = 0f
+    val trail = ArrayList<Triple<Float, Float, Long>>()
     while (true) {
         val event = awaitPointerEvent()
         val change = event.changes.firstOrNull { it.id == down.id } ?: break
         val across = (change.position.x - down.position.x) / density
         val drop = (change.position.y - down.position.y) / density
+        trail.add(Triple(change.position.x / density, change.position.y / density, change.uptimeMillis))
         travel = max(travel, hypot(across, drop))
         if (!change.pressed) {
             if (!isFromControl && !isPushed && travel < Dashboard.TAP_SLOP && !Island.wasCancelled && dashboard.isOpen) {
@@ -284,7 +289,7 @@ private suspend fun PointerInputScope.ground(dashboard: Dashboard) = awaitEachGe
         if (!isPushed && !isFromLevel && drop < -Dashboard.PUSH_DISMISS && abs(across) < Dashboard.PUSH_STRAY) {
             isPushed = true
             if (!isFromControl) Haptics.play(Haptic.Dismiss)
-            dashboard.close()
+            dashboard.close(Sling.throwOf(trail))
         }
     }
     dashboard.isControlTouch = false
@@ -327,9 +332,12 @@ fun DashboardPanel(dashboard: Dashboard) {
         if (isOpen) Island.regions[Region.Dashboard] = Rect(0f, 0f, screenWidth, screenHeight)
         else Island.regions.remove(Region.Dashboard)
     }
+    val now = Island.now
+    val nowTall = animateFloatAsState(if (now.isInPanel && Island.media != null) now.restHeight else 0f, tween(NowBubble.GROW, easing = Curves.grow), label = "nowTall")
+    val geometry = PanelGeometry(screenWidth, screenHeight, nowTall.value)
+    SideEffect { dashboard.nowBottom = geometry.top + geometry.knobTop - NowBubble.PANEL_GAP }
     if (!isOpen && !dashboard.isLeaving) return
     val appearance = Island.appearance
-    val geometry = remember(screenWidth, screenHeight) { PanelGeometry(screenWidth, screenHeight) }
     val paired = Island.connectivity?.paired
     val pairedCount = paired?.names?.size ?: 0
     LaunchedEffect(pairedCount, isOpen) {

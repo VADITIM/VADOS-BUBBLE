@@ -121,7 +121,8 @@ fun RevealLabel(text: String, style: TextStyle, bar: Color, delayMilliseconds: I
 
 /* Writing the text in character by character re-wrapped the row on every frame and pushed the rows under it; the whole text is laid out from the start and only the untyped rest is left uncoloured, as typeBody in tabs.js did. */
 @Composable
-fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, interval: Float = typeInterval(text.length)) {
+fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, interval: Float = typeInterval(text.length), isLine: Boolean = false) {
+    var isOverflowing by remember { androidx.compose.runtime.mutableStateOf(false) }
     var shown by remember(text) { mutableIntStateOf(0) }
     LaunchedEffect(text) {
         if (text.isEmpty()) return@LaunchedEffect
@@ -136,7 +137,15 @@ fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: 
         append(text.substring(0, shown))
         withStyle(androidx.compose.ui.text.SpanStyle(color = Color.Transparent)) { append(text.substring(shown)) }
     }
-    BasicText(typed, modifier, style = style, maxLines = maxLines, overflow = TextOverflow.Clip)
+    BasicText(
+        typed,
+        if (isLine && isOverflowing) modifier.fadeEnd() else modifier,
+        style = style,
+        maxLines = if (isLine) 1 else maxLines,
+        softWrap = !isLine,
+        overflow = TextOverflow.Clip,
+        onTextLayout = { isOverflowing = it.didOverflowWidth },
+    )
 }
 
 fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))

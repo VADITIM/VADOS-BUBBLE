@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 
-enum class Region { Dashboard, Main, Clock, Status, Clear }
+enum class Region { Dashboard, Now, Main, Clock, Status, Clear }
 
 interface HostActions {
     fun openNotification(key: String)
@@ -77,6 +77,7 @@ object Island {
     val clock = ClockBubble()
     val status = StatusBubble()
     val dashboard = Dashboard()
+    val now = NowBubble()
     var frost = 0f
 
     fun start(actions: HostActions) {

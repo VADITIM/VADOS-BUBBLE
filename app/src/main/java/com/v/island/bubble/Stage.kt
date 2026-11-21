@@ -22,6 +22,7 @@ fun IslandStage() {
             )
             SatellitesView(Island.bubble)
             DashboardPanel(Island.dashboard)
+            NowView(Island.now)
             ClockView(Island.clock)
             StatusView(Island.status)
             ClearButton(Island.bubble)

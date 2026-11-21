@@ -52,6 +52,7 @@ class Dashboard {
         private set
     var soloGeneration by mutableIntStateOf(0)
         private set
+    var nowBottom by mutableFloatStateOf(0f)
     var knobShift by mutableFloatStateOf(0f)
         private set
     var pairedTurn by mutableIntStateOf(0)
@@ -84,6 +85,7 @@ class Dashboard {
         Island.bubble.toClosedIfExtended()
         Island.clock.closePanel()
         isOpen = true
+        Island.now.enterPanel()
         generation += 1
         areReadingsHeld = true
         Island.actions.requestVitals()
@@ -105,10 +107,11 @@ class Dashboard {
         }
     }
 
-    fun close() {
+    fun close(thrown: androidx.compose.ui.geometry.Offset? = null) {
         if (!isOpen) return
         endSolo()
         isOpen = false
+        Island.now.leavePanel(thrown)
         isLeaving = true
         generation += 1
         enterJob?.cancel()

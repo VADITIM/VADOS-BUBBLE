@@ -131,7 +131,7 @@ class MainBubble {
     var clearedMods by mutableStateOf(emptySet<Mod>())
         private set
 
-    fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods
+    fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods && !Island.now.isStolen(mod)
 
     val hasPresentMods: Boolean get() = modOrder.any(::isPresent)
 
@@ -143,6 +143,20 @@ class MainBubble {
     fun restoreMods() {
         clearedMods = emptySet()
         if (mode == Mode.Idle) toClosed()
+    }
+
+    var bumpLift by mutableFloatStateOf(0f)
+        private set
+
+    /* Mirrors bumpPill in js/lock.js: Main gives under the Now bubble melting back into it. */
+    fun bump() {
+        Island.scope.launch(androidx.compose.ui.platform.AndroidUiDispatcher.Main) {
+            androidx.compose.animation.core.animate(0f, 1f, animationSpec = androidx.compose.animation.core.tween(BUMP_MILLISECONDS, easing = androidx.compose.animation.core.LinearEasing)) { step, _ ->
+                bumpLift = if (step < 0.3f) -BUMP * BUMP_RISE.transform(step / 0.3f)
+                else -BUMP * (1f - com.v.island.vas.Curves.bubble.transform((step - 0.3f) / 0.7f))
+            }
+            bumpLift = 0f
+        }
     }
 
     private fun isPresent(mod: Mod): Boolean = when (mod) {
@@ -831,6 +845,9 @@ class MainBubble {
         const val ALERT_IMAGE_HEIGHT = 190f
         const val ALERT_LINES = 4
         const val PICTURE_MAXIMUM_HEIGHT = 460f
+        const val BUMP = 12f
+        const val BUMP_MILLISECONDS = 420
+        val BUMP_RISE = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0.8f, 0.3f, 1f)
         const val HOLD_SCALE = 1.14f
         const val HOLD_BLOCK = 18f
         const val HOLD_WANDER = 150L
