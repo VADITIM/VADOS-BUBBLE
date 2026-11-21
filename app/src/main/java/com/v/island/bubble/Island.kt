@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 
-enum class Region { Main, Clock, Status, Clear }
+enum class Region { Dashboard, Main, Clock, Status, Clear }
 
 interface HostActions {
     fun openNotification(key: String)
@@ -19,7 +19,15 @@ interface HostActions {
     fun openClock()
     fun openControlPanel()
     fun openPowerMenu()
-    fun openQuickSettings()
+    fun openConnectionSettings(kind: String)
+    fun requestToggles()
+    fun setToggle(name: String, isOn: Boolean)
+    fun setLevel(name: String, percent: Int, isFinal: Boolean)
+    fun requestVitals()
+    fun requestWeather()
+    fun readBatteryExact(): Double
+    fun readDataToday(): String
+    fun transferAction(index: Int)
     fun readNotifications(): List<Notice>
     fun dismissNotification(key: String)
     fun mediaControl(action: String)
@@ -68,6 +76,8 @@ object Island {
     val bubble = MainBubble()
     val clock = ClockBubble()
     val status = StatusBubble()
+    val dashboard = Dashboard()
+    var frost = 0f
 
     fun start(actions: HostActions) {
         this.actions = actions
@@ -100,5 +110,6 @@ object Island {
         if (isOurs) return
         bubble.onOutsideTap()
         clock.onOutsideTap()
+        dashboard.close()
     }
 }

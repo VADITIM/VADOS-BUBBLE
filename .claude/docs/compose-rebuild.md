@@ -27,10 +27,11 @@ Ported (unverified on the phone):
 - [ ] Clock with hold to open the clock app; torch step panel; recording face and panel
 - [ ] Status bubble readings (USB, transfer, modus, link, battery, paired charge) and the charge announcement
 - [ ] Liquid merge between every bubble; Samsung blur behind each blob
+- [ ] Dashboard (`bubble/Dashboard.kt` state, `bubble/DashboardView.kt`): opened by a tap on the Status bubble, a pull down past 34 or a pull stolen by the shade past 12, and by the panel broadcast; closed by a tap on the Status bubble, a swipe up anywhere (24 up, under 40 across), a tap on bare ground, the stage hiding, or Main extending. Status hold opens the settings of what it shows. Clock and Status grow into the two top corners (time with seconds over the date; settings and power), Main rises into the screen's top edge. Frosted scrim through one full-screen blur pane (`syncScrim`), stepped in twelfths. Stats (weather, storage/RAM, battery cell with hundredths read every second and charge bubbles, transfer strip or data today, USB), connection grid with spinning ring readings and searching dots, brightness/volume/call bars with the eased value curve and the merge on hold (brightness clears the panel), endless knob row with fling, the mods clear/restore switch. Pop entrance ranked from the panel's centre outward, collapse leave, fast entrance preference, 12dp grace to the nearest control, toggle read-backs held while the panel moves, asked-for switches and levels held over the read until the phone agrees
 
 Not ported yet, in order:
 
-1. The Dashboard (status.js: quick toggles, levels, vitals, weather, battery cell) — the Status bubble opens One UI's quick settings until then
+1. Dashboard remainder: the stats-section channel (swipe down into notifications), the slung Alert, the Now bubble moving into the panel with Main's mods, the stat rise after the pop, the ring's found burst
 2. The Alert band window, pull-to-focus and the slung dashboard alert
 3. The lock screen: Now bubble, notification stacks and their proxies, edge proxies
 4. Messaging bubbles and the pull out of the Clock

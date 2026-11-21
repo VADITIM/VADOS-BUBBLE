@@ -1,17 +1,24 @@
 package com.v.island.bubble
 
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import com.v.island.vas.Curves
 import com.v.island.vas.Durations
 import com.v.island.vas.Haptic
 import com.v.island.vas.Haptics
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
 
 sealed interface StatusSlot {
     val name: String
@@ -31,10 +38,18 @@ class StatusBubble {
     var announcing by mutableStateOf<BatteryEvent?>(null)
         private set
 
-    private var holdJob: Job? = null
-    private var announceJob: Job? = null
+    var drag by mutableStateOf(Offset.Zero)
+        private set
 
-    fun closePanel() = Unit
+    private var holdJob: Job? = null
+    private var homeJob: Job? = null
+    private var announceJob: Job? = null
+    private var downX = 0f
+    private var downY = 0f
+    private var deepest = 0f
+    private var isPulled = false
+
+    fun closePanel() = Island.dashboard.close()
 
     fun modus(): String? {
         val attached = Island.connectivity ?: return null
@@ -53,7 +68,8 @@ class StatusBubble {
         else -> null
     }
 
-    private fun wifiGlyph(attached: Connectivity): Glyph = when {
+    fun wifiGlyph(attached: Connectivity?): Glyph = when {
+        attached == null || attached.link != "wifi" -> Glyphs.wifi
         !attached.isOnline -> Glyphs.wifiAlert
         attached.level < 0 || attached.level >= 3 -> Glyphs.wifi
         attached.level == 2 -> Glyphs.wifiGood
@@ -90,7 +106,13 @@ class StatusBubble {
         return shown
     }
 
+    fun retireAnnouncement() {
+        announceJob?.cancel()
+        announcing = null
+    }
+
     fun announce(event: BatteryEvent) {
+        if (Island.dashboard.isOpen) return
         announceJob?.cancel()
         announcing = event
         Haptics.play(Haptic.Release)
@@ -100,14 +122,55 @@ class StatusBubble {
         }
     }
 
-    fun onDown() {
-        isPressing = true
+    fun subject(): String = modus() ?: Island.connectivity?.link ?: "none"
+
+    fun target(): Frame {
+        val appearance = Island.appearance
+        if (Island.dashboard.isOpen) {
+            return Frame(CORNER_WIDE, Dashboard.CORNER_TALL, Dashboard.CORNER_RADIUS, Dashboard.CORNER_INSET, Island.screenWidth - Dashboard.CORNER_INSET - CORNER_WIDE)
+        }
+        val width = contentWidth + 17.6f
+        return Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, Island.screenWidth - STATUS_RIGHT - width)
+    }
+
+    fun onDown(x: Float, y: Float) {
+        downX = x
+        downY = y
+        deepest = 0f
+        isPulled = false
+        isPressing = !Island.dashboard.isOpen
+        homeJob?.cancel()
         holdJob?.cancel()
+        if (Island.dashboard.isOpen) return
         holdJob = Island.scope.launch {
             delay(Durations.HOLD.toLong())
             isPressing = false
             Haptics.play(Haptic.Expand)
-            Island.actions.openControlPanel()
+            Island.actions.openConnectionSettings(subject())
+        }
+    }
+
+    fun onMove(x: Float, y: Float) {
+        if (isPulled || Island.dashboard.isOpen) return
+        val across = x - downX
+        val down = y - downY
+        deepest = max(deepest, down)
+        val travel = hypot(across, down)
+        val past = max(0f, travel - HOLD_BLOCK)
+        val reach = DRAG_RADIUS * past / (past + DRAG_RADIUS)
+        val scale = if (travel > 0f) reach / travel else 0f
+        drag = Offset(across * scale, down * scale)
+        if (travel > HOLD_BLOCK) {
+            holdJob?.cancel()
+            isPressing = false
+        }
+        if (down > STATUS_PULL && down > abs(across)) {
+            isPulled = true
+            holdJob?.cancel()
+            isPressing = false
+            goHome()
+            Haptics.play(Haptic.Expand)
+            Island.dashboard.open()
         }
     }
 
@@ -115,14 +178,35 @@ class StatusBubble {
         val wasHeld = holdJob?.isCompleted == true
         holdJob?.cancel()
         isPressing = false
-        if (!isTap || wasHeld) return
-        Haptics.play(Haptic.Expand)
-        Island.bubble.toClosedIfExtended()
-        Island.actions.openQuickSettings()
+        goHome()
+        if (Island.wasCancelled) {
+            if (!wasHeld && !isPulled && !Island.dashboard.isOpen && deepest > STATUS_PULL_STOLEN) {
+                Haptics.play(Haptic.Expand)
+                Island.dashboard.open()
+            }
+            return
+        }
+        if (!isTap || wasHeld || isPulled) return
+        Haptics.play(Haptic.Tap)
+        Island.dashboard.toggle()
+    }
+
+    private fun goHome() {
+        val from = drag
+        if (from == Offset.Zero) return
+        homeJob = Island.scope.launch {
+            animate(0f, 1f, animationSpec = tween(Durations.HOME, easing = Curves.bubble)) { progress, _ -> drag = from * (1f - progress) }
+        }
     }
 
     companion object {
         const val STATUS_RIGHT = 14f
+        /* Mirrors STATUS_CORNER_WIDE in the retired js/status.js: the actions face has no width of its own to be measured. */
+        const val CORNER_WIDE = 96f
+        const val STATUS_PULL = 34f
+        const val STATUS_PULL_STOLEN = 12f
+        private const val HOLD_BLOCK = 18f
+        private const val DRAG_RADIUS = 40f
         const val CHARGE_DWELL = 2600L
         private val ZEN_MODES = listOf(
             Glyphs.zenSleep to listOf("schlaf", "nacht", "sleep", "night", "bett", "bed"),

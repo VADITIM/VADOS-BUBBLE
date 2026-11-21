@@ -13,6 +13,7 @@ fun IslandStage() {
     val appearance = Island.appearance
     CompositionLocalProvider(LocalAccent provides appearance.accent) {
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (Island.isLandscape) 0f else 1f }) {
+            DashboardScrim(Island.dashboard)
             LiquidLayer(
                 Island.liquid,
                 fill = { Island.appearance.pillFill },
@@ -20,6 +21,7 @@ fun IslandStage() {
                 hairline = Island.density,
             )
             SatellitesView(Island.bubble)
+            DashboardPanel(Island.dashboard)
             ClockView(Island.clock)
             StatusView(Island.status)
             ClearButton(Island.bubble)

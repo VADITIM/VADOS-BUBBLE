@@ -126,7 +126,24 @@ class MainBubble {
 
     val liveMods: List<Mod> get() = modOrder.filter(::isLive)
 
-    fun isLive(mod: Mod): Boolean = when (mod) {
+    var clearedMods by mutableStateOf(emptySet<Mod>())
+        private set
+
+    fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods
+
+    val hasPresentMods: Boolean get() = modOrder.any(::isPresent)
+
+    fun clearMods() {
+        clearedMods = modOrder.filter(::isPresent).toSet()
+        if (mode == Mode.Idle) toClosed()
+    }
+
+    fun restoreMods() {
+        clearedMods = emptySet()
+        if (mode == Mode.Idle) toClosed()
+    }
+
+    private fun isPresent(mod: Mod): Boolean = when (mod) {
         Mod.Timer -> Island.timer != null
         Mod.Media -> Island.media != null
         Mod.Call -> Island.call != null
@@ -228,7 +245,15 @@ class MainBubble {
         }
     }
 
+    val isRisen: Boolean get() = size.isClosed && Island.dashboard.isOpen
+
     fun target(): Frame {
+        val frame = frame()
+        if (!isRisen) return frame
+        return frame.copy(top = -EDGE_OVER, height = appearance.compactHeight + EDGE_OVER)
+    }
+
+    private fun frame(): Frame {
         val grab = appearance.grab
         val grown = grab + GROWN_PAD
         return when (size) {
@@ -268,6 +293,7 @@ class MainBubble {
     }
 
     fun onModsChanged() {
+        clearedMods = clearedMods.filter(::isPresent).toSet()
         if (mode == Mode.Idle) toClosed()
         if (size == Size.TimerPanel && Island.timer == null) toClosed()
         if (size == Size.Player && Island.media == null) toClosed()
@@ -781,6 +807,8 @@ class MainBubble {
     companion object {
         /* Mirrors GROWN_PAD and --grown-pad in the retired pill.css: a grown bubble hangs this far below the compact one's top. */
         const val GROWN_PAD = 26f
+        /* Mirrors --edge-over in the retired pill.css: how far past the screen's top edge the closed bubble rises while the Dashboard stands open. */
+        const val EDGE_OVER = 20f
         const val GROWN_WIDTH = 340f
         const val ALERT_WIDTH = 300f
         const val ALERT_HEIGHT = 155f

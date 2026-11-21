@@ -43,6 +43,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private const val WAKE_MILLIS = 6_000L
         private const val SHADE_STRIP = 48
         private const val ROTATION_SETTLE = 600L
+        private const val TOGGLE_SETTLE_MILLIS = 2_500L
+        private const val TOGGLE_RECHECK_MILLIS = 400L
+        private const val LEVEL_SETTLE_SLACK = 3
         /* Mirrors the liquid layer's MAXIMUM_BLOBS: one blur pane per blob it can draw. */
         private const val BLUR_PANES = 16
         const val PANEL_BROADCAST = "com.v.island.TOGGLE_STATUS_PANEL"
@@ -68,7 +71,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             instance?.disableSelf()
         }
 
-        fun toggleStatusPanel() = Island.post { instance?.openQuickSettings() }
+        fun toggleStatusPanel() = Island.post {
+            if (instance != null) Island.dashboard.toggle()
+        }
 
         fun toggleMessaging() = Unit
 
@@ -234,6 +239,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private lateinit var canvasParams: WindowManager.LayoutParams
     private lateinit var proxies: Map<Region, Proxy>
     private lateinit var blurPanes: List<View>
+    private lateinit var scrimPane: View
+    private var scrimRadius = -1
     private val owner = OverlayOwner()
     private val paneRadius = IntArray(BLUR_PANES) { -1 }
     private val paneCorner = FloatArray(BLUR_PANES) { -1f }
@@ -249,6 +256,14 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private var lastTouch = ""
     private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
     private var isPaneSyncQueued = false
+    private val togglesWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+    /* A level shares nothing with the toggles' worker: a drag begun as the Dashboard opens would otherwise wait behind the panel's whole read-back. */
+    private val levelsWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val togglesQueued = java.util.concurrent.atomic.AtomicInteger(0)
+    private val levelTargets = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    /* A switch or level just asked for reads back at what it was a moment ago, so what was asked is held over the read until the phone agrees or the settle runs out. */
+    private val toggleIntents = java.util.concurrent.ConcurrentHashMap<String, Pair<Boolean, Long>>()
+    private val levelIntents = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Long>>()
 
     private val paneSync = Choreographer.FrameCallback {
         isPaneSyncQueued = false
@@ -286,6 +301,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
             setViewTreeViewModelStoreOwner(owner)
+            scrimPane = View(this@BubbleService).apply { visibility = View.GONE }
+            addView(scrimPane, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
             blurPanes = List(BLUR_PANES) { View(this@BubbleService).apply { visibility = View.GONE } }
             blurPanes.forEach { addView(it, FrameLayout.LayoutParams(0, 0, Gravity.TOP or Gravity.START)) }
             addView(composeView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
@@ -305,7 +322,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, canvasParams)
-        proxies = listOf(Region.Clear, Region.Main, Region.Status, Region.Clock).associateWith { Proxy(it) }
+        proxies = listOf(Region.Dashboard, Region.Clear, Region.Main, Region.Status, Region.Clock).associateWith { Proxy(it) }
         proxies.values.forEach { windowManager.addView(it.view, it.params) }
         applyBarLock()
         instance = this
@@ -334,6 +351,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         ShizukuShell.bind(this)
         ShizukuShell.watch(this)
         SystemToggles.attach(this)
+        getSystemService(android.media.AudioManager::class.java)?.addOnModeChangedListener(mainExecutor) { requestToggles() }
         MediaControl.start(this) { media -> deliverMedia(media) }
         BatteryWatch.start(
             this,
@@ -393,6 +411,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             panelWatch?.let { runCatching { unregisterReceiver(it) } }
             preferences.unregisterOnSharedPreferenceChangeListener(this)
             Choreographer.getInstance().removeFrameCallback(paneSync)
+            togglesWorker.shutdownNow()
+            levelsWorker.shutdownNow()
             Island.onBlobsDrawn = {}
             Island.stop()
             proxies.values.forEach { runCatching { windowManager.removeView(it.view) } }
@@ -410,6 +430,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         relayout(stage, canvasParams)
         proxies.values.forEach { it.place(it.placed) }
         paneRadius.fill(-1)
+        if (scrimRadius != -1) scrimRadius = 0
         requestPaneSync()
         applyBarLock()
     }
@@ -447,6 +468,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         Island.isStageHidden = isHidden
         if (isHidden) {
             blurPanes.forEachIndexed { index, pane -> clearPane(index, pane) }
+            clearScrim()
+            Island.dashboard.close()
             Island.bubble.toClosedIfExtended()
         } else requestPaneSync()
         proxies.values.forEach { proxy ->
@@ -537,6 +560,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     private fun syncPanes() {
         if (isHidden()) return
+        syncScrim()
         val shapes: List<BlobShape> = Island.liquid.shapes()
         val radius = Island.appearance.blurRadius
         blurPanes.forEachIndexed { index, pane ->
@@ -570,6 +594,24 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 paneCorner[index] = corner
             }
         }
+    }
+
+    private fun syncScrim() {
+        val wanted = (Island.appearance.scrimBlurRadius * Island.frost).roundToInt()
+        if (wanted <= 0) {
+            clearScrim()
+            return
+        }
+        if (scrimPane.visibility != View.VISIBLE) scrimPane.visibility = View.VISIBLE
+        if (wanted == scrimRadius) return
+        if (SamsungBlur.apply(scrimPane, dp(wanted), 0f)) scrimRadius = wanted
+    }
+
+    private fun clearScrim() {
+        if (scrimRadius == -1) return
+        SamsungBlur.clear(scrimPane)
+        scrimPane.visibility = View.GONE
+        scrimRadius = -1
     }
 
     private fun clearPane(index: Int, pane: View) {
@@ -633,9 +675,115 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
     }
 
-    override fun openQuickSettings() {
-        performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+    override fun openConnectionSettings(kind: String) {
+        val action = when (kind) {
+            "bluetooth" -> android.provider.Settings.ACTION_BLUETOOTH_SETTINGS
+            "wifi" -> android.provider.Settings.ACTION_WIFI_SETTINGS
+            "mobile" -> android.provider.Settings.ACTION_DATA_ROAMING_SETTINGS
+            "plane" -> android.provider.Settings.ACTION_AIRPLANE_MODE_SETTINGS
+            "hotspot" -> "com.android.settings.WIFI_TETHER_SETTINGS"
+            "usb" -> "android.settings.USB_SETTINGS"
+            "battery" -> android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
+            "vitals" -> android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS
+            else -> android.provider.Settings.ACTION_SETTINGS
+        }
+        if (kind == "battery" && startOrFalse(Intent(Intent.ACTION_MAIN).setClassName("com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"))) return
+        if (kind == "vitals" && startOrFalse(Intent("com.samsung.android.sm.ACTION_DASHBOARD").setPackage("com.samsung.android.lool"))) return
+        if (!startOrFalse(Intent(action))) startOrFalse(Intent(android.provider.Settings.ACTION_SETTINGS))
     }
+
+    private fun startOrFalse(intent: Intent): Boolean =
+        runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }.getOrDefault(false)
+
+    override fun requestToggles() = queueToggleWork {}
+
+    override fun setToggle(name: String, isOn: Boolean) {
+        toggleIntents[name] = isOn to (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
+        if (SystemToggles.setDirect(name, isOn)) queueToggleWork {}
+        else queueToggleWork { SystemToggles.set(name, isOn) }
+    }
+
+    override fun setLevel(name: String, percent: Int, isFinal: Boolean) {
+        levelIntents[name] = percent to (android.os.SystemClock.uptimeMillis() + TOGGLE_SETTLE_MILLIS)
+        if (isFinal) {
+            levelTargets.remove(name)
+            levelsWorker.execute { SystemToggles.setLevel(name, percent, true) }
+            return
+        }
+        levelTargets[name] = percent
+        levelsWorker.execute {
+            val target = levelTargets.remove(name) ?: return@execute
+            SystemToggles.setLevel(name, target, false)
+        }
+    }
+
+    private fun queueToggleWork(work: () -> Unit) {
+        togglesQueued.incrementAndGet()
+        togglesWorker.execute {
+            work()
+            if (togglesQueued.decrementAndGet() == 0) reportToggles()
+        }
+    }
+
+    private fun reportToggles() {
+        val state = SystemToggles.read()
+        var isWaiting = false
+        val now = android.os.SystemClock.uptimeMillis()
+        for ((name, intent) in toggleIntents) {
+            val (wanted, deadline) = intent
+            if (!state.has(name) || state.optBoolean(name) == wanted || now > deadline) {
+                toggleIntents.remove(name)
+                continue
+            }
+            state.put(name, wanted)
+            isWaiting = true
+        }
+        for ((name, intent) in levelIntents) {
+            val (wanted, deadline) = intent
+            val answer = if (state.has(name)) state.optInt(name) else wanted
+            if (kotlin.math.abs(answer - wanted) <= LEVEL_SETTLE_SLACK || now > deadline) {
+                levelIntents.remove(name)
+                continue
+            }
+            state.put(name, wanted)
+            isWaiting = true
+        }
+        val toggles = Payloads.toggles(state)
+        Island.post { Island.dashboard.onToggles(toggles) }
+        if (isWaiting) togglesWorker.schedule({ reportToggles() }, TOGGLE_RECHECK_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS)
+    }
+
+    override fun requestVitals() {
+        val context = this
+        togglesWorker.execute {
+            val vitals = Payloads.vitals(VitalsWatch.read(context))
+            Island.post { Island.dashboard.onVitals(vitals) }
+        }
+    }
+
+    override fun requestWeather() {
+        WeatherWatch.request(this) { weather ->
+            val parsed = Payloads.weather(weather)
+            Island.post { Island.dashboard.onWeather(parsed) }
+        }
+    }
+
+    override fun readBatteryExact(): Double = BatteryWatch.readExact(this)
+
+    override fun readDataToday(): String {
+        val total = android.net.TrafficStats.getTotalRxBytes() + android.net.TrafficStats.getTotalTxBytes()
+        val day = java.time.LocalDate.now().toEpochDay()
+        var base = preferences.getLong(Preferences.DATA_BASE, total)
+        if (day != preferences.getLong(Preferences.DATA_DAY, -1L) || total < base) {
+            base = total
+            preferences.edit().putLong(Preferences.DATA_DAY, day).putLong(Preferences.DATA_BASE, base).apply()
+        }
+        val megabytes = (total - base) / 1024.0 / 1024.0
+        return if (megabytes >= 1024) String.format(java.util.Locale.ROOT, "%.1f GB", megabytes / 1024)
+        else String.format(java.util.Locale.ROOT, "%.0f MB", megabytes)
+    }
+
+    override fun transferAction(index: Int) = IslandNotificationListener.transferAction(index)
 
     override fun readNotifications(): List<Notice> = Payloads.notices(IslandNotificationListener.shade())
 

@@ -45,10 +45,17 @@ class ClockBubble {
 
     val isNowStanding: Boolean get() = owner != null
 
-    val isOpen: Boolean get() = owner == NowMod.Torch || (owner == NowMod.Recording && isRecordingOpen)
+    var cornerWidth by mutableFloatStateOf(Dashboard.CORNER_WIDE_FLOOR)
+
+    val isCornered: Boolean get() = Island.dashboard.isOpen
+
+    val isOpen: Boolean get() = !isCornered && (owner == NowMod.Torch || (owner == NowMod.Recording && isRecordingOpen))
 
     fun target(): Frame {
         val appearance = Island.appearance
+        if (isCornered) {
+            return Frame(cornerWidth, Dashboard.CORNER_TALL, Dashboard.CORNER_RADIUS, Dashboard.CORNER_INSET, Dashboard.CORNER_INSET)
+        }
         if (isOpen) {
             val left = Island.screenWidth / 2f - NOW_PANEL_WIDTH / 2f
             return Frame(NOW_PANEL_WIDTH, NOW_PANEL_HEIGHT, 26f, appearance.grab, left)
@@ -108,7 +115,7 @@ class ClockBubble {
                 animate(0f, 1f, animationSpec = tween(Durations.HOME, easing = Curves.bubble)) { progress, _ -> drag = from * (1f - progress) }
             }
         }
-        if (!isTap || abs(from.x) + abs(from.y) > 2f) return
+        if (!isTap || abs(from.x) + abs(from.y) > 2f || isCornered) return
         if (owner == NowMod.Recording && !isRecordingOpen) {
             Haptics.play(Haptic.Expand)
             Island.bubble.toClosedIfExtended()

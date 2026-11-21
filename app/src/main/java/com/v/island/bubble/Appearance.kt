@@ -37,6 +37,12 @@ data class Appearance(
     val headingScale: Float = 1f,
     val contentScale: Float = 1f,
     val showBatteryPercent: Boolean = false,
+    val batteryFont: FontFamily = Faces.tanker,
+    val batteryScale: Float = 1.5f,
+    val statsScale: Float = 1f,
+    val connectorsScale: Float = 1f,
+    val hasDividers: Boolean = false,
+    val isFastDashboard: Boolean = false,
 ) {
     companion object {
         /* Mirrors MELT_MAX in the retired js/state.js: the goo preference is a share of it. */
@@ -79,6 +85,12 @@ data class Appearance(
                 headingScale = scale(Preferences.FONT_SIZE_NOTIFICATION_HEADING),
                 contentScale = scale(Preferences.FONT_SIZE_NOTIFICATION_CONTENT),
                 showBatteryPercent = value(Preferences.STATUS_BATTERY_PERCENT) == 1,
+                batteryFont = Faces.stack(value(Preferences.FONT_BATTERY)),
+                batteryScale = scale(Preferences.FONT_SIZE_BATTERY),
+                statsScale = scale(Preferences.FONT_SIZE_STATS),
+                connectorsScale = scale(Preferences.FONT_SIZE_CONNECTORS),
+                hasDividers = value(Preferences.QUICK_DIVIDERS) != 0,
+                isFastDashboard = value(Preferences.FAST_DASHBOARD) != 0,
             )
         }
     }

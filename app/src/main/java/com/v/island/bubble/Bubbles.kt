@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -157,12 +158,15 @@ fun ClockView(clock: ClockBubble) {
         clock::onDown, clock::onMove, clock::onUp,
     ) {
         AnimatedContent(
-            targetState = if (clock.isOpen) 2 else if (clock.isNowStanding) 1 else 0,
+            targetState = if (clock.isCornered) 3 else if (clock.isOpen) 2 else if (clock.isNowStanding) 1 else 0,
             transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) },
             label = "clock",
             modifier = Modifier.fillMaxSize(),
         ) { face ->
             when (face) {
+                3 -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CornerTime(appearance) { measured -> clock.cornerWidth = maxOf(Dashboard.CORNER_WIDE_FLOOR, measured + CORNER_PADDING * 2f) }
+                }
                 2 -> NowPanel(clock, appearance)
                 1 -> NowClosed(clock, appearance)
                 else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -194,6 +198,33 @@ private fun ClockTime(appearance: Appearance, onMeasured: (Float) -> Unit) {
         }
     }
 }
+
+@Composable
+private fun CornerTime(appearance: Appearance, onMeasured: (Float) -> Unit) {
+    val now = rememberNow(1000)
+    val calendar = java.util.Calendar.getInstance().apply { timeInMillis = now }
+    fun pad(value: Int) = value.toString().padStart(2, '0')
+    Column(
+        Modifier.wrapContentWidth(unbounded = true).onSizeChanged { onMeasured(it.width / Island.density) },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BasicText(
+            "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}:${pad(calendar.get(java.util.Calendar.SECOND))}",
+            style = type(0.68f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f),
+        )
+        BasicText(
+            dateText(appearance.dateFormat, calendar),
+            Modifier.padding(top = 2.4.dp).widthIn(max = 70.dp).graphicsLayer { alpha = 0.75f }.fadeEnd(),
+            style = type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f),
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/* Mirrors --corner-grow-scale and the corner's 0.7rem side padding in the retired pill.css. */
+private const val CORNER_GROW = 1.15f
+private const val CORNER_PADDING = 11.2f
 
 private val TORCH_GLYPH = Glyph(
     0f, 0f, 24f, 24f,
@@ -287,22 +318,32 @@ private fun TorchSlider(clock: ClockBubble) {
 @Composable
 fun StatusView(status: StatusBubble) {
     val appearance = Island.appearance
-    val width = status.contentWidth + 17.6f
-    val target = Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, Island.screenWidth - StatusBubble.STATUS_RIGHT - width)
+    val isCornered = Island.dashboard.isOpen
     FloatingBubble(
-        Region.Status, target, status.modusColour() ?: Palette.border,
-        if (status.isPressing) 1.03f else 1f, { Offset.Zero },
-        { _, _ -> status.onDown() }, { _, _ -> }, status::onUp,
+        Region.Status, status.target(), status.modusColour() ?: Palette.border,
+        if (status.isPressing) 1.03f else 1f, { status.drag },
+        status::onDown, status::onMove, status::onUp,
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Row(
-                Modifier.wrapContentWidth(unbounded = true).onSizeChanged { status.contentWidth = it.width / Island.density },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                status.slots().forEachIndexed { index, slot ->
-                    key(slot.name) {
-                        Box(Modifier.padding(start = if (index == 0) 0.dp else if (slot is StatusSlot.Battery) 5.4.dp else 1.9.dp)) {
-                            StatusSlotView(slot, appearance)
+        AnimatedContent(
+            targetState = isCornered,
+            transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) },
+            label = "status",
+            modifier = Modifier.fillMaxSize(),
+        ) { cornered ->
+            if (cornered) {
+                StatusActions(Island.dashboard)
+                return@AnimatedContent
+            }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Row(
+                    Modifier.wrapContentWidth(unbounded = true).onSizeChanged { status.contentWidth = it.width / Island.density },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    status.slots().forEachIndexed { index, slot ->
+                        key(slot.name) {
+                            Box(Modifier.padding(start = if (index == 0) 0.dp else if (slot is StatusSlot.Battery) 5.4.dp else 1.9.dp)) {
+                                StatusSlotView(slot, appearance)
+                            }
                         }
                     }
                 }

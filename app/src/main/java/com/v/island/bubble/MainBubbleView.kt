@@ -48,6 +48,11 @@ fun MainBubbleView(bubble: MainBubble) {
     val shift = animateFloatAsState(target.shift, follow, label = "shift")
     val radius = animateFloatAsState(target.radius, tween(Durations.GROW, easing = FastOutSlowInEasing), label = "radius")
     val scale = animateFloatAsState(bubble.holdScale, tween(Durations.HOLD, easing = Curves.bubble), label = "hold")
+    val rise = animateFloatAsState(
+        if (bubble.isRisen) MainBubble.EDGE_OVER else 0f,
+        if (bubble.isRisen) tween(Durations.CONTENT_DROP, Durations.GROW, Curves.grow) else tween(Durations.CONTENT_DROP, easing = Curves.grow),
+        label = "rise",
+    )
     val centre = Island.screenWidth / 2f
 
     Blob(Island.liquid) {
@@ -120,7 +125,11 @@ fun MainBubbleView(bubble: MainBubble) {
                 label = "face",
                 modifier = Modifier.fillMaxSize(),
             ) { face ->
-                Box(Modifier.fillMaxSize()) { FaceContent(face, bubble, appearance) }
+                Box(Modifier.fillMaxSize().layout { measurable, constraints ->
+                    val drop = (rise.value * Island.density).roundToInt()
+                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = (constraints.maxHeight - drop).coerceAtLeast(0)))
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, drop) }
+                }) { FaceContent(face, bubble, appearance) }
             }
         }
     }

@@ -107,7 +107,7 @@ data class Transfer(
 )
 
 @Immutable
-data class Paired(val name: String?, val charge: Int)
+data class Paired(val names: List<String>, val charge: Int)
 
 @Immutable
 data class Connectivity(
@@ -127,6 +127,26 @@ data class Connectivity(
 data class Charge(val percent: Int, val exact: Double, val isPlugged: Boolean, val remainingMinutes: Int)
 
 enum class BatteryEvent { Plugged, Low, Critical }
+
+@Immutable
+data class Toggles(val switches: Map<String, Boolean>, val levels: Map<String, Int>) {
+    val isCall: Boolean get() = switches["call"] == true
+
+    fun has(name: String) = name in switches
+
+    companion object {
+        val NONE = Toggles(emptyMap(), emptyMap())
+    }
+}
+
+@Immutable
+data class Vital(val usedGigabytes: Double, val totalGigabytes: Double, val percent: Int)
+
+@Immutable
+data class Vitals(val storage: Vital?, val ram: Vital?)
+
+@Immutable
+data class Weather(val celsius: Double, val sky: String)
 
 @Immutable
 data class Conversation(
@@ -281,8 +301,29 @@ object Payloads {
         isHotspot = json.optBoolean("hotspot"),
         isZen = json.optBoolean("zen"),
         zenName = json.optString("zenName"),
-        paired = json.optJSONObject("bluetooth")?.let { Paired(it.text("name"), it.optInt("charge", -1)) },
+        paired = json.optJSONObject("bluetooth")?.let { paired ->
+            val names = paired.optJSONArray("names")?.let { array -> (0 until array.length()).map(array::optString).filter(String::isNotEmpty) }.orEmpty()
+            Paired(names.ifEmpty { listOfNotNull(paired.text("name")) }, paired.optInt("charge", -1))
+        },
     )
+
+    fun toggles(json: JSONObject): Toggles {
+        val switches = HashMap<String, Boolean>()
+        val levels = HashMap<String, Int>()
+        json.keys().forEach { name ->
+            when (val value = json.opt(name)) {
+                is Boolean -> switches[name] = value
+                is Number -> levels[name] = value.toInt()
+            }
+        }
+        return Toggles(switches, levels)
+    }
+
+    private fun vital(json: JSONObject?) = json?.let { Vital(it.optDouble("usedGigabytes"), it.optDouble("totalGigabytes"), it.optInt("percent")) }
+
+    fun vitals(json: JSONObject) = Vitals(vital(json.optJSONObject("storage")), vital(json.optJSONObject("ram")))
+
+    fun weather(json: JSONObject?) = json?.let { Weather(it.optDouble("celsius"), it.optString("sky", "cloud")) }
 
     fun batteryEvent(json: JSONObject): BatteryEvent? = when (json.optString("state")) {
         "charging", "plugged" -> BatteryEvent.Plugged

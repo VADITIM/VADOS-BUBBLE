@@ -10,6 +10,7 @@ object Faces {
     val wosker = FontFamily(Font(R.font.wosker))
     val striker = FontFamily(Font(R.font.striker))
     val tanker = FontFamily(Font(R.font.tanker))
+    val clashMedium = FontFamily(Font(R.font.clash_medium))
 
     /* Mirrors FONT_STACKS in panel.html: the index a font preference holds has to mean the same face on both sides. */
     private val stacks: List<FontFamily> = listOf(
@@ -21,7 +22,7 @@ object Faces {
         FontFamily(Font(R.font.clash_extralight)),
         FontFamily(Font(R.font.clash_light)),
         FontFamily(Font(R.font.clash_regular)),
-        FontFamily(Font(R.font.clash_medium)),
+        clashMedium,
         FontFamily(Font(R.font.clash_semibold)),
         FontFamily(Font(R.font.clash_bold)),
         FontFamily(Font(R.font.general_extralight)),
