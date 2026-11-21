@@ -311,6 +311,8 @@ function typeBody(body, delay) {
     part.rest.textContent = part.full;
     part.node.nodeValue = '';
     part.node.after(part.rest);
+    part.mark = part.node.parentElement.matches('.notification-text, .notification-who') ? null : part.node.parentElement;
+    part.mark?.style.setProperty('--typed', '0%');
   }
   const interval = Math.min(TYPE_CHARACTER, TYPE_BUDGET / total);
   const start = performance.now() + delay;
@@ -323,24 +325,28 @@ function typeBody(body, delay) {
       if (part.node.nodeValue.length === typed) continue;
       part.node.nodeValue = part.full.slice(0, typed);
       part.rest.textContent = part.full.slice(typed);
+      part.mark?.style.setProperty('--typed', (typed / part.full.length * 100) + '%');
     }
     if (shown <= 0 && parts[parts.length - 1].rest.textContent) {
       requestAnimationFrame(step);
       return;
     }
-    for (const part of parts) part.rest.remove();
+    for (const part of parts) {
+      part.rest.remove();
+      part.mark?.style.removeProperty('--typed');
+    }
   };
   requestAnimationFrame(step);
   return interval * total;
 }
 
-// Mirrors SHELL's Motion.notifications: rows 30ms apart, ten at most, characters 10ms apart; the budget keeps a long message from typing for seconds.
+// Mirrors SHELL's Motion.notifications: rows 30ms apart, ten at most, characters 6ms apart; the budget keeps a long message from typing for seconds.
 const ROW_ENTER_DELAY = 104;
 const ROW_STAGGER = 30;
 const ROW_STAGGER_LIMIT = 10;
 const BODY_TYPE_AFTER = 174;
-const TYPE_CHARACTER = 10;
-const TYPE_BUDGET = 610;
+const TYPE_CHARACTER = 6;
+const TYPE_BUDGET = 400;
 
 export function retireNotifications() {
   if (!root.style.getPropertyValue('--notifications-drop')) return;

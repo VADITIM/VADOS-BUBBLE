@@ -1645,6 +1645,7 @@ function pressToggle(name, element) {
   
   bridge.triggerHaptic('toggle');
   bridge.setToggle(name, next);
+  if (name === 'recording') closeStatusPanel();
 }
 
 const HOLD_OPENS = {

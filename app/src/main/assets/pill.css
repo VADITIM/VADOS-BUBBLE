@@ -1054,7 +1054,8 @@ html.handing-over .face.showing > .glyph { visibility: hidden; }
 
 
 
-  background-size: 100% 78%;
+  /* A highlight was painted at full width from the first frame, so a marked date or amount showed as an empty box ahead of its text while it was typed. */
+  background-size: var(--typed, 100%) 78%;
   background-position: 0 50%;
   
   padding: 0 0.12em;

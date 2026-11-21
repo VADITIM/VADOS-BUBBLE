@@ -1,4 +1,9 @@
-# 0.7.1
+# 0.7.2
+
+- Notifications menu: message text types faster, and a highlighted amount or date grows with its text instead of showing as an empty box ahead of it.
+- Dashboard: pressing the screen recorder closes the Dashboard.
+
+## 0.7.1
 
 - Notifications menu: the title line ("REWE eBon", "Your weekly prize…") is now typed in like the message, ahead of it; the whole list plays 15% faster.
 
