@@ -39,6 +39,7 @@ fun Blob(liquid: Liquid, shape: () -> BlobShape?) {
 
 private const val MAXIMUM_BLOBS = 16
 
+/* "half" is an AGSL type and cannot name a parameter, so the shader failed to compile and the service crashed before drawing a bubble. */
 private val LIQUID_SHADER = """
 uniform float2 origin;
 uniform float count;
@@ -49,14 +50,14 @@ uniform float4 fill;
 uniform float melt;
 uniform float hairline;
 
-float roundBox(float2 point, float2 half, float radius) {
-    float2 q = abs(point) - half + radius;
+float roundBox(float2 point, float2 extent, float radius) {
+    float2 q = abs(point) - extent + radius;
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 }
 
 half4 main(float2 coordinate) {
     float2 point = coordinate + origin;
-    float distance = 100000.0;
+    float field = 100000.0;
     float4 border = float4(0.0);
     float weights = 0.0;
     float opacity = 0.0;
@@ -65,8 +66,8 @@ half4 main(float2 coordinate) {
         float4 box = boxes[index];
         float4 look = looks[index];
         float own = roundBox(point - box.xy, box.zw, look.x) + (1.0 - look.y) * box.w;
-        float blend = clamp(0.5 + 0.5 * (own - distance) / melt, 0.0, 1.0);
-        distance = mix(own, distance, blend) - melt * blend * (1.0 - blend);
+        float blend = clamp(0.5 + 0.5 * (own - field) / melt, 0.0, 1.0);
+        field = mix(own, field, blend) - melt * blend * (1.0 - blend);
         float weight = exp(-max(own, 0.0) / max(melt, 1.0));
         border += borders[index] * weight;
         opacity += look.y * weight;
@@ -74,8 +75,8 @@ half4 main(float2 coordinate) {
     }
     border /= max(weights, 0.0001);
     opacity = clamp(opacity / max(weights, 0.0001), 0.0, 1.0);
-    float inside = clamp(0.5 - distance, 0.0, 1.0);
-    float core = clamp(0.5 - (distance + hairline), 0.0, 1.0);
+    float inside = clamp(0.5 - field, 0.0, 1.0);
+    float core = clamp(0.5 - (field + hairline), 0.0, 1.0);
     float4 color = mix(border, fill, core);
     float alpha = inside * color.a * opacity;
     return half4(color.rgb * alpha, alpha);
