@@ -162,20 +162,28 @@ data class Conversation(
 )
 
 object Payloads {
-    private val decoded = object : LinkedHashMap<String, ImageBitmap?>(32, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap?>?) = size > 48
+    /* The cache held 48 entries whatever their size, keyed by their whole base64 text, and decoded pictures at full resolution, so a few photos in a row ran the service out of memory; it is now bounded by bytes and pictures are decoded no larger than the screen needs. */
+    private val decoded = object : android.util.LruCache<String, ImageBitmap>(IMAGE_CACHE_BYTES) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4 + key.length * 2
     }
 
     fun image(dataUri: String?): ImageBitmap? {
         val value = dataUri?.takeIf { it.startsWith("data:image") } ?: return null
-        synchronized(decoded) { decoded[value]?.let { return it } }
+        decoded.get(value)?.let { return it }
         val bitmap = runCatching {
             val bytes = Base64.decode(value.substringAfter(','), Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-        }.getOrNull()
-        synchronized(decoded) { decoded[value] = bitmap }
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= IMAGE_LONGEST) sample *= 2
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+        }.getOrNull() ?: return null
+        decoded.put(value, bitmap)
         return bitmap
     }
+
+    private const val IMAGE_CACHE_BYTES = 24 * 1024 * 1024
+    private const val IMAGE_LONGEST = 1080
 
     private fun JSONObject.text(name: String): String? =
         if (isNull(name)) null else optString(name).takeIf { it.isNotEmpty() }

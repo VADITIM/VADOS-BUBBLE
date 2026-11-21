@@ -80,9 +80,19 @@ fun Modifier.fadeTop(reach: Dp = 24.dp): Modifier = graphicsLayer { compositingS
         )
     }
 
+/* The fade was drawn on every line, so a string with room to spare still lost its last characters; it is drawn only once the text runs out of room. */
 @Composable
 fun FadingLine(text: String, style: TextStyle, modifier: Modifier = Modifier) {
-    BasicText(text, modifier.fadeEnd(), style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+    var isOverflowing by remember { androidx.compose.runtime.mutableStateOf(false) }
+    BasicText(
+        text,
+        if (isOverflowing) modifier.fadeEnd() else modifier,
+        style = style,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        onTextLayout = { isOverflowing = it.didOverflowWidth },
+    )
 }
 
 @Composable
@@ -108,21 +118,27 @@ fun RevealLabel(text: String, style: TextStyle, bar: Color, delayMilliseconds: I
     }
 }
 
+/* Writing the text in character by character re-wrapped the row on every frame and pushed the rows under it; the whole text is laid out from the start and only the untyped rest is left uncoloured, as typeBody in tabs.js did. */
 @Composable
-fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE) {
+fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, interval: Float = typeInterval(text.length)) {
     var shown by remember(text) { mutableIntStateOf(0) }
     LaunchedEffect(text) {
         if (text.isEmpty()) return@LaunchedEffect
         delay(delayMilliseconds.toLong())
-        val interval = minOf(TYPE_CHARACTER, TYPE_BUDGET / text.length.toFloat())
         val start = System.nanoTime()
         while (shown < text.length) {
             delay(16)
             shown = ((System.nanoTime() - start) / 1_000_000f / interval).toInt().coerceAtMost(text.length)
         }
     }
-    BasicText(text.take(shown), modifier, style = style, maxLines = maxLines, overflow = TextOverflow.Clip)
+    val typed = androidx.compose.ui.text.buildAnnotatedString {
+        append(text.substring(0, shown))
+        withStyle(androidx.compose.ui.text.SpanStyle(color = Color.Transparent)) { append(text.substring(shown)) }
+    }
+    BasicText(typed, modifier, style = style, maxLines = maxLines, overflow = TextOverflow.Clip)
 }
+
+fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))
 
 private const val TYPE_CHARACTER = 6f
 private const val TYPE_BUDGET = 400f

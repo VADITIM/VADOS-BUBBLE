@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -446,6 +447,13 @@ private fun StatsSection(dashboard: Dashboard, geometry: PanelGeometry, appearan
     }
 }
 
+/* The reading was left out of the row while held, so the icon beside it stood alone and jumped aside when the reveal began; the text keeps its room, unseen, until it is revealed. */
+@Composable
+private fun HeldReveal(dashboard: Dashboard, text: String, style: TextStyle, bar: Color) {
+    if (dashboard.areReadingsHeld) BasicText(text, Modifier.graphicsLayer { alpha = 0f }, style = style, maxLines = 1, softWrap = false)
+    else RevealLabel(text, style, bar)
+}
+
 @Composable
 private fun WeatherLine(dashboard: Dashboard, appearance: Appearance) {
     val shown = appearing(dashboard, 160)
@@ -457,9 +465,7 @@ private fun WeatherLine(dashboard: Dashboard, appearance: Appearance) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val style = type(0.78f, Color.White, Faces.clashMedium, appearance.statsScale, spacing = 0.0156f, lineHeight = 1.2f)
-        if (!dashboard.areReadingsHeld) {
-            RevealLabel(if (weather != null) "${weather.celsius.roundToInt()}°C" else "--°C", style, accent)
-        }
+        HeldReveal(dashboard, if (weather != null) "${weather.celsius.roundToInt()}°C" else "--°C", style, accent)
         GlyphIcon(
             when (weather?.sky) {
                 "clear" -> Glyphs.weatherClear
@@ -551,12 +557,8 @@ private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appeara
                 val inset = 6.dp.toPx()
                 val wide = max(0f, (size.width - 4.dp.toPx()) * share - 8.dp.toPx())
                 if (wide > 0f) {
-                    drawRoundRect(
-                        colour.value,
-                        topLeft = Offset(inset, inset),
-                        size = androidx.compose.ui.geometry.Size(wide, size.height - inset * 2f),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(17.dp.toPx()),
-                    )
+                    val outline = FILL_SHAPE.createOutline(androidx.compose.ui.geometry.Size(wide, size.height - inset * 2f), layoutDirection, this)
+                    translate(inset, inset) { drawOutline(outline, colour.value) }
                 }
             }
             if (isPlugged && dashboard.isOpen) ChargeBubbles(share)
@@ -576,6 +578,9 @@ private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appeara
         )
     }
 }
+
+/* Mirrors #battery-fill in pill.css: the fill is a squircle like its cell, and a circular 17dp corner read rounder than the WebView's. */
+private val FILL_SHAPE = SquircleShape(17.dp)
 
 @Composable
 private fun BoxScope.ChargeBubbles(share: Float) {
@@ -679,7 +684,7 @@ private fun TransferStrip(dashboard: Dashboard, appearance: Appearance, modifier
                 Modifier.size(15.dp),
             )
             if (transfer == null) {
-                if (!dashboard.areReadingsHeld) RevealLabel(dashboard.dataToday, mono, accent)
+                HeldReveal(dashboard, dashboard.dataToday, mono, accent)
             } else {
                 BasicText(if (isDone) "Done" else "${(share * 100f).roundToInt()}%", style = mono)
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
@@ -1161,8 +1166,9 @@ private fun KnobRow(dashboard: Dashboard, geometry: PanelGeometry, appearance: A
     val windowWide = geometry.width + Dashboard.MARGIN * 2f
     Box(
         Modifier
-            .offset { IntOffset((-Dashboard.MARGIN * Island.density).roundToInt(), (geometry.knobTop * Island.density).roundToInt()) }
-            .size(windowWide.dp, Dashboard.KNOB_SIZE.dp)
+            .offset { IntOffset(0, (geometry.knobTop * Island.density).roundToInt()) }
+            /* size() was held to the panel's width, so the window bled past the left margin only and left both margins as a gap on the right; requiredSize overhangs both sides equally. */
+            .requiredSize(windowWide.dp, Dashboard.KNOB_SIZE.dp)
             .clipToBounds()
             .pointerInput(dashboard) {
                 awaitEachGesture {

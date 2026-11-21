@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.v.island.vas.Curves
 import com.v.island.vas.Haptic
@@ -54,12 +57,15 @@ fun agoText(postedAt: Long): String {
 @Composable
 fun NotificationsFace(bubble: MainBubble, appearance: Appearance) {
     Column(Modifier.fillMaxSize().padding(start = 6.4.dp, end = 6.4.dp, top = 14.4.dp, bottom = 8.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            RevealLabel("NOTIFICATIONS", type(0.63f, Palette.textLabel, appearance.headingFont, appearance.headingScale, spacing = 0.19f), appearance.accent)
+        Row(
+            Modifier.fillMaxWidth().padding(start = 14.4.dp, end = 14.4.dp, bottom = 9.6.dp)
+                .onSizeChanged { bubble.reportNotificationsHead(it.height / Island.density) },
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            RevealLabel("NOTIFICATIONS", type(0.6f, Palette.textLabel, appearance.headingFont, appearance.headingScale, spacing = 0.19f), appearance.accent)
             val total = bubble.groups.sumOf { it.entries.size }
-            if (total > 0) BasicText(total.toString(), style = type(0.63f, Palette.textMuted, appearance.headingFont, appearance.headingScale))
+            if (total > 0) BasicText(total.toString(), style = type(0.6f, Palette.textLabel, appearance.headingFont, appearance.headingScale, spacing = 0.08f))
         }
-        Spacer(Modifier.size(8.dp))
         if (bubble.groups.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 BasicText("Nothing waiting", style = type(0.75f, Palette.textFaint, appearance.contentFont, appearance.contentScale))
@@ -67,15 +73,17 @@ fun NotificationsFace(bubble: MainBubble, appearance: Appearance) {
             return@Column
         }
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(bubble.notificationsScroll, enabled = false)) {
-            bubble.groups.forEachIndexed { index, group ->
-                key(group.id) { NotificationRow(bubble, group, index, appearance) }
+            Column(Modifier.fillMaxWidth().onSizeChanged { bubble.reportNotificationsList(it.height / Island.density) }) {
+                bubble.groups.forEachIndexed { index, group ->
+                    key(group.id) { NotificationRow(bubble, group, index, index == bubble.groups.lastIndex, appearance) }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, appearance: Appearance) {
+private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, isLast: Boolean, appearance: Appearance) {
     val entry = group.head
     val delayMilliseconds = ROW_ENTER_DELAY + minOf(index, ROW_STAGGER_LIMIT) * ROW_STAGGER
     val slide = remember { Animatable(0f) }
@@ -84,17 +92,18 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         delay(delayMilliseconds.toLong())
-        arrival.animateTo(1f, tween(360, easing = Curves.enter))
+        arrival.animateTo(1f, tween(191, easing = ROW_ARRIVE))
     }
     Row(
         Modifier.fillMaxWidth()
+            .padding(start = 5.6.dp, end = 5.6.dp, bottom = if (isLast) 0.dp else 6.4.dp)
             .graphicsLayer {
                 translationX = slide.value * density
                 alpha = arrival.value * (1f - (abs(slide.value) / SWIPE_AWAY).coerceIn(0f, 1f))
                 translationY = (1f - arrival.value) * 10f * density
             }
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (isPressing) Palette.textBright.copy(alpha = 0.11f) else androidx.compose.ui.graphics.Color.Transparent)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Palette.textBright.copy(alpha = if (isPressing) 0.11f else 0.05f))
             .pointerInput(group.id) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -132,45 +141,68 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
                     }
                 }
             }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 12.dp, vertical = 12.8.dp),
+        horizontalArrangement = Arrangement.spacedBy(13.6.dp),
     ) {
         val badge = entry.appIcon ?: entry.icon
         if (badge != null) {
-            Image(badge, null, Modifier.size(26.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            Image(badge, null, Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop)
         } else {
-            Box(Modifier.size(26.dp).clip(CircleShape).background(entry.accent), contentAlignment = Alignment.Center) {
-                BasicText(entry.appName.trim().take(1).uppercase(), style = type(0.7f, Palette.ground, appearance.headingFont))
+            Box(Modifier.size(40.dp).clip(CircleShape).background(entry.accent), contentAlignment = Alignment.Center) {
+                BasicText(entry.appName.ifEmpty { entry.app }.trim().take(1).uppercase(), style = type(0.9f, Palette.ground, appearance.headingFont))
             }
         }
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RevealLabel(
                     entry.appName.ifEmpty { entry.app }.uppercase(),
-                    type(0.6f, entry.accent, appearance.headingFont, appearance.headingScale, spacing = 0.16f),
+                    type(0.68f, entry.accent, appearance.headingFont, appearance.headingScale, spacing = 0.14f, weight = FontWeight.Bold),
                     entry.accent,
-                    delayMilliseconds,
+                    delayMilliseconds + 70,
                     Modifier.weight(1f, fill = false),
                 )
                 if (group.entries.size > 1) {
-                    BasicText(group.entries.size.toString(), style = type(0.6f, Palette.textMuted, appearance.headingFont, appearance.headingScale))
+                    BasicText(
+                        group.entries.size.toString(),
+                        Modifier.border(1.dp, Palette.borderControl, RoundedCornerShape(50)).padding(horizontal = 6.4.dp),
+                        style = type(0.62f, Palette.textMuted, appearance.headingFont, appearance.headingScale),
+                    )
                 }
-                val newest = group.entries.maxOf { it.postedAt }
-                val age = agoText(newest)
-                if (age.isNotEmpty()) BasicText(age, style = type(0.6f, Palette.textFaint, appearance.headingFont, appearance.headingScale))
+                Spacer(Modifier.weight(1f))
+                val age = agoText(group.entries.maxOf { it.postedAt })
+                if (age.isNotEmpty()) BasicText(age, style = type(0.68f, Palette.textLabel, appearance.headingFont, appearance.headingScale))
             }
+            val typedFrom = delayMilliseconds + BODY_TYPE_AFTER
+            var titleTyping = 0f
             if (entry.title.isNotEmpty()) {
-                TypedText(entry.title, type(0.72f, Palette.textBright, appearance.contentFont, appearance.contentScale, lineHeight = 1.35f), delayMilliseconds + BODY_TYPE_AFTER, maxLines = 1)
+                val interval = typeInterval(entry.title.length)
+                titleTyping = interval * entry.title.length
+                TypedText(entry.title, type(0.95f, Palette.textBright, appearance.headingFont, appearance.headingScale, lineHeight = 1.3f), typedFrom, Modifier.padding(top = 3.2.dp), interval = interval)
             }
             val lines = group.entries.flatMap { one ->
                 if (one.messages.isNotEmpty()) one.messages.map { it.text } else listOf(one.text.ifEmpty { if (entry.title.isEmpty()) one.title else "" })
             }.filter { it.isNotEmpty() }
-            lines.forEach { line ->
-                TypedText(line, type(0.72f, Palette.textBody, appearance.contentFont, appearance.contentScale, lineHeight = 1.4f), delayMilliseconds + BODY_TYPE_AFTER + 120)
+            if (lines.isNotEmpty()) {
+                val interval = typeInterval(lines.sumOf { it.length })
+                var typedBefore = 0
+                Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(3.2.dp)) {
+                    lines.forEach { line ->
+                        TypedText(
+                            line,
+                            type(0.86f, Palette.textBody, appearance.contentFont, appearance.contentScale, lineHeight = 1.45f),
+                            typedFrom + titleTyping.toInt() + (typedBefore * interval).toInt(),
+                            interval = interval,
+                        )
+                        typedBefore += line.length
+                    }
+                }
             }
         }
     }
 }
+
+/* Mirrors the notification-row-in keyframes in pill.css. */
+private val ROW_ARRIVE = androidx.compose.animation.core.CubicBezierEasing(0.25f, 0.46f, 0.45f, 0.94f)
 
 private const val ROW_ENTER_DELAY = 104
 private const val ROW_STAGGER = 30

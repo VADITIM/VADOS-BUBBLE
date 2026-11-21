@@ -1,14 +1,17 @@
 package com.v.island.bubble
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.using
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -159,7 +162,8 @@ fun ClockView(clock: ClockBubble) {
     ) {
         AnimatedContent(
             targetState = if (clock.isCornered) 3 else if (clock.isOpen) 2 else if (clock.isNowStanding) 1 else 0,
-            transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) },
+            transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) using SizeTransform(clip = false) { _, _ -> snap() } },
+            contentAlignment = Alignment.Center,
             label = "clock",
             modifier = Modifier.fillMaxSize(),
         ) { face ->
@@ -212,12 +216,10 @@ private fun CornerTime(appearance: Appearance, onMeasured: (Float) -> Unit) {
             "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}:${pad(calendar.get(java.util.Calendar.SECOND))}",
             style = type(0.68f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f),
         )
-        BasicText(
+        FadingLine(
             dateText(appearance.dateFormat, calendar),
-            Modifier.padding(top = 2.4.dp).widthIn(max = 70.dp).graphicsLayer { alpha = 0.75f }.fadeEnd(),
-            style = type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f),
-            maxLines = 1,
-            softWrap = false,
+            type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f),
+            Modifier.padding(top = 2.4.dp).widthIn(max = 70.dp).graphicsLayer { alpha = 0.75f },
         )
     }
 }
@@ -326,7 +328,8 @@ fun StatusView(status: StatusBubble) {
     ) {
         AnimatedContent(
             targetState = isCornered,
-            transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) },
+            transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) using SizeTransform(clip = false) { _, _ -> snap() } },
+            contentAlignment = Alignment.Center,
             label = "status",
             modifier = Modifier.fillMaxSize(),
         ) { cornered ->
@@ -389,14 +392,15 @@ private fun MiniBattery(charge: Charge, modGlyph: Float, appearance: Appearance)
                 val outline = 1.5.dp.toPx()
                 val corner = modGlyph * 0.17f * density
                 drawRoundRect(Color(0xD92A2832), cornerRadius = CornerRadius(corner))
-                val inner = 1.dp.toPx() + outline / 2f
+                val inner = outline + 1.dp.toPx()
+                val well = size.width - outline * 2f
                 drawRoundRect(
                     colour,
                     topLeft = Offset(inner, inner),
-                    size = Size((size.width - inner * 2f) * fill.value, size.height - inner * 2f),
+                    size = Size(minOf(well * fill.value, well - 2.dp.toPx()), size.height - inner * 2f),
                     cornerRadius = CornerRadius((corner - 2.5f * density).coerceAtLeast(density)),
                 )
-                drawRoundRect(colour, topLeft = Offset(outline / 2f, outline / 2f), size = Size(size.width - outline, size.height - outline), cornerRadius = CornerRadius(corner), style = Stroke(outline))
+                drawRoundRect(colour, topLeft = Offset(outline / 2f, outline / 2f), size = Size(size.width - outline, size.height - outline), cornerRadius = CornerRadius(corner - outline / 2f), style = Stroke(outline))
             }
             if (!isBare) BasicText("${charge.percent}%", style = type(0.6f, Color.Black, appearance.statusFont, appearance.statusScale, weight = FontWeight.Bold, lineHeight = 1f))
         }

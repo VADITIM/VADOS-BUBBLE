@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
@@ -40,7 +41,11 @@ fun MainBubbleView(bubble: MainBubble) {
     val appearance = Island.appearance
     val target = bubble.target()
     val isClosed = bubble.size.isClosed
-    val easing = if (isClosed) Curves.bubble else Curves.grow
+    val wasClosed = remember { BooleanArray(1) { true } }
+    val isReturning = isClosed && !wasClosed[0]
+    SideEffect { wasClosed[0] = isClosed }
+    /* A grown box collapsing on the 1.7 overshoot undershot the closed pill and slammed back, so every return home rides the reach curve, as html.returning in pill.css did. */
+    val easing = if (isReturning) Curves.reach else if (isClosed) Curves.bubble else Curves.grow
     val follow = if (bubble.isDragging) snap<Float>() else tween(Durations.GROW, easing = easing)
     val width = animateFloatAsState(target.width, follow, label = "width")
     val height = animateFloatAsState(target.height, tween(Durations.GROW, easing = easing), label = "height")
@@ -119,6 +124,17 @@ fun MainBubbleView(bubble: MainBubble) {
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(radius.value.dp)
                 },
         ) {
+            /* Laid out at the animated size, every face re-centred on each frame of the growth and its contents drifted in from the corner; at the target size only the clip moves. */
+            Box(Modifier.layout { measurable, constraints ->
+                val density = Island.density
+                val placeable = measurable.measure(
+                    androidx.compose.ui.unit.Constraints.fixed(
+                        (maxOf(target.width, width.value) * density).roundToInt().coerceAtLeast(1),
+                        (maxOf(target.height, height.value) * density).roundToInt().coerceAtLeast(1),
+                    ),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place((constraints.maxWidth - placeable.width) / 2, 0) }
+            }) {
             AnimatedContent(
                 targetState = bubble.face,
                 transitionSpec = { faceTransition(initialState, targetState) },
@@ -130,6 +146,7 @@ fun MainBubbleView(bubble: MainBubble) {
                     val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = (constraints.maxHeight - drop).coerceAtLeast(0)))
                     layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, drop) }
                 }) { FaceContent(face, bubble, appearance) }
+            }
             }
         }
     }
@@ -143,11 +160,11 @@ private fun faceTransition(from: Face, to: Face): ContentTransform {
         return ContentTransform(
             scaleIn(tween(Durations.POP_IN, Durations.POP_OUT, Curves.enter)) + fadeIn(tween(120, Durations.POP_OUT)),
             scaleOut(tween(Durations.POP_OUT, easing = Curves.leave)) + fadeOut(tween(Durations.POP_OUT)),
-            sizeTransform = SizeTransform(clip = false),
+            sizeTransform = SizeTransform(clip = false) { _, _ -> snap() },
         )
     }
     val arriving = if (to in CLOSED_FACES) Durations.COLLAPSE / 2 else Durations.CONTENT_DROP
-    return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(120)), sizeTransform = SizeTransform(clip = false))
+    return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(120)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
 }
 
 @Composable

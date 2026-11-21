@@ -90,6 +90,8 @@ class MainBubble {
         private set
     var notificationsDrop by mutableFloatStateOf(0f)
         private set
+    private var notificationsHead = NOTIFICATIONS_HEAD
+    private var notificationsList = -1f
     var accent by mutableStateOf(Color.White)
         private set
     var isScrubbing by mutableStateOf(false)
@@ -399,7 +401,8 @@ class MainBubble {
         val below = CLEAR_GAP + CLEAR_SIZE
         val floor = (tall * 0.35f).roundToInt().toFloat()
         val ceiling = (tall * 0.85f).roundToInt() - below
-        val wanted = NOTIFICATIONS_HEAD + groups.sumOf { group -> rowHeight(group).toDouble() }.toFloat() + 20f
+        val list = if (notificationsList >= 0f) notificationsList else groups.sumOf { group -> rowHeight(group).toDouble() }.toFloat()
+        val wanted = notificationsHead + list + 20f
         val height = max(floor, min(ceiling, wanted))
         val lowest = max(highest, tall - height - below - NOTIFICATIONS_FOOT)
         val top = (lowest + (highest - lowest) * appearance.notificationsRise).roundToInt().toFloat()
@@ -407,9 +410,22 @@ class MainBubble {
         notificationsDrop = top - highest
     }
 
+    /* The height was guessed from line counts, so a long message overflowed and a short list left a gap; the menu is now sized off its rows as they are laid out, as notificationsWindow did off scrollHeight. */
+    fun reportNotificationsHead(height: Float) {
+        if (height == notificationsHead) return
+        notificationsHead = height
+        if (size == Size.Notifications) fitNotifications()
+    }
+
+    fun reportNotificationsList(height: Float) {
+        if (height == notificationsList) return
+        notificationsList = height
+        if (size == Size.Notifications) fitNotifications()
+    }
+
     private fun rowHeight(group: NoticeGroup): Float {
         val lines = group.entries.sumOf { entry -> max(1, entry.messages.size).coerceAtMost(4) }
-        return 46f + lines * 17f
+        return 70f + lines * 20f
     }
 
     fun dismissGroup(group: NoticeGroup) {
