@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -132,13 +131,14 @@ private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, F
 private fun faceTransition(from: Face, to: Face): ContentTransform {
     val isHandOver = from in CLOSED_FACES && to in CLOSED_FACES
     if (isHandOver) {
-        return (scaleIn(tween(Durations.POP_IN, Durations.POP_OUT, Curves.enter)) + fadeIn(tween(120, Durations.POP_OUT)))
-            .togetherWith(scaleOut(tween(Durations.POP_OUT, easing = Curves.leave)) + fadeOut(tween(Durations.POP_OUT)))
-            .using(SizeTransform(clip = false))
+        return ContentTransform(
+            scaleIn(tween(Durations.POP_IN, Durations.POP_OUT, Curves.enter)) + fadeIn(tween(120, Durations.POP_OUT)),
+            scaleOut(tween(Durations.POP_OUT, easing = Curves.leave)) + fadeOut(tween(Durations.POP_OUT)),
+            sizeTransform = SizeTransform(clip = false),
+        )
     }
     val arriving = if (to in CLOSED_FACES) Durations.COLLAPSE / 2 else Durations.CONTENT_DROP
-    return fadeIn(tween(160, arriving)).togetherWith(fadeOut(tween(120)))
-        .using(SizeTransform(clip = false))
+    return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(120)), sizeTransform = SizeTransform(clip = false))
 }
 
 @Composable
