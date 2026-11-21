@@ -9,9 +9,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 
-enum class Region { Dashboard, Now, Main, Clock, Status, Clear }
+enum class Region { Shield, Dashboard, Now, Main, Clock, Status, Clear, Alert }
+
+@androidx.compose.runtime.Immutable
+class DarkAlert(val appName: String, val title: String, val text: String, val accent: androidx.compose.ui.graphics.Color, val generation: Int, val isAppending: Boolean, val revealKey: Int)
 
 interface HostActions {
     fun openNotification(key: String)
@@ -37,6 +41,8 @@ interface HostActions {
     fun tripAction(index: Int)
     fun recordingAction(index: Int)
     fun setTorch(step: Int)
+    fun passTap(x: Float, y: Float)
+    fun sleepScreen()
 }
 
 object Island {
@@ -79,6 +85,49 @@ object Island {
     val dashboard = Dashboard()
     val now = NowBubble()
     var frost = 0f
+
+    /* Mirrors setScreenDark and paintDarkAlert in js/alert.js: an arrival on a dark screen is read as always-on text on black at a low brightness, not as the Alert the lit screen gets. */
+    var isScreenDark by mutableStateOf(false)
+        private set
+    var isDarkSimulated = false
+        private set
+    var darkAlert by mutableStateOf<DarkAlert?>(null)
+        private set
+    var darkAlertBox: Rect? = null
+    private var darkGeneration = 0
+    private var sleepJob: kotlinx.coroutines.Job? = null
+
+    fun setScreenDark(isOn: Boolean, isSimulated: Boolean = false) {
+        isScreenDark = isOn
+        isDarkSimulated = isOn && isSimulated
+        sleepJob?.cancel()
+        if (!isOn) darkAlert = null
+    }
+
+    fun showDarkAlert(appName: String, title: String, text: String, accent: androidx.compose.ui.graphics.Color, isAppending: Boolean) {
+        darkGeneration += 1
+        val previous = darkAlert
+        val isAdded = isAppending && previous != null
+        darkAlert = DarkAlert(appName, title, text, accent, darkGeneration, isAdded, if (isAdded) previous!!.revealKey else darkGeneration)
+    }
+
+    fun liftScreenDark() {
+        if (!isScreenDark) return
+        setScreenDark(false)
+    }
+
+    fun sleepDark() {
+        if (!isScreenDark) return
+        darkAlert = null
+        sleepJob?.cancel()
+        sleepJob = scope.launch {
+            kotlinx.coroutines.delay(DARK_SLEEP)
+            if (isDarkSimulated) liftScreenDark() else actions.sleepScreen()
+        }
+    }
+
+    /* Mirrors HOME_TRAVEL in js/alert.js: the text fades before the screen is put back to sleep. */
+    private const val DARK_SLEEP = 460L
 
     fun start(actions: HostActions) {
         this.actions = actions

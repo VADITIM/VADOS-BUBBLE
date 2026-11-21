@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -42,16 +44,22 @@ fun MainBubbleView(bubble: MainBubble) {
     val target = bubble.target()
     val isClosed = bubble.size.isClosed
     val wasClosed = remember { BooleanArray(1) { true } }
+    val previous = remember { arrayOf(bubble.size) }
     val isReturning = isClosed && !wasClosed[0]
-    SideEffect { wasClosed[0] = isClosed }
+    /* Mirrors --grow-ms on the grown sizes and html.notifications-homing in pill.css: the big boxes open and go home over 460ms, not the pill's 340. */
+    val growth = if (bubble.size in LONG_SIZES || previous[0] in LONG_SIZES) LONG_GROW else Durations.GROW
+    SideEffect {
+        wasClosed[0] = isClosed
+        previous[0] = bubble.size
+    }
     /* A grown box collapsing on the 1.7 overshoot undershot the closed pill and slammed back, so every return home rides the reach curve, as html.returning in pill.css did. */
     val easing = if (isReturning) Curves.reach else if (isClosed) Curves.bubble else Curves.grow
-    val follow = if (bubble.isDragging) snap<Float>() else tween(Durations.GROW, easing = easing)
+    val follow = if (bubble.isDragging) snap<Float>() else tween(growth, easing = easing)
     val width = animateFloatAsState(target.width, follow, label = "width")
-    val height = animateFloatAsState(target.height, tween(Durations.GROW, easing = easing), label = "height")
-    val top = animateFloatAsState(target.top, tween(Durations.GROW, easing = if (isClosed) Curves.reach else Curves.grow), label = "top")
+    val height = animateFloatAsState(target.height, tween(growth, easing = easing), label = "height")
+    val top = animateFloatAsState(target.top, tween(growth, easing = if (isClosed) Curves.reach else Curves.grow), label = "top")
     val shift = animateFloatAsState(target.shift, follow, label = "shift")
-    val radius = animateFloatAsState(target.radius, tween(Durations.GROW, easing = FastOutSlowInEasing), label = "radius")
+    val radius = animateFloatAsState(target.radius, tween(growth, easing = FastOutSlowInEasing), label = "radius")
     val scale = animateFloatAsState(bubble.holdScale, tween(Durations.HOLD, easing = Curves.bubble), label = "hold")
     val rise = animateFloatAsState(
         if (bubble.isRisen) MainBubble.EDGE_OVER else 0f,
@@ -101,6 +109,8 @@ fun MainBubbleView(bubble: MainBubble) {
     ) {
         Box(
             Modifier
+                /* The pad is sized to the target, so collapsing it shrank under a box still the open size, and Compose centred the oversized box in it: the menu's contents slid up out of the liquid on the way home. */
+                .wrapContentSize(Alignment.TopStart, unbounded = true)
                 .layout { measurable, _ ->
                     val density = Island.density
                     val placeable = measurable.measure(
@@ -152,6 +162,11 @@ fun MainBubbleView(bubble: MainBubble) {
     }
 }
 
+private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre)
+private const val LONG_GROW = 460
+/* A grown face kept its open size while it faded over the collapsing bubble; it goes in the first frames of the collapse, as .face:not(.showing) does. */
+private const val GROWN_FADE = 90
+
 private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, Face.Trip)
 
 private fun faceTransition(from: Face, to: Face): ContentTransform {
@@ -164,7 +179,7 @@ private fun faceTransition(from: Face, to: Face): ContentTransform {
         )
     }
     val arriving = if (to in CLOSED_FACES) Durations.COLLAPSE / 2 else Durations.CONTENT_DROP
-    return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(120)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
+    return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(if (to in CLOSED_FACES) GROWN_FADE else 120)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
 }
 
 @Composable

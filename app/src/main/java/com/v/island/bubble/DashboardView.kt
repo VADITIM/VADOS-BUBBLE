@@ -8,6 +8,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -47,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -288,13 +288,15 @@ private suspend fun PointerInputScope.ground(dashboard: Dashboard) = awaitEachGe
         }
         if (!isPushed && !isFromLevel && drop < -Dashboard.PUSH_DISMISS && abs(across) < Dashboard.PUSH_STRAY) {
             isPushed = true
-            if (!isFromControl) Haptics.play(Haptic.Dismiss)
             dashboard.close(Sling.throwOf(trail))
         }
     }
     dashboard.isControlTouch = false
     dashboard.isLevelTouch = false
 }
+
+/* Mirrors FOCUS_RAMP in js/liquid.js. */
+private const val FOCUS_RAMP = 240
 
 @Composable
 fun DashboardScrim(dashboard: Dashboard) {
@@ -313,8 +315,12 @@ fun DashboardScrim(dashboard: Dashboard) {
         tween(if (isShown) 62 else if (dashboard.isSoloOut) Dashboard.SOLO_FROST else 270, easing = Curves.sweep),
         label = "frost",
     )
+    /* Mirrors focusFrost in js/liquid.js: a focused Alert and the open Notifications menu frost the screen through the Dashboard's own pane. */
+    val bubble = Island.bubble
+    val isFocused = bubble.size == Size.AlertCentre || bubble.size == Size.Notifications
+    val focus = animateFloatAsState(if (isFocused) 1f else 0f, tween(FOCUS_RAMP, easing = FastOutSlowInEasing), label = "focus")
     Canvas(Modifier.fillMaxSize()) {
-        val stepped = (frost.value * FROST_STEPS).roundToInt() / FROST_STEPS.toFloat()
+        val stepped = (maxOf(frost.value, focus.value) * FROST_STEPS).roundToInt() / FROST_STEPS.toFloat()
         if (stepped != Island.frost) {
             Island.frost = stepped
             Island.onBlobsDrawn()
@@ -455,11 +461,18 @@ private fun StatsSection(dashboard: Dashboard, geometry: PanelGeometry, appearan
     }
 }
 
-/* The reading was left out of the row while held, so the icon beside it stood alone and jumped aside when the reveal began; the text keeps its room, unseen, until it is revealed. */
+/* The glyph beside a held reading stood there alone before the sweep showed the reading it belongs to; the two keep their room unseen and are swept in as one. */
 @Composable
-private fun HeldReveal(dashboard: Dashboard, text: String, style: TextStyle, bar: Color) {
-    if (dashboard.areReadingsHeld) BasicText(text, Modifier.graphicsLayer { alpha = 0f }, style = style, maxLines = 1, softWrap = false)
-    else RevealLabel(text, style, bar)
+private fun HeldReveal(dashboard: Dashboard, text: String, style: TextStyle, bar: Color, isGlyphFirst: Boolean, glyph: @Composable () -> Unit) {
+    val line = @Composable {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.2.dp)) {
+            if (isGlyphFirst) glyph()
+            BasicText(text, style = style, maxLines = 1, softWrap = false)
+            if (!isGlyphFirst) glyph()
+        }
+    }
+    if (dashboard.areReadingsHeld) Box(Modifier.graphicsLayer { alpha = 0f }) { line() }
+    else Reveal(text, bar) { line() }
 }
 
 @Composable
@@ -473,16 +486,17 @@ private fun WeatherLine(dashboard: Dashboard, appearance: Appearance) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val style = type(0.78f, Color.White, Faces.clashMedium, appearance.statsScale, spacing = 0.0156f, lineHeight = 1.2f)
-        HeldReveal(dashboard, if (weather != null) "${weather.celsius.roundToInt()}°C" else "--°C", style, accent)
-        GlyphIcon(
-            when (weather?.sky) {
-                "clear" -> Glyphs.weatherClear
-                "rain" -> Glyphs.weatherRain
-                else -> Glyphs.weatherCloud
-            },
-            Color.White,
-            Modifier.size(16.dp),
-        )
+        HeldReveal(dashboard, if (weather != null) "${weather.celsius.roundToInt()}°C" else "--°C", style, accent, isGlyphFirst = false) {
+            GlyphIcon(
+                when (weather?.sky) {
+                    "clear" -> Glyphs.weatherClear
+                    "rain" -> Glyphs.weatherRain
+                    else -> Glyphs.weatherCloud
+                },
+                Color.White,
+                Modifier.size(16.dp),
+            )
+        }
     }
 }
 
@@ -681,19 +695,12 @@ private fun TransferStrip(dashboard: Dashboard, appearance: Appearance, modifier
         verticalArrangement = Arrangement.spacedBy(4.8.dp, Alignment.CenterVertically),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.2.dp)) {
-            GlyphIcon(
-                when {
-                    transfer == null -> Glyphs.dataToday
-                    isDone -> Glyphs.transferDone
-                    transfer.isUpload -> Glyphs.upload
-                    else -> Glyphs.download
-                },
-                Color.White,
-                Modifier.size(15.dp),
-            )
             if (transfer == null) {
-                HeldReveal(dashboard, dashboard.dataToday, mono, accent)
+                HeldReveal(dashboard, dashboard.dataToday, mono, accent, isGlyphFirst = true) {
+                    GlyphIcon(Glyphs.dataToday, Color.White, Modifier.size(15.dp))
+                }
             } else {
+                GlyphIcon(if (isDone) Glyphs.transferDone else if (transfer.isUpload) Glyphs.upload else Glyphs.download, Color.White, Modifier.size(15.dp))
                 BasicText(if (isDone) "Done" else "${(share * 100f).roundToInt()}%", style = mono)
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                     FadingStart(transfer.label, mono.copy(color = Palette.textMuted))
@@ -1177,7 +1184,6 @@ private fun KnobRow(dashboard: Dashboard, geometry: PanelGeometry, appearance: A
             .offset { IntOffset(0, (geometry.knobTop * Island.density).roundToInt()) }
             /* size() was held to the panel's width, so the window bled past the left margin only and left both margins as a gap on the right; requiredSize overhangs both sides equally. */
             .requiredSize(windowWide.dp, Dashboard.KNOB_SIZE.dp)
-            .clipToBounds()
             .pointerInput(dashboard) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)

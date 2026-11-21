@@ -8,6 +8,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -31,9 +32,12 @@ class Liquid {
 
 @Composable
 fun Blob(liquid: Liquid, shape: () -> BlobShape?) {
+    /* The first composition's lambda was the one registered for good, so every plain value it had captured (the delete-all bubble's top, a border colour) stayed where it was while the content beside it moved on. */
+    val current = rememberUpdatedState(shape)
     DisposableEffect(liquid) {
-        liquid.sources.add(shape)
-        onDispose { liquid.sources.remove(shape) }
+        val source = { current.value() }
+        liquid.sources.add(source)
+        onDispose { liquid.sources.remove(source) }
     }
 }
 

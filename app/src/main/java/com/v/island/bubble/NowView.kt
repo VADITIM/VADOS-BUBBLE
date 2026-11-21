@@ -1,6 +1,7 @@
 package com.v.island.bubble
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -61,10 +62,12 @@ fun NowView(now: NowBubble) {
     Island.media?.let { held = it }
     val media = held
 
-    val width = animateFloatAsState(now.restWidth, tween(NowBubble.GROW, easing = Curves.split), label = "nowWidth")
-    val height = animateFloatAsState(now.restHeight, tween(NowBubble.GROW, easing = Curves.bubble), label = "nowHeight")
-    val radius = animateFloatAsState(now.restRadius, tween(NowBubble.GROW), label = "nowRadius")
-    val bottom = animateFloatAsState(now.restBottom, tween(NowBubble.GROW, easing = Curves.grow), label = "nowBottom")
+    /* A flight is aimed at the rest box it was launched against, so easing that box at the same time slid the drop off Main: only a bubble standing still grows. */
+    val isStanding = now.phase == NowPhase.Rest
+    val width = animateFloatAsState(now.restWidth, if (isStanding) tween(NowBubble.GROW, easing = Curves.split) else snap<Float>(), label = "nowWidth")
+    val height = animateFloatAsState(now.restHeight, if (isStanding) tween(NowBubble.GROW, easing = Curves.bubble) else snap<Float>(), label = "nowHeight")
+    val radius = animateFloatAsState(now.restRadius, if (isStanding) tween(NowBubble.GROW) else snap<Float>(), label = "nowRadius")
+    val bottom = animateFloatAsState(now.restBottom, if (isStanding) tween(NowBubble.GROW, easing = Curves.grow) else snap<Float>(), label = "nowBottom")
     val press = animateFloatAsState(if (now.isPressing) 1.03f else 1f, tween(320, easing = Curves.split), label = "nowPress")
 
     val isTouchable = (now.phase == NowPhase.Rest || now.phase == NowPhase.Arriving) && Island.media != null
@@ -116,7 +119,7 @@ fun NowView(now: NowBubble) {
         }.align(Alignment.Center)) {
             when {
                 now.isCompact -> CompactNow(now, media)
-                now.isInPanel || !now.isLockOpen -> RestNow(now, media, appearance, isOpen = false)
+                !now.isOpenFace -> RestNow(now, media, appearance, isOpen = false)
                 else -> RestNow(now, media, appearance, isOpen = true)
             }
         }

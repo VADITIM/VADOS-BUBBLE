@@ -1,6 +1,22 @@
 package com.v.island.bubble
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.delay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -90,56 +106,176 @@ fun markUp(message: String, accent: Color): AnnotatedString {
 fun AlertFace(bubble: MainBubble, appearance: Appearance) {
     val shown = bubble.notice ?: return
     val isPicture = bubble.size == Size.Picture
+    val isCentred = bubble.size == Size.AlertCentre
     val isLarge = isPicture
-    Column(
-        Modifier.fillMaxSize().padding(horizontal = if (isLarge) 17.6.dp else 15.2.dp, vertical = if (isLarge) 14.4.dp else 9.9.dp),
-        verticalArrangement = if (isPicture) Arrangement.spacedBy(9.6.dp) else Arrangement.spacedBy(6.4.dp, Alignment.CenterVertically),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MainBubble.HOLE_GAP.dp)) {
-            Row(Modifier.padding(horizontal = 7.2.dp, vertical = 2.4.dp), verticalAlignment = Alignment.CenterVertically) {
-                val icon = shown.icon
-                if (icon != null && appearance.identity != 1) {
-                    Image(icon, null, Modifier.size(if (isLarge) 24.dp else 18.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-                    Spacer(Modifier.size(7.2.dp))
+    /* The card is sized off what its content asks for, as measureAlert did, so the content is measured free of the box it stands in; only the picture card keeps a box of its own. */
+    val isMeasured = bubble.size == Size.Alert || isCentred
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            (if (isMeasured) Modifier.fillMaxWidth().wrapContentHeight(Alignment.CenterVertically, unbounded = true).onSizeChanged { bubble.reportAlertHeight(it.height / Island.density) } else Modifier.fillMaxSize())
+                .padding(horizontal = if (isLarge) 17.6.dp else 15.2.dp, vertical = if (isLarge) 14.4.dp else 9.9.dp),
+            verticalArrangement = if (isPicture) Arrangement.spacedBy(9.6.dp) else Arrangement.spacedBy(6.4.dp, Alignment.CenterVertically),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MainBubble.HOLE_GAP.dp)) {
+                Row(Modifier.padding(horizontal = 7.2.dp, vertical = 2.4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val icon = shown.icon
+                    if (icon != null && appearance.identity != 1) {
+                        Image(icon, null, Modifier.size(if (isLarge) 24.dp else 18.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                        Spacer(Modifier.size(7.2.dp))
+                    }
+                    if (appearance.identity != 0) {
+                        FadingLine(
+                            shown.appName.uppercase(),
+                            type(0.63f, shown.accent, appearance.headingFont, appearance.headingScale, spacing = 0.19f),
+                        )
+                    }
                 }
-                if (appearance.identity != 0) {
+                /* Mirrors #title in pill.css: the sender stands at the right end and only fades from the left once it runs out of room. */
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                     FadingLine(
-                        shown.appName.uppercase(),
-                        type(0.63f, shown.accent, appearance.headingFont, appearance.headingScale, spacing = 0.19f),
+                        bubble.whoSent(shown),
+                        type(0.68f, Palette.textMuted, appearance.headingFont, appearance.headingScale, spacing = 0.04f),
                     )
                 }
             }
-            FadingLine(
-                bubble.whoSent(shown),
-                type(0.68f, Palette.textMuted, appearance.headingFont, appearance.headingScale, spacing = 0.04f),
-                Modifier.weight(1f),
-            )
-        }
-        val isStacked = bubble.alertLines.size > 1
-        Column(
-            (if (isStacked) Modifier.weight(1f, fill = false).fadeTop() else Modifier),
-            verticalArrangement = Arrangement.Bottom,
-        ) {
-            bubble.alertLines.forEach { line ->
-                BasicText(
-                    markUp(line, shown.accent),
-                    style = type(0.78f, Palette.textPrimary, appearance.contentFont, appearance.contentScale, lineHeight = 1.4f),
-                    maxLines = 3,
-                    overflow = TextOverflow.Clip,
+            val isStacked = bubble.alertLines.size > 1
+            Box(
+                if (isStacked && !isCentred) Modifier.heightIn(max = (Island.screenHeight * MainBubble.CENTRE_CEILING - ALERT_HEAD_ROOM).dp).clipToBounds().fadeTop() else Modifier,
+                contentAlignment = Alignment.BottomStart,
+            ) {
+                Column(Modifier.wrapContentHeight(Alignment.Bottom, unbounded = true)) {
+                    bubble.alertLines.forEach { line ->
+                        BasicText(
+                            markUp(line, shown.accent),
+                            style = type(0.78f, Palette.textPrimary, appearance.contentFont, appearance.contentScale, lineHeight = 1.4f),
+                            maxLines = if (isCentred) Int.MAX_VALUE else 3,
+                            overflow = TextOverflow.Clip,
+                        )
+                    }
+                }
+            }
+            val picture = shown.picture
+            if (picture != null) {
+                Image(
+                    picture,
+                    null,
+                    (if (isCentred) Modifier.fillMaxWidth().aspectRatio(picture.width.toFloat() / maxOf(1, picture.height)) else Modifier.fillMaxWidth().weight(1f))
+                        .clip(RoundedCornerShape(14.dp)),
+                    contentScale = if (isPicture || isCentred) ContentScale.Fit else ContentScale.Crop,
                 )
             }
         }
-        val picture = shown.picture
-        if (picture != null) {
-            Image(
-                picture,
-                null,
-                Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(14.dp)),
-                contentScale = if (isPicture) ContentScale.Fit else ContentScale.Crop,
-            )
+    }
+}
+
+private const val ALERT_HEAD_ROOM = 60f
+
+/* Mirrors #alert-zone and the focused band in the retired BubbleService: the strip a pull-to-focus is heard on, and the whole screen once the Alert is focused or dark. */
+@Composable
+fun AlertBand(bubble: MainBubble) {
+    val band = bubble.alertBand()
+    SideEffect {
+        if (band != null) Island.regions[Region.Alert] = band else Island.regions.remove(Region.Alert)
+    }
+    if (band == null) return
+    val current = rememberUpdatedState(band)
+    Box(
+        Modifier
+            .offset { IntOffset((band.left * Island.density).roundToInt(), (band.top * Island.density).roundToInt()) }
+            .size(band.width.dp, band.height.dp)
+            .pointerInput(bubble) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    fun at(position: Offset) = Offset(position.x / density + current.value.left, position.y / density + current.value.top)
+                    var last = at(down.position)
+                    bubble.onAlertDown(last.x, last.y)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        change.consume()
+                        last = at(change.position)
+                        if (!change.pressed) break
+                        bubble.onAlertMove(last.x, last.y)
+                    }
+                    bubble.onAlertUp(last.x, last.y)
+                }
+            },
+    )
+}
+
+/* Mirrors #screen-dark and #dark-alert in pill.css and paintDarkAlert in js/alert.js. */
+@Composable
+fun DarkAlertView() {
+    val isDark = Island.isScreenDark
+    val black = animateFloatAsState(if (isDark) 1f else 0f, if (isDark) snap<Float>() else tween(DARK_FADE, easing = Curves.leave), label = "dark")
+    val live = Island.darkAlert
+    var held by remember { mutableStateOf<DarkAlert?>(null) }
+    if (live != null) held = live
+    val shown = animateFloatAsState(if (live != null) 1f else 0f, if (live != null) snap<Float>() else tween(DARK_FADE, easing = Curves.leave), label = "darkAlert")
+    val width = Island.screenWidth
+    val height = Island.screenHeight
+    SideEffect { Island.darkAlertBox = Rect(DARK_INSET, height * DARK_TOP, width - DARK_INSET, height * (DARK_TOP + DARK_TALL)) }
+    if (black.value <= 0f && shown.value <= 0f) return
+    Box(Modifier.fillMaxSize().graphicsLayer { alpha = black.value }.background(Color.Black))
+    val alert = held ?: return
+    val appearance = Island.appearance
+    val total = if (alert.isAppending) alert.text.length else alert.title.length + alert.text.length
+    val step = minOf(DARK_TYPE_STEP, DARK_TYPE_CEILING / maxOf(total, 1))
+    var count by remember(alert.generation) { mutableIntStateOf(0) }
+    LaunchedEffect(alert.generation) {
+        val start = System.nanoTime() + (if (alert.isAppending) 0 else DARK_TYPE_DELAY) * 1_000_000L
+        while (count < total) {
+            delay(16)
+            count = ((System.nanoTime() - start) / 1_000_000f / step).toInt().coerceIn(0, total)
+        }
+    }
+    val titleShown = if (alert.isAppending) alert.title.length else minOf(count, alert.title.length)
+    val textShown = if (alert.isAppending) minOf(count, alert.text.length) else (count - alert.title.length).coerceIn(0, alert.text.length)
+    Box(
+        Modifier
+            .offset { IntOffset((DARK_INSET * Island.density).roundToInt(), (height * DARK_TOP * Island.density).roundToInt()) }
+            .size((width - DARK_INSET * 2f).dp, (height * DARK_TALL).dp)
+            .graphicsLayer {
+                alpha = shown.value
+                compositingStrategy = CompositingStrategy.Offscreen
+                clip = true
+            }
+            .drawWithContent {
+                drawContent()
+                val fade = DARK_FADE_EDGE.dp.toPx()
+                drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height), blendMode = BlendMode.DstIn)
+            }
+            /* Mirrors justify-content: safe center: centred while it fits, held to the top once it does not. */
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, maxOf(0, (constraints.maxHeight - placeable.height) / 2)) }
+            },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Reveal(alert.revealKey, alert.accent) {
+                BasicText(alert.appName.uppercase(), style = type(0.8125f, alert.accent, appearance.headingFont, appearance.headingScale, spacing = 0.13f), maxLines = 1, softWrap = false)
+            }
+            BasicText(typedPart(alert.title, titleShown), style = type(1.5f, Color.White.copy(alpha = 0.62f), appearance.headingFont, appearance.headingScale, lineHeight = 1.25f))
+            BasicText(typedPart(alert.text, textShown), style = type(1.125f, Color.White.copy(alpha = 0.46f), appearance.contentFont, appearance.contentScale, lineHeight = 1.45f))
         }
     }
 }
+
+private fun typedPart(text: String, shown: Int): AnnotatedString = buildAnnotatedString {
+    append(text.substring(0, shown))
+    withStyle(SpanStyle(color = Color.Transparent)) { append(text.substring(shown)) }
+}
+
+/* Mirrors #dark-alert's insets, TYPE_STEP, TYPE_CEILING and TYPE_DELAY in js/alert.js, and the 360ms fade on #screen-dark. */
+private const val DARK_INSET = 36f
+private const val DARK_TOP = 0.3f
+private const val DARK_TALL = 0.4f
+private const val DARK_FADE_EDGE = 40f
+private const val DARK_FADE = 360
+private const val DARK_TYPE_STEP = 9f
+private const val DARK_TYPE_CEILING = 520f
+private const val DARK_TYPE_DELAY = 140L
 
 @Composable
 fun PlayerFace(bubble: MainBubble, appearance: Appearance) {

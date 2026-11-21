@@ -34,7 +34,7 @@ enum class Mode { Idle, Haptic, Alert, Extended }
 
 enum class Size(val isClosed: Boolean) {
     Idle(true), Playing(true), Timing(true), Calling(true), Travelling(true),
-    Alert(false), Image(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false),
+    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false),
 }
 
 enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications }
@@ -90,6 +90,7 @@ class MainBubble {
         private set
     var notificationsDrop by mutableFloatStateOf(0f)
         private set
+    private var alertWanted by mutableFloatStateOf(ALERT_HEIGHT)
     private var notificationsHead = NOTIFICATIONS_HEAD
     private var notificationsList = -1f
     var accent by mutableStateOf(Color.White)
@@ -278,8 +279,12 @@ class MainBubble {
                 val box = layout()
                 Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
             }
-            Size.Alert -> Frame(ALERT_WIDTH, ALERT_HEIGHT, 24f, grab, 0f)
-            Size.Image -> Frame(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grab, 0f)
+            Size.Alert -> Frame(ALERT_WIDTH, alertHeight(), 24f, grown, 0f)
+            Size.Image -> Frame(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grown, 0f)
+            Size.AlertCentre -> {
+                val tall = alertHeight()
+                Frame(ALERT_WIDTH, tall, CENTRE_RADIUS, grown + (Island.screenHeight - tall) / 2f - Island.screenHeight * CENTRE_LIFT, 0f)
+            }
             Size.Picture -> Frame(GROWN_WIDTH, pictureHeight, 26f, grown, 0f)
             Size.Player -> Frame(GROWN_WIDTH, 304f, 34f, grown, 0f)
             Size.TimerPanel -> Frame(GROWN_WIDTH, 132f, 26f, grown, 0f)
@@ -290,7 +295,104 @@ class MainBubble {
 
     val holdScale: Float get() = if (isHolding) HOLD_SCALE else 1f
 
-    fun border(): Color = if (mode == Mode.Alert) accent else com.v.island.vas.Palette.border
+    fun border(): Color = com.v.island.vas.Palette.border
+
+    /* Mirrors measureAlert in js/alert.js: the box is what the content asks for between a floor and a share of the screen, the whole picture's share once focused; it was a fixed 155 that left a short message floating in an empty card. */
+    private fun alertHeight(): Float {
+        val hasPicture = size == Size.AlertCentre && notice?.picture != null
+        val ceiling = Island.screenHeight * if (hasPicture) PICTURE_CENTRE_CEILING else CENTRE_CEILING
+        return alertWanted.coerceIn(ALERT_FLOOR, ceiling).roundToInt().toFloat()
+    }
+
+    fun reportAlertHeight(height: Float) {
+        if (height > 0f) alertWanted = height
+    }
+
+    val isAlertCentred: Boolean get() = size == Size.AlertCentre
+
+    /* Mirrors setAlertBand in the retired BubbleService: a standing Alert is answered on a strip at the right edge across the middle, a focused or dark one on the whole screen. */
+    fun alertBand(): androidx.compose.ui.geometry.Rect? {
+        if (mode != Mode.Alert) return null
+        val width = Island.screenWidth
+        val height = Island.screenHeight
+        if (size == Size.AlertCentre || Island.isScreenDark) return androidx.compose.ui.geometry.Rect(0f, 0f, width, height)
+        val tall = height * ALERT_ZONE_HEIGHT_PART
+        return androidx.compose.ui.geometry.Rect(width - ALERT_ZONE_WIDTH, (height - tall) / 2f, width, (height + tall) / 2f)
+    }
+
+    private var alertActed = false
+    private var isAlertTouch = false
+    private var lastX = 0f
+    private var lastY = 0f
+
+    fun onAlertDown(x: Float, y: Float) {
+        startX = x
+        startY = y
+        pullDrop = 0f
+        alertActed = false
+    }
+
+    fun onAlertMove(x: Float, y: Float) {
+        if (mode != Mode.Alert) return
+        val down = y - startY
+        val across = abs(x - startX)
+        pullDrop = max(pullDrop, down)
+        if (alertActed || Island.isScreenDark) return
+        if (hypot(across, down) <= HOLD_BLOCK) return
+        toy(0f, down)
+        if (down < -PULL_TRIGGER && -down > across) {
+            alertActed = true
+            dismissAlert()
+            return
+        }
+        if (down > PULL_TRIGGER && down > across) {
+            alertActed = true
+            untoy()
+            if (size == Size.AlertCentre) dismissAlert() else centreAlert()
+        }
+    }
+
+    fun onAlertUp(x: Float, y: Float) {
+        untoy()
+        if (mode != Mode.Alert) return
+        if (Island.wasCancelled) {
+            if (!alertActed && size != Size.AlertCentre && pullDrop > PULL_STOLEN) {
+                alertActed = true
+                centreAlert()
+            }
+            return
+        }
+        if (alertActed || hypot(x - startX, y - startY) > ALERT_TAP_SLOP) return
+        if (Island.isScreenDark) {
+            val isOnText = Island.darkAlertBox?.contains(androidx.compose.ui.geometry.Offset(x, y)) == true
+            Island.liftScreenDark()
+            if (isOnText) openCurrent()
+            return
+        }
+        if (!holds(x, y)) {
+            Island.actions.passTap(x, y)
+            return
+        }
+        dwellJob?.cancel()
+        if (notice?.picture != null && size == Size.Image) {
+            Haptics.play(Haptic.Expand)
+            openPicture()
+            return
+        }
+        openCurrent()
+    }
+
+    private fun dismissAlert() {
+        untoy()
+        Haptics.play(if (size == Size.AlertCentre) Haptic.Release else Haptic.Dismiss)
+        toClosed()
+    }
+
+    private fun centreAlert() {
+        Haptics.play(Haptic.Expand)
+        dwellJob?.cancel()
+        size = Size.AlertCentre
+    }
 
     private fun closedSizeOf(mod: Mod?) = when (mod) {
         Mod.Timer -> Size.Timing
@@ -318,6 +420,7 @@ class MainBubble {
 
     fun toClosed() {
         dwellJob?.cancel()
+        if (Island.isScreenDark) Island.sleepDark()
         val wasOpen = !size.isClosed
         if (wasOpen) closedInTouch = Island.isTouchDown
         if (size == Size.Notifications) notificationsClosedAt = SystemClock.uptimeMillis()
@@ -340,7 +443,7 @@ class MainBubble {
         mode = Mode.Extended
     }
 
-    fun onNotice(next: Notice) {
+    fun onNotice(next: Notice, isDark: Boolean = false) {
         if (Island.isLandscape) return
         dwellJob?.cancel()
         goneJob?.cancel()
@@ -350,12 +453,20 @@ class MainBubble {
             (shown.key == next.key || (next.title.isNotEmpty() && shown.title == next.title && shown.packageName == next.packageName))
         val lines = next.messages.map { it.text }.filter { it.isNotEmpty() }.ifEmpty { listOf(next.text) }
         alertLines = if (isAppending) (alertLines + lines.takeLast(1)).distinct().takeLast(ALERT_LINES) else lines.takeLast(1)
+        val wasCentred = mode == Mode.Alert && size == Size.AlertCentre
         mode = Mode.Alert
         notice = next
         accent = next.accent
         face = Face.Alert
-        size = if (hasImage) Size.Image else Size.Alert
+        if (isDark) Island.showDarkAlert(next.appName, whoSent(next), lines.lastOrNull().orEmpty(), next.accent, isAppending)
+        /* A second message reaching a focused Alert grows it where it stands rather than putting it back on the bar, as onNotificationUpdate did; a dark arrival is read at the centre. */
+        size = when {
+            wasCentred || (isDark && !hasImage) -> Size.AlertCentre
+            hasImage -> Size.Image
+            else -> Size.Alert
+        }
         Haptics.play(Haptic.Release)
+        if (size == Size.AlertCentre && !isDark) return
         dwellJob = Island.scope.launch {
             delay(appearance.dwellMilliseconds)
             toClosed()
@@ -592,6 +703,14 @@ class MainBubble {
         gate = DragGate()
         heldStep = null
         if (closedInTouch) return
+        /* The bubble itself answers an Alert the way its band does, as alertOwnsTouch in bridge.js claimed mainHolds: a pull down on the card focuses it instead of only an upward swipe being heard. */
+        isAlertTouch = mode == Mode.Alert
+        if (isAlertTouch) {
+            lastX = x
+            lastY = y
+            onAlertDown(x, y)
+            return
+        }
         if (mode == Mode.Extended && size == Size.Notifications && !holds(x, y)) {
             toClosed()
             closedInTouch = true
@@ -634,6 +753,7 @@ class MainBubble {
     }
 
     fun onReleasedOnControl() {
+        isAlertTouch = false
         releaseSwap()
         endHold()
         untoy()
@@ -646,6 +766,12 @@ class MainBubble {
     }
 
     fun onMove(x: Float, y: Float) {
+        if (isAlertTouch) {
+            lastX = x
+            lastY = y
+            onAlertMove(x, y)
+            return
+        }
         if (hasHeld || closedInTouch) return
         if (!size.isClosed || mode == Mode.Extended) {
             grantHoldWander()
@@ -706,6 +832,11 @@ class MainBubble {
     }
 
     fun onUp() {
+        if (isAlertTouch) {
+            isAlertTouch = false
+            onAlertUp(lastX, lastY)
+            return
+        }
         releaseSwap()
         if (Island.wasCancelled) {
             untoy()
@@ -844,6 +975,15 @@ class MainBubble {
         const val ALERT_HEIGHT = 155f
         const val ALERT_IMAGE_HEIGHT = 190f
         const val ALERT_LINES = 4
+        /* Mirrors ALERT_FLOOR, CENTRE_CEILING, PICTURE_CENTRE_CEILING, CENTRE_LIFT, ALERT_TAP_SLOP and ZONE_HEIGHT_PART in js/alert.js, and #alert-zone's width in pill.css. */
+        const val ALERT_FLOOR = 88f
+        const val CENTRE_CEILING = 0.6f
+        const val PICTURE_CENTRE_CEILING = 0.8f
+        const val CENTRE_LIFT = 0.1f
+        const val CENTRE_RADIUS = 28f
+        const val ALERT_TAP_SLOP = 10f
+        const val ALERT_ZONE_WIDTH = 96f
+        const val ALERT_ZONE_HEIGHT_PART = 0.3f
         const val PICTURE_MAXIMUM_HEIGHT = 460f
         const val BUMP = 12f
         const val BUMP_MILLISECONDS = 420
@@ -872,6 +1012,8 @@ class MainBubble {
         const val NOTIFICATIONS_HEAD = 34f
         const val CLEAR_SIZE = 44f
         const val CLEAR_GAP = 12f
+        /* Mirrors the top transition on #notifications-clear in pill.css. */
+        const val CLEAR_TOP_MILLISECONDS = 460
         const val CLEAR_STAGGER = 35L
         const val CLEAR_FLIGHT = 240L
         const val SCROLL_BAND = 0.15f

@@ -98,8 +98,13 @@ fun FadingLine(text: String, style: TextStyle, modifier: Modifier = Modifier) {
 
 @Composable
 fun RevealLabel(text: String, style: TextStyle, bar: Color, delayMilliseconds: Int = 0, modifier: Modifier = Modifier) {
-    val sweep = remember(text) { Animatable(0f) }
-    LaunchedEffect(text) {
+    Reveal(text, bar, delayMilliseconds, modifier) { FadingLine(text, style) }
+}
+
+@Composable
+fun Reveal(key: Any, bar: Color, delayMilliseconds: Int = 0, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val sweep = remember(key) { Animatable(0f) }
+    LaunchedEffect(key) {
         delay(delayMilliseconds.toLong())
         sweep.animateTo(1f, tween(Durations.REVEAL_BAR, easing = Curves.sweep))
     }
@@ -115,7 +120,7 @@ fun RevealLabel(text: String, style: TextStyle, bar: Color, delayMilliseconds: I
             }
         },
     ) {
-        FadingLine(text, style)
+        content()
     }
 }
 

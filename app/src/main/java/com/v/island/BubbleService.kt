@@ -41,6 +41,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     companion object {
         private const val WAKE_MILLIS = 6_000L
+        private const val SYSTEM_WAKE_MILLIS = 1_500L
+        private const val DARK_BRIGHTNESS = 0.07f
+        private const val TAP_MILLIS = 40L
         private const val SHADE_STRIP = 48
         private const val ROTATION_SETTLE = 600L
         private const val TOGGLE_SETTLE_MILLIS = 2_500L
@@ -89,19 +92,30 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             return service.lastTouch + hotspot
         }
 
-        fun isDarkArrival(): Boolean = instance?.let { !it.getSystemService(PowerManager::class.java).isInteractive } == true
+        fun isDarkArrival(): Boolean = instance?.isDarkArrival() == true
 
         fun deliver(payload: JSONObject, arrivedDark: Boolean = false) {
             val notice = Payloads.notice(payload)
             Island.post {
                 val service = instance ?: return@post
-                if (arrivedDark || isDarkArrival()) service.wakeScreen()
+                val isDark = arrivedDark || service.isDarkArrival()
+                if (isDark) {
+                    service.wakeScreen()
+                    Island.setScreenDark(true)
+                }
                 Island.unread = IslandNotificationListener.count()
-                Island.bubble.onNotice(notice)
+                Island.bubble.onNotice(notice, Island.isScreenDark)
             }
         }
 
-        fun deliverDark(payload: JSONObject) = deliver(payload)
+        fun deliverDark(payload: JSONObject) {
+            val notice = Payloads.notice(payload)
+            Island.post {
+                if (instance == null) return@post
+                Island.setScreenDark(true, isSimulated = true)
+                Island.bubble.onNotice(notice, isDark = true)
+            }
+        }
 
         fun deliverCount(count: Int) = Island.post { Island.unread = count }
 
@@ -253,6 +267,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private var screenWatch: BroadcastReceiver? = null
     private var panelWatch: BroadcastReceiver? = null
     private var outsideReportedAt = -1L
+    private var isUserPresent = false
+    private var screenOnAt = 0L
     private var lastTouch = ""
     private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
     private var isPaneSyncQueued = false
@@ -322,7 +338,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, canvasParams)
-        proxies = listOf(Region.Dashboard, Region.Now, Region.Clear, Region.Main, Region.Status, Region.Clock).associateWith { Proxy(it) }
+        proxies = listOf(Region.Shield, Region.Dashboard, Region.Now, Region.Clear, Region.Main, Region.Status, Region.Clock, Region.Alert).associateWith { Proxy(it) }
         proxies.values.forEach { windowManager.addView(it.view, it.params) }
         applyBarLock()
         instance = this
@@ -330,6 +346,11 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         Island.scope.launch {
             snapshotFlow { Island.regions.toMap() }.collect { regions ->
                 proxies.forEach { (region, proxy) -> proxy.place(regions[region]) }
+            }
+        }
+        Island.scope.launch {
+            snapshotFlow { Island.isScreenDark }.collect { isDark ->
+                setStageBrightness(if (isDark) DARK_BRIGHTNESS else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
             }
         }
 
@@ -365,6 +386,10 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         isScreenOff = !getSystemService(PowerManager::class.java).isInteractive
         screenWatch = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action != Intent.ACTION_SCREEN_ON) Island.setScreenDark(false)
+                if (intent.action == Intent.ACTION_SCREEN_ON) screenOnAt = android.os.SystemClock.elapsedRealtime()
+                if (intent.action == Intent.ACTION_USER_PRESENT) isUserPresent = true
+                if (intent.action == Intent.ACTION_SCREEN_OFF) isUserPresent = false
                 if (intent.action != Intent.ACTION_USER_PRESENT) {
                     isScreenOff = intent.action == Intent.ACTION_SCREEN_OFF
                     applyVisibility()
@@ -637,6 +662,20 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         applyVisibility()
     }
 
+    /* Mirrors isDarkArrival in the retired BubbleService: Samsung lights the screen for a lock-screen notification before it is delivered, so a screen that came on a moment ago over a locked keyguard with nobody unlocking it still counts as dark. */
+    private fun isDarkArrival(): Boolean {
+        if (!getSystemService(PowerManager::class.java).isInteractive) return true
+        return !isUserPresent &&
+            android.os.SystemClock.elapsedRealtime() - screenOnAt < SYSTEM_WAKE_MILLIS &&
+            getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+    }
+
+    private fun setStageBrightness(brightness: Float) {
+        if (canvasParams.screenBrightness == brightness) return
+        canvasParams.screenBrightness = brightness
+        relayout(stage, canvasParams)
+    }
+
     private fun screenWidth(): Int = windowManager.currentWindowMetrics.bounds.width()
 
     private fun screenHeight(): Int = windowManager.currentWindowMetrics.bounds.height()
@@ -802,6 +841,37 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     override fun recordingAction(index: Int) = IslandNotificationListener.recordingAction(index)
 
     override fun setTorch(step: Int) = TorchWatch.set(step)
+
+    /* Mirrors replayAlertTap in the retired BubbleService: a tap the Alert's band heard that was not for the bubble is handed on to the app underneath, with the band untouchable for as long as the replay takes. */
+    override fun passTap(x: Float, y: Float) {
+        val band = proxies[Region.Alert] ?: return
+        if (band.placed == null) return
+        band.params.flags = BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        relayout(band.view, band.params)
+        val restore = {
+            if (band.placed != null) {
+                band.params.flags = proxyFlags()
+                relayout(band.view, band.params)
+            }
+        }
+        val path = android.graphics.Path().apply { moveTo(x * Island.density + canvasParams.x, y * Island.density) }
+        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, TAP_MILLIS)
+        val isSent = runCatching {
+            dispatchGesture(
+                android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build(),
+                object : GestureResultCallback() {
+                    override fun onCompleted(description: android.accessibilityservice.GestureDescription?) = restore()
+                    override fun onCancelled(description: android.accessibilityservice.GestureDescription?) = restore()
+                },
+                null,
+            )
+        }.getOrDefault(false)
+        if (!isSent) restore()
+    }
+
+    override fun sleepScreen() {
+        performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+    }
 }
 
 fun Context.pushToIsland(payload: JSONObject, arrivedDark: Boolean = false) = BubbleService.deliver(payload, arrivedDark)

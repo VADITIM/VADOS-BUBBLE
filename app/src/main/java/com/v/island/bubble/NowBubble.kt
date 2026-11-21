@@ -23,6 +23,8 @@ import kotlin.math.min
 
 enum class NowPhase { Idle, Arriving, Rest, Leaving }
 
+data class NowStand(val isInPanel: Boolean, val isExpanded: Boolean, val isLockOpen: Boolean)
+
 /* Mirrors js/lock.js: the media mod leaves Main for its own bubble on the keyguard and in the Dashboard, slung out of Main and thrown home again. */
 @Stable
 class NowBubble {
@@ -60,8 +62,15 @@ class NowBubble {
     var scrubPosition by mutableStateOf(0L)
 
     private var flight: Job? = null
+    private var isMelting = false
+    private var meltJob: Job? = null
 
-    val isCompact: Boolean get() = isInPanel && !isExpanded
+    /* The leave flips isInPanel before it flies, so every size read off the live flags described the lock-screen bubble while the panel's pill was still the one in the air. */
+    private var flown by mutableStateOf<NowStand?>(null)
+
+    private val stand: NowStand get() = flown ?: NowStand(isInPanel, isExpanded, isLockOpen)
+
+    val isCompact: Boolean get() = stand.isInPanel && !stand.isExpanded
 
     fun isStolen(mod: Mod): Boolean = mod == Mod.Media && (isInPanel || isLocked || isHomeHeld)
 
@@ -69,22 +78,24 @@ class NowBubble {
 
     val isShowing: Boolean get() = phase != NowPhase.Idle
 
+    val isOpenFace: Boolean get() = !stand.isInPanel && stand.isLockOpen
+
     val restWidth: Float get() = if (isCompact) COMPACT_WIDTH else Island.screenWidth - INSET * 2f
 
     val restHeight: Float get() = when {
-        isInPanel -> if (isExpanded) HEIGHT else COMPACT_HEIGHT
-        isLockOpen -> OPEN_HEIGHT
+        stand.isInPanel -> if (stand.isExpanded) HEIGHT else COMPACT_HEIGHT
+        stand.isLockOpen -> OPEN_HEIGHT
         else -> HEIGHT
     }
 
     val restRadius: Float get() = when {
         isCompact -> COMPACT_RADIUS
-        isInPanel -> PANEL_RADIUS
-        isLockOpen -> OPEN_RADIUS
+        stand.isInPanel -> PANEL_RADIUS
+        stand.isLockOpen -> OPEN_RADIUS
         else -> RADIUS
     }
 
-    val restBottom: Float get() = if (isInPanel) Island.dashboard.nowBottom else Island.screenHeight - BOTTOM
+    val restBottom: Float get() = if (stand.isInPanel) Island.dashboard.nowBottom else Island.screenHeight - BOTTOM
 
     fun rest(): Rect {
         val left = (Island.screenWidth - restWidth) / 2f
@@ -102,6 +113,7 @@ class NowBubble {
         isLocked = locked
         if (!locked && !isInPanel && phase != NowPhase.Idle) {
             isHomeHeld = true
+            flown = stand
             leave(null)
             return
         }
@@ -121,6 +133,7 @@ class NowBubble {
 
     fun leavePanel(thrown: Offset?) {
         if (!isInPanel) return
+        val leaving = stand
         isInPanel = false
         if (isLocked) {
             Island.bubble.onModsChanged()
@@ -133,6 +146,7 @@ class NowBubble {
             return
         }
         isHomeHeld = true
+        flown = leaving
         leave(thrown)
     }
 
@@ -157,6 +171,7 @@ class NowBubble {
 
     private fun launchFlight(work: suspend () -> Unit) {
         flight?.cancel()
+        meltJob?.cancel()
         flight = Island.scope.launch(AndroidUiDispatcher.Main) { work() }
     }
 
@@ -218,6 +233,13 @@ class NowBubble {
         phase = NowPhase.Leaving
         isPressing = false
         isScrubbing = false
+        isMelting = false
+        val entering = { step: Sling.Frame, wide: Float ->
+            if (!isMelting && enteredShare(from.center, step, wide, ball) >= CATCH_ENTERED) {
+                isMelting = true
+                meltJob = Island.scope.launch(AndroidUiDispatcher.Main) { melt() }
+            }
+        }
         launchFlight {
             if (thrown != null) {
                 val room = Rect(-from.center.x, -from.center.y, Island.screenWidth - from.center.x, Island.screenHeight - from.center.y)
@@ -229,8 +251,10 @@ class NowBubble {
                 coroutineScope {
                     launch { dropReadings((shot.milliseconds * Sling.THROW_CIRCLE).toInt()) }
                     run(shot.milliseconds) {
-                        applyFrame(Sling.at(frames, it))
+                        val frame = Sling.at(frames, it)
+                        applyFrame(frame)
                         ballShare = closing(it)
+                        entering(frame, from.width + (ball - from.width) * closing(it))
                     }
                 }
             } else {
@@ -249,10 +273,30 @@ class NowBubble {
                 }
                 val hold = backOffset + launch * (reach * Sling.SHOT_LEAD)
                 val frames = Sling.frames(backOffset, hold, offset, Sling.DRAW_SQUEEZE, drop, Sling.between(Sling.SHOT_OVER), reach)
-                run(Sling.between(Sling.SHOT_MILLISECONDS).toInt()) { applyFrame(Sling.at(frames, it)) }
+                run(Sling.between(Sling.SHOT_MILLISECONDS).toInt()) {
+                    val frame = Sling.at(frames, it)
+                    applyFrame(frame)
+                    entering(frame, ball)
+                }
             }
-            melt()
+            if (!isMelting) {
+                isMelting = true
+                melt()
+            }
         }
+    }
+
+    /* Mirrors enteredShare in js/liquid.js: how much of the drop already stands inside Main, which is when the two read as one body and the mod changes hands. */
+    private fun enteredShare(centre: Offset, frame: Sling.Frame, wide: Float, tall: Float): Float {
+        val main = mainRect()
+        val halfWide = wide * frame.scale / 2f
+        val halfTall = tall * frame.scale / 2f
+        val x = centre.x + frame.x
+        val y = centre.y + frame.y
+        val across = min(x + halfWide, main.right) - maxOf(x - halfWide, main.left)
+        val down = min(y + halfTall, main.bottom) - maxOf(y - halfTall, main.top)
+        if (across <= 0f || down <= 0f) return 0f
+        return across * down / (halfWide * 2f * halfTall * 2f)
     }
 
     private suspend fun dropReadings(milliseconds: Int) = coroutineScope {
@@ -271,6 +315,8 @@ class NowBubble {
 
     private fun land() {
         flight?.cancel()
+        flown = null
+        isMelting = false
         phase = NowPhase.Idle
         isHomeHeld = false
         poseX = 0f
@@ -338,5 +384,7 @@ class NowBubble {
         const val LEAVE_STAGGER = 0.08f
         const val SPRIG_LEAVE = 0.5f
         const val LEAVE_DROP = 20f
+        /* Mirrors CATCH_ENTERED in js/liquid.js. */
+        const val CATCH_ENTERED = 0.8f
     }
 }

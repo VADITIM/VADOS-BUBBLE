@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
@@ -101,6 +102,7 @@ private fun FloatingBubble(
     ) {
         Box(
             Modifier
+                .wrapContentSize(Alignment.TopStart, unbounded = true)
                 .layout { measurable, _ ->
                     val density = Island.density
                     val placeable = measurable.measure(
@@ -470,31 +472,64 @@ fun SatellitesView(bubble: MainBubble) {
 fun ClearButton(bubble: MainBubble) {
     val isShown = bubble.size == com.v.island.bubble.Size.Notifications && bubble.groups.isNotEmpty()
     val box = bubble.target()
-    val top = box.top + box.height + MainBubble.CLEAR_GAP
+    val restTop = box.top + box.height + MainBubble.CLEAR_GAP
+    val settled = animateFloatAsState(restTop, tween(MainBubble.CLEAR_TOP_MILLISECONDS, easing = Curves.grow), label = "clearTop")
     val left = Island.screenWidth / 2f - MainBubble.CLEAR_SIZE / 2f
-    val presence = animateFloatAsState(if (isShown) 1f else 0f, tween(if (isShown) Durations.POP_IN else Durations.POP_OUT, easing = if (isShown) Curves.enter else Curves.leave), label = "clear")
-    if (presence.value <= 0.01f && !isShown) return
+    /* Mirrors #notifications-clear in pill.css: it slides out from under the menu and grows from its top edge after the menu has opened, and goes back up under it on the way home. */
+    val drop = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(380, 220, Curves.split) else tween(220, easing = Curves.grow), label = "clearDrop")
+    val grown = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(320, 220, Curves.split) else tween(220, easing = Curves.grow), label = "clearGrow")
+    val glyph = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(0, 380) else tween(120), label = "clearGlyph")
+    if (grown.value <= 0.01f && !isShown) return
+    fun top() = settled.value - (1f - drop.value) * (MainBubble.CLEAR_SIZE + MainBubble.CLEAR_GAP)
     Blob(Island.liquid) {
         val density = Island.density
-        val diameter = MainBubble.CLEAR_SIZE * presence.value
+        val diameter = MainBubble.CLEAR_SIZE * grown.value
         val x = left + (MainBubble.CLEAR_SIZE - diameter) / 2f
-        val y = top + (MainBubble.CLEAR_SIZE - diameter) / 2f
+        val y = top()
         BlobShape(Rect(x * density, y * density, (x + diameter) * density, (y + diameter) * density), diameter / 2f * density, Palette.border)
     }
     SideEffect {
-        if (isShown) Island.regions[Region.Clear] = Rect(left, top, left + MainBubble.CLEAR_SIZE, top + MainBubble.CLEAR_SIZE)
+        if (isShown) Island.regions[Region.Clear] = Rect(left, restTop, left + MainBubble.CLEAR_SIZE, restTop + MainBubble.CLEAR_SIZE)
         else Island.regions.remove(Region.Clear)
     }
     Box(
         Modifier
-            .offset { IntOffset((left * Island.density).roundToInt(), (top * Island.density).roundToInt()) }
+            .offset { IntOffset((left * Island.density).roundToInt(), (top() * Island.density).roundToInt()) }
             .size(MainBubble.CLEAR_SIZE.dp)
-            .graphicsLayer { scaleX = presence.value; scaleY = presence.value }
+            .graphicsLayer {
+                scaleX = grown.value
+                scaleY = grown.value
+                transformOrigin = TransformOrigin(0.5f, 0f)
+            }
             .then(if (isShown) Modifier.pressableClear(bubble) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        GlyphIcon(TRASH, Palette.textBody, Modifier.size(20.dp))
+        GlyphIcon(TRASH, Palette.textBright, Modifier.size(20.dp).graphicsLayer { alpha = glyph.value })
     }
+}
+
+/* A tap beside the open menu went through to the app underneath and closed the menu as well; while it is open the rest of the screen answers only by closing it. */
+@Composable
+fun NotificationsShield(bubble: MainBubble) {
+    val isShown = bubble.size == com.v.island.bubble.Size.Notifications
+    SideEffect {
+        if (isShown) Island.regions[Region.Shield] = Rect(0f, 0f, Island.screenWidth, Island.screenHeight)
+        else Island.regions.remove(Region.Shield)
+    }
+    if (!isShown) return
+    Box(
+        Modifier.fillMaxSize().pointerInput(bubble) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false).consume()
+                while (true) {
+                    val event = awaitPointerEvent()
+                    event.changes.forEach { it.consume() }
+                    if (event.changes.none { it.pressed }) break
+                }
+                bubble.onOutsideTap()
+            }
+        },
+    )
 }
 
 private fun Modifier.pressableClear(bubble: MainBubble) = pressable(pressedScale = 1.03f, haptic = null) { bubble.clearAll() }
