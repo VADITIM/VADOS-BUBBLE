@@ -82,6 +82,10 @@ object ConnectivityWatch {
     private var isHotspotOn = false
     private var pairedName: String? = null
     private val pairedNames = linkedSetOf<String>()
+    private val linkedTransports = HashMap<String, MutableSet<Int>>()
+    private val linkedNames = HashMap<String, String>()
+    private var defaultNetwork: Network? = null
+    private var wifiNetwork: Network? = null
     private var pairedCharge = -1
 
     private var lastPublished = ""
@@ -129,6 +133,7 @@ object ConnectivityWatch {
         val manager = context.getSystemService(ConnectivityManager::class.java)
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, seen: NetworkCapabilities) {
+                defaultNetwork = network
                 readLink(context, seen)
                 publish()
             }
@@ -136,6 +141,9 @@ object ConnectivityWatch {
             
             
             override fun onLost(network: Network) {
+                // The previous default's late onLost arrived after the next default had already reported itself, and wiped the link to none until the next signal wobble repainted it.
+                if (network != defaultNetwork) return
+                defaultNetwork = null
                 link = "none"
                 level = -1
                 ssid = ""
@@ -145,10 +153,13 @@ object ConnectivityWatch {
         networks = callback
         
         
-        runCatching { manager.registerDefaultNetworkCallback(callback) }
+        // Without a handler the callbacks ran on the connectivity thread while the receivers ran on main, both writing the same fields and the dedupe key.
+        val main = android.os.Handler(context.mainLooper)
+        runCatching { manager.registerDefaultNetworkCallback(callback, main) }
 
         val wifiCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, seen: NetworkCapabilities) {
+                wifiNetwork = network
                 isWifiUp = true
                 wifiLevel = strengthOf(context, seen)
                 isWifiOnline = seen.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
@@ -156,6 +167,9 @@ object ConnectivityWatch {
             }
 
             override fun onLost(network: Network) {
+                // Samsung raises a second wifi network beside the joined one, and its loss marked wifi as gone while the phone was still on it.
+                if (network != wifiNetwork) return
+                wifiNetwork = null
                 isWifiUp = false
                 wifiLevel = -1
                 isWifiOnline = true
@@ -169,7 +183,8 @@ object ConnectivityWatch {
                 android.net.NetworkRequest.Builder()
                     .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                     .build(),
-                wifiCallback
+                wifiCallback,
+                main
             )
         }
     }
@@ -201,6 +216,10 @@ object ConnectivityWatch {
         isHotspotOn = false
         pairedName = null
         pairedNames.clear()
+        linkedTransports.clear()
+        linkedNames.clear()
+        defaultNetwork = null
+        wifiNetwork = null
         pairedCharge = -1
         lastPublished = ""
     }
@@ -216,13 +235,25 @@ object ConnectivityWatch {
             
             // The charge was wiped on every ACL event as well, and the only thing that can refill it is the device's own BATTERY_LEVEL_CHANGED broadcast, which it sends when the level moves rather than when it is asked — so one profile link of a headset that holds several coming or going left the percentage gone until the headset was reconnected. It is held now for as long as anything is connected, and cleared where the connected set is rebuilt empty.
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                nameOf(intent)?.takeIf { it.isNotEmpty() }?.let { pairedNames.add(it) }
+                val device = deviceOf(intent)
+                if (device != null) {
+                    linkedTransports.getOrPut(device.address) { mutableSetOf() }.add(transportOf(intent))
+                    nameOf(intent)?.takeIf { it.isNotEmpty() }?.let { linkedNames[device.address] = it; pairedNames.add(it) }
+                }
                 pairedName = pairedNames.firstOrNull()
                 readConnected(context)
             }
 
             // A headset holds several ACL links at once — A2DP, the handsfree profile, and an LE one — and Android reports each of them separately, so one transport dropping while the rest stay up arrived here as the device having gone. The name was cleared on that first disconnect and the ring emptied with the headphones still playing. A disconnect is a reason to ask what is still connected, never an answer on its own.
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                deviceOf(intent)?.address?.let { address ->
+                    val transports = linkedTransports[address]
+                    transports?.remove(transportOf(intent))
+                    if (transports.isNullOrEmpty()) {
+                        linkedTransports.remove(address)
+                        linkedNames.remove(address)
+                    }
+                }
                 readConnected(context)
             }
 
@@ -233,6 +264,8 @@ object ConnectivityWatch {
                 if (state != BluetoothAdapter.STATE_ON) {
                     pairedName = null
                     pairedNames.clear()
+                    linkedTransports.clear()
+                    linkedNames.clear()
                     pairedCharge = -1
                 } else {
                     
@@ -273,10 +306,12 @@ object ConnectivityWatch {
 
 
     // The first connected device of the first profile that answered used to be the whole answer, and it was latched — once a name was held, neither profile could correct it. A phone carries several devices at once, so what is published is the union of what both profiles report, rebuilt on every event rather than added to.
+    // Only A2DP and the handsfree profile were asked, so buds on LE Audio, a watch or a car on any other profile were wiped by the first rebuild a few minutes in, while still connected. LE Audio is asked too, and anything whose ACL link is still up stays.
     private fun readConnected(context: Context) {
         val adapter = context.getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter ?: return
         if (!runCatching { adapter.isEnabled }.getOrDefault(false)) return
         val found = linkedSetOf<String>()
+        found.addAll(linkedNames.values)
         val listener = object : android.bluetooth.BluetoothProfile.ServiceListener {
             override fun onServiceConnected(profile: Int, proxy: android.bluetooth.BluetoothProfile) {
                 val devices = runCatching { proxy.connectedDevices }.getOrDefault(emptyList())
@@ -295,6 +330,7 @@ object ConnectivityWatch {
         }
         runCatching { adapter.getProfileProxy(context, listener, android.bluetooth.BluetoothProfile.A2DP) }
         runCatching { adapter.getProfileProxy(context, listener, android.bluetooth.BluetoothProfile.HEADSET) }
+        runCatching { adapter.getProfileProxy(context, listener, android.bluetooth.BluetoothProfile.LE_AUDIO) }
     }
 
     // BLUETOOTH_CONNECT, READ_PHONE_STATE and the weather's ACCESS_COARSE_LOCATION were only ever granted by grant.ps1 over adb, so an install that had to uninstall first — a build signed by a different debug key — came back without them, and every connected device read back as nothing paired with no error anywhere. The shell grants what is missing itself, then the connected set is read again.
@@ -311,10 +347,13 @@ object ConnectivityWatch {
         }
     }
 
-    private fun nameOf(intent: Intent): String? {
-        val device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-        return runCatching { device?.name }.getOrNull()
-    }
+    private fun deviceOf(intent: Intent): BluetoothDevice? =
+        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+
+    private fun transportOf(intent: Intent): Int =
+        intent.getIntExtra(BluetoothDevice.EXTRA_TRANSPORT, BluetoothDevice.TRANSPORT_AUTO)
+
+    private fun nameOf(intent: Intent): String? = runCatching { deviceOf(intent)?.name }.getOrNull()
 
     
 

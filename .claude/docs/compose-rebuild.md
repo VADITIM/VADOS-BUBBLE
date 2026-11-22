@@ -16,6 +16,8 @@ The `compose` branch replaces the WebView canvas (`pill.html`, `pill.css`, `js/`
 
 Rules carried over unchanged: one surface draws everything; proxies come down at the start of a collapse except under a live finger (`Proxy.place` defers until the lift); grace is sideways and upward; untouchable while hidden; the shade swipe keeps every pixel no window needs.
 
+`ConnectivityWatch` is shared with the WebView build. Bluetooth keeps every device whose ACL link is still up (tracked per address and transport) and also asks A2DP, handsfree and LE Audio, so a watch or LE Audio buds no longer vanish on the next rebuild. A network's `onLost` clears only the network last reported, and the callbacks run on the main thread.
+
 ## Parity ledger
 
 Ported (unverified on the phone):
