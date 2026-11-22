@@ -1075,7 +1075,8 @@ private fun Levels(dashboard: Dashboard, geometry: PanelGeometry) {
         val bottom = animateFloatAsState(frame.bottom, spec, label = "bottom")
         val isHidden = (held != null && held != name && isSettled) ||
             (name == "callVolume" && !isCall && held != name && LEVELS_TALL - top.value - bottom.value <= 2.5f)
-        if (!isHidden) Level(dashboard, name, geometry, held == name, { left.value }, { top.value }, { right.value }, { bottom.value })
+        /* Dropped from composition while hidden, the far bar came back with a fresh pop and grew in from a random scale instead of sliding out from behind the held one. */
+        Level(dashboard, name, geometry, held == name, isHidden, { left.value }, { top.value }, { right.value }, { bottom.value })
     }
 }
 
@@ -1085,6 +1086,7 @@ private fun Level(
     name: String,
     geometry: PanelGeometry,
     isHeld: Boolean,
+    isHidden: Boolean,
     left: () -> Float,
     top: () -> Float,
     right: () -> Float,
@@ -1115,8 +1117,10 @@ private fun Level(
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
+                alpha = if (isHidden) 0f else 1f
             }
-            .pointerInput(name) {
+            .pointerInput(name, isHidden) {
+                if (isHidden) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     dashboard.isControlTouch = true

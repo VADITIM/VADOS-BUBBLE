@@ -1,6 +1,13 @@
 package com.v.island.bubble
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -162,68 +169,90 @@ fun ClockView(clock: ClockBubble) {
         clock::onDown, clock::onMove, clock::onUp,
     ) {
         AnimatedContent(
-            targetState = if (clock.isCornered) 3 else if (clock.isOpen) 2 else if (clock.isNowStanding) 1 else 0,
+            targetState = if (clock.isCornered) 0 else if (clock.isOpen) 2 else if (clock.isNowStanding) 1 else 0,
             transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) using SizeTransform(clip = false) { _, _ -> snap() } },
             contentAlignment = Alignment.Center,
             label = "clock",
             modifier = Modifier.fillMaxSize(),
         ) { face ->
             when (face) {
-                3 -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CornerTime(appearance) { measured -> clock.cornerWidth = maxOf(Dashboard.CORNER_WIDE_FLOOR, measured + CORNER_PADDING * 2f) }
-                }
                 2 -> NowPanel(clock, appearance)
                 1 -> NowClosed(clock, appearance)
                 else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    ClockTime(appearance) { measured -> clock.timeWidth = measured + 22.4f }
+                    ClockFace(clock, appearance)
                 }
             }
         }
     }
 }
 
+/* The time and the corner were two faces cross-faded by AnimatedContent, so opening the Dashboard rebuilt the whole reading; the hours and minutes are the same at both sizes, and only the seconds change form and the date arrives, as handOverClock in js/clock.js did. */
 @Composable
-private fun ClockTime(appearance: Appearance, onMeasured: (Float) -> Unit) {
+private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
+    val isCornered = clock.isCornered
     val now = rememberNow(1000)
     val calendar = java.util.Calendar.getInstance().apply { timeInMillis = now }
-    val minutes = calendar.get(java.util.Calendar.MINUTE)
-    val seconds = calendar.get(java.util.Calendar.SECOND).toString().padStart(2, '0')
-    Row(
-        Modifier.wrapContentWidth(unbounded = true).onSizeChanged { onMeasured(it.width / Island.density) },
-        verticalAlignment = Alignment.CenterVertically,
+    fun pad(value: Int) = value.toString().padStart(2, '0')
+    val seconds = pad(calendar.get(java.util.Calendar.SECOND))
+    val grow = animateFloatAsState(if (isCornered) CORNER_GROW else 1f, tween(Durations.GROW, easing = Curves.split), label = "clockGrow")
+    var secondsForm by remember { mutableStateOf(isCornered) }
+    val secondsPop = remember { Animatable(1f) }
+    LaunchedEffect(isCornered) {
+        if (secondsForm == isCornered) return@LaunchedEffect
+        secondsPop.animateTo(0f, tween(SECONDS_POP_OUT, easing = Curves.leave))
+        secondsForm = isCornered
+        secondsPop.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
+    }
+    Column(
+        Modifier.wrapContentWidth(unbounded = true).onSizeChanged {
+            val measured = it.width / Island.density
+            if (isCornered) clock.cornerWidth = maxOf(Dashboard.CORNER_WIDE_FLOOR, measured + CORNER_PADDING * 2f)
+            else clock.timeWidth = measured + 22.4f
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BasicText(
-            "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${minutes.toString().padStart(2, '0')}",
-            style = type(0.68f, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium),
-        )
-        Column(Modifier.padding(start = 2.dp).graphicsLayer { alpha = 0.6f }, horizontalAlignment = Alignment.CenterHorizontally) {
-            val digit = type(0.29f, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 0.95f)
-            BasicText(seconds.substring(0, 1), style = digit)
-            BasicText(seconds.substring(1, 2), style = digit)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BasicText(
+                "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}",
+                style = type(0.68f * grow.value, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.5f - 0.3f * (grow.value - 1f) / (CORNER_GROW - 1f)),
+            )
+            Box(
+                Modifier.graphicsLayer {
+                    val pop = secondsPop.value
+                    alpha = pop.coerceIn(0f, 1f)
+                    scaleX = SECONDS_POP_FLOOR + (1f - SECONDS_POP_FLOOR) * pop
+                    scaleY = scaleX
+                    rotationZ = (1f - pop) * SECONDS_TURN
+                },
+            ) {
+                if (secondsForm) {
+                    BasicText(":$seconds", style = type(0.68f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f))
+                } else {
+                    Column(Modifier.padding(start = 2.dp).graphicsLayer { alpha = 0.6f }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        val digit = type(0.29f, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 0.95f)
+                        BasicText(seconds.substring(0, 1), style = digit)
+                        BasicText(seconds.substring(1, 2), style = digit)
+                    }
+                }
+            }
+        }
+        AnimatedVisibility(isCornered, enter = EnterTransition.None, exit = fadeOut(tween(DATE_FADE))) {
+            TypedText(
+                dateText(appearance.dateFormat, calendar),
+                type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f),
+                Durations.POP_IN / 2,
+                Modifier.padding(top = 2.4.dp).widthIn(max = 70.dp).graphicsLayer { alpha = 0.75f },
+                isLine = true,
+            )
         }
     }
 }
 
-@Composable
-private fun CornerTime(appearance: Appearance, onMeasured: (Float) -> Unit) {
-    val now = rememberNow(1000)
-    val calendar = java.util.Calendar.getInstance().apply { timeInMillis = now }
-    fun pad(value: Int) = value.toString().padStart(2, '0')
-    Column(
-        Modifier.wrapContentWidth(unbounded = true).onSizeChanged { onMeasured(it.width / Island.density) },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        BasicText(
-            "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}:${pad(calendar.get(java.util.Calendar.SECOND))}",
-            style = type(0.68f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f),
-        )
-        FadingLine(
-            dateText(appearance.dateFormat, calendar),
-            type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f),
-            Modifier.padding(top = 2.4.dp).widthIn(max = 70.dp).graphicsLayer { alpha = 0.75f },
-        )
-    }
-}
+/* Mirrors the seconds' popOut and popIn in the retired js/clock.js; the turn is the small rotation the pop arrives with. */
+private const val SECONDS_POP_OUT = 160
+private const val SECONDS_POP_FLOOR = 0.6f
+private const val SECONDS_TURN = -14f
+private const val DATE_FADE = 140
 
 /* Mirrors --corner-grow-scale and the corner's 0.7rem side padding in the retired pill.css. */
 private const val CORNER_GROW = 1.15f
@@ -323,7 +352,7 @@ fun StatusView(status: StatusBubble) {
     val appearance = Island.appearance
     val isCornered = Island.dashboard.isOpen
     FloatingBubble(
-        Region.Status, status.target(), status.modusColour() ?: Palette.border,
+        Region.Status, status.target(), Palette.border,
         if (status.isPressing) 1.03f else 1f, { status.drag },
         status::onDown, status::onMove, status::onUp,
     ) {

@@ -61,13 +61,6 @@ class StatusBubble {
         }
     }
 
-    fun modusColour(): Color? = when (modus()) {
-        "bluetooth" -> Color(0xFF6FB0FF)
-        "hotspot" -> Color(0xFFFF9B3D)
-        "zen" -> Color(0xFFA07DFF)
-        else -> null
-    }
-
     fun wifiGlyph(attached: Connectivity?): Glyph = when {
         attached == null || attached.link != "wifi" -> Glyphs.wifi
         !attached.isOnline -> Glyphs.wifiAlert
