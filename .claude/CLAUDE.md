@@ -30,7 +30,7 @@ Everything agent-facing is in `.claude/docs/`; `docs/map.md` says where things a
 
 ## Commands
 
-- `export JAVA_HOME="/c/Program Files/Java/jdk-21.0.11" && ./gradlew assembleDebug` — the build. `JAVA_HOME` is not set globally and Gradle will not find a JDK without it.
+- `export JAVA_HOME="/c/Users/vn/dependencies/jdk-21" && ./gradlew assembleDebug` — the build. `JAVA_HOME` is not set globally and Gradle will not find a JDK without it.
 - `adb install -r app/build/outputs/apk/debug/app-debug.apk` — reinstalling keeps the accessibility and notification-listener grants, so `grant.ps1` is only needed on a first install or after an uninstall.
 - `adb logcat -s IslandBubble` — every WebView console line from every page lands here, tagged with which page it came from.
 

@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 
@@ -76,7 +75,7 @@ object Island {
     var onBlobsDrawn: () -> Unit = {}
 
     lateinit var actions: HostActions
-    var scope: CoroutineScope = MainScope()
+    var scope: CoroutineScope = uiScope()
         private set
 
     val bubble = MainBubble()
@@ -132,8 +131,11 @@ object Island {
     fun start(actions: HostActions) {
         this.actions = actions
         scope.cancel()
-        scope = MainScope()
+        scope = uiScope()
     }
+
+    // A bare MainScope has no MonotonicFrameClock, so any animate() launched from it outside a composition threw on the first frame and took the service down mid-transition — StatusBubble.goHome on a dashboard pull was the one that surfaced.
+    private fun uiScope() = CoroutineScope(kotlinx.coroutines.SupervisorJob() + androidx.compose.ui.platform.AndroidUiDispatcher.Main)
 
     fun stop() {
         scope.cancel()
