@@ -102,7 +102,9 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     val height = screenHeight - top - Dashboard.MARGIN
     /* Landscape laid the portrait column across a screen 278 tall, so the sections overran each other and the foot; the stats stand top-left, the toggles run along the foot and the system section is the right-hand end, where the thumb holding the phone is. */
     val isWide = screenWidth > screenHeight
-    val systemWide = if (isWide) GRID_COLUMN * 2f + KNOB_GAP + Dashboard.GAP + LEVELS_WIDE + LEVELS_INSET else width
+    val gridSpread = if (isWide) WIDE_GRID_SPREAD else KNOB_GAP
+    val gridWide = GRID_COLUMN * 2f + gridSpread
+    val systemWide = if (isWide) gridWide * WIDE_GRID_SCALE + WIDE_GRID_SHIFT + LEVELS_WIDE + LEVELS_INSET else width
     val systemLeft = if (isWide) width - systemWide else 0f
     val wideDivider = systemLeft - WIDE_DIVIDER_ROOM - 1f
     val knobWide = if (isWide) wideDivider - WIDE_DIVIDER_ROOM else width + Dashboard.MARGIN * 2f
@@ -113,7 +115,7 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     val lift = max(0f, (band - Dashboard.KNOB_SIZE) / 2f)
     val firstDivider = statsTall + Dashboard.GAP + DIVIDER_SHIFT
     val systemTop = firstDivider + 1f + DIVIDER_ROOM + Dashboard.GAP
-    val knobTop = if (isWide) height - Dashboard.KNOB_SIZE else height - lift - Dashboard.KNOB_SIZE
+    val knobTop = if (isWide) height - Dashboard.KNOB_SIZE - WIDE_KNOB_LIFT else height - lift * KNOB_LIFT_SHARE - Dashboard.KNOB_SIZE
     /* Mirrors html.lock-live in pill.css: with the Now bubble standing over the toggles the lower divider sits a gap above it, so the room over the bubble and under it are one measurement. */
     val secondDivider = if (nowTall > 0f) min(height - band - Dashboard.GAP - DIVIDER_SHIFT, knobTop - NowBubble.PANEL_GAP * 2f - nowTall) - 1f
     else height - band - Dashboard.GAP - DIVIDER_SHIFT - 1f
@@ -469,21 +471,32 @@ private fun StatsSection(dashboard: Dashboard, geometry: PanelGeometry, appearan
     Column(
         Modifier
             .size(geometry.statsWide.dp, geometry.statsTall.dp)
-            .padding(top = STATS_DROP.dp, start = STATS_INSET.dp, end = STATS_INSET.dp),
+            .padding(top = (if (geometry.isWide) 0f else STATS_DROP).dp, start = STATS_INSET.dp, end = STATS_INSET.dp),
         verticalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp),
     ) {
-        WeatherLine(dashboard, appearance)
-        Row(Modifier.fillMaxWidth().height(VITALS_TALL.dp), horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp)) {
+        Row(Modifier.fillMaxWidth().height((if (geometry.isWide) WIDE_BATTERY_TALL else VITALS_TALL).dp), horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp)) {
             if (geometry.isWide) BatteryBubble(dashboard, geometry, appearance, Modifier.weight(1f).fillMaxHeight())
             else {
                 VitalsBubble(dashboard, geometry, appearance, Modifier.weight(1f).fillMaxHeight())
                 BatteryBubble(dashboard, geometry, appearance, Modifier.width(SIDE_WIDE.dp).fillMaxHeight())
             }
         }
-        Row(Modifier.fillMaxWidth().height(TRANSFER_TALL.dp), horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp)) {
-            TransferStrip(dashboard, appearance, Modifier.weight(1f).fillMaxHeight())
-            if (Island.connectivity?.isUsb == true) UsbBubble(dashboard, geometry, appearance, Modifier.width(SIDE_WIDE.dp).fillMaxHeight())
-        }
+        WeatherLine(dashboard, appearance)
+        if (!geometry.isWide) TransferRow(dashboard, geometry, appearance, Modifier.fillMaxWidth())
+    }
+    if (geometry.isWide) {
+        TransferRow(
+            dashboard, geometry, appearance,
+            Modifier.offset { IntOffset(((geometry.statsWide + Dashboard.GAP) * Island.density).roundToInt(), 0) }.width(WIDE_TRANSFER.dp),
+        )
+    }
+}
+
+@Composable
+private fun TransferRow(dashboard: Dashboard, geometry: PanelGeometry, appearance: Appearance, modifier: Modifier) {
+    Row(modifier.height(TRANSFER_TALL.dp), horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp)) {
+        TransferStrip(dashboard, appearance, Modifier.weight(1f).fillMaxHeight())
+        if (Island.connectivity?.isUsb == true) UsbBubble(dashboard, geometry, appearance, Modifier.width(SIDE_WIDE.dp).fillMaxHeight())
     }
 }
 
@@ -848,13 +861,20 @@ private fun SystemSection(dashboard: Dashboard, geometry: PanelGeometry, appeara
         horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val gridScale = if (geometry.isWide) WIDE_GRID_SCALE else GRID_SCALE
         Column(
-            Modifier.weight(1f).fillMaxHeight(),
+            (if (geometry.isWide) Modifier.padding(start = ((gridScale - 1f) * geometry.gridWide / 2f).dp, end = ((gridScale - 1f) * geometry.gridWide / 2f + WIDE_GRID_SHIFT - Dashboard.GAP).dp).width(geometry.gridWide.dp)
+            else Modifier.weight(1f))
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleX = gridScale
+                    scaleY = gridScale
+                },
             verticalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Dashboard.MODES.chunked(2).forEachIndexed { row, pair ->
-                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(KNOB_GAP.dp)) {
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(geometry.gridSpread.dp)) {
                     pair.forEach { name -> ModeButton(dashboard, name, geometry.modeCentre(row), geometry, appearance) }
                 }
             }
@@ -1226,9 +1246,18 @@ private fun KnobRow(dashboard: Dashboard, geometry: PanelGeometry, appearance: A
     Box(
         Modifier
             .offset { IntOffset(0, (geometry.knobTop * Island.density).roundToInt()) }
-            .then(if (geometry.isWide) Modifier.drawWithContent {
+            .then(if (geometry.isWide) Modifier.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }.drawWithContent {
                 val room = WIDE_KNOB_ROOM.dp.toPx()
-                clipRect(0f, -room, size.width, size.height + room) { this@drawWithContent.drawContent() }
+                val fade = (WIDE_KNOB_FADE.dp.toPx() / size.width).coerceIn(0f, 0.5f)
+                clipRect(0f, -room, size.width, size.height + room) {
+                    this@drawWithContent.drawContent()
+                    drawRect(
+                        Brush.horizontalGradient(0f to Color.Transparent, fade to Color.Black, 1f - fade to Color.Black, 1f to Color.Transparent),
+                        topLeft = Offset(0f, -room),
+                        size = androidx.compose.ui.geometry.Size(size.width, size.height + room * 2f),
+                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                    )
+                }
             } else Modifier)
             /* size() was held to the panel's width, so the window bled past the left margin only and left both margins as a gap on the right; requiredSize overhangs both sides equally. */
             .requiredSize(windowWide.dp, Dashboard.KNOB_SIZE.dp)
@@ -1348,13 +1377,13 @@ fun StatusActions(dashboard: Dashboard) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(26.dp).popIn(STATUS_ACTION_DELAY).pressable(pressedScale = 0.9f, haptic = Haptic.Tap) {
+            Modifier.size(22.dp).popIn(STATUS_ACTION_DELAY).pressable(pressedScale = 0.9f, haptic = Haptic.Tap) {
                 Island.actions.openControlPanel()
                 dashboard.close()
             },
         ) { GlyphIcon(Glyphs.settings, Palette.textBright, Modifier.fillMaxSize()) }
         Box(
-            Modifier.size(26.dp).popIn(STATUS_ACTION_DELAY + Durations.POP_IN_STAGGER).pressable(pressedScale = 0.9f, haptic = Haptic.Expand) {
+            Modifier.size(22.dp).popIn(STATUS_ACTION_DELAY + Durations.POP_IN_STAGGER).pressable(pressedScale = 0.9f, haptic = Haptic.Expand) {
                 Island.actions.openPowerMenu()
                 dashboard.close()
             },
@@ -1463,7 +1492,16 @@ private const val LEVEL_STEP = 1
 private const val DIVIDER_ROOM = 34f
 private const val DIVIDER_SHIFT = -18f
 private const val DIVIDER_SHARE = 0.46f
-private const val WIDE_STATS = 260f
+private const val WIDE_STATS = 200f
+private const val WIDE_BATTERY_TALL = 62f
+private const val WIDE_TRANSFER = 190f
+private const val WIDE_KNOB_LIFT = 40f
+private const val WIDE_KNOB_FADE = 28f
+private const val WIDE_GRID_SCALE = 1.15f
+private const val WIDE_GRID_SPREAD = 18f
+private const val WIDE_GRID_SHIFT = 70f
+private const val GRID_SCALE = 1.1f
+private const val KNOB_LIFT_SHARE = 0.55f
 private const val WIDE_KNOB_ROOM = 28f
 private const val WIDE_DIVIDER_ROOM = 10f
 private const val WIDE_DIVIDER_SHARE = 0.46f

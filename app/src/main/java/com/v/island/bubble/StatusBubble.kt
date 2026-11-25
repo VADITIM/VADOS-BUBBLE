@@ -195,7 +195,7 @@ class StatusBubble {
     companion object {
         const val STATUS_RIGHT = 14f
         /* Mirrors STATUS_CORNER_WIDE in the retired js/status.js: the actions face has no width of its own to be measured. */
-        const val CORNER_WIDE = 96f
+        const val CORNER_WIDE = 82f
         const val STATUS_PULL = 34f
         const val STATUS_PULL_STOLEN = 12f
         private const val HOLD_BLOCK = 18f

@@ -281,8 +281,8 @@ class Dashboard {
     companion object {
         /* Mirrors --corner-inset, --corner-tall and --corner-radius in the retired pill.css: the grown Clock and Status bubbles stand in the screen's two top corners while the Dashboard is open. */
         const val CORNER_INSET = 10f
-        const val CORNER_TALL = 40f
-        const val CORNER_RADIUS = 18f
+        const val CORNER_TALL = 34f
+        const val CORNER_RADIUS = 15f
         const val CORNER_WIDE_FLOOR = StatusBubble.CORNER_WIDE
         const val QUICK_CLEARANCE = 22f
         const val MARGIN = 10f

@@ -263,8 +263,8 @@ private const val SECONDS_TURN = -14f
 private const val DATE_FADE = 140
 
 /* Mirrors --corner-grow-scale and the corner's 0.7rem side padding in the retired pill.css. */
-private const val CORNER_GROW = 1.15f
-private const val CORNER_PADDING = 11.2f
+private const val CORNER_GROW = 1.0f
+private const val CORNER_PADDING = 9f
 
 @Composable
 private fun NowClosed(clock: ClockBubble, appearance: Appearance) {
