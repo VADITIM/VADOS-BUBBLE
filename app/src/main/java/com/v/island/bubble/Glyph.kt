@@ -30,8 +30,9 @@ class Glyph(val left: Float, val top: Float, val width: Float, val height: Float
 fun GlyphIcon(glyph: Glyph, color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val scale = minOf(size.width / glyph.width, size.height / glyph.height)
-        val offsetX = (size.width - glyph.width * scale) / 2f
-        val offsetY = (size.height - glyph.height * scale) / 2f
+        // A centred glyph landed between pixels, so its thin strokes were antialiased across two and read as blurred; its origin snaps to a whole pixel.
+        val offsetX = kotlin.math.round((size.width - glyph.width * scale) / 2f)
+        val offsetY = kotlin.math.round((size.height - glyph.height * scale) / 2f)
         translate(offsetX, offsetY) {
             withTransform({ scale(scale, scale, pivot = androidx.compose.ui.geometry.Offset.Zero); translate(-glyph.left, -glyph.top) }) {
                 glyph.layers.forEach { layer ->
