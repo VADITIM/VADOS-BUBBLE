@@ -203,10 +203,10 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
             return@graphicsLayer
         }
         val rest = 1f - value
-        // The battery and stats were thrown in from past the screen top with an overshoot, so they flew over the clock and each other; they fade in from a short fixed drop instead.
+        // The battery and stats were thrown in from past the screen top with an overshoot, so they flew over the clock and each other; they slide in from past the screen top without overshoot, already near full size.
         if (kind == PopKind.Top && !isLeaving) {
-            alpha = value.coerceIn(0f, 1f) * soloValue
-            translationY = -TOP_DROP * rest * density
+            alpha = (value * TOP_FADE_SHARE).coerceIn(0f, 1f) * soloValue
+            translationY = -(centre + TOP_DROP) * rest * density
             scaleX = (TOP_SCALE + (1f - TOP_SCALE) * value) * soloValue
             scaleY = scaleX
             return@graphicsLayer
@@ -1511,9 +1511,10 @@ private const val BATTERY_CRITICAL = 19
 private const val FROST_STEPS = 12
 private const val FAST_DROP = 220
 private const val FAST_LIFT = 14f
-private const val TOP_FADE = 480
-private const val TOP_DROP = 16f
-private const val TOP_SCALE = 0.94f
+private const val TOP_FADE = 620
+private const val TOP_DROP = 160f
+private const val TOP_SCALE = 0.88f
+private const val TOP_FADE_SHARE = 3f
 private const val SOLO_SHRINK = 130
 private const val SOLO_SHRINK_STEP = 14L
 private const val SOLO_SWELL = 300

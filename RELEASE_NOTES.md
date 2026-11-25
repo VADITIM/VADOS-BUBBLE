@@ -1,3 +1,3 @@
-# 0.7.67
+# 0.7.68
 
-- the Dashboard Now rest is taken from the settled layout so the pill no longer chases the room-making animation.
+- battery and stats pills slide in from past the screen top over 620ms starting at 88% scale.
