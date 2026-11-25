@@ -627,7 +627,13 @@ private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appeara
                 .fillMaxHeight()
                 .clip(cellShape)
                 .background(BATTERY_WELL)
-                .border(2.dp, outline.value, cellShape),
+                // The border was stroked along the clipped squircle, so half its width fell outside the clip and the corners thinned out; it is drawn inset by half its width on a squircle shrunk by the same amount.
+                .drawWithContent {
+                    drawContent()
+                    val width = 2.dp.toPx()
+                    val ring = RING_SHAPE.createOutline(androidx.compose.ui.geometry.Size(size.width - width, size.height - width), layoutDirection, this)
+                    translate(width / 2f, width / 2f) { drawOutline(ring, outline.value, style = Stroke(width)) }
+                },
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 val inset = 6.dp.toPx()
@@ -657,6 +663,7 @@ private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appeara
 
 /* Mirrors #battery-fill in pill.css: the fill is a squircle like its cell, and a circular 17dp corner read rounder than the WebView's. */
 private val FILL_SHAPE = SquircleShape(17.dp)
+private val RING_SHAPE = SquircleShape(21.dp)
 
 @Composable
 private fun BoxScope.ChargeBubbles(share: Float) {
@@ -1117,8 +1124,8 @@ private fun levelFrame(name: String, isCall: Boolean, held: String?): LevelFrame
     }
     return when (name) {
         "brightness" -> LevelFrame(0f, 0f, half, 0f)
-        "volume" -> LevelFrame(half, if (isCall) LEVELS_TALL / 2f + LEVEL_SPLIT / 2f else 0f, 0f, 0f)
-        else -> LevelFrame(half, 0f, 0f, if (isCall) LEVELS_TALL / 2f + LEVEL_SPLIT / 2f else LEVELS_TALL - 2f)
+        "volume" -> LevelFrame(half, if (isCall) LEVELS_TALL / 2f + LEVEL_SPLIT / 2f else 0f, 0f, if (isCall) -CALL_GROW else 0f)
+        else -> LevelFrame(half, if (isCall) -CALL_GROW else 0f, 0f, if (isCall) LEVELS_TALL / 2f + LEVEL_SPLIT / 2f else LEVELS_TALL - 2f)
     }
 }
 
@@ -1477,7 +1484,7 @@ private const val SOLO_SWELL = 300
 private const val SOLO_SWELL_STEP = 16L
 private const val STATS_SHARE = 0.27f
 private const val TOGGLE_SHARE = 0.275f
-private const val STATS_DROP = 12f
+private const val STATS_DROP = 4f
 private const val STATS_INSET = 10f
 private const val WEATHER_TALL = 17.6f
 private const val VITALS_TALL = 80f
@@ -1493,6 +1500,7 @@ private const val LEVELS_WIDE = 108f
 private const val LEVELS_TALL = 285f
 private const val LEVELS_INSET = 14f
 private const val LEVEL_SPLIT = 10f
+private const val CALL_GROW = (LEVELS_TALL - LEVEL_SPLIT) / 2f * 0.2f
 private const val LEVEL_SLOP = 8f
 private const val LEVEL_STEP = 1
 private const val DIVIDER_ROOM = 34f

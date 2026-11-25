@@ -1,7 +1,10 @@
 package com.v.island.bubble
 
 import android.os.SystemClock
+import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.Stable
@@ -121,6 +124,13 @@ class MainBubble {
     private var holdPending = false
     private var pullDrop = 0f
     private var scrollOrigin = 0
+    private var scrollMode = ScrollMode.Undecided
+    private var scrollFromY = 0f
+    private var lastScrollY = 0f
+    private var lastScrollAt = 0L
+    private var scrollSpeed = 0f
+    private var flingJob: Job? = null
+    var expandedGroup by mutableStateOf<String?>(null)
     private var gate = DragGate()
     private var closedInTouch = false
     private var closedOutsideAt = -1_000L
@@ -680,6 +690,7 @@ class MainBubble {
         entries.forEach { entry -> byId.getOrPut(entry.app + "  " + entry.title) { mutableListOf() }.add(entry) }
         groups = byId.map { (id, list) -> NoticeGroup(id, list.first(), list) }
         Island.unread = 0
+        expandedGroup = null
         becomeExtended()
         face = Face.Notifications
         fitNotifications()
@@ -716,7 +727,7 @@ class MainBubble {
 
     fun systemHeight() = if (systemNotices.isEmpty()) 0f else SYSTEM_PAD * 2f + systemNotices.size * SYSTEM_ROW
 
-    fun systemOffset() = if (systemNotices.isEmpty()) 0f else systemHeight() + CLEAR_GAP
+    fun systemOffset() = if (systemNotices.isEmpty()) 0f else systemHeight() + SYSTEM_FOOT
 
     fun openSystem(entry: Notice) {
         Island.actions.openNotification(entry.key)
@@ -867,7 +878,10 @@ class MainBubble {
     fun onDown(x: Float, y: Float) {
         startX = x
         startY = y
+        flingJob?.cancel()
         scrollOrigin = notificationsScroll.value
+        scrollMode = ScrollMode.Undecided
+        scrollSpeed = 0f
         hasMoved = false
         hasHeld = false
         hasSwiped = false
@@ -961,12 +975,32 @@ class MainBubble {
             grantHoldWander()
             /* A swipe on the player to skip, pause or close still let the hold run out and opened the app; a panel touch that travels is a gesture, never a hold. */
             if (panelMod() != null && hypot(x - startX, y - startY) > HOLD_BLOCK) endHold()
-            if (size == Size.Notifications && isInScrollBand(startX)) {
-                hasMoved = true
-                endHold()
-                val wanted = (scrollOrigin - (y - startY) * Island.density).roundToInt()
-                notificationsScroll.dispatchRawDelta(wanted - notificationsScroll.value.toFloat())
-                return
+            // The list only scrolled from a band along its right edge, so a drag anywhere else did nothing and the menu read as stuck; it scrolls from anywhere once the drag is clearly vertical.
+            if (size == Size.Notifications && notificationsScroll.maxValue > 0 && scrollMode != ScrollMode.Across) {
+                if (scrollMode == ScrollMode.Undecided) {
+                    val across = abs(x - startX)
+                    val vertical = abs(y - startY)
+                    if (across > SCROLL_SLOP && across > vertical) scrollMode = ScrollMode.Across
+                    else if (vertical > SCROLL_SLOP) {
+                        scrollMode = ScrollMode.Along
+                        scrollOrigin = notificationsScroll.value
+                        scrollFromY = y
+                        lastScrollY = y
+                        lastScrollAt = SystemClock.uptimeMillis()
+                    }
+                }
+                if (scrollMode == ScrollMode.Along) {
+                    hasMoved = true
+                    endHold()
+                    val now = SystemClock.uptimeMillis()
+                    if (now > lastScrollAt) scrollSpeed = scrollSpeed * 0.4f + (lastScrollY - y) * Island.density * 1000f / (now - lastScrollAt) * 0.6f
+                    lastScrollY = y
+                    lastScrollAt = now
+                    val wanted = (scrollOrigin - (y - scrollFromY) * Island.density).roundToInt()
+                    notificationsScroll.dispatchRawDelta(wanted - notificationsScroll.value.toFloat())
+                    return
+                }
+                if (scrollMode == ScrollMode.Undecided) return
             }
             val isPanel = size == Size.Notifications || panelMod() != null || mode == Mode.Alert
             if (!hasDismissed && isPanel && startY - y > PULL_TRIGGER && abs(x - startX) < 40f) {
@@ -1047,6 +1081,7 @@ class MainBubble {
         }
         endHold()
         untoy()
+        if (scrollMode == ScrollMode.Along && size == Size.Notifications) flingNotifications(if (SystemClock.uptimeMillis() - lastScrollAt > FLING_STALE) 0f else scrollSpeed)
         if (hasMoved || hasHeld || closedInTouch) return
         tap()
     }
@@ -1084,10 +1119,28 @@ class MainBubble {
         }
     }
 
-    private fun isInScrollBand(x: Float): Boolean {
-        val box = target()
-        val right = Island.screenWidth / 2f + box.width / 2f
-        return x >= right - Island.screenWidth * SCROLL_BAND
+    private fun flingNotifications(speed: Float) {
+        if (abs(speed) < FLING_FLOOR) return
+        flingJob = Island.scope.launch {
+            notificationsScroll.scroll {
+                var last = 0f
+                AnimationState(0f, speed).animateDecay(exponentialDecay()) {
+                    val step = value - last
+                    last = value
+                    if (abs(scrollBy(step) - step) > 0.5f) cancelAnimation()
+                }
+            }
+        }
+    }
+
+    fun toggleGroup(group: NoticeGroup) {
+        Haptics.play(Haptic.Tap)
+        expandedGroup = if (expandedGroup == group.id) null else group.id
+    }
+
+    fun groupAction(group: NoticeGroup, action: Action) {
+        Haptics.play(Haptic.Tap)
+        Island.actions.noticeAction(group.head.key, action.index)
     }
 
     private fun dragSwap(travelled: Float): Boolean {
@@ -1214,7 +1267,10 @@ class MainBubble {
         const val CLEAR_TOP_MILLISECONDS = 460
         const val CLEAR_STAGGER = 35L
         const val CLEAR_FLIGHT = 240L
-        const val SCROLL_BAND = 0.15f
+        private const val SCROLL_SLOP = 8f
+        private const val FLING_FLOOR = 300f
+        private const val FLING_STALE = 80L
+        const val SYSTEM_FOOT = 28f
         const val OUTSIDE_LATCH = 120L
         const val DRAG_COMMIT = 10f
         const val DRAG_WINDOW = 110L
@@ -1238,3 +1294,5 @@ class MainBubble {
         const val TORCH_SWIPE_STEP = 36f
     }
 }
+
+private enum class ScrollMode { Undecided, Along, Across }

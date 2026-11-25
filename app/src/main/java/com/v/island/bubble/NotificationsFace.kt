@@ -2,7 +2,11 @@ package com.v.island.bubble
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -31,6 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -71,6 +80,7 @@ fun NotificationsFace(bubble: MainBubble, appearance: Appearance) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, isLast: Boolean, appearance: Appearance) {
     val entry = group.head
@@ -80,6 +90,10 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
     val iconPop = remember { Animatable(0f) }
     val backing = remember { Animatable(0f) }
     var isPressing by remember { mutableStateOf(false) }
+    var fullHeight by remember { mutableStateOf(0f) }
+    val isExpanded = bubble.expandedGroup == group.id
+    val ceiling = Island.screenHeight * ROW_CEILING_SHARE
+    val isCut = !isExpanded && fullHeight > ceiling
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         delay(delayMilliseconds.toLong())
@@ -96,7 +110,16 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
                 alpha = arrival.value * (1f - (abs(slide.value) / SWIPE_AWAY).coerceIn(0f, 1f))
                 translationY = (1f - arrival.value) * 10f * density
             }
+            .animateContentSize(tween(ROW_RESIZE, easing = Curves.split))
+            .heightIn(max = if (isExpanded) androidx.compose.ui.unit.Dp.Infinity else ceiling.dp)
             .clip(RoundedCornerShape(22.dp))
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                if (!isCut) return@drawWithContent
+                val fade = ROW_FADE * density
+                drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height), topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fade), blendMode = BlendMode.DstIn)
+            }
             .background(Palette.textBright.copy(alpha = (if (isPressing) 0.11f else 0.05f) * backing.value))
             .pointerInput(group.id) {
                 awaitEachGesture {
@@ -128,14 +151,14 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
                                 } else scope.launch { slide.animateTo(0f, tween(260, easing = Curves.enter)) }
                             } else if (!isScrolling) {
                                 change.consume()
-                                bubble.openGroup(group)
+                                bubble.toggleGroup(group)
                             }
                             break
                         }
                     }
                 }
             }
-            .padding(horizontal = 12.dp, vertical = 12.8.dp),
+            .padding(horizontal = 12.dp, vertical = ROW_PADDING.dp),
         horizontalArrangement = Arrangement.spacedBy(13.6.dp),
     ) {
         val badge = entry.appIcon ?: entry.icon
@@ -151,7 +174,7 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
                 BasicText(entry.appName.ifEmpty { entry.app }.trim().take(1).uppercase(), style = type(0.9f, Palette.ground, appearance.headingFont))
             }
         }
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).onSizeChanged { fullHeight = it.height / Island.density + ROW_PADDING * 2f }) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RevealLabel(
                     entry.appName.ifEmpty { entry.app }.uppercase(),
@@ -196,6 +219,18 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
                     }
                 }
             }
+            if (isExpanded) {
+                FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.4.dp), verticalArrangement = Arrangement.spacedBy(6.4.dp)) {
+                    group.head.actions.forEachIndexed { index, action ->
+                        PillButton(action.title, index == 0, entry.accent, appearance) { bubble.groupAction(group, action) }
+                    }
+                    PillButton("Open", group.head.actions.isEmpty(), entry.accent, appearance) { bubble.openGroup(group) }
+                    PillButton("Dismiss", false, entry.accent, appearance) {
+                        Haptics.play(Haptic.Dismiss)
+                        bubble.dismissGroup(group)
+                    }
+                }
+            }
         }
     }
 }
@@ -216,3 +251,7 @@ private const val BACKING_FADE = 320
 private const val ICON_POP_TILT = -26f
 private const val SWIPE_DISMISS = 90f
 private const val SWIPE_AWAY = 400f
+private const val ROW_CEILING_SHARE = 0.2f
+private const val ROW_PADDING = 12.8f
+private const val ROW_FADE = 28f
+private const val ROW_RESIZE = 300

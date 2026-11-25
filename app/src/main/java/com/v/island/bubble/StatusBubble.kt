@@ -122,7 +122,7 @@ class StatusBubble {
         if (Island.dashboard.isOpen) {
             return Frame(CORNER_WIDE, Dashboard.CORNER_TALL, Dashboard.CORNER_RADIUS, Dashboard.CORNER_INSET, Island.screenWidth - Dashboard.CORNER_INSET - CORNER_WIDE)
         }
-        val width = contentWidth + 17.6f
+        val width = contentWidth + 9.6f
         return Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, Island.screenWidth - STATUS_RIGHT - width)
     }
 
@@ -221,8 +221,8 @@ class StatusBubble {
             BatteryEvent.Critical to Color(0xFFFF3B30),
         )
 
-        fun chargeColour(charge: Charge): Color =
-            if (charge.isPlugged) CHARGING_COLOUR
-            else BATTERY_GRADIENT.firstOrNull { charge.percent >= it.first }?.second ?: BATTERY_GRADIENT.last().second
+        fun chargeColour(charge: Charge): Color = if (charge.isPlugged) CHARGING_COLOUR else levelColour(charge.percent)
+
+        fun levelColour(percent: Int): Color = BATTERY_GRADIENT.firstOrNull { percent >= it.first }?.second ?: BATTERY_GRADIENT.last().second
     }
 }

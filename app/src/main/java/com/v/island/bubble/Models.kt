@@ -31,6 +31,7 @@ data class Notice(
     val picture: ImageBitmap?,
     val postedAt: Long,
     val isSystem: Boolean = false,
+    val actions: List<Action> = emptyList(),
 )
 
 @Immutable
@@ -217,6 +218,7 @@ object Payloads {
         picture = image(json.text("imageBase64")),
         postedAt = json.optLong("postedAt", System.currentTimeMillis()),
         isSystem = json.optBoolean("isSystem"),
+        actions = actions(json.optJSONArray("actions")),
     )
 
     fun notices(array: JSONArray): List<Notice> =

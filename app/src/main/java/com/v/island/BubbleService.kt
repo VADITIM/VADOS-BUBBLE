@@ -857,6 +857,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     override fun mediaSpeed(rate: Float) = MediaControl.setSpeed(rate)
 
     override fun timerAction(index: Int) = IslandNotificationListener.timerAction(index)
+    override fun noticeAction(key: String, index: Int) = IslandNotificationListener.noticeAction(key, index)
 
     override fun tripAction(index: Int) = IslandNotificationListener.tripAction(index)
 

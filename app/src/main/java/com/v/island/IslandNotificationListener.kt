@@ -117,6 +117,12 @@ class IslandNotificationListener : NotificationListenerService() {
             instance?.activeNotifications?.firstOrNull { TimerWatch.isTimer(it) }
 
         
+        fun noticeAction(key: String, index: Int) {
+            val posted = instance?.activeNotifications?.firstOrNull { it.key == key } ?: return
+            val action = posted.notification.actions?.getOrNull(index) ?: return
+            runCatching { action.actionIntent.send() }
+        }
+
         fun timerAction(index: Int) {
             timer()?.let { TimerWatch.act(it, index) }
         }
@@ -440,6 +446,11 @@ class IslandNotificationListener : NotificationListenerService() {
             
             
             .put("postedAt", statusBarNotification.postTime)
+            .put("actions", JSONArray().apply {
+                statusBarNotification.notification.actions?.forEachIndexed { index, action ->
+                    if (action.remoteInputs.isNullOrEmpty() && !action.title.isNullOrBlank()) put(JSONObject().put("index", index).put("title", action.title.toString()))
+                }
+            })
     }
 
     

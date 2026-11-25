@@ -33,6 +33,7 @@ interface HostActions {
     fun transferAction(index: Int)
     fun readNotifications(): List<Notice>
     fun dismissNotification(key: String)
+    fun noticeAction(key: String, index: Int)
     fun mediaControl(action: String)
     fun mediaSeek(milliseconds: Long)
     fun mediaSpeed(rate: Float)

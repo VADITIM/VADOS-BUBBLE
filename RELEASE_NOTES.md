@@ -1,3 +1,3 @@
-# 0.7.40
+# 0.7.41
 
-The Dashboard opens without stuttering after its first open, and while closed it no longer keeps drawing in the background.
+Dashboard: the battery and stats sit a little higher, the two volume sliders during a call are taller, and the charging outline follows the battery's corners. The status pill has bigger icons, shows the Bluetooth device's charge as a coloured ring round its icon, and its battery reads clearly at any level with a bolt while charging. The clock's small seconds are larger and closer together, and the clock no longer jumps when the Dashboard opens. Notifications: system notifications sit at the bottom of the screen in colour, the list scrolls from anywhere, long notifications are capped and expand on a tap to show their own commands plus Open and Dismiss.
