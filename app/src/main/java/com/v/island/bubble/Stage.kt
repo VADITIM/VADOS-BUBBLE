@@ -27,6 +27,7 @@ fun IslandStage() {
             ClockView(Island.clock)
             StatusView(Island.status)
             if (!isLandscape) {
+                SystemPill(Island.bubble)
                 ClearButton(Island.bubble)
                 MainBubbleView(Island.bubble)
                 TorchView(Island.bubble)

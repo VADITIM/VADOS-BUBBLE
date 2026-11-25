@@ -465,7 +465,7 @@ fun SatellitesView(bubble: MainBubble) {
 fun ClearButton(bubble: MainBubble) {
     val isShown = bubble.size == com.v.island.bubble.Size.Notifications && bubble.groups.isNotEmpty()
     val box = bubble.target()
-    val restTop = box.top + box.height + MainBubble.CLEAR_GAP
+    val restTop = box.top + box.height + MainBubble.CLEAR_GAP + bubble.systemOffset()
     val settled = animateFloatAsState(restTop, tween(MainBubble.CLEAR_TOP_MILLISECONDS, easing = Curves.grow), label = "clearTop")
     val left = Island.screenWidth / 2f - MainBubble.CLEAR_SIZE / 2f
     /* Mirrors #notifications-clear in pill.css: it slides out from under the menu and grows from its top edge after the menu has opened, and goes back up under it on the way home. */
@@ -521,6 +521,56 @@ fun ClearButton(bubble: MainBubble) {
         contentAlignment = Alignment.Center,
     ) {
         GlyphIcon(TRASH, Palette.textBright, Modifier.size(20.dp).graphicsLayer { alpha = glyph.value })
+    }
+}
+
+@Composable
+fun SystemPill(bubble: MainBubble) {
+    val isShown = bubble.size == com.v.island.bubble.Size.Notifications && bubble.systemNotices.isNotEmpty()
+    val box = bubble.target()
+    val restTop = box.top + box.height + MainBubble.CLEAR_GAP
+    val settled = animateFloatAsState(restTop, tween(MainBubble.CLEAR_TOP_MILLISECONDS, easing = Curves.grow), label = "systemTop")
+    val left = Island.screenWidth / 2f - MainBubble.GROWN_WIDTH / 2f
+    val height = bubble.systemHeight()
+    val drop = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(380, 160, Curves.split) else tween(220, easing = Curves.grow), label = "systemDrop")
+    val grown = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(320, 160, Curves.split) else tween(220, easing = Curves.grow), label = "systemGrow")
+    val content = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(200, 340) else tween(120), label = "systemContent")
+    if (grown.value <= 0.01f && !isShown) return
+    fun top() = settled.value - (1f - drop.value) * (height + MainBubble.CLEAR_GAP)
+    Blob(Island.liquid) {
+        val density = Island.density
+        val shown = height * grown.value
+        val y = top()
+        BlobShape(Rect(left * density, y * density, (left + MainBubble.GROWN_WIDTH) * density, (y + shown) * density), kotlin.math.min(26f, shown / 2f) * density, Palette.border)
+    }
+    SideEffect {
+        if (isShown) Island.regions[Region.System] = Rect(left, restTop, left + MainBubble.GROWN_WIDTH, restTop + height)
+        else Island.regions.remove(Region.System)
+    }
+    Column(
+        Modifier
+            .offset { IntOffset((left * Island.density).roundToInt(), (top() * Island.density).roundToInt()) }
+            .size(MainBubble.GROWN_WIDTH.dp, height.dp)
+            .graphicsLayer { alpha = content.value }
+            .padding(horizontal = 10.dp, vertical = MainBubble.SYSTEM_PAD.dp),
+    ) {
+        bubble.systemNotices.forEach { entry ->
+            key(entry.key) {
+                Row(
+                    Modifier.size(MainBubble.GROWN_WIDTH.dp - 20.dp, MainBubble.SYSTEM_ROW.dp)
+                        .then(if (isShown) Modifier.pressable(pressedScale = 1.02f, haptic = null) { bubble.openSystem(entry) } else Modifier),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    val badge = entry.icon ?: entry.appIcon
+                    if (badge != null) androidx.compose.foundation.Image(badge, null, Modifier.size(22.dp).clip(CircleShape), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                    Column(Modifier.weight(1f).clipToBounds()) {
+                        BasicText(entry.title.ifEmpty { entry.appName }, style = type(0.72f, Palette.textBright, Island.appearance.headingFont, Island.appearance.headingScale), maxLines = 1, softWrap = false)
+                        if (entry.text.isNotEmpty()) BasicText(entry.text, style = type(0.64f, Palette.textFaint, Island.appearance.contentFont, Island.appearance.contentScale), maxLines = 1, softWrap = false)
+                    }
+                }
+            }
+        }
     }
 }
 

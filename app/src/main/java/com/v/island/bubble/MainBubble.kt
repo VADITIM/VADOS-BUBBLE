@@ -84,6 +84,7 @@ class MainBubble {
     var drag by mutableStateOf(Offset.Zero)
         private set
     var groups by mutableStateOf<List<NoticeGroup>>(emptyList())
+    var systemNotices by mutableStateOf<List<Notice>>(emptyList())
         private set
     var pictureHeight by mutableFloatStateOf(320f)
         private set
@@ -673,7 +674,8 @@ class MainBubble {
 
     fun openNotifications() {
         if (isNotificationsSettling()) return
-        val entries = Island.actions.readNotifications()
+        val (system, entries) = Island.actions.readNotifications().sortedByDescending { it.postedAt }.partition { it.isSystem }
+        systemNotices = system
         val byId = LinkedHashMap<String, MutableList<Notice>>()
         entries.forEach { entry -> byId.getOrPut(entry.app + "  " + entry.title) { mutableListOf() }.add(entry) }
         groups = byId.map { (id, list) -> NoticeGroup(id, list.first(), list) }
@@ -688,7 +690,7 @@ class MainBubble {
     fun fitNotifications() {
         val highest = appearance.grab + GROWN_PAD
         val tall = Island.screenHeight
-        val below = CLEAR_GAP + CLEAR_SIZE
+        val below = CLEAR_GAP + CLEAR_SIZE + systemOffset()
         val floor = (tall * 0.35f).roundToInt().toFloat()
         val ceiling = (tall * 0.85f).roundToInt() - below
         val list = if (notificationsList >= 0f) notificationsList else groups.sumOf { group -> rowHeight(group).toDouble() }.toFloat()
@@ -710,6 +712,16 @@ class MainBubble {
     private fun rowHeight(group: NoticeGroup): Float {
         val lines = group.entries.sumOf { entry -> max(1, entry.messages.size).coerceAtMost(4) }
         return 70f + lines * 20f
+    }
+
+    fun systemHeight() = if (systemNotices.isEmpty()) 0f else SYSTEM_PAD * 2f + systemNotices.size * SYSTEM_ROW
+
+    fun systemOffset() = if (systemNotices.isEmpty()) 0f else systemHeight() + CLEAR_GAP
+
+    fun openSystem(entry: Notice) {
+        Island.actions.openNotification(entry.key)
+        Haptics.play(Haptic.Tap)
+        toClosed()
     }
 
     fun dismissGroup(group: NoticeGroup) {
@@ -1195,6 +1207,8 @@ class MainBubble {
         const val NOTIFICATIONS_HOMING = 460L
         const val NOTIFICATIONS_FOOT = 16f
         const val CLEAR_SIZE = 44f
+        const val SYSTEM_ROW = 40f
+        const val SYSTEM_PAD = 6f
         const val CLEAR_GAP = 12f
         /* Mirrors the top transition on #notifications-clear in pill.css. */
         const val CLEAR_TOP_MILLISECONDS = 460

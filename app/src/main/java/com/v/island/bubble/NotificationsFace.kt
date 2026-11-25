@@ -49,9 +49,7 @@ fun agoText(postedAt: Long): String {
     if (postedAt <= 0L) return ""
     val minutes = (System.currentTimeMillis() - postedAt) / 60_000
     if (minutes < 1) return "now"
-    if (minutes < 60) return "${minutes}m"
-    val hours = minutes / 60
-    return if (hours < 24) "${hours}h" else "${hours / 24}d"
+    return "${minutes}m"
 }
 
 @Composable
@@ -79,10 +77,12 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
     val delayMilliseconds = ROW_ENTER_DELAY + minOf(index, ROW_STAGGER_LIMIT) * ROW_STAGGER
     val slide = remember { Animatable(0f) }
     val arrival = remember { Animatable(0f) }
+    val iconPop = remember { Animatable(0f) }
     var isPressing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         delay(delayMilliseconds.toLong())
+        launch { delay(ICON_POP_AFTER); iconPop.animateTo(1f, tween(360, easing = Curves.split)) }
         arrival.animateTo(1f, tween(191, easing = ROW_ARRIVE))
     }
     Row(
@@ -136,10 +136,15 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
         horizontalArrangement = Arrangement.spacedBy(13.6.dp),
     ) {
         val badge = entry.appIcon ?: entry.icon
+        val popping = Modifier.graphicsLayer {
+            scaleX = iconPop.value
+            scaleY = iconPop.value
+            rotationZ = (1f - iconPop.value) * ICON_POP_TILT
+        }
         if (badge != null) {
-            Image(badge, null, Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            Image(badge, null, popping.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop)
         } else {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(entry.accent), contentAlignment = Alignment.Center) {
+            Box(popping.size(40.dp).clip(CircleShape).background(entry.accent), contentAlignment = Alignment.Center) {
                 BasicText(entry.appName.ifEmpty { entry.app }.trim().take(1).uppercase(), style = type(0.9f, Palette.ground, appearance.headingFont))
             }
         }
@@ -200,5 +205,7 @@ private const val ROW_STAGGER = 30
 private const val ROW_STAGGER_LIMIT = 10
 private const val BODY_TYPE_AFTER = 174
 private const val SWIPE_SLOP = 10f
+private const val ICON_POP_AFTER = 60L
+private const val ICON_POP_TILT = -26f
 private const val SWIPE_DISMISS = 90f
 private const val SWIPE_AWAY = 400f

@@ -68,8 +68,8 @@ class IslandNotificationListener : NotificationListenerService() {
             val active = runCatching { service.activeNotifications }.getOrNull() ?: return JSONArray()
             return JSONArray().apply {
                 active.reversed()
-                    .filter { service.belongsInList(it) }
-                    .forEach { put(service.describe(it)) }
+                    .filter { service.belongsInList(it) || service.isSystemEntry(it) }
+                    .forEach { put(service.describe(it).put("isSystem", service.isSystemEntry(it))) }
             }
         }
 
@@ -491,7 +491,14 @@ class IslandNotificationListener : NotificationListenerService() {
         return titleOf(notification).isNotBlank() || textOf(notification).isNotBlank()
     }
 
-    
+        private fun isSystemEntry(statusBarNotification: StatusBarNotification): Boolean {
+        if (statusBarNotification.packageName == packageName) return false
+        if (isPlayer(statusBarNotification) || CallWatch.isCall(statusBarNotification)) return false
+        val notification = statusBarNotification.notification
+        val isReactive = statusBarNotification.packageName in systemPackages || notification.flags and Notification.FLAG_ONGOING_EVENT != 0
+        return isReactive && (titleOf(notification).isNotBlank() || textOf(notification).isNotBlank())
+    }
+
     private fun launch(target: String?): Boolean {
         val intent = target?.let { packageManager.getLaunchIntentForPackage(it) } ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

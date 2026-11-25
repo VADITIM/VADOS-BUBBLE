@@ -1,3 +1,3 @@
-# 0.7.32
+# 0.7.33
 
-The Dashboard opens in landscape again from its launcher. It is laid out for the wide screen: the stats at the top left, the toggles along the bottom, and the modes and sliders at the right end where your thumb is. Nothing else of the bubble is drawn or touchable in landscape.
+System notices such as "Wireless debugging connected" and other ongoing status notifications now sit in their own small pill at the bottom of the notifications menu, above the clear button, instead of being left out. Tapping one opens it. The menu lists the newest notification first, shows every age in minutes, and each app icon pops in with a turn.

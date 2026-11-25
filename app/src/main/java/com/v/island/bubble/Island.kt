@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 
-enum class Region { Shield, Dashboard, Now, Main, Torch, TorchOff, Clock, Status, Clear, Alert }
+enum class Region { Shield, Dashboard, Now, Main, Torch, TorchOff, Clock, Status, Clear, System, Alert }
 
 @androidx.compose.runtime.Immutable
 class DarkAlert(val appName: String, val title: String, val text: String, val accent: androidx.compose.ui.graphics.Color, val generation: Int, val isAppending: Boolean, val revealKey: Int)
