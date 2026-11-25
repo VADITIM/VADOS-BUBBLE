@@ -55,10 +55,11 @@ fun MainBubbleView(bubble: MainBubble) {
     }
     /* A grown box collapsing on the 1.7 overshoot undershot the closed pill and slammed back, and the reach curve home still bounced too hard, so every return home rides the gentler settle curve; opening had no bounce at all on the grow curve, and the Clock's 1.7 overshoot was a little too much, so it takes a 1.5 one. */
     val easing = if (isReturning) Curves.settle else if (isClosed) Curves.bubble else Curves.open
-    val follow = if (bubble.isDragging) snap<Float>() else tween(growth, easing = easing)
+    val lead = if (bubble.size == Size.Torch && previous[0].isClosed) TORCH_CLEAR else 0
+    val follow = if (bubble.isDragging) snap<Float>() else tween(growth, lead, easing)
     val width = animateFloatAsState(target.width, follow, label = "width")
-    val height = animateFloatAsState(target.height, tween(growth, easing = easing), label = "height")
-    val top = animateFloatAsState(target.top, tween(growth, easing = if (isClosed) Curves.settle else Curves.open), label = "top")
+    val height = animateFloatAsState(target.height, tween(growth, lead, easing), label = "height")
+    val top = animateFloatAsState(target.top, tween(growth, lead, if (isClosed) Curves.settle else Curves.open), label = "top")
     val shift = animateFloatAsState(target.shift, follow, label = "shift")
     val radius = animateFloatAsState(target.radius, tween(growth, easing = FastOutSlowInEasing), label = "radius")
     val scale = animateFloatAsState(bubble.holdScale, tween(Durations.HOLD, easing = Curves.bubble), label = "hold")

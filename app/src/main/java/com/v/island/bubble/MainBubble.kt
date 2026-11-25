@@ -28,7 +28,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
 
-enum class Mod { Timer, Media, Call, Trip }
+enum class Mod { Timer, Media, Call, Trip, Torch }
 
 enum class Mode { Idle, Haptic, Alert, Extended, Torch }
 
@@ -127,12 +127,17 @@ class MainBubble {
 
     private val appearance get() = Island.appearance
 
-    val liveMods: List<Mod> get() = modOrder.filter(::isLive)
+    /* A folded torch was its own size beside the mods and left an active Media hiding it; it is the leading mod while folded, every other mod a satellite beside it, and none while it stands open. */
+    val liveMods: List<Mod> get() = when {
+        !isTorchShown -> modOrder.filter(::isLive)
+        isTorchFolded -> listOf(Mod.Torch) + modOrder.filter(::isLive)
+        else -> emptyList()
+    }
 
     var clearedMods by mutableStateOf(emptySet<Mod>())
         private set
 
-    fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods && !Island.now.isStolen(mod) && !isTorchShown
+    fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods && !Island.now.isStolen(mod)
 
     val isTorchShown: Boolean get() = (Island.torch?.step ?: 0) > 0 && !Island.dashboard.isOpen
 
@@ -143,7 +148,8 @@ class MainBubble {
     private var torchTicked = 0
     private var torchSwipeBase = 0
     private var torchSwipeLevel = 0
-    private var isTorchFolded = false
+    var isTorchFolded by mutableStateOf(false)
+        private set
 
     fun torchCount(): Int = Island.torch?.let { if (it.isDimmable) it.steps else 1 } ?: 1
 
@@ -237,6 +243,7 @@ class MainBubble {
         Mod.Media -> Island.media != null
         Mod.Call -> Island.call != null
         Mod.Trip -> Island.trip != null
+        Mod.Torch -> (Island.torch?.step ?: 0) > 0
     }
 
     fun accentOf(mod: Mod): Color = when (mod) {
@@ -244,6 +251,7 @@ class MainBubble {
         Mod.Media -> Island.media?.accent
         Mod.Call -> Island.call?.accent
         Mod.Trip -> Island.trip?.accent
+        Mod.Torch -> null
     } ?: appearance.accent
 
     private fun satelliteSize() = appearance.compactHeight
@@ -348,7 +356,7 @@ class MainBubble {
         val grown = grab + GROWN_PAD
         return when (size) {
             Size.Idle -> Frame(appearance.compactWidth, appearance.compactHeight, appearance.compactHeight / 2f, grab, layout().mainX)
-            Size.Playing, Size.Timing, Size.Calling, Size.Travelling -> {
+            Size.Playing, Size.Timing, Size.Calling, Size.Travelling, Size.TorchIdle -> {
                 val box = layout()
                 Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
             }
@@ -364,7 +372,6 @@ class MainBubble {
             Size.TripPanel -> Frame(GROWN_WIDTH, 232f, 26f, grown, 0f)
             Size.Notifications -> Frame(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
             Size.Torch -> torchFrame()
-            Size.TorchIdle -> Frame(appearance.compactWidth + appearance.modWidth + 4f, appearance.compactHeight, appearance.compactHeight / 2f, grab, 0f)
         }
     }
 
@@ -474,6 +481,7 @@ class MainBubble {
         Mod.Media -> Size.Playing
         Mod.Call -> Size.Calling
         Mod.Trip -> Size.Travelling
+        Mod.Torch -> Size.TorchIdle
         null -> Size.Idle
     }
 
@@ -482,6 +490,7 @@ class MainBubble {
         Mod.Media -> Face.Media
         Mod.Call -> Face.Call
         Mod.Trip -> Face.Trip
+        Mod.Torch -> Face.TorchIdle
         null -> Face.Idle
     }
 
@@ -510,10 +519,12 @@ class MainBubble {
         if ((Island.torch?.step ?: 0) == 0) isTorchFolded = false
         if (isTorchShown) {
             mode = Mode.Torch
-            accent = appearance.accent
-            size = if (isTorchFolded) Size.TorchIdle else Size.Torch
-            face = if (isTorchFolded) Face.TorchIdle else Face.Torch
             readTorch()
+        }
+        if (isTorchShown && !isTorchFolded) {
+            accent = appearance.accent
+            size = Size.Torch
+            face = Face.Torch
             return
         }
         val owner = liveMods.firstOrNull()
@@ -704,7 +715,7 @@ class MainBubble {
             Mod.Timer -> Island.timer?.key?.let(Island.actions::openNotification)
             Mod.Call -> Island.call?.key?.let(Island.actions::openNotification)
             Mod.Trip -> Island.trip?.key?.let(Island.actions::openNotification)
-            null -> Unit
+            Mod.Torch, null -> Unit
         }
     }
 
@@ -1003,6 +1014,7 @@ class MainBubble {
                 Island.call?.key?.let(Island.actions::openNotification)
                 toClosed()
             }
+            Mod.Torch -> foldTorch(false)
             null -> openNotifications()
         }
     }

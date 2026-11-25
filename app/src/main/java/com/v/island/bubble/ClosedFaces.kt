@@ -301,6 +301,7 @@ fun SatelliteFace(mod: Mod, appearance: Appearance, diameter: Float) {
             Mod.Timer -> TimerGlyph(Island.timer, Island.timer?.accent ?: appearance.accent, diameter - 8f)
             Mod.Call -> Avatar(Island.call, Island.call?.accent ?: appearance.accent, diameter - 6f)
             Mod.Trip -> TripMark(Island.trip?.accent ?: appearance.accent, diameter - 6f, appearance)
+            Mod.Torch -> GlyphIcon(Glyphs.torch, Color.White, Modifier.size((diameter - 8f).dp))
         }
     }
 }

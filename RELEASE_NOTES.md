@@ -1,3 +1,3 @@
-# 0.7.23
+# 0.7.24
 
-The flashlight sits lower and larger, and its level changes as your finger passes each dot instead of on release. Off is bigger and red, and on the way out it flies up into the main pill rather than sinking into where the flashlight was. A tap anywhere else folds the flashlight into the main pill, showing the torch on the left and the level on the right: tap it or pull it down to open it again, swipe left or right to step the level down or up.
+Opening the flashlight is staged: whatever the main pill was showing leaves first, then the pill drops to its place and bounces, and only then do the level dots pop in one by one from the middle outward, turning and growing as they arrive. Folded, the flashlight is now the main pill even while music or another activity is running, and those activities sit beside it as satellites.

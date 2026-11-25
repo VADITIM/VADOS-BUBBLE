@@ -18,7 +18,15 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.withTransform
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -47,13 +55,29 @@ fun TorchFace(bubble: MainBubble) {
     val gap = MainBubble.TORCH_SLOT_GAP
     val width = bubble.torchSliderWidth()
     val shown = animateFloatAsState(bubble.torchAt, if (bubble.isTorchSliding) snap() else tween(TORCH_SETTLE, easing = Curves.grow), label = "torchDot")
+    val pops = remember(count) { List(count) { Animatable(0f) } }
+    LaunchedEffect(count) {
+        val middle = (count - 1) / 2f
+        pops.forEachIndexed { index, pop ->
+            launch {
+                delay(TORCH_CLEAR + LONG_GROW + (abs(index - middle) * POP_STAGGER).toLong())
+                pop.animateTo(1f, tween(POP_DURATION, easing = Curves.bubble))
+            }
+        }
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(Modifier.size(width.dp, slot.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = RAIL_OPACITY }) {
                 val unit = slot.dp.toPx()
                 val step = (slot + gap).dp.toPx()
                 for (index in 0 until count) {
-                    drawRoundRect(Color.White, Offset(index * step, 0f), Extent(unit, unit), CornerRadius(SLOT_RADIUS.dp.toPx()))
+                    val pop = pops[index].value
+                    if (pop <= 0f) continue
+                    val centre = Offset(index * step + unit / 2f, unit / 2f)
+                    withTransform({
+                        rotate((1f - pop) * POP_TURN, centre)
+                        scale(pop, pop, centre)
+                    }) { drawRoundRect(Color.White, Offset(index * step, 0f), Extent(unit, unit), CornerRadius(SLOT_RADIUS.dp.toPx())) }
                 }
             }
             Canvas(
@@ -72,13 +96,16 @@ fun TorchFace(bubble: MainBubble) {
                 val step = (slot + gap).dp.toPx()
                 val at = shown.value
                 for (index in 0 until count) {
-                    val near = max(0f, 1f - abs(at - index))
+                    val near = max(0f, 1f - abs(at - index)) * pops[index].value
                     if (near <= 0f) continue
                     val side = unit * near
                     val centre = Offset(room + index * step + unit / 2f, room + unit / 2f)
-                    drawRoundRect(Color.White, centre - Offset(side / 2f, side / 2f), Extent(side, side), CornerRadius(SLOT_RADIUS.dp.toPx() * near))
+                    withTransform({ rotate((1f - pops[index].value) * POP_TURN, centre) }) {
+                        drawRoundRect(Color.White, centre - Offset(side / 2f, side / 2f), Extent(side, side), CornerRadius(SLOT_RADIUS.dp.toPx() * near))
+                    }
                 }
-                drawCircle(Color.White, unit / 4f, Offset(room + at * step + unit / 2f, room + unit / 2f))
+                val dotPop = pops[at.roundToInt().coerceIn(0, count - 1)].value
+                if (dotPop > 0f) drawCircle(Color.White, unit / 4f * dotPop, Offset(room + at * step + unit / 2f, room + unit / 2f))
             }
         }
     }
@@ -163,3 +190,8 @@ private const val OFF_DELAY = 160
 private const val OFF_LEAVE = 200
 private const val OFF_SEED = 0.4f
 private const val IDLE_END = 10f
+/* Opening the torch moved the pill while the mod's face was still fading and showed the levels before the pill had landed; the pill waits for the face to clear and the levels pop out from the middle only once it has bounced home. */
+const val TORCH_CLEAR = 120
+private const val POP_STAGGER = 70f
+private const val POP_DURATION = 320
+private const val POP_TURN = -90f
