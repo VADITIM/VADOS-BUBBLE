@@ -2,6 +2,7 @@ package com.v.island.bubble
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -163,9 +164,10 @@ fun MainBubbleView(bubble: MainBubble) {
 }
 
 private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre)
-private const val LONG_GROW = 460
+const val LONG_GROW = 460
 /* A grown face kept its open size while it faded over the collapsing bubble; it goes in the first frames of the collapse, as .face:not(.showing) does. */
 private const val GROWN_FADE = 90
+private const val PLAYER_FOLD_HANDOVER = 120
 
 private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, Face.Trip)
 
@@ -177,6 +179,13 @@ private fun faceTransition(from: Face, to: Face): ContentTransform {
             scaleOut(tween(Durations.POP_OUT, easing = Curves.leave)) + fadeOut(tween(Durations.POP_OUT)),
             sizeTransform = SizeTransform(clip = false) { _, _ -> snap() },
         )
+    }
+    /* Closing the player faded it out in 90ms and popped the small face in, so nothing showed the artwork and wave going home; the player stays for the collapse and folds its art and wave into the small face's places, which only then fades in over them, and opening unfolds them from there. */
+    if (from == Face.Media && to == Face.Player) {
+        return ContentTransform(EnterTransition.None, fadeOut(tween(PLAYER_FOLD_HANDOVER)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
+    }
+    if (from == Face.Player && to == Face.Media) {
+        return ContentTransform(fadeIn(tween(PLAYER_FOLD_HANDOVER, LONG_GROW - PLAYER_FOLD_HANDOVER)), fadeOut(tween(PLAYER_FOLD_HANDOVER, LONG_GROW)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
     }
     val arriving = if (to in CLOSED_FACES) Durations.COLLAPSE / 2 else Durations.CONTENT_DROP
     return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(if (to in CLOSED_FACES) GROWN_FADE else 120)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
