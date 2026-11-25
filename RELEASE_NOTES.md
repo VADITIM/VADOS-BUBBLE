@@ -1,4 +1,3 @@
-# 0.7.4
+# 0.7.5
 
-- The typing caret is a thin sharp bar instead of a block.
-- Media expanded and the Now bubble type their title and artist again, at the old media speed, starting once the player is visible.
+- Dashboard: the volume bar gives its bottom 62% to the quiet range (up to 30%), so low volumes are easy to set; the top of the bar covers the loud rest.

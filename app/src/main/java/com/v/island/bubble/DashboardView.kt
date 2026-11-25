@@ -1129,7 +1129,7 @@ private fun Level(
                     val tall = size.height.toFloat()
                     val from = down.position.y
                     val start = dashboard.levelShare(name)
-                    var sent = Dashboard.valueAt(start).roundToInt()
+                    var sent = Dashboard.valueAt(name, start).roundToInt()
                     var isDraggingNow = false
                     val solo = Island.scope.launch {
                         delay(Dashboard.SOLO_HOLD)
@@ -1149,7 +1149,7 @@ private fun Level(
                         change.consume()
                         val position = (start + travelled / tall * 100f).coerceIn(0f, 100f)
                         dashboard.dragLevel(name, position)
-                        val value = Dashboard.valueAt(position).roundToInt()
+                        val value = Dashboard.valueAt(name, position).roundToInt()
                         if (abs(value - sent) < LEVEL_STEP && value != 0 && value != 100) continue
                         sent = value
                         Island.actions.setLevel(name, value, false)

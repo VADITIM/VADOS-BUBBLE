@@ -190,7 +190,7 @@ class Dashboard {
     fun levelShare(name: String): Float {
         draggedLevels[name]?.let { return it }
         val value = toggles.levels[name] ?: return 0f
-        return positionOf(value.toFloat())
+        return positionOf(name, value.toFloat())
     }
 
     fun dragLevel(name: String, position: Float) {
@@ -199,7 +199,7 @@ class Dashboard {
 
     fun settleLevel(name: String) {
         val position = draggedLevels[name] ?: return
-        val value = valueAt(position).roundToInt()
+        val value = valueAt(name, position).roundToInt()
         toggles = toggles.copy(levels = toggles.levels + (name to value))
         draggedLevels.remove(name)
         Island.actions.setLevel(name, value, true)
@@ -322,20 +322,28 @@ class Dashboard {
         /* Half smoothstep and half straight: the ends of a bar are where a person fine-tunes, so they get more travel per percent than the middle. */
         private const val LEVEL_EASE = 0.6f
 
-        fun valueAt(position: Float): Float {
+        /* The volume bar shared the eased ends, so quiet listening sat in the bar's bottom fifth and a step was a few pixels; its knee stands above 60% of the bar, everything under it fine-tuning the quiet range and the rest of the room only for loud. */
+        private const val VOLUME_KNEE_POSITION = 62f
+        private const val VOLUME_KNEE_VALUE = 30f
+
+        fun valueAt(name: String, position: Float): Float {
+            if (name == "volume") {
+                return if (position <= VOLUME_KNEE_POSITION) position / VOLUME_KNEE_POSITION * VOLUME_KNEE_VALUE
+                else VOLUME_KNEE_VALUE + (position - VOLUME_KNEE_POSITION) / (100f - VOLUME_KNEE_POSITION) * (100f - VOLUME_KNEE_VALUE)
+            }
             val unit = position / 100f
             val smooth = unit * unit * (3f - 2f * unit)
             return 100f * (unit + LEVEL_EASE * (smooth - unit))
         }
 
-        fun positionOf(value: Float): Float {
+        fun positionOf(name: String, value: Float): Float {
             if (value <= 0f) return 0f
             if (value >= 100f) return 100f
             var low = 0f
             var high = 100f
             repeat(20) {
                 val middle = (low + high) / 2f
-                if (valueAt(middle) < value) low = middle else high = middle
+                if (valueAt(name, middle) < value) low = middle else high = middle
             }
             return (low + high) / 2f
         }
