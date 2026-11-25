@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
@@ -214,27 +215,26 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
         if (secondsForm == isCornered) return@LaunchedEffect
         secondsPop.animateTo(0f, tween(SECONDS_POP_OUT, easing = Curves.leave))
         secondsForm = isCornered
-        if (isCornered) secondsPop.snapTo(1f) else secondsPop.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
+        secondsPop.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
     }
     val timeStyle = type(0.68f, ink, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f)
     val digit = type(SECONDS_SIZE, ink, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = SECONDS_LINE)
     val dateStyle = type(0.62f * CORNER_GROW, ink, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f)
     val date = dateText(appearance.dateFormat, calendar)
     val measurer = rememberTextMeasurer()
+    fun wide(text: String, style: androidx.compose.ui.text.TextStyle) = measurer.measure(text, style).size.width / Island.density
+    val timeWide = wide(time, timeStyle)
+    val smallWide = SECONDS_GAP + maxOf(wide(seconds.substring(0, 1), digit), wide(seconds.substring(1, 2), digit))
+    val bigWide = wide(":$seconds", timeStyle)
+    val dateTall = measurer.measure(date, dateStyle).size.height / Island.density + DATE_TOP
     // Both widths were read off the laid-out content, which only switched form partway through the grow, so the pill retargeted mid-flight and jumped; they are measured up front from the text alone.
     SideEffect {
-        fun wide(text: String, style: androidx.compose.ui.text.TextStyle) = measurer.measure(text, style).size.width / Island.density
-        val timeWide = wide(time, timeStyle)
-        clock.timeWidth = timeWide + SECONDS_GAP + maxOf(wide(seconds.substring(0, 1), digit), wide(seconds.substring(1, 2), digit)) + 22.4f
-        clock.cornerWidth = maxOf(Dashboard.CORNER_WIDE_FLOOR, maxOf(timeWide + wide(":$seconds", timeStyle), minOf(DATE_WIDE, wide(date, dateStyle))) + CORNER_PADDING * 2f)
+        clock.timeWidth = timeWide + smallWide + 22.4f
+        clock.cornerWidth = maxOf(Dashboard.CORNER_WIDE_FLOOR, maxOf(timeWide + bigWide, minOf(DATE_WIDE, wide(date, dateStyle))) + CORNER_PADDING * 2f)
     }
-    var dateTall by remember { mutableStateOf(0f) }
-    // The date arrived in one frame and took its height in the column, so the time jumped up when the Dashboard opened; the date takes no room and the time eases up by half its height with the grow.
-    Column(
-        Modifier.wrapContentWidth(unbounded = true).graphicsLayer { translationY = -dateTall / 2f * corner.value * density },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // The time sat in a column that only made room for the seconds and date once they arrived, so it jumped sideways on the swap and stayed low enough to cut the date; it is placed for the corner's final seconds and date from the start of the grow.
+    Layout(
+        {
             AwayText(
                 time,
                 /* The corner line height was read off the grow over CORNER_GROW - 1, which is 0/0 once the corner stopped growing the clock, and the NaN crashed every frame; it follows its own 0 to 1 progress. */
@@ -243,7 +243,7 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                 0,
             )
             Box(
-                Modifier.animateContentSize(tween(Durations.GROW, easing = Curves.split)).graphicsLayer {
+                Modifier.graphicsLayer {
                     val pop = secondsPop.value
                     alpha = pop.coerceIn(0f, 1f)
                     scaleX = SECONDS_POP_FLOOR + (1f - SECONDS_POP_FLOOR) * pop
@@ -260,24 +260,27 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                     }
                 }
             }
-        }
-        AnimatedVisibility(
-            isCornered,
-            Modifier.onSizeChanged { if (it.height > 0) dateTall = it.height / Island.density }.layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                layout(placeable.width, 0) { placeable.place(0, 0) }
-            },
-            enter = EnterTransition.None,
-            exit = fadeOut(tween(DATE_FADE)),
-        ) {
-            Box(Modifier.padding(top = 2.4.dp).widthIn(max = DATE_WIDE.dp).clipToBounds().graphicsLayer { alpha = 0.75f }) {
-                PopText(
-                    date,
-                    dateStyle,
-                    Durations.POP_IN / 4,
-                    Modifier.wrapContentWidth(Alignment.Start, unbounded = true),
-                )
+            AnimatedVisibility(isCornered && secondsForm, enter = EnterTransition.None, exit = fadeOut(tween(DATE_FADE))) {
+                Box(Modifier.padding(top = DATE_TOP.dp).widthIn(max = DATE_WIDE.dp).clipToBounds().graphicsLayer { alpha = 0.75f }) {
+                    PopText(date, dateStyle, 0, Modifier.wrapContentWidth(Alignment.Start, unbounded = true))
+                }
             }
+        },
+        Modifier.fillMaxSize(),
+    ) { measurables, constraints ->
+        val loose = Constraints()
+        val timePlaced = measurables[0].measure(loose)
+        val secondsPlaced = measurables[1].measure(loose)
+        val datePlaced = measurables[2].measure(loose)
+        val progress = corner.value
+        val wideNow = timePlaced.width + (smallWide + (bigWide - smallWide) * progress) * density
+        val tallNow = timePlaced.height + dateTall * progress * density
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val left = ((constraints.maxWidth - wideNow) / 2f).roundToInt()
+            val top = ((constraints.maxHeight - tallNow) / 2f).roundToInt()
+            timePlaced.place(left, top)
+            secondsPlaced.place(left + timePlaced.width, top + (timePlaced.height - secondsPlaced.height) / 2)
+            datePlaced.place((constraints.maxWidth - datePlaced.width) / 2, top + timePlaced.height)
         }
     }
 }
@@ -288,6 +291,7 @@ private const val SECONDS_POP_FLOOR = 0.6f
 private const val SECONDS_TURN = -14f
 private const val DATE_FADE = 140
 private const val DATE_WIDE = 70f
+private const val DATE_TOP = 2.4f
 private const val SECONDS_SIZE = 0.36f
 private const val SECONDS_LINE = 0.78f
 private const val SECONDS_GAP = 1f

@@ -52,7 +52,8 @@ object Island {
 
     val isPlayerOpen: Boolean get() = bubble.size == Size.Player
     // Only the player sent the Clock and Status away, so an Alert or the menu grew over them and their glyphs stood above its glass; any opened Main clears them.
-    val isMainOpen: Boolean get() = !bubble.size.isClosed && !dashboard.isOpen
+    // The notifications menu sits below the bar, so sending the Clock and Status away for it emptied the bar for nothing.
+    val isMainOpen: Boolean get() = !bubble.size.isClosed && bubble.size != Size.Notifications && !dashboard.isOpen
     var screenWidth by mutableStateOf(360f)
     var screenHeight by mutableStateOf(780f)
     var density = 3f

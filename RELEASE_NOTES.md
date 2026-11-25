@@ -1,3 +1,3 @@
-# 0.7.43
+# 0.7.44
 
-During a call, holding either volume slider now grows it over the column like a single slider, on top of the other, and dragging keeps the fill under your finger.
+Opening the Dashboard, the clock's time slides straight to its final place while the pill grows; the small seconds pop out, the large seconds pop in beside it without moving it, and then the date appears, no longer cut off. The clock and status pills stay put while the notifications menu is open.
