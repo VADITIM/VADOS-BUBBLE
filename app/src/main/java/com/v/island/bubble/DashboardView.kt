@@ -153,8 +153,10 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
     val progress = remember { Animatable(0f) }
     var isLeaving by remember { mutableStateOf(false) }
     val isFast = Island.appearance.isFastDashboard
+    val shownTurn = remember { floatArrayOf(0f, 0f) }
     LaunchedEffect(generation) {
         if (dashboard.isOpen) {
+            shownTurn[1] = if (progress.value > 0.001f) shownTurn[0] + 360f else 0f
             isLeaving = false
             progress.snapTo(0f)
             if (isFast) {
@@ -170,6 +172,7 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
             }
             progress.animateTo(1f, if (kind == PopKind.Knob) tween(roll.throwMilliseconds, easing = roll.throwEase) else tween(Dashboard.POP, easing = Curves.sling))
         } else {
+            shownTurn[1] = shownTurn[0] - (1f - progress.value) * 180f
             isLeaving = true
             delay(((Dashboard.RANK_STEPS - rank) * Dashboard.DROP_STAGGER).toLong())
             progress.animateTo(0f, tween(Dashboard.COLLAPSE, easing = Curves.leave))
@@ -212,11 +215,14 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
         scaleY = scale
         if (isLeaving) {
             alpha = value.coerceIn(0f, 1f)
-            rotationZ = if (turnsIn) rest * 180f else 0f
+            // Leaving switched the spin to a new formula from zero, so a half-entered or overshot control snapped back to its original rotation; the turn it had is carried into the exit.
+            rotationZ = if (turnsIn) rest * 180f + shownTurn[1] else 0f
+            shownTurn[0] = rotationZ
             translationY = rest * pull * 0.6f * density
         } else {
             alpha = soloValue
-            rotationZ = if (turnsIn) rest * -360f else 0f
+            rotationZ = if (turnsIn) rest * -360f + shownTurn[1] * rest else 0f
+            shownTurn[0] = rotationZ
             translationY = rest * (if (kind == PopKind.Level) -pull else pull) * density
         }
     }
@@ -983,7 +989,7 @@ private fun ModeButton(dashboard: Dashboard, name: String, centre: Float, geomet
                 .background(appearance.pillFill, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            GlyphIcon(modeGlyph(name, turn.shownOn), colour.value, Modifier.size((GRID_ICON * 0.62f).dp))
+            GlyphIcon(modeGlyph(name, turn.shownOn), colour.value, Modifier.size((GRID_ICON * 0.62f).dp).graphicsLayer { scaleX = turn.iconScale; scaleY = turn.iconScale })
         }
         Ring(
             if (isSearching) "" else reading,
@@ -1013,20 +1019,23 @@ private fun ModeButton(dashboard: Dashboard, name: String, centre: Float, geomet
     }
 }
 
-private class Turn(val rotation: Float, val growth: Float, val shownOn: Boolean)
+private class Turn(val rotation: Float, val growth: Float, val shownOn: Boolean, val iconScale: Float)
 
 @Composable
 private fun rememberTurn(dashboard: Dashboard, name: String, isOn: Boolean): Turn {
     val count = dashboard.turns[name] ?: 0
     val rotation = remember { Animatable(0f) }
+    val iconScale = remember { Animatable(1f) }
     var shownOn by remember { mutableStateOf(isOn) }
     val origin = remember { intArrayOf(count) }
     LaunchedEffect(count) {
         if (count == origin[0]) return@LaunchedEffect
         rotation.snapTo(0f)
         launch {
-            delay(Dashboard.KNOB_TURN / 2L)
+            delay(Dashboard.KNOB_TURN / 2L - ICON_DIP_OUT.toLong())
+            iconScale.animateTo(ICON_DIP, tween(ICON_DIP_OUT, easing = Curves.leave))
             shownOn = dashboard.isOn(name)
+            iconScale.animateTo(1f, tween(ICON_DIP_IN, easing = Curves.sling))
         }
         rotation.animateTo(360f, tween(Dashboard.KNOB_TURN, easing = Curves.enter))
         rotation.snapTo(0f)
@@ -1035,8 +1044,12 @@ private fun rememberTurn(dashboard: Dashboard, name: String, isOn: Boolean): Tur
         if (!rotation.isRunning) shownOn = isOn
     }
     val isTurning = rotation.isRunning
-    return Turn(rotation.value, if (isTurning) (rotation.value / 360f).coerceIn(0f, 1.2f) else 1f, shownOn)
+    return Turn(rotation.value, if (isTurning) (rotation.value / 360f).coerceIn(0f, 1.2f) else 1f, shownOn, iconScale.value)
 }
+
+private const val ICON_DIP = 0.7f
+private const val ICON_DIP_OUT = 70
+private const val ICON_DIP_IN = 140
 
 private class RingCharacter(val character: String, val turn: Float, val at: Int, val tilt: Float)
 
@@ -1371,7 +1384,7 @@ private fun Knob(dashboard: Dashboard, name: String, slot: Int, geometry: PanelG
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(KNOB_ICON.dp).graphicsLayer { rotationZ = turn.rotation }) {
+        Box(Modifier.size(KNOB_ICON.dp).graphicsLayer { rotationZ = turn.rotation; scaleX = turn.iconScale; scaleY = turn.iconScale }) {
             if (name == "recording") {
                 GlyphIcon(RECORDING_RING, colour.value, Modifier.fillMaxSize())
                 GlyphIcon(RECORDING_DOT, if (turn.shownOn) RECORD_RED else colour.value, Modifier.fillMaxSize())

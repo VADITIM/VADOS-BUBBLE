@@ -417,7 +417,7 @@ private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
             StatusBubble.ANNOUNCE_COLOURS.getValue(slot.event),
             Modifier.size(modGlyph.dp),
         )
-        is StatusSlot.Battery -> MiniBattery(slot.charge, modGlyph, appearance, ink)
+        is StatusSlot.Battery -> MiniBattery(slot.charge, if (isBarePill()) modGlyph * BARE_BATTERY else modGlyph, appearance, ink)
     }
 }
 
@@ -454,9 +454,9 @@ private fun MiniBattery(charge: Charge, modGlyph: Float, appearance: Appearance,
 
 private fun isBarePill() = !Island.appearance.hasSidePills
 
-private fun bareGrow() = if (isBarePill()) BARE_GROW else 1f
+private fun bareGrow() = if (isBarePill()) Island.appearance.bareScale else 1f
 
-private const val BARE_GROW = 1.15f
+private const val BARE_BATTERY = 1.2f
 
 private fun sideInk(isBare: Boolean) = if (isBare && Island.isBarLight) Color.Black else Color.White
 

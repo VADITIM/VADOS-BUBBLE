@@ -790,6 +790,8 @@
       labels: ['Off', 'On'] },
     { group: 'Other', key: 'sidePills', name: 'Clock and status pills', min: 0, max: 1,
       labels: ['Off', 'On'] },
+    { group: 'Other', key: 'sidePillsSize', name: 'Clock and status size without pills', min: 80, max: 160, step: 5,
+      read: size => size + '%' },
     { group: 'Other', key: 'statusBatteryPercent', name: 'Status battery %', min: 0, max: 1,
       labels: ['Hidden', 'Shown'] },
     { group: 'Other', key: 'statusBatteryPercentLight', name: 'Status battery % colour', min: 0, max: 1,
