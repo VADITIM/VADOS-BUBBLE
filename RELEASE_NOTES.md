@@ -1,3 +1,3 @@
-# 0.7.62
+# 0.7.63
 
-While music plays, the artwork in the main pill is now a circle instead of a wide stretched tile, and its left edge no longer fades out.
+- Dashboard connectors and sliders raised 12dp so the room above and below them is balanced.

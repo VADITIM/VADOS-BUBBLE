@@ -122,11 +122,11 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     else height - band - Dashboard.GAP - DIVIDER_SHIFT - 1f
     val systemBottom = secondDivider - DIVIDER_ROOM - Dashboard.GAP
     val systemTall = systemBottom - systemTop
-    val gridTop = if (isWide) (height - GRID_TALL) / 2f else systemTop + (systemTall - GRID_TALL) / 2f
+    val gridTop = if (isWide) (height - GRID_TALL) / 2f else systemTop + (systemTall - GRID_TALL) / 2f - SYSTEM_RAISE
     val gridRow = (GRID_TALL - Dashboard.GAP * 2f) / 3f
     val vitalsCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP + VITALS_TALL / 2f
     val transferCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP * 2f + VITALS_TALL + TRANSFER_TALL / 2f
-    val levelsCentre = if (isWide) height / 2f else systemTop + systemTall / 2f
+    val levelsCentre = if (isWide) height / 2f else systemTop + systemTall / 2f - SYSTEM_RAISE
 
     fun modeCentre(row: Int) = gridTop + row * (gridRow + Dashboard.GAP) + gridRow / 2f
 }
@@ -1516,6 +1516,7 @@ private const val SOLO_SWELL = 300
 private const val SOLO_SWELL_STEP = 16L
 private const val STATS_SHARE = 0.27f
 private const val TOGGLE_SHARE = 0.275f
+private const val SYSTEM_RAISE = 12f
 private const val STATS_DROP = 4f
 private const val STATS_INSET = 10f
 private const val WEATHER_TALL = 17.6f
