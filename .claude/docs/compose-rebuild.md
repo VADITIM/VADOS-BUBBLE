@@ -36,6 +36,8 @@ Ported (unverified on the phone):
 
 - **Now bubble** (unverified): the flight is drawn against the rest box it was aimed at (`NowStand` frozen for a leave, sizes snapped while flying), and the mod changes hands when 80% of the drop stands inside Main (`CATCH_ENTERED`), not at the shot's end. `NowBubble.kt`/`NowView.kt`/`Sling.kt` port `js/lock.js` and `js/sling.js`. On the keyguard and in the Dashboard the media mod leaves Main (`isStolen`) for its own bubble, slung out of Main as a ball and opened in place; it flies home on unlock or when the panel closes, thrown along the flick that closed it, and Main bumps as it melts in. Tap opens/closes it (lock 124↔546, panel compact 190×44↔124), hold opens the app, sideways skips, down pauses when big, the wave scrubs. In the panel the lower divider stands a gap above it.
 
+- **Typewriter** (unverified): every typed text goes through `TypedRun` (`bubble/Type.kt`), which draws the one caret, a sharp 0.42em block blinking at 250ms while typing only (V/AS `components/09-typewriter.md` §10). The dark alert's own count drives it too.
+
 Not ported yet, in order:
 
 1. Dashboard remainder: the stats-section channel (swipe down into notifications), the slung Alert, the stat rise after the pop, the ring's found burst, the knob row shrinking under an expanded Now bubble (`html.now-open`)

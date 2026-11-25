@@ -127,15 +127,33 @@ fun Reveal(key: Any, bar: Color, delayMilliseconds: Int = 0, modifier: Modifier 
 /* Writing the text in character by character re-wrapped the row on every frame and pushed the rows under it; the whole text is laid out from the start and only the untyped rest is left uncoloured, as typeBody in tabs.js did. */
 @Composable
 fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, interval: Float = typeInterval(text.length), isLine: Boolean = false) {
-    var isOverflowing by remember { androidx.compose.runtime.mutableStateOf(false) }
     var shown by remember(text) { mutableIntStateOf(0) }
+    var isTyping by remember(text) { androidx.compose.runtime.mutableStateOf(false) }
     LaunchedEffect(text) {
         if (text.isEmpty()) return@LaunchedEffect
         delay(delayMilliseconds.toLong())
+        isTyping = true
         val start = System.nanoTime()
         while (shown < text.length) {
             delay(16)
             shown = ((System.nanoTime() - start) / 1_000_000f / interval).toInt().coerceAtMost(text.length)
+        }
+        isTyping = false
+    }
+    TypedRun(text, shown, isTyping, style, modifier, maxLines, isLine)
+}
+
+/* The menu typed with no caret and Media expanded with its own; every typed text draws the same caret now, V/AS components/09-typewriter.md §10: a sharp block 0.42em wide, blinking at 250ms, standing after the last typed character only while typing. */
+@Composable
+fun TypedRun(text: String, shown: Int, isTyping: Boolean, style: TextStyle, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, isLine: Boolean = false) {
+    var isOverflowing by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var layout by remember { androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    var isCaretLit by remember { androidx.compose.runtime.mutableStateOf(true) }
+    LaunchedEffect(isTyping) {
+        isCaretLit = true
+        while (isTyping) {
+            delay(CARET_BLINK)
+            isCaretLit = !isCaretLit
         }
     }
     val typed = androidx.compose.ui.text.buildAnnotatedString {
@@ -144,14 +162,32 @@ fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: 
     }
     BasicText(
         typed,
-        if (isLine && isOverflowing) modifier.fadeEnd() else modifier,
+        (if (isLine && isOverflowing) modifier.fadeEnd() else modifier).drawWithContent {
+            drawContent()
+            val laidOut = layout ?: return@drawWithContent
+            if (!isTyping || !isCaretLit || laidOut.layoutInput.text.length != text.length) return@drawWithContent
+            val offset = shown.coerceIn(0, text.length)
+            val em = style.fontSize.toPx()
+            val baseline = laidOut.getLineBaseline(laidOut.getLineForOffset(offset))
+            val left = laidOut.getCursorRect(offset).left + if (offset > 0) em * CARET_GAP else 0f
+            drawRect(style.color, topLeft = Offset(left, baseline + em * CARET_DROP - em), size = Size(em * CARET_WIDTH, em))
+        },
         style = style,
         maxLines = if (isLine) 1 else maxLines,
         softWrap = !isLine,
         overflow = TextOverflow.Clip,
-        onTextLayout = { isOverflowing = it.didOverflowWidth },
+        onTextLayout = {
+            isOverflowing = it.didOverflowWidth
+            layout = it
+        },
     )
 }
+
+/* Mirrors the .typing::after caret in the retired pill.css (width 0.42em, margin-left 0.12em, vertical-align -0.12em); the blink is V/AS's 250ms Android caret. */
+private const val CARET_WIDTH = 0.42f
+private const val CARET_GAP = 0.12f
+private const val CARET_DROP = 0.12f
+private const val CARET_BLINK = 250L
 
 fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))
 

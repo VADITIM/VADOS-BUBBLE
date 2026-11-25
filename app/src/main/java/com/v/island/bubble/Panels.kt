@@ -256,15 +256,11 @@ fun DarkAlertView() {
             Reveal(alert.revealKey, alert.accent) {
                 BasicText(alert.appName.uppercase(), style = type(0.8125f, alert.accent, appearance.headingFont, appearance.headingScale, spacing = 0.13f), maxLines = 1, softWrap = false)
             }
-            BasicText(typedPart(alert.title, titleShown), style = type(1.5f, Color.White.copy(alpha = 0.62f), appearance.headingFont, appearance.headingScale, lineHeight = 1.25f))
-            BasicText(typedPart(alert.text, textShown), style = type(1.125f, Color.White.copy(alpha = 0.46f), appearance.contentFont, appearance.contentScale, lineHeight = 1.45f))
+            val isTypingTitle = count < alert.title.length && !alert.isAppending
+            TypedRun(alert.title, titleShown, isTypingTitle, type(1.5f, Color.White.copy(alpha = 0.62f), appearance.headingFont, appearance.headingScale, lineHeight = 1.25f))
+            TypedRun(alert.text, textShown, !isTypingTitle && textShown < alert.text.length, type(1.125f, Color.White.copy(alpha = 0.46f), appearance.contentFont, appearance.contentScale, lineHeight = 1.45f))
         }
     }
-}
-
-private fun typedPart(text: String, shown: Int): AnnotatedString = buildAnnotatedString {
-    append(text.substring(0, shown))
-    withStyle(SpanStyle(color = Color.Transparent)) { append(text.substring(shown)) }
 }
 
 /* Mirrors #dark-alert's insets, TYPE_STEP, TYPE_CEILING and TYPE_DELAY in js/alert.js, and the 360ms fade on #screen-dark. */

@@ -2,7 +2,7 @@
 # over in Settings because the app was sideloaded ("Restricted setting").
 # Usage: powershell -ExecutionPolicy Bypass -File grant.ps1
 
-$adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
+$adb = (Get-Command adb).Source
 $package = 'com.v.island'
 $listener = "$package/$package.IslandNotificationListener"
 $bubble = "$package/$package.BubbleService"
