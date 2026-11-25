@@ -36,6 +36,7 @@ Ported (unverified on the phone):
 
 - **Now bubble** (unverified): the flight is drawn against the rest box it was aimed at (`NowStand` frozen for a leave, sizes snapped while flying), and the mod changes hands when 80% of the drop stands inside Main (`CATCH_ENTERED`), not at the shot's end. `NowBubble.kt`/`NowView.kt`/`Sling.kt` port `js/lock.js` and `js/sling.js`. On the keyguard and in the Dashboard the media mod leaves Main (`isStolen`) for its own bubble, slung out of Main as a ball and opened in place; it flies home on unlock or when the panel closes, thrown along the flick that closed it, and Main bumps as it melts in. Tap opens/closes it (lock 124↔546, panel compact 190×44↔124), hold opens the app, sideways skips, down pauses when big, the wave scrubs. In the panel the lower divider stands a gap above it.
 
+- **Media closed face** (unverified): `MediaFace` in `bubble/ClosedFaces.kt` is the artwork as a rounded tile `MEDIA_TILE_RATIO` (1.8) times the glyph wide left of the punch hole and the title fading right of it; `modFloor` in `MainBubble.kt` widens Main to fit the tile on both sides while Media leads.
 - **Typewriter** (unverified): every typed text goes through `TypedRun` (`bubble/Type.kt`), which draws the one caret, a sharp 0.08em bar blinking at 250ms while typing only (V/AS `components/09-typewriter.md` §3). Media labels type at `MEDIA_TYPE_CHARACTER` (60ms), the player's from `CONTENT_DROP` on. The dark alert's own count drives it too.
 
 Not ported yet, in order:

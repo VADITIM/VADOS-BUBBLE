@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,12 +78,23 @@ fun ArtCircle(media: Media?, diameter: Float, modifier: Modifier = Modifier) {
     }
 }
 
+fun mediaTileWidth(appearance: Appearance) = glyphSize(appearance) * MEDIA_TILE_RATIO
+
+/* The closed Media face was a round thumbnail and a five-bar equalizer, so nothing said what was playing; the artwork is a wide rounded tile left of the punch hole and the title stands right of it, fading where it runs out of room. */
 @Composable
 fun MediaFace(appearance: Appearance) {
     val media = Island.media
+    val tile = mediaTileWidth(appearance)
     ModRow(appearance, glyphInset(appearance)) {
-        ArtCircle(media, glyphSize(appearance))
-        Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, modifier = Modifier.size(glyphSize(appearance).dp))
+        Box(Modifier.size(tile.dp, glyphSize(appearance).dp).clip(RoundedCornerShape((glyphSize(appearance) * MEDIA_TILE_ROUNDING).dp)).background(Palette.sunken)) {
+            val art = media?.art
+            if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        }
+        FadingLine(
+            media?.title.orEmpty(),
+            type(0.62f, Palette.textBright, appearance.mainFont, appearance.mainScale, weight = FontWeight.SemiBold),
+            Modifier.width(tile.dp),
+        )
     }
 }
 
@@ -182,7 +194,8 @@ fun TripFace(appearance: Appearance) {
 }
 
 const val SWEEP_CYCLE = 12_000L
-const val EQUALIZER_BARS = 5
+const val MEDIA_TILE_RATIO = 1.8f
+private const val MEDIA_TILE_ROUNDING = 0.35f
 const val WAVE_BARS = 54
 private const val WAVE_BEAT = 480f
 private const val WAVE_REST = 0.12f

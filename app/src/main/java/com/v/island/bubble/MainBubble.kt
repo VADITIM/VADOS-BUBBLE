@@ -179,7 +179,8 @@ class MainBubble {
     private fun modFloor(): Float {
         val glyph = appearance.compactHeight - 10f
         val inset = (appearance.compactHeight - glyph) / 2f - 1f
-        return 2f * (inset + glyph) + HOLE_GAP + 2f
+        val face = if (liveMods.firstOrNull() == Mod.Media) glyph * MEDIA_TILE_RATIO else glyph
+        return 2f * (inset + face) + HOLE_GAP + 2f
     }
 
     private fun restingMain(): Float {

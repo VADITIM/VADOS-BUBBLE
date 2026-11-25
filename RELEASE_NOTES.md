@@ -1,3 +1,3 @@
-# 0.7.5
+# 0.7.6
 
-- Dashboard: the volume bar gives its bottom 62% to the quiet range (up to 30%), so low volumes are easy to set; the top of the bar covers the loud rest.
+The closed Media bubble shows the artwork as a wide rounded tile left of the camera and the song title right of it, fading where it runs out of room.
