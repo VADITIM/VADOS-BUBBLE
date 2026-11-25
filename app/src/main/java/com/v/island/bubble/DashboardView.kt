@@ -127,6 +127,7 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     val vitalsCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP + VITALS_TALL / 2f
     val transferCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP * 2f + VITALS_TALL + TRANSFER_TALL / 2f
     val levelsCentre = if (isWide) height / 2f else systemTop + systemTall / 2f - SYSTEM_RAISE
+    val nowRest = if (isWide || knobPush > 0f) knobTop - NowBubble.PANEL_GAP else (levelsCentre + LEVELS_TALL / 2f + knobTop + NowBubble.COMPACT_HEIGHT) / 2f
 
     fun modeCentre(row: Int) = gridTop + row * (gridRow + Dashboard.GAP) + gridRow / 2f
 }
@@ -370,7 +371,7 @@ fun DashboardPanel(dashboard: Dashboard) {
     val now = Island.now
     val nowTall = animateFloatAsState(if (now.isInPanel && Island.media != null) now.restHeight else 0f, tween(NowBubble.GROW, easing = Curves.bubble), label = "nowTall")
     val geometry = PanelGeometry(screenWidth, screenHeight, nowTall.value)
-    SideEffect { dashboard.nowBottom = geometry.top + geometry.knobTop - NowBubble.PANEL_GAP }
+    SideEffect { dashboard.nowBottom = geometry.top + geometry.nowRest }
     var hasOpened by remember { mutableStateOf(false) }
     if (isOpen) hasOpened = true
     // Every open built the whole panel from nothing on the main thread, so the first frames of the open ran 30 to 90 ms; it now stays composed and hidden after the first open.

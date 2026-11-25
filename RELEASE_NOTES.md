@@ -1,3 +1,3 @@
-# 0.7.64
+# 0.7.65
 
-- system section raise cut to 4dp so it sits centred between the weather and the Now pill.
+- the compact Now pill in the Dashboard sits centred between the sliders and the toggles.
