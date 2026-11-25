@@ -62,7 +62,6 @@ object Island {
     var isLocked by mutableStateOf(false)
 
     var unread by mutableStateOf(0)
-    var isBarLight by mutableStateOf(false)
     var media by mutableStateOf<Media?>(null)
     var timer by mutableStateOf<Timer?>(null)
     var call by mutableStateOf<Call?>(null)
