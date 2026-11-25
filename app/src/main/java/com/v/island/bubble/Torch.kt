@@ -135,24 +135,26 @@ private fun TorchFace(bubble: MainBubble, isOpen: Boolean) {
         pops.forEach { it.snapTo(0f) }
         pops.forEachIndexed { index, pop ->
             launch {
-                delay(LONG_GROW + (abs(index - middle) * POP_STAGGER).toLong())
+                delay((LONG_GROW * POP_START).toLong() + (abs(index - middle) * POP_STAGGER).toLong())
                 pop.animateTo(1f, tween(POP_DURATION, easing = Curves.bubble))
             }
         }
     }
     Box(Modifier.size(slot.dp, length.dp), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = RAIL_OPACITY }) {
+        /* The rail's alpha layer was only as wide as a slot, so a square overshooting its pop was cut at the slot's edges instead of only by the torch pill. */
+        Canvas(Modifier.requiredSize((slot + GOO_ROOM * 2f).dp, (length + GOO_ROOM * 2f).dp).graphicsLayer { alpha = RAIL_OPACITY }) {
+            val room = GOO_ROOM.dp.toPx()
             val unit = slot.dp.toPx()
             val step = (slot + gap).dp.toPx()
             for (index in 0 until count) {
                 val pop = pops[index].value
                 if (pop <= 0f) continue
-                val top = (count - 1 - index) * step
-                val centre = Offset(unit / 2f, top + unit / 2f)
+                val top = room + (count - 1 - index) * step
+                val centre = Offset(room + unit / 2f, top + unit / 2f)
                 withTransform({
                     rotate((1f - pop) * POP_TURN, centre)
                     scale(pop, pop, centre)
-                }) { drawRoundRect(Color.White, Offset(0f, top), Extent(unit, unit), CornerRadius(SLOT_RADIUS.dp.toPx())) }
+                }) { drawRoundRect(Color.White, Offset(room, top), Extent(unit, unit), CornerRadius(SLOT_RADIUS.dp.toPx())) }
             }
         }
         Canvas(
@@ -276,3 +278,4 @@ private const val IDLE_END = 10f
 private const val POP_STAGGER = 70f
 private const val POP_DURATION = 320
 private const val POP_TURN = -90f
+private const val POP_START = 0.8f
