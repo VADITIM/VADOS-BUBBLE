@@ -13,7 +13,7 @@ fun IslandStage() {
     val appearance = Island.appearance
     CompositionLocalProvider(LocalAccent provides appearance.accent) {
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (Island.isLandscape) 0f else 1f }) {
-            NotificationsShield(Island.bubble)
+            PanelShield(Island.bubble)
             DashboardScrim(Island.dashboard)
             LiquidLayer(
                 Island.liquid,

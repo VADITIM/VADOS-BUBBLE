@@ -43,6 +43,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -203,7 +204,7 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
         if (secondsForm == isCornered) return@LaunchedEffect
         secondsPop.animateTo(0f, tween(SECONDS_POP_OUT, easing = Curves.leave))
         secondsForm = isCornered
-        secondsPop.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
+        if (isCornered) secondsPop.snapTo(1f) else secondsPop.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
     }
     Column(
         Modifier.wrapContentWidth(unbounded = true).onSizeChanged {
@@ -228,7 +229,7 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                 },
             ) {
                 if (secondsForm) {
-                    BasicText(":$seconds", style = type(0.68f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f))
+                    PopText(":$seconds", type(0.68f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f), 0)
                 } else {
                     Column(Modifier.padding(start = 2.dp).graphicsLayer { alpha = 0.6f }, horizontalAlignment = Alignment.CenterHorizontally) {
                         val digit = type(0.29f, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 0.95f)
@@ -239,13 +240,14 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
             }
         }
         AnimatedVisibility(isCornered, enter = EnterTransition.None, exit = fadeOut(tween(DATE_FADE))) {
-            TypedText(
-                dateText(appearance.dateFormat, calendar),
-                type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f),
-                Durations.POP_IN / 2,
-                Modifier.padding(top = 2.4.dp).widthIn(max = 70.dp).graphicsLayer { alpha = 0.75f },
-                isLine = true,
-            )
+            Box(Modifier.padding(top = 2.4.dp).widthIn(max = 70.dp).clipToBounds().graphicsLayer { alpha = 0.75f }) {
+                PopText(
+                    dateText(appearance.dateFormat, calendar),
+                    type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f),
+                    Durations.POP_IN / 4,
+                    Modifier.wrapContentWidth(Alignment.Start, unbounded = true),
+                )
+            }
         }
     }
 }
@@ -358,9 +360,10 @@ fun StatusView(status: StatusBubble) {
         if (status.isPressing) 1.03f else 1f, { status.drag },
         status::onDown, status::onMove, status::onUp,
     ) {
+        /* The settings and power glyphs were scaled in as one Row from its middle, so both grew out of the gap between them; each pops from its own centre now. */
         AnimatedContent(
             targetState = isCornered,
-            transitionSpec = { (fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) using SizeTransform(clip = false) { _, _ -> snap() } },
+            transitionSpec = { (if (targetState) EnterTransition.None else fadeIn(tween(200, 120)) + scaleIn(tween(Durations.POP_IN, 120, Curves.enter), 0.6f)).togetherWith(fadeOut(tween(160)) + scaleOut(tween(160), 0.6f)) using SizeTransform(clip = false) { _, _ -> snap() } },
             contentAlignment = Alignment.Center,
             label = "status",
             modifier = Modifier.fillMaxSize(),
@@ -539,10 +542,10 @@ fun ClearButton(bubble: MainBubble) {
     }
 }
 
-/* A tap beside the open menu went through to the app underneath and closed the menu as well; while it is open the rest of the screen answers only by closing it. */
+/* A tap beside the open menu went through to the app underneath and closed the menu as well, and a tap beside the open player reached nothing at all and left it open; while either is open the rest of the screen answers only by closing it. */
 @Composable
-fun NotificationsShield(bubble: MainBubble) {
-    val isShown = bubble.size == com.v.island.bubble.Size.Notifications
+fun PanelShield(bubble: MainBubble) {
+    val isShown = bubble.size == com.v.island.bubble.Size.Notifications || bubble.size == com.v.island.bubble.Size.Player
     SideEffect {
         if (isShown) Island.regions[Region.Shield] = Rect(0f, 0f, Island.screenWidth, Island.screenHeight)
         else Island.regions.remove(Region.Shield)

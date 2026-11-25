@@ -513,16 +513,27 @@ private fun VitalsBubble(dashboard: Dashboard, geometry: PanelGeometry, appearan
             Modifier.fillMaxSize().padding(horizontal = 17.6.dp, vertical = 9.6.dp),
             verticalArrangement = Arrangement.spacedBy(6.4.dp, Alignment.CenterVertically),
         ) {
-            VitalRow(Glyphs.vitalStorage, accent, vitals?.storage, appearance)
-            VitalRow(Glyphs.vitalRam, RAM_COLOUR, vitals?.ram, appearance)
+            VitalRow(dashboard, 0, Glyphs.vitalStorage, accent, vitals?.storage, appearance)
+            VitalRow(dashboard, 1, Glyphs.vitalRam, RAM_COLOUR, vitals?.ram, appearance)
         }
     }
 }
 
 @Composable
-private fun VitalRow(glyph: Glyph, colour: Color, reading: Vital?, appearance: Appearance) {
-    val share = animateFloatAsState((reading?.percent ?: 0) / 100f, tween(360, easing = Curves.split), label = "gauge")
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun VitalRow(dashboard: Dashboard, index: Int, glyph: Glyph, colour: Color, reading: Vital?, appearance: Appearance) {
+    val isShown = dashboard.isOpen
+    val start = VITAL_DELAY + index * VITAL_STAGGER
+    val rise = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(Durations.POP_IN, start, Curves.grow) else tween(120), label = "rise")
+    val share = animateFloatAsState(if (isShown) (reading?.percent ?: 0) / 100f else 0f, tween(VITAL_GAUGE, if (isShown) start + VITAL_GAUGE_LAG else 0, Curves.split), label = "gauge")
+    /* The storage and RAM rows stood there from the first frame while everything around them arrived; each rises from below in a fade and its line fills from empty. */
+    Row(
+        Modifier.graphicsLayer {
+            alpha = rise.value.coerceIn(0f, 1f)
+            translationY = (1f - rise.value) * VITAL_DROP * density
+        },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         GlyphIcon(glyph, colour, Modifier.size(15.dp))
         Column(verticalArrangement = Arrangement.spacedBy(4.5.dp)) {
             BasicText(
@@ -1304,13 +1315,13 @@ fun StatusActions(dashboard: Dashboard) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(26.dp).pressable(pressedScale = 0.9f, haptic = Haptic.Tap) {
+            Modifier.size(26.dp).popIn(STATUS_ACTION_DELAY).pressable(pressedScale = 0.9f, haptic = Haptic.Tap) {
                 Island.actions.openControlPanel()
                 dashboard.close()
             },
         ) { GlyphIcon(Glyphs.settings, Palette.textBright, Modifier.fillMaxSize()) }
         Box(
-            Modifier.size(26.dp).pressable(pressedScale = 0.9f, haptic = Haptic.Expand) {
+            Modifier.size(26.dp).popIn(STATUS_ACTION_DELAY + Durations.POP_IN_STAGGER).pressable(pressedScale = 0.9f, haptic = Haptic.Expand) {
                 Island.actions.openPowerMenu()
                 dashboard.close()
             },
@@ -1374,6 +1385,12 @@ private val SCRIM = Color(6, 6, 8).copy(alpha = 0.42f)
 private val BATTERY_WELL = Color(10, 9, 13).copy(alpha = 0.85f)
 private val BATTERY_LOW_EDGE = Color(0xFFFF3B30)
 private val RAM_COLOUR = Color(0xFF8A5BFD)
+private const val VITAL_DELAY = 180
+private const val VITAL_STAGGER = 70
+private const val VITAL_GAUGE = 420
+private const val VITAL_GAUGE_LAG = 120
+private const val VITAL_DROP = 10f
+private const val STATUS_ACTION_DELAY = 120
 private val DOWNLOAD_COLOUR = Color(0xFFF09B3A)
 private val UPLOAD_COLOUR = Color(0xFF3A8CFF)
 private val PAIRED_CRITICAL = Color(0xFFB33A3A)

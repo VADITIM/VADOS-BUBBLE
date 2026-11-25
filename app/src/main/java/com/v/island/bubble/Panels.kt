@@ -66,6 +66,7 @@ import com.v.island.vas.Haptics
 import com.v.island.vas.Palette
 import com.v.island.vas.pressable
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sign
 
@@ -303,27 +304,39 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         var across = 0f
-                        var isSwiping = false
+                        var downward = 0f
+                        var axis = PlayerAxis.None
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             across = (change.position.x - down.position.x) / density
-                            if (!isSwiping && abs(across) > PLAYER_HOLD_OFF) isSwiping = true
-                            if (isSwiping) artDrag = across * PLAYER_DRAG_FOLLOW
+                            downward = (change.position.y - down.position.y) / density
+                            if (axis == PlayerAxis.None && hypot(across, downward) > PLAYER_HOLD_OFF) {
+                                axis = if (abs(across) > abs(downward)) PlayerAxis.Across else PlayerAxis.Along
+                            }
+                            if (axis == PlayerAxis.Across) artDrag = across * PLAYER_DRAG_FOLLOW
                             if (!change.pressed) {
-                                if (isSwiping) {
-                                    change.consume()
-                                    if (abs(across) > PLAYER_SWIPE) {
+                                change.consume()
+                                when {
+                                    axis == PlayerAxis.Across && abs(across) > PLAYER_SWIPE -> {
                                         Haptics.play(Haptic.Tap)
-                                        Island.actions.mediaControl(if (across < 0) "next" else "previous")
+                                        Island.actions.mediaControl(if (across > 0) "next" else "previous")
                                         artDrag = sign(across) * PLAYER_THROW
                                     }
-                                    artDrag = 0f
-                                } else {
-                                    change.consume()
-                                    Haptics.play(Haptic.Tap)
-                                    Island.actions.mediaControl(if (media.isPlaying) "pause" else "play")
+                                    axis == PlayerAxis.Along && downward > PLAYER_PULL -> {
+                                        Haptics.play(Haptic.Tap)
+                                        Island.actions.mediaControl(if (media.isPlaying) "pause" else "play")
+                                    }
+                                    axis == PlayerAxis.Along && downward < -PLAYER_PULL -> {
+                                        Haptics.play(Haptic.Dismiss)
+                                        bubble.toClosed()
+                                    }
+                                    axis == PlayerAxis.None -> {
+                                        Haptics.play(Haptic.Tap)
+                                        bubble.toClosed()
+                                    }
                                 }
+                                artDrag = 0f
                                 break
                             }
                         }
@@ -401,8 +414,11 @@ private fun SpeedToggle(style: androidx.compose.ui.text.TextStyle) {
 private fun seekAt(x: Float, width: Int, duration: Long): Long =
     ((x / width.coerceAtLeast(1)).coerceIn(0f, 1f) * duration).roundToInt().toLong()
 
+private enum class PlayerAxis { None, Across, Along }
+
 private const val PLAYER_HOLD_OFF = 17f
 private const val PLAYER_SWIPE = 105f
+private const val PLAYER_PULL = 48f
 private const val PLAYER_DRAG_FOLLOW = 0.85f
 private const val PLAYER_THROW = 340f
 

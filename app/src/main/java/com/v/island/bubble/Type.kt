@@ -179,7 +179,8 @@ fun TypedRun(text: String, shown: Int, isTyping: Boolean, style: TextStyle, modi
             if (!isTyping || !isCaretLit || laidOut.layoutInput.text.length != text.length) return@drawWithContent
             val offset = shown.coerceIn(0, text.length)
             val em = style.fontSize.toPx()
-            val baseline = laidOut.getLineBaseline(laidOut.getLineForOffset(offset))
+            /* A one-line text cut by maxLines still put its caret on line 1, which the layout never kept, and crashed the app; the line is held to the last one laid out. */
+            val baseline = laidOut.getLineBaseline(laidOut.getLineForOffset(offset).coerceAtMost(laidOut.lineCount - 1))
             val left = laidOut.getCursorRect(offset).left + if (offset > 0) em * CARET_GAP else 0f
             drawRect(style.color, topLeft = Offset(left, baseline + em * CARET_DROP - em), size = Size(em * CARET_WIDTH, em))
         },
@@ -199,6 +200,31 @@ private const val CARET_WIDTH = 0.08f
 private const val CARET_GAP = 0.04f
 private const val CARET_DROP = 0.08f
 private const val CARET_BLINK = 250L
+
+@Composable
+fun Modifier.popIn(delayMilliseconds: Int): Modifier {
+    val pop = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(delayMilliseconds.toLong())
+        pop.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
+    }
+    return graphicsLayer {
+        scaleX = pop.value
+        scaleY = pop.value
+        alpha = pop.value.coerceIn(0f, 1f)
+    }
+}
+
+@Composable
+fun PopText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Row(modifier) {
+        text.forEachIndexed { index, character ->
+            androidx.compose.runtime.key(index) {
+                BasicText(character.toString(), Modifier.popIn(delayMilliseconds + index * Durations.POP_STAGGER), style = style, maxLines = 1, softWrap = false)
+            }
+        }
+    }
+}
 
 fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))
 
