@@ -400,13 +400,13 @@ private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
         is StatusSlot.Paired -> Box(Modifier.size(modGlyph.dp), contentAlignment = Alignment.Center) {
             val colour = StatusBubble.levelColour(slot.charge)
             Canvas(Modifier.fillMaxSize()) {
-                val width = 2.dp.toPx()
+                val width = 1.4.dp.toPx()
                 val ring = Size(size.width - width, size.height - width)
                 val corner = Offset(width / 2f, width / 2f)
                 drawArc(colour.copy(alpha = 0.22f), 0f, 360f, false, corner, ring, style = Stroke(width))
                 drawArc(colour, -90f, 360f * slot.charge.coerceIn(0, 100) / 100f, false, corner, ring, style = Stroke(width, cap = androidx.compose.ui.graphics.StrokeCap.Round))
             }
-            GlyphIcon(Glyphs.bluetooth, ink, Modifier.size((modGlyph * 0.58f).dp))
+            GlyphIcon(Glyphs.bluetooth, ink, Modifier.size((modGlyph * 0.72f).dp))
         }
         is StatusSlot.Announce -> GlyphIcon(
             when (slot.event) {

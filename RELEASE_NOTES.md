@@ -1,3 +1,3 @@
-# 0.7.56
+# 0.7.57
 
-The app no longer takes a screenshot of the status bar every second; the clock and status text is always white over the black fade, so it was not needed.
+The Bluetooth charge ring in the status pill is thinner, and the Bluetooth icon inside it is larger.
