@@ -1,3 +1,3 @@
-# 0.7.49
+# 0.7.50
 
-Opening the notifications menu while something is playing, timing or calling leaves that pill where it is: it wobbles and the menu shoots out of it. Scrolling the menu drifts on after you let go. Tapping inside the menu no longer closes it; only a tap outside does.
+The Dashboard's battery and stats pills now fade in with a short, gentle slide instead of flying in from above the screen over everything else.
