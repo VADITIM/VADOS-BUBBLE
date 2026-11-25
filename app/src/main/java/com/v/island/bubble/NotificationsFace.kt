@@ -56,16 +56,7 @@ fun agoText(postedAt: Long): String {
 
 @Composable
 fun NotificationsFace(bubble: MainBubble, appearance: Appearance) {
-    Column(Modifier.fillMaxSize().padding(start = 6.4.dp, end = 6.4.dp, top = 14.4.dp, bottom = 8.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 14.4.dp, end = 14.4.dp, bottom = 9.6.dp)
-                .onSizeChanged { bubble.reportNotificationsHead(it.height / Island.density) },
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            RevealLabel("NOTIFICATIONS", type(0.6f, Palette.textLabel, appearance.headingFont, appearance.headingScale, spacing = 0.19f), appearance.accent)
-            val total = bubble.groups.sumOf { it.entries.size }
-            if (total > 0) BasicText(total.toString(), style = type(0.6f, Palette.textLabel, appearance.headingFont, appearance.headingScale, spacing = 0.08f))
-        }
+    Column(Modifier.fillMaxSize().padding(start = 6.4.dp, end = 6.4.dp, top = 12.dp, bottom = 8.dp)) {
         if (bubble.groups.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 BasicText("Nothing waiting", style = type(0.75f, Palette.textFaint, appearance.contentFont, appearance.contentScale))

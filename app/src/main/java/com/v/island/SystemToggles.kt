@@ -200,10 +200,10 @@ object SystemToggles {
         }
     }
 
-    
+    /* The share was floored onto the stream's steps, and the knee gives the bottom of the bar such small shares that the lowest tenth of a visible fill already landed on step 0 and muted; any fill now rounds up to at least the quietest step. */
     private fun volumeIndex(share: Int): Int {
         val top = volumeTop.takeIf { it > 0 } ?: return 0
-        return share * top / 100
+        return (share * top + 99) / 100
     }
 
     

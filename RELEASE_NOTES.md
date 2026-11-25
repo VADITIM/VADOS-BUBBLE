@@ -1,3 +1,3 @@
-# 0.7.26
+# 0.7.27
 
-Off is now a round red button showing a struck-through torch, and it comes out of the flashlight pill instead of the main pill. When the flashlight closes, both pills round off and melt together into one slightly smaller circle on their way up. With nothing else running, the main pill bounces out of that circle into its usual shape; with music or another activity running, the circle melts into that pill and gives it a little bounce. The main pill no longer rebuilds itself while the flashlight is still flying home, and the folded flashlight's level is set a little smaller so it stays clear of the camera hole.
+The volume bar in the dashboard no longer goes silent while some of it is still filled: the quiet steps at the bottom stay, and only an empty bar mutes. The notification center drops its heading so the notifications start right at the top, and the number of notifications now sits in a small circle to the right of the trash can.

@@ -92,7 +92,6 @@ class MainBubble {
     var notificationsDrop by mutableFloatStateOf(0f)
         private set
     private var alertWanted by mutableFloatStateOf(ALERT_HEIGHT)
-    private var notificationsHead = NOTIFICATIONS_HEAD
     private var notificationsList = -1f
     var accent by mutableStateOf(Color.White)
         private set
@@ -693,7 +692,7 @@ class MainBubble {
         val floor = (tall * 0.35f).roundToInt().toFloat()
         val ceiling = (tall * 0.85f).roundToInt() - below
         val list = if (notificationsList >= 0f) notificationsList else groups.sumOf { group -> rowHeight(group).toDouble() }.toFloat()
-        val wanted = notificationsHead + list + 20f
+        val wanted = list + 20f
         val height = max(floor, min(ceiling, wanted))
         val lowest = max(highest, tall - height - below - NOTIFICATIONS_FOOT)
         val top = (lowest + (highest - lowest) * appearance.notificationsRise).roundToInt().toFloat()
@@ -702,12 +701,6 @@ class MainBubble {
     }
 
     /* The height was guessed from line counts, so a long message overflowed and a short list left a gap; the menu is now sized off its rows as they are laid out, as notificationsWindow did off scrollHeight. */
-    fun reportNotificationsHead(height: Float) {
-        if (height == notificationsHead) return
-        notificationsHead = height
-        if (size == Size.Notifications) fitNotifications()
-    }
-
     fun reportNotificationsList(height: Float) {
         if (height == notificationsList) return
         notificationsList = height
@@ -1201,7 +1194,6 @@ class MainBubble {
         const val GONE_GRACE = 900L
         const val NOTIFICATIONS_HOMING = 460L
         const val NOTIFICATIONS_FOOT = 16f
-        const val NOTIFICATIONS_HEAD = 34f
         const val CLEAR_SIZE = 44f
         const val CLEAR_GAP = 12f
         /* Mirrors the top transition on #notifications-clear in pill.css. */

@@ -474,12 +474,35 @@ fun ClearButton(bubble: MainBubble) {
     val glyph = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(0, 380) else tween(120), label = "clearGlyph")
     if (grown.value <= 0.01f && !isShown) return
     fun top() = settled.value - (1f - drop.value) * (MainBubble.CLEAR_SIZE + MainBubble.CLEAR_GAP)
+    val countLeft = left + MainBubble.CLEAR_SIZE + COUNT_GAP
+    fun countTop() = top() + (MainBubble.CLEAR_SIZE - COUNT_SIZE) / 2f
     Blob(Island.liquid) {
         val density = Island.density
         val diameter = MainBubble.CLEAR_SIZE * grown.value
         val x = left + (MainBubble.CLEAR_SIZE - diameter) / 2f
         val y = top()
         BlobShape(Rect(x * density, y * density, (x + diameter) * density, (y + diameter) * density), diameter / 2f * density, Palette.border)
+    }
+    Blob(Island.liquid) {
+        val density = Island.density
+        val diameter = COUNT_SIZE * grown.value
+        val x = countLeft + (COUNT_SIZE - diameter) / 2f
+        val y = countTop()
+        BlobShape(Rect(x * density, y * density, (x + diameter) * density, (y + diameter) * density), diameter / 2f * density, Palette.border)
+    }
+    Box(
+        Modifier
+            .offset { IntOffset((countLeft * Island.density).roundToInt(), (countTop() * Island.density).roundToInt()) }
+            .size(COUNT_SIZE.dp)
+            .graphicsLayer {
+                scaleX = grown.value
+                scaleY = grown.value
+                alpha = glyph.value
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        val total = bubble.groups.sumOf { it.entries.size }
+        if (total > 0) BasicText(total.toString(), style = type(0.62f, Palette.textBright, Island.appearance.headingFont, Island.appearance.headingScale))
     }
     SideEffect {
         if (isShown) Island.regions[Region.Clear] = Rect(left, restTop, left + MainBubble.CLEAR_SIZE, restTop + MainBubble.CLEAR_SIZE)
@@ -526,5 +549,8 @@ fun PanelShield(bubble: MainBubble) {
 }
 
 private fun Modifier.pressableClear(bubble: MainBubble) = pressable(pressedScale = 1.03f, haptic = null) { bubble.clearAll() }
+
+private const val COUNT_SIZE = 34f
+private const val COUNT_GAP = 6f
 
 private val TRASH = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5", LayerKind.Stroke, 1.6f)))
