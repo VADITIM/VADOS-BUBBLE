@@ -399,7 +399,7 @@ private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
         is StatusSlot.Reading -> BasicText(slot.text, style = type(0.56f, ink, appearance.statusFont, appearance.statusScale * bareGrow(), weight = FontWeight.Bold))
         is StatusSlot.Paired -> Box(Modifier.size(modGlyph.dp), contentAlignment = Alignment.Center) {
             val colour = StatusBubble.levelColour(slot.charge)
-            Canvas(Modifier.fillMaxSize()) {
+            Canvas(Modifier.size((modGlyph * PAIRED_RING).dp)) {
                 val width = 1.4.dp.toPx()
                 val ring = Size(size.width - width, size.height - width)
                 val corner = Offset(width / 2f, width / 2f)
@@ -457,6 +457,7 @@ private fun isBarePill() = !Island.appearance.hasSidePills
 private fun bareGrow() = if (isBarePill()) Island.appearance.bareScale else 1f
 
 private const val BARE_BATTERY = 1.2f
+private const val PAIRED_RING = 0.84f
 
 
 @Composable

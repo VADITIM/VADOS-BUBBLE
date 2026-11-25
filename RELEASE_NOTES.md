@@ -1,3 +1,3 @@
-# 0.7.57
+# 0.7.58
 
-The Bluetooth charge ring in the status pill is thinner, and the Bluetooth icon inside it is larger.
+The Bluetooth charge ring in the status pill is smaller, while the Bluetooth icon inside keeps its larger size.
