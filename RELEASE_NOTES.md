@@ -1,3 +1,3 @@
-# 0.7.19
+# 0.7.20
 
-The main pill bounces when a mod expands, the way the Clock bubble does when the flashlight opens, and settles home with a gentler bounce when it closes.
+The main pill bounces a little less when a mod expands and a little more when it settles home on close.
