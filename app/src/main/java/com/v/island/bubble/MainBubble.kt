@@ -307,6 +307,10 @@ class MainBubble {
     var bumpLift by mutableFloatStateOf(0f)
         private set
 
+    var mediaEntrance = MediaEntrance.Full
+
+    fun takeMediaEntrance(): MediaEntrance = mediaEntrance.also { mediaEntrance = MediaEntrance.Full }
+
     /* Mirrors bumpPill in js/lock.js: Main gives under the Now bubble melting back into it. */
     fun bump() {
         Island.scope.launch(androidx.compose.ui.platform.AndroidUiDispatcher.Main) {
@@ -605,7 +609,11 @@ class MainBubble {
         if (Island.isScreenDark) Island.sleepDark()
         val wasOpen = !size.isClosed
         if (wasOpen) closedInTouch = Island.isTouchDown
-        if (size == Size.Notifications) notificationsClosedAt = SystemClock.uptimeMillis()
+        if (size == Size.Notifications) {
+            notificationsClosedAt = SystemClock.uptimeMillis()
+            /* The menu dropped the closed face, so closing it composed the media face afresh and its artwork slid in and the wave popped again under a mod that never left. */
+            mediaEntrance = MediaEntrance.Still
+        }
         mode = Mode.Idle
         notice = null
         notificationsDrop = 0f

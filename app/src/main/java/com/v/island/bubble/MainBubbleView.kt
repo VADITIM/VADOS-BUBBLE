@@ -185,7 +185,8 @@ private fun StayPill(bubble: MainBubble, centre: Float) {
     LaunchedEffect(mod != null) {
         if (mod == null) return@LaunchedEffect
         wobble.snapTo(1f)
-        wobble.animateTo(STAY_SQUASH, tween(STAY_SQUASH_TIME, easing = Curves.leave))
+        /* The squash eased in, so the burst barely moved for its first frames and read as late; it leaps out at once and further. */
+        wobble.animateTo(STAY_SQUASH, tween(STAY_SQUASH_TIME, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
         wobble.animateTo(1f, spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMedium))
     }
     val frame = bubble.stayFrame(shown)
@@ -211,8 +212,8 @@ private fun StayPill(bubble: MainBubble, centre: Float) {
     ) { FaceContent(bubble.stayFace(shown), bubble, Island.appearance) }
 }
 
-private const val STAY_SQUASH = 1.12f
-private const val STAY_SQUASH_TIME = 110
+private const val STAY_SQUASH = 1.22f
+private const val STAY_SQUASH_TIME = 70
 
 private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre)
 const val LONG_GROW = 460
@@ -224,6 +225,9 @@ private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, F
 
 private fun faceTransition(from: Face, to: Face): ContentTransform {
     val isHandOver = from in CLOSED_FACES && to in CLOSED_FACES
+    if (isHandOver && to == Face.Media && Island.bubble.mediaEntrance == MediaEntrance.Placed) {
+        return ContentTransform(EnterTransition.None, fadeOut(tween(Durations.POP_OUT)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
+    }
     if (isHandOver) {
         return ContentTransform(
             scaleIn(tween(Durations.POP_IN, Durations.POP_OUT, Curves.enter)) + fadeIn(tween(120, Durations.POP_OUT)),

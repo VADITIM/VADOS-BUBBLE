@@ -311,6 +311,8 @@ class NowBubble {
         Island.bubble.bump()
         isHomeHeld = false
         if (!isInPanel && !isLocked) isLockOpen = false
+        /* The caught media face slid its artwork in from the hole as if newly arrived; it stands in place and only the wave pops. */
+        Island.bubble.mediaEntrance = MediaEntrance.Placed
         Island.bubble.onModsChanged()
         run(MERGE_FADE) { opacity = 1f - it }
         land()
@@ -390,7 +392,7 @@ class NowBubble {
         const val PANEL_RADIUS = 26f
         const val COMPACT_RADIUS = COMPACT_HEIGHT / 2f
         const val ARRIVE_STRETCH = 1.6f
-        const val LEAVE_OVER_SHARE = 0.4f
+        const val LEAVE_OVER_SHARE = 0.25f
         const val INSET = 16f
         const val BOTTOM = 20f
         const val PANEL_GAP = 16f
@@ -410,3 +412,5 @@ class NowBubble {
 }
 
 enum class SwipeMark { Next, Previous, Play, Pause }
+
+enum class MediaEntrance { Full, Placed, Still }

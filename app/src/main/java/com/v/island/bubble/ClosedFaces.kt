@@ -104,8 +104,9 @@ fun MediaFace(appearance: Appearance) {
     val padding = (appearance.compactHeight - glyphSize(appearance)) / 2f
     val tile = mediaTileWidth(appearance)
     val travel = MEDIA_TILE_INSET + tile
-    val entry = remember { Animatable(0f) }
-    val pop = remember { Animatable(0f) }
+    val entrance = remember { Island.bubble.takeMediaEntrance() }
+    val entry = remember { Animatable(if (entrance == MediaEntrance.Full) 0f else 1f) }
+    val pop = remember { Animatable(if (entrance == MediaEntrance.Still) 1f else 0f) }
     LaunchedEffect(Unit) { entry.animateTo(1f, tween(Durations.MORPH, easing = Curves.sweep)) }
     LaunchedEffect(Unit) { pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) }
     Row(

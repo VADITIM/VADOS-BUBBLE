@@ -1,3 +1,6 @@
-# 0.7.72
+# 0.7.73
 
-- Now pill swipes flash the player's skip arrow or play-pause mark over a dark scrim inside the pill.
+- The Now pill flying home from the Dashboard overshoots less.
+- When Main catches the media mod back, the artwork stands in place and only the wave pops in.
+- Closing Notifications no longer replays the media face's entrance.
+- The burst entering Notifications starts at once and squashes harder.
