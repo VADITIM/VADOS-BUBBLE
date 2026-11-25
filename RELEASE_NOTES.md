@@ -1,3 +1,3 @@
-# 0.7.63
+# 0.7.64
 
-- Dashboard connectors and sliders raised 12dp so the room above and below them is balanced.
+- system section raise cut to 4dp so it sits centred between the weather and the Now pill.
