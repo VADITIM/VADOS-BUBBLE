@@ -1,3 +1,3 @@
-# 0.7.28
+# 0.7.29
 
-When music appears in the main pill, the artwork now slides in from outside the pill's left edge and the wave pops in with its bars rising. Pausing lets the wave calm down to rest instead of stopping dead.
+The artwork in the music pill sits a little further in from the left edge.

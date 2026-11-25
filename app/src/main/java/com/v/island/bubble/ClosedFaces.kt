@@ -109,7 +109,7 @@ fun MediaFace(appearance: Appearance) {
     LaunchedEffect(Unit) { entry.animateTo(1f, tween(Durations.MORPH, easing = Curves.sweep)) }
     LaunchedEffect(Unit) { pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) }
     Row(
-        Modifier.fillMaxSize().padding(end = padding.dp),
+        Modifier.fillMaxSize().padding(start = MEDIA_TILE_LEAD.dp, end = padding.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -235,6 +235,8 @@ fun TripFace(appearance: Appearance) {
 const val SWEEP_CYCLE = 12_000L
 const val MEDIA_TILE_RATIO = 1.5f
 const val MEDIA_TILE_INSET = 3f
+/* The artwork sat as close to the pill's left edge as to its top and bottom and looked pressed against the curve. */
+const val MEDIA_TILE_LEAD = 5f
 const val EQUALIZER_BARS = 5
 const val WAVE_BARS = 54
 private const val WAVE_BEAT = 480f
