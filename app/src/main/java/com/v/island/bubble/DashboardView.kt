@@ -131,7 +131,7 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     fun modeCentre(row: Int) = gridTop + row * (gridRow + Dashboard.GAP) + gridRow / 2f
 }
 
-private enum class PopKind { Plain, Turning, Knob, Level }
+private enum class PopKind { Plain, Turning, Knob, Level, Top }
 
 private class PopRoll {
     val strength = 0.6f + Random.nextFloat() * 0.4f
@@ -164,6 +164,10 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
             }
             val jitter = if (kind == PopKind.Turning) roll.jitter else 0
             delay((rank * Dashboard.STAGGER + jitter).toLong())
+            if (kind == PopKind.Top) {
+                progress.animateTo(1f, tween(TOP_FADE, easing = Curves.enter))
+                return@LaunchedEffect
+            }
             progress.animateTo(1f, if (kind == PopKind.Knob) tween(roll.throwMilliseconds, easing = roll.throwEase) else tween(Dashboard.POP, easing = Curves.sling))
         } else {
             isLeaving = true
@@ -195,6 +199,14 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
             return@graphicsLayer
         }
         val rest = 1f - value
+        // The battery and stats were thrown in from past the screen top with an overshoot, so they flew over the clock and each other; they fade in from a short fixed drop instead.
+        if (kind == PopKind.Top && !isLeaving) {
+            alpha = value.coerceIn(0f, 1f) * soloValue
+            translationY = -TOP_DROP * rest * density
+            scaleX = (TOP_SCALE + (1f - TOP_SCALE) * value) * soloValue
+            scaleY = scaleX
+            return@graphicsLayer
+        }
         val scale = value * soloValue
         scaleX = scale
         scaleY = scale
@@ -550,7 +562,7 @@ private fun VitalsBubble(dashboard: Dashboard, geometry: PanelGeometry, appearan
     val vitals = dashboard.vitals
     QuickBubble(
         modifier
-            .pop(dashboard, geometry.vitalsCentre, geometry.height, PopKind.Plain)
+            .pop(dashboard, geometry.vitalsCentre, geometry.height, PopKind.Top)
             .control(dashboard, "vitals", 0.97f, onHold = { dashboard.openSettings("vitals") }) { dashboard.openSettings("vitals") },
     ) {
         Column(
@@ -616,7 +628,7 @@ private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appeara
     val share = (percent.coerceAtLeast(0)) / 100f
     Row(
         modifier
-            .pop(dashboard, geometry.vitalsCentre, geometry.height, PopKind.Plain)
+            .pop(dashboard, geometry.vitalsCentre, geometry.height, PopKind.Top)
             .control(dashboard, "battery", 0.97f, onHold = { dashboard.openSettings("battery") }) { dashboard.openSettings("battery") },
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1479,6 +1491,9 @@ private const val BATTERY_CRITICAL = 19
 private const val FROST_STEPS = 12
 private const val FAST_DROP = 220
 private const val FAST_LIFT = 14f
+private const val TOP_FADE = 480
+private const val TOP_DROP = 16f
+private const val TOP_SCALE = 0.94f
 private const val SOLO_SHRINK = 130
 private const val SOLO_SHRINK_STEP = 14L
 private const val SOLO_SWELL = 300
