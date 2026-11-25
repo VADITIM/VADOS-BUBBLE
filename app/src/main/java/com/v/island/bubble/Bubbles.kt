@@ -537,12 +537,13 @@ fun PanelShield(bubble: MainBubble) {
         Modifier.fillMaxSize().pointerInput(bubble) {
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false).consume()
+                /* The shield closed the open panel only once the finger lifted, so a tap outside felt late; it closes on the touch and swallows the rest of the gesture. */
+                bubble.onOutsideTap()
                 while (true) {
                     val event = awaitPointerEvent()
                     event.changes.forEach { it.consume() }
                     if (event.changes.none { it.pressed }) break
                 }
-                bubble.onOutsideTap()
             }
         },
     )

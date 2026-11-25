@@ -1,3 +1,3 @@
-# 0.7.30
+# 0.7.31
 
-The flashlight's level squares now start popping in before the pill has finished opening, and a square that swells past its slot while popping is no longer cut off at the slot's edge.
+Tapping outside an open notification center or player now closes it the moment your finger touches the screen, not when you lift it.
