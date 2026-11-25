@@ -35,7 +35,7 @@ object Palette {
         "hotspot" to Color(0xFF30D158),
         "plane" to Color(0xFFFF9F0A),
         "mobile" to Color(0xFF64D2FF),
-        "gps" to Color(0xFFFF375F),
+        "gps" to Color(0xFFFF9F0A),
         "wifi" to Color(0xFF0A84FF),
         "bluetooth" to Color(0xFF5E5CE6),
         "augenkomfort" to Color(0xFFFFB340),

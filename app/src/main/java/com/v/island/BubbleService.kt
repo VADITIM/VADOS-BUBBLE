@@ -311,6 +311,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         Island.appearance = Appearance.read(preferences)
         Island.onBlobsDrawn = ::requestPaneSync
         Island.onDashboardLeft = ::hideLandscapeStage
+        watchBar()
 
         owner.start()
         composeView = ComposeView(this).apply {
@@ -895,6 +896,43 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     override fun sleepScreen() {
         performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
     }
+
+    private fun watchBar() = Island.scope.launch {
+        while (true) {
+            kotlinx.coroutines.delay(BAR_SAMPLE)
+            if (!Island.appearance.hasSidePills) sampleBar()
+        }
+    }
+
+    private fun sampleBar() {
+        takeScreenshot(android.view.Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
+            override fun onSuccess(result: ScreenshotResult) {
+                val buffer = result.hardwareBuffer
+                val bitmap = android.graphics.Bitmap.wrapHardwareBuffer(buffer, result.colorSpace)?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                buffer.close()
+                bitmap ?: return
+                val density = resources.displayMetrics.density
+                val top = (Island.appearance.grab * density).toInt().coerceIn(0, bitmap.height - 1)
+                val bottom = ((Island.appearance.grab + Island.appearance.compactHeight) * density).toInt().coerceIn(top + 1, bitmap.height)
+                val third = bitmap.width / 3
+                var sum = 0.0
+                var count = 0
+                for (y in top until bottom step 4) for (x in 0 until bitmap.width step 6) {
+                    if (x in third until bitmap.width - third) continue
+                    val pixel = bitmap.getPixel(x, y)
+                    sum += 0.2126 * android.graphics.Color.red(pixel) + 0.7152 * android.graphics.Color.green(pixel) + 0.0722 * android.graphics.Color.blue(pixel)
+                    count++
+                }
+                bitmap.recycle()
+                if (count > 0) Island.isBarLight = sum / count > BAR_LIGHT
+            }
+
+            override fun onFailure(errorCode: Int) = Unit
+        })
+    }
 }
+
+private const val BAR_SAMPLE = 1000L
+private const val BAR_LIGHT = 150.0
 
 fun Context.pushToIsland(payload: JSONObject, arrivedDark: Boolean = false) = BubbleService.deliver(payload, arrivedDark)

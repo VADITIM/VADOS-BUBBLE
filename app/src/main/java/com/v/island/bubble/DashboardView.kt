@@ -1120,7 +1120,9 @@ private fun levelFrame(name: String, isCall: Boolean, held: String?): LevelFrame
     val half = LEVELS_WIDE / 2f + KNOB_GAP / 2f
     if (held != null) {
         val inset = LEVELS_WIDE * 0.1f
-        return if (held == "brightness") LevelFrame(0f, 0f, inset, 0f) else LevelFrame(inset, 0f, 0f, 0f)
+        // A held bar during a call took the whole column's height, so the media bar under the finger stretched to the top while it was dragged and its fill ran away from the finger; it keeps its own height and only widens.
+        val own = levelFrame(name, isCall, null)
+        return if (held == "brightness") LevelFrame(0f, 0f, inset, 0f) else LevelFrame(inset, if (name == "brightness") 0f else own.top, 0f, if (name == "brightness") 0f else own.bottom)
     }
     return when (name) {
         "brightness" -> LevelFrame(0f, 0f, half, 0f)

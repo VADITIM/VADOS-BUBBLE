@@ -422,10 +422,13 @@ class MainBubble {
         }
     }
 
-    val isRisen: Boolean get() = size.isClosed && Island.dashboard.isOpen
+    val isRisen: Boolean get() = size.isClosed && Island.dashboard.isOpen && liveMods.isNotEmpty()
+
+    val isPunched: Boolean get() = size.isClosed && Island.dashboard.isOpen && liveMods.isEmpty()
 
     fun target(): Frame {
         val frame = frame()
+        if (isPunched) return Frame(lentSide(), lentSide(), lentSide() / 2f, appearance.grab + (appearance.compactHeight - lentSide()) / 2f, 0f)
         if (!isRisen) return frame
         return frame.copy(top = -EDGE_OVER, height = appearance.compactHeight + EDGE_OVER)
     }
@@ -440,8 +443,8 @@ class MainBubble {
                 val box = layout()
                 Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
             }
-            Size.Alert -> Frame(ALERT_WIDTH, alertHeight(), 24f, grown, 0f)
-            Size.Image -> Frame(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grown, 0f)
+            Size.Alert -> Frame(ALERT_WIDTH, alertHeight(), 24f, grab, 0f)
+            Size.Image -> Frame(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grab, 0f)
             Size.AlertCentre -> {
                 val tall = alertHeight()
                 Frame(ALERT_WIDTH, tall, CENTRE_RADIUS, grown + (Island.screenHeight - tall) / 2f - Island.screenHeight * CENTRE_LIFT, 0f)

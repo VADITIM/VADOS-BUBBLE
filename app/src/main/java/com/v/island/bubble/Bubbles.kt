@@ -19,6 +19,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -81,9 +82,10 @@ private fun FloatingBubble(
     onDown: (Float, Float) -> Unit,
     onMove: (Float, Float) -> Unit,
     onUp: (Boolean) -> Unit,
+    isBare: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val isEaten = Island.isPlayerOpen
+    val isEaten = Island.isMainOpen
     val width = animateFloatAsState(target.width, tween(Durations.GROW, easing = Curves.bubble), label = "width")
     val height = animateFloatAsState(target.height, tween(Durations.GROW, easing = Curves.bubble), label = "height")
     val left = animateFloatAsState(target.shift, tween(Durations.GROW, easing = Curves.split), label = "left")
@@ -91,7 +93,7 @@ private fun FloatingBubble(
     val radius = animateFloatAsState(target.radius, tween(Durations.GROW, easing = FastOutSlowInEasing), label = "radius")
     val grown = animateFloatAsState(scale, tween(320, easing = Curves.split), label = "scale")
 
-    Blob(Island.liquid) {
+    if (!isBare) Blob(Island.liquid) {
         val density = Island.density
         val offset = drag()
         val wide = width.value * grown.value
@@ -172,6 +174,7 @@ fun ClockView(clock: ClockBubble) {
         Region.Clock, target, Palette.border,
         if (clock.isPressing) 1.03f else 1f, { clock.drag },
         clock::onDown, clock::onMove, clock::onUp,
+        isBare = isBarePill() && !clock.isCornered && !clock.isNowStanding,
     ) {
         AnimatedContent(
             targetState = if (clock.isCornered) 0 else if (clock.isOpen) 2 else if (clock.isNowStanding) 1 else 0,
@@ -194,6 +197,7 @@ fun ClockView(clock: ClockBubble) {
 /* The time and the corner were two faces cross-faded by AnimatedContent, so opening the Dashboard rebuilt the whole reading; the hours and minutes are the same at both sizes, and only the seconds change form and the date arrives, as handOverClock in js/clock.js did. */
 @Composable
 private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
+    val ink = sideInk(isBarePill() && !clock.isCornered)
     val isCornered = clock.isCornered
     val now = rememberNow(1000)
     val calendar = java.util.Calendar.getInstance().apply { timeInMillis = now }
@@ -201,7 +205,7 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
     val seconds = pad(calendar.get(java.util.Calendar.SECOND))
     val time = "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}"
     /* The bubble slid under the player and shrank to nothing, so the Clock vanished while the player was open; it stays where it is and only its characters turn out, one by one, and back in when the player closes. */
-    val isAway = Island.isPlayerOpen
+    val isAway = Island.isMainOpen
     val corner = animateFloatAsState(if (isCornered) 1f else 0f, tween(Durations.GROW, easing = Curves.split), label = "clockCorner")
     val grow = 1f + (CORNER_GROW - 1f) * corner.value
     var secondsForm by remember { mutableStateOf(isCornered) }
@@ -212,9 +216,9 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
         secondsForm = isCornered
         if (isCornered) secondsPop.snapTo(1f) else secondsPop.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
     }
-    val timeStyle = type(0.68f, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f)
-    val digit = type(SECONDS_SIZE, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = SECONDS_LINE)
-    val dateStyle = type(0.62f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f)
+    val timeStyle = type(0.68f, ink, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f)
+    val digit = type(SECONDS_SIZE, ink, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = SECONDS_LINE)
+    val dateStyle = type(0.62f * CORNER_GROW, ink, appearance.clockFont, appearance.clockScale, lineHeight = 1.2f)
     val date = dateText(appearance.dateFormat, calendar)
     val measurer = rememberTextMeasurer()
     // Both widths were read off the laid-out content, which only switched form partway through the grow, so the pill retargeted mid-flight and jumped; they are measured up front from the text alone.
@@ -224,20 +228,22 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
         clock.timeWidth = timeWide + SECONDS_GAP + maxOf(wide(seconds.substring(0, 1), digit), wide(seconds.substring(1, 2), digit)) + 22.4f
         clock.cornerWidth = maxOf(Dashboard.CORNER_WIDE_FLOOR, maxOf(timeWide + wide(":$seconds", timeStyle), minOf(DATE_WIDE, wide(date, dateStyle))) + CORNER_PADDING * 2f)
     }
+    var dateTall by remember { mutableStateOf(0f) }
+    // The date arrived in one frame and took its height in the column, so the time jumped up when the Dashboard opened; the date takes no room and the time eases up by half its height with the grow.
     Column(
-        Modifier.wrapContentWidth(unbounded = true),
+        Modifier.wrapContentWidth(unbounded = true).graphicsLayer { translationY = -dateTall / 2f * corner.value * density },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AwayText(
                 time,
                 /* The corner line height was read off the grow over CORNER_GROW - 1, which is 0/0 once the corner stopped growing the clock, and the NaN crashed every frame; it follows its own 0 to 1 progress. */
-                type(0.68f * grow, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.5f - 0.3f * corner.value),
+                type(0.68f * grow, ink, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.5f - 0.3f * corner.value),
                 isAway,
                 0,
             )
             Box(
-                Modifier.graphicsLayer {
+                Modifier.animateContentSize(tween(Durations.GROW, easing = Curves.split)).graphicsLayer {
                     val pop = secondsPop.value
                     alpha = pop.coerceIn(0f, 1f)
                     scaleX = SECONDS_POP_FLOOR + (1f - SECONDS_POP_FLOOR) * pop
@@ -246,7 +252,7 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                 },
             ) {
                 if (secondsForm) {
-                    PopText(":$seconds", type(0.68f * CORNER_GROW, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f), 0)
+                    PopText(":$seconds", type(0.68f * CORNER_GROW, ink, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.2f), 0)
                 } else {
                     Column(Modifier.padding(start = SECONDS_GAP.dp).graphicsLayer { alpha = 0.6f }, horizontalAlignment = Alignment.CenterHorizontally) {
                         BasicText(seconds.substring(0, 1), Modifier.popAway(isAway, time.length), style = digit)
@@ -255,7 +261,15 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                 }
             }
         }
-        AnimatedVisibility(isCornered, enter = EnterTransition.None, exit = fadeOut(tween(DATE_FADE))) {
+        AnimatedVisibility(
+            isCornered,
+            Modifier.onSizeChanged { if (it.height > 0) dateTall = it.height / Island.density }.layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, 0) { placeable.place(0, 0) }
+            },
+            enter = EnterTransition.None,
+            exit = fadeOut(tween(DATE_FADE)),
+        ) {
             Box(Modifier.padding(top = 2.4.dp).widthIn(max = DATE_WIDE.dp).clipToBounds().graphicsLayer { alpha = 0.75f }) {
                 PopText(
                     date,
@@ -325,6 +339,7 @@ fun StatusView(status: StatusBubble) {
         Region.Status, status.target(), Palette.border,
         if (status.isPressing) 1.03f else 1f, { status.drag },
         status::onDown, status::onMove, status::onUp,
+        isBare = isBarePill() && !isCornered,
     ) {
         /* The settings and power glyphs were scaled in as one Row from its middle, so both grew out of the gap between them; each pops from its own centre now. */
         AnimatedContent(
@@ -346,7 +361,7 @@ fun StatusView(status: StatusBubble) {
                     status.slots().forEachIndexed { index, slot ->
                         key(slot.name) {
                             Box(Modifier.padding(start = if (index == 0) 0.dp else if (slot is StatusSlot.Battery) 4.dp else 1.dp)) {
-                                StatusSlotView(slot, appearance, Island.isPlayerOpen, index * 2)
+                                StatusSlotView(slot, appearance, Island.isMainOpen, index * 2)
                             }
                         }
                     }
@@ -367,11 +382,12 @@ private fun StatusSlotView(slot: StatusSlot, appearance: Appearance, isAway: Boo
 
 @Composable
 private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
+    val ink = sideInk(isBarePill() && !Island.dashboard.isOpen)
     val glyph = appearance.compactHeight - 13f
     val modGlyph = appearance.compactHeight - 8f
     when (slot) {
-        is StatusSlot.Mark -> GlyphIcon(slot.glyph, slot.tint, Modifier.size(glyph.dp))
-        is StatusSlot.Reading -> BasicText(slot.text, style = type(0.56f, Color.White, appearance.statusFont, appearance.statusScale, weight = FontWeight.Bold))
+        is StatusSlot.Mark -> GlyphIcon(slot.glyph, if (slot.tint == Color.White) ink else slot.tint, Modifier.size(glyph.dp))
+        is StatusSlot.Reading -> BasicText(slot.text, style = type(0.56f, ink, appearance.statusFont, appearance.statusScale, weight = FontWeight.Bold))
         is StatusSlot.Paired -> Box(Modifier.size(modGlyph.dp), contentAlignment = Alignment.Center) {
             val colour = StatusBubble.levelColour(slot.charge)
             Canvas(Modifier.fillMaxSize()) {
@@ -381,7 +397,7 @@ private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
                 drawArc(colour.copy(alpha = 0.22f), 0f, 360f, false, corner, ring, style = Stroke(width))
                 drawArc(colour, -90f, 360f * slot.charge.coerceIn(0, 100) / 100f, false, corner, ring, style = Stroke(width, cap = androidx.compose.ui.graphics.StrokeCap.Round))
             }
-            GlyphIcon(Glyphs.bluetooth, Color.White, Modifier.size((modGlyph * 0.58f).dp))
+            GlyphIcon(Glyphs.bluetooth, ink, Modifier.size((modGlyph * 0.58f).dp))
         }
         is StatusSlot.Announce -> GlyphIcon(
             when (slot.event) {
@@ -392,12 +408,12 @@ private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
             StatusBubble.ANNOUNCE_COLOURS.getValue(slot.event),
             Modifier.size(modGlyph.dp),
         )
-        is StatusSlot.Battery -> MiniBattery(slot.charge, modGlyph, appearance)
+        is StatusSlot.Battery -> MiniBattery(slot.charge, modGlyph, appearance, ink)
     }
 }
 
 @Composable
-private fun MiniBattery(charge: Charge, modGlyph: Float, appearance: Appearance) {
+private fun MiniBattery(charge: Charge, modGlyph: Float, appearance: Appearance, ink: Color) {
     val colour = StatusBubble.chargeColour(charge)
     val fill = animateFloatAsState(charge.percent / 100f, tween(500), label = "charge")
     val isBare = !appearance.showBatteryPercent
@@ -420,12 +436,16 @@ private fun MiniBattery(charge: Charge, modGlyph: Float, appearance: Appearance)
                 drawRoundRect(colour, topLeft = Offset(outline / 2f, outline / 2f), size = Size(size.width - outline, size.height - outline), cornerRadius = CornerRadius(corner - outline / 2f), style = Stroke(outline))
             }
             // The reading was black wherever it sat, so the part over the empty well vanished at low charge; it is white over the well and black over the fill.
-            BatteryReading(charge, isBare, tall, appearance, Color.White, { fill.value }, isOverFill = false)
+            BatteryReading(charge, isBare, tall, appearance, ink, { fill.value }, isOverFill = false)
             BatteryReading(charge, isBare, tall, appearance, Color.Black, { fill.value }, isOverFill = true)
         }
         Box(Modifier.padding(start = 1.dp).size(1.5.dp, (tall * 0.34f).dp).background(colour, RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp)))
     }
 }
+
+private fun isBarePill() = !Island.appearance.hasSidePills
+
+private fun sideInk(isBare: Boolean) = if (isBare && Island.isBarLight) Color.Black else Color.White
 
 @Composable
 private fun BoxScope.BatteryReading(charge: Charge, isBare: Boolean, tall: Float, appearance: Appearance, colour: Color, fill: () -> Float, isOverFill: Boolean) {

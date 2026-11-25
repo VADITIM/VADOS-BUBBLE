@@ -122,6 +122,8 @@ object Preferences {
 
     const val FAST_DASHBOARD = "fastDashboard"
 
+    const val SIDE_PILLS = "sidePills"
+
     const val NOTIFICATIONS_CLEAR_CORNER = "notificationsClearCorner"
 
     const val ALERT_ZONE_SHOWN = "alertZoneShown"
@@ -195,6 +197,7 @@ object Preferences {
         LOCK_NOTES to 1,
         LOCK_NOTES_HOME to 0,
         FAST_DASHBOARD to 0,
+        SIDE_PILLS to 1,
         NOTIFICATIONS_CLEAR_CORNER to 0,
         ALERT_ZONE_SHOWN to 0,
         ALERT_ZONE_GLOW to 40,

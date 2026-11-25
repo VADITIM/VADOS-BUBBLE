@@ -232,10 +232,9 @@ fun PopText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Mo
 
 @Composable
 fun Modifier.popAway(isAway: Boolean, order: Int): Modifier {
-    val stagger = order * Durations.POP_STAGGER
     val pop = androidx.compose.animation.core.animateFloatAsState(
         if (isAway) 0f else 1f,
-        if (isAway) tween(Durations.POP_OUT, stagger, Curves.leave) else tween(Durations.POP_IN, stagger, Curves.enter),
+        if (isAway) tween(AWAY_OUT, order * AWAY_STAGGER, Curves.leave) else tween(Durations.POP_IN, order * Durations.POP_STAGGER, Curves.enter),
         label = "away",
     )
     return graphicsLayer {
@@ -258,6 +257,8 @@ fun AwayText(text: String, style: TextStyle, isAway: Boolean, firstOrder: Int, m
 }
 
 private const val AWAY_TURN = -40f
+private const val AWAY_OUT = 90
+private const val AWAY_STAGGER = 8
 
 @Composable
 fun ScrambleText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier) {
