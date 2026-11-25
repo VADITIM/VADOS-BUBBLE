@@ -1,3 +1,3 @@
-# 0.7.66
+# 0.7.67
 
-- Now pill flights follow the rest and Main boxes while flying, the panel pill eases between rests, expanding no longer recomposes every frame, and its labels symbol-type.
+- the Dashboard Now rest is taken from the settled layout so the pill no longer chases the room-making animation.

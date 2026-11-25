@@ -369,9 +369,12 @@ fun DashboardPanel(dashboard: Dashboard) {
         else Island.regions.remove(Region.Dashboard)
     }
     val now = Island.now
-    val nowTall = animateFloatAsState(if (now.isInPanel && Island.media != null) now.restHeight else 0f, tween(NowBubble.GROW, easing = Curves.bubble), label = "nowTall")
+    val nowTallTarget = if (now.isInPanel && Island.media != null) now.restHeight else 0f
+    val nowTall = animateFloatAsState(nowTallTarget, tween(NowBubble.GROW, easing = Curves.bubble), label = "nowTall")
     val geometry = PanelGeometry(screenWidth, screenHeight, nowTall.value)
-    SideEffect { dashboard.nowBottom = geometry.top + geometry.nowRest }
+    /* The Now rest was read off the geometry mid-animation, so every frame of the panel making room retargeted the pill's own tween and it crawled downwards while the Dashboard recomposed under it; the rest is the settled layout's. */
+    val nowRest = remember(screenWidth, screenHeight, nowTallTarget) { PanelGeometry(screenWidth, screenHeight, nowTallTarget).nowRest }
+    SideEffect { dashboard.nowBottom = geometry.top + nowRest }
     var hasOpened by remember { mutableStateOf(false) }
     if (isOpen) hasOpened = true
     // Every open built the whole panel from nothing on the main thread, so the first frames of the open ran 30 to 90 ms; it now stays composed and hidden after the first open.
