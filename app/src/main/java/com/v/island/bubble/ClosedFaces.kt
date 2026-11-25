@@ -2,6 +2,8 @@ package com.v.island.bubble
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import kotlinx.coroutines.launch
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -75,6 +77,29 @@ fun IdleFace(appearance: Appearance) {
     }
 }
 
+class Arrival(val glyph: Animatable<Float, AnimationVector1D>, val pop: Animatable<Float, AnimationVector1D>, val isSwapped: Boolean)
+
+@Composable
+fun rememberArrival(mod: Mod): Arrival {
+    val travel = remember { Island.bubble.takeSwapArrival(mod) }
+    val arrival = remember { Arrival(Animatable(travel ?: 0f), Animatable(if (travel == null) 1f else 0f), travel != null) }
+    LaunchedEffect(Unit) {
+        if (travel == null) return@LaunchedEffect
+        launch { arrival.glyph.animateTo(0f, tween(SWAP_TRAVEL, easing = Curves.split)) }
+        arrival.pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
+    }
+    return arrival
+}
+
+fun Modifier.travelled(arrival: Arrival) = graphicsLayer { translationX = arrival.glyph.value * Island.density }
+
+fun Modifier.popped(arrival: Arrival) = graphicsLayer {
+    scaleX = arrival.pop.value
+    scaleY = arrival.pop.value
+}
+
+const val SWAP_TRAVEL = 380
+
 @Composable
 private fun ModRow(appearance: Appearance, endPadding: Float, content: @Composable () -> Unit) {
     Row(
@@ -104,11 +129,12 @@ fun MediaFace(appearance: Appearance) {
     val padding = (appearance.compactHeight - glyphSize(appearance)) / 2f
     val tile = mediaTileWidth(appearance)
     val travel = MEDIA_TILE_INSET + tile
-    val entrance = remember { Island.bubble.takeMediaEntrance() }
+    val arrival = rememberArrival(Mod.Media)
+    val entrance = remember { Island.bubble.takeMediaEntrance().let { if (arrival.isSwapped) MediaEntrance.Placed else it } }
     val entry = remember { Animatable(if (entrance == MediaEntrance.Full) 0f else 1f) }
     val pop = remember { Animatable(if (entrance == MediaEntrance.Still) 1f else 0f) }
     LaunchedEffect(Unit) { entry.animateTo(1f, tween(Durations.MORPH, easing = Curves.sweep)) }
-    LaunchedEffect(Unit) { pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) }
+    LaunchedEffect(Unit) { if (!arrival.isSwapped) pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) }
     Row(
         Modifier.fillMaxSize().padding(start = MEDIA_TILE_LEAD.dp, end = padding.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -116,7 +142,7 @@ fun MediaFace(appearance: Appearance) {
     ) {
         AnimatedContent(
             targetState = media,
-            modifier = Modifier.size(travel.dp, mediaTileHeight(appearance).dp).clipToBounds(),
+            modifier = Modifier.travelled(arrival).size(travel.dp, mediaTileHeight(appearance).dp).clipToBounds(),
             contentKey = { song -> song?.let { it.title + "|" + it.artist } },
             contentAlignment = Alignment.CenterEnd,
             transitionSpec = {
@@ -132,8 +158,8 @@ fun MediaFace(appearance: Appearance) {
             }
         }
         Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, isRising = true, modifier = Modifier.size(glyphSize(appearance).dp).graphicsLayer {
-            scaleX = pop.value
-            scaleY = pop.value
+            scaleX = if (arrival.isSwapped) arrival.pop.value else pop.value
+            scaleY = if (arrival.isSwapped) arrival.pop.value else pop.value
         })
     }
 }
@@ -173,12 +199,13 @@ fun TimerFace(appearance: Appearance) {
     val timer = Island.timer
     val now = rememberNow(1000)
     val accent = timer?.accent ?: appearance.accent
+    val arrival = rememberArrival(Mod.Timer)
     ModRow(appearance, 6.4f) {
-        TimerGlyph(timer, accent, glyphSize(appearance))
+        Box(Modifier.travelled(arrival)) { TimerGlyph(timer, accent, glyphSize(appearance)) }
         FadingLine(
             remainingText(timer, now),
             type(0.62f, if (timer?.isPaused == true) Palette.textMuted else Palette.textBright, appearance.mainFont, appearance.mainScale, spacing = 0.02f),
-            Modifier.widthIn(max = 104.dp),
+            Modifier.widthIn(max = 104.dp).popped(arrival),
         )
     }
 }
@@ -195,10 +222,12 @@ fun Avatar(call: Call?, accent: Color, diameter: Float) {
 fun CallFace(appearance: Appearance) {
     val call = Island.call
     val now = rememberNow(1000)
+    val arrival = rememberArrival(Mod.Call)
     ModRow(appearance, 6.4f) {
-        Avatar(call, call?.accent ?: appearance.accent, glyphSize(appearance))
+        Box(Modifier.travelled(arrival)) { Avatar(call, call?.accent ?: appearance.accent, glyphSize(appearance)) }
         BasicText(
             clockReading(now - (call?.since ?: now)),
+            Modifier.popped(arrival),
             style = type(0.62f, Palette.textBright, appearance.mainFont, appearance.mainScale, spacing = 0.02f),
         )
     }
@@ -227,9 +256,10 @@ fun tripRemaining(trip: Trip?, now: Long): String {
 fun TripFace(appearance: Appearance) {
     val trip = Island.trip
     val now = rememberNow(1000)
+    val arrival = rememberArrival(Mod.Trip)
     ModRow(appearance, 6.4f) {
-        TripMark(trip?.accent ?: appearance.accent, glyphSize(appearance), appearance)
-        FadingLine(tripRemaining(trip, now), type(0.62f, Palette.textBright, appearance.mainFont, appearance.mainScale), Modifier.widthIn(max = 104.dp))
+        Box(Modifier.travelled(arrival)) { TripMark(trip?.accent ?: appearance.accent, glyphSize(appearance), appearance) }
+        FadingLine(tripRemaining(trip, now), type(0.62f, Palette.textBright, appearance.mainFont, appearance.mainScale), Modifier.widthIn(max = 104.dp).popped(arrival))
     }
 }
 

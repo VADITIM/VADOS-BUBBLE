@@ -228,6 +228,9 @@ private fun faceTransition(from: Face, to: Face): ContentTransform {
     if (isHandOver && to == Face.Media && Island.bubble.mediaEntrance == MediaEntrance.Placed) {
         return ContentTransform(EnterTransition.None, fadeOut(tween(Durations.POP_OUT)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
     }
+    if (isHandOver && Island.bubble.isSwapArriving) {
+        return ContentTransform(EnterTransition.None, fadeOut(tween(Durations.POP_OUT)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
+    }
     if (isHandOver) {
         return ContentTransform(
             scaleIn(tween(Durations.POP_IN, Durations.POP_OUT, Curves.enter)) + fadeIn(tween(120, Durations.POP_OUT)),

@@ -1,6 +1,4 @@
-# 0.7.73
+# 0.7.74
 
-- The Now pill flying home from the Dashboard overshoots less.
-- When Main catches the media mod back, the artwork stands in place and only the wave pops in.
-- Closing Notifications no longer replays the media face's entrance.
-- The burst entering Notifications starts at once and squashes harder.
+- Swapping a satellite into Main slides its existing glyph (timer clock, cover, avatar, trip mark) across into place instead of rebuilding it; the elements on the right pop in from their centres.
+- Satellites are 20% smaller and have no border colour.

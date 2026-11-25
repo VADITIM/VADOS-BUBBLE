@@ -506,29 +506,24 @@ fun SatellitesView(bubble: MainBubble) {
             val width = animateFloatAsState(placement.width, follow, label = "satelliteWidth")
             val born = remember(placement.mod) { androidx.compose.animation.core.Animatable(0f) }
             androidx.compose.runtime.LaunchedEffect(placement.mod) { born.animateTo(1f, tween(380, easing = Curves.split)) }
-            val height = appearance.compactHeight
-            val accent = bubble.accentOf(placement.mod)
-            val isLive = when (placement.mod) {
-                Mod.Media -> Island.media?.isPlaying == true
-                Mod.Timer -> Island.timer?.endsAt != null
-                else -> true
-            }
+            val height = appearance.compactHeight * MainBubble.SATELLITE_SHARE
+            val lift = appearance.grab + (appearance.compactHeight - height) / 2f
             Blob(Island.liquid) {
                 val density = Island.density
                 val at = placement.birth + (x.value - placement.birth) * born.value
                 val wide = width.value
                 val left = centre + at - wide / 2f
-                val top = appearance.grab
+                val top = lift
                 BlobShape(
                     Rect(left * density, top * density, (left + wide) * density, (top + height) * density),
                     height / 2f * density,
-                    if (isLive) accent.copy(alpha = 0.6f) else Palette.border,
+                    Color.Transparent,
                     placement.opacity,
                 )
             }
             Box(
                 Modifier
-                    .offset { IntOffset(((centre + placement.birth + (x.value - placement.birth) * born.value - width.value / 2f) * Island.density).roundToInt(), (appearance.grab * Island.density).roundToInt()) }
+                    .offset { IntOffset(((centre + placement.birth + (x.value - placement.birth) * born.value - width.value / 2f) * Island.density).roundToInt(), (lift * Island.density).roundToInt()) }
                     .layout { measurable, _ ->
                         val placeable = measurable.measure(Constraints.fixed((width.value * Island.density).roundToInt().coerceAtLeast(1), (height * Island.density).roundToInt()))
                         layout(placeable.width, placeable.height) { placeable.place(0, 0) }

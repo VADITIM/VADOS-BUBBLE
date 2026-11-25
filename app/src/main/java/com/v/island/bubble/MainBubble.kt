@@ -338,7 +338,7 @@ class MainBubble {
         Mod.Torch -> null
     } ?: appearance.accent
 
-    private fun satelliteSize() = appearance.compactHeight
+    private fun satelliteSize() = appearance.compactHeight * SATELLITE_SHARE
 
     private fun modFloor(): Float {
         val glyph = appearance.compactHeight - 10f
@@ -394,7 +394,7 @@ class MainBubble {
         )
     }
 
-    private fun glyphAligned(box: RowLayout) = box.mainX - box.main / 2f + satelliteSize() / 2f
+    private fun glyphAligned(box: RowLayout) = box.mainX - box.main / 2f + appearance.compactHeight / 2f
 
     fun satellites(): List<SatellitePlacement> {
         val live = liveMods
@@ -1210,10 +1210,19 @@ class MainBubble {
         swapDirection = 1
         isDragging = false
         if (!isCommitted) return
+        val incoming = satellites().firstOrNull()
         rotate(if (isFlanked) direction else 1)
         if (!isFlanked) satelliteSide = -satelliteSide
         toClosed()
+        /* The promoted mod's face was composed afresh, so its glyph popped in at Main's edge while the satellite holding it vanished; the glyph travels over from where the satellite stood. */
+        swapArrival = incoming?.takeIf { it.mod == liveMods.firstOrNull() }?.let { it.mod to it.x - glyphAligned(layout()) }
     }
+
+    private var swapArrival: Pair<Mod, Float>? = null
+
+    val isSwapArriving: Boolean get() = swapArrival != null
+
+    fun takeSwapArrival(mod: Mod): Float? = swapArrival?.takeIf { it.first == mod }?.second.also { swapArrival = null }
 
     private fun rotate(direction: Int) {
         val live = liveMods
@@ -1278,6 +1287,7 @@ class MainBubble {
         const val SWAP_DISTANCE = 80f
         const val SWAP_PRESS = 5f
         const val FAR_PUSH = 17f
+        const val SATELLITE_SHARE = 0.8f
         const val SATELLITE_GAP = 8f
         const val SATELLITE_GAP_ASIDE = 4f
         const val CHIP_ROOM = 12f
