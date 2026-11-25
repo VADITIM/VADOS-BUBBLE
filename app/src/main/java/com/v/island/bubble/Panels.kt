@@ -368,6 +368,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                 }
                 .graphicsLayer {
                     translationX = skip.artShift() * density
+                    translationY = skip.sink.value * density
                     compositingStrategy = CompositingStrategy.Offscreen
                     clip = true
                     shape = RoundedCornerShape((tileRadius * fold.value.coerceIn(0f, 1f)).dp)
@@ -525,12 +526,16 @@ private class PlayerSwipe {
     }
 
     val pulled = Animatable(0f)
+    /* A pull that paused or played moved only the small mark, so the artwork under the finger stood still; it sinks with the pull and springs back up once the pull lands. */
+    val sink = Animatable(0f)
     var isPullArmed by mutableStateOf(false)
     var isPausing by mutableStateOf(true)
 
     fun pull(scope: CoroutineScope, downward: Float) {
         if (pulled.value == 0f && !pulled.isRunning) isPausing = Island.media?.isPlaying == true
         scope.launch { pulled.snapTo((downward / PLAYER_PULL).coerceIn(0f, 1f)) }
+        val depth = downward.coerceAtLeast(0f)
+        scope.launch { sink.snapTo(ART_SINK * depth / (depth + PLAYER_PULL)) }
         val isArmed = downward > PLAYER_PULL
         if (isArmed == isPullArmed) return
         isPullArmed = isArmed
@@ -543,11 +548,13 @@ private class PlayerSwipe {
             pulled.animateTo(PULL_FLASH, tween(120, easing = Curves.powerTwoOut))
             pulled.animateTo(0f, tween(260, easing = Curves.leave))
         }
+        scope.launch { sink.animateTo(0f, spring(dampingRatio = SINK_DAMPING, stiffness = SINK_STIFFNESS)) }
     }
 
     fun dropPull(scope: CoroutineScope) {
         isPullArmed = false
         scope.launch { pulled.animateTo(0f, tween(160, easing = Curves.leave)) }
+        scope.launch { sink.animateTo(0f, tween(160, easing = Curves.leave)) }
     }
 
     fun release(scope: CoroutineScope) {
@@ -639,6 +646,9 @@ private const val SKIP_ARROW_SIZE = 26f
 private const val SKIP_OUT = 200
 private const val SKIP_WAIT = 900L
 private const val PULL_FLASH = 1.3f
+private const val ART_SINK = 20f
+private const val SINK_DAMPING = 0.4f
+private const val SINK_STIFFNESS = 420f
 private const val PULL_MARK_SIZE = 52f
 private const val PULL_MARK_TRAVEL = 24f
 

@@ -1,3 +1,3 @@
-# 0.7.24
+# 0.7.25
 
-Opening the flashlight is staged: whatever the main pill was showing leaves first, then the pill drops to its place and bounces, and only then do the level dots pop in one by one from the middle outward, turning and growing as they arrive. Folded, the flashlight is now the main pill even while music or another activity is running, and those activities sit beside it as satellites.
+The flashlight is now an upright pill of its own at the right edge of the screen, with Off beside it on the left. It travels out of the main pill and back into it, and the main pill keeps showing your music or other activity while the flashlight is open. Only when you fold the flashlight does it take over the main pill, with the other activities beside it as satellites; turning it off puts everything back as it was. Off now flies back into the main pill as a whole, and its label disappears straight away. On the expanded player, the artwork now sinks a little as you pull down to pause or play, and springs back up when it takes effect.

@@ -55,11 +55,10 @@ fun MainBubbleView(bubble: MainBubble) {
     }
     /* A grown box collapsing on the 1.7 overshoot undershot the closed pill and slammed back, and the reach curve home still bounced too hard, so every return home rides the gentler settle curve; opening had no bounce at all on the grow curve, and the Clock's 1.7 overshoot was a little too much, so it takes a 1.5 one. */
     val easing = if (isReturning) Curves.settle else if (isClosed) Curves.bubble else Curves.open
-    val lead = if (bubble.size == Size.Torch && previous[0].isClosed) TORCH_CLEAR else 0
-    val follow = if (bubble.isDragging) snap<Float>() else tween(growth, lead, easing)
+    val follow = if (bubble.isDragging) snap<Float>() else tween(growth, easing = easing)
     val width = animateFloatAsState(target.width, follow, label = "width")
-    val height = animateFloatAsState(target.height, tween(growth, lead, easing), label = "height")
-    val top = animateFloatAsState(target.top, tween(growth, lead, if (isClosed) Curves.settle else Curves.open), label = "top")
+    val height = animateFloatAsState(target.height, tween(growth, easing = easing), label = "height")
+    val top = animateFloatAsState(target.top, tween(growth, easing = if (isClosed) Curves.settle else Curves.open), label = "top")
     val shift = animateFloatAsState(target.shift, follow, label = "shift")
     val radius = animateFloatAsState(target.radius, tween(growth, easing = FastOutSlowInEasing), label = "radius")
     val scale = animateFloatAsState(bubble.holdScale, tween(Durations.HOLD, easing = Curves.bubble), label = "hold")
@@ -85,9 +84,8 @@ fun MainBubbleView(bubble: MainBubble) {
 
     val padLeft = centre + target.shift - target.width / 2f - GRAB - BLEED
     val padWidth = target.width + (GRAB + BLEED) * 2f
-    /* The pad ran from the screen's top down to the bubble, which was harmless at the bar but would have made the whole column above the flashlight at thumb height untouchable for the app beneath. */
-    val padTop = if (bubble.size == Size.Torch) target.top - GRAB else 0f
-    val padHeight = target.top + target.height + GRAB - padTop
+    val padTop = 0f
+    val padHeight = target.top + target.height + GRAB
     SideEffect { Island.regions[Region.Main] = Rect(padLeft, padTop, padLeft + padWidth, padTop + padHeight) }
 
     Box(
@@ -166,7 +164,7 @@ fun MainBubbleView(bubble: MainBubble) {
     }
 }
 
-private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre, Size.Torch)
+private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre)
 const val LONG_GROW = 460
 /* A grown face kept its open size while it faded over the collapsing bubble; it goes in the first frames of the collapse, as .face:not(.showing) does. */
 private const val GROWN_FADE = 90
@@ -207,7 +205,6 @@ private fun FaceContent(face: Face, bubble: MainBubble, appearance: Appearance) 
         Face.TimerPanel -> TimerPanel(bubble, appearance)
         Face.TripPanel -> TripPanel(bubble, appearance)
         Face.Notifications -> NotificationsFace(bubble, appearance)
-        Face.Torch -> TorchFace(bubble)
         Face.TorchIdle -> TorchIdleFace(appearance)
     }
 }

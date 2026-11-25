@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import com.v.island.vas.Curves
 import com.v.island.vas.Durations
@@ -34,10 +35,10 @@ enum class Mode { Idle, Haptic, Alert, Extended, Torch }
 
 enum class Size(val isClosed: Boolean) {
     Idle(true), Playing(true), Timing(true), Calling(true), Travelling(true),
-    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), Torch(false), TorchIdle(true),
+    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), TorchIdle(true),
 }
 
-enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, Torch, TorchIdle }
+enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, TorchIdle }
 
 data class Frame(val width: Float, val height: Float, val radius: Float, val top: Float, val shift: Float)
 
@@ -127,12 +128,8 @@ class MainBubble {
 
     private val appearance get() = Island.appearance
 
-    /* A folded torch was its own size beside the mods and left an active Media hiding it; it is the leading mod while folded, every other mod a satellite beside it, and none while it stands open. */
-    val liveMods: List<Mod> get() = when {
-        !isTorchShown -> modOrder.filter(::isLive)
-        isTorchFolded -> listOf(Mod.Torch) + modOrder.filter(::isLive)
-        else -> emptyList()
-    }
+    /* A folded torch was its own size beside the mods and left an active Media hiding it, and an open one stopped every mod although it stands apart at the right edge; it is the leading mod only while folded, every other mod a satellite beside it. */
+    val liveMods: List<Mod> get() = if (isTorchShown && isTorchFolded) listOf(Mod.Torch) + modOrder.filter(::isLive) else modOrder.filter(::isLive)
 
     var clearedMods by mutableStateOf(emptySet<Mod>())
         private set
@@ -140,6 +137,8 @@ class MainBubble {
     fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods && !Island.now.isStolen(mod)
 
     val isTorchShown: Boolean get() = (Island.torch?.step ?: 0) > 0 && !Island.dashboard.isOpen
+
+    val isTorchOpen: Boolean get() = isTorchShown && !isTorchFolded
 
     var torchAt by mutableFloatStateOf(0f)
         private set
@@ -153,20 +152,43 @@ class MainBubble {
 
     fun torchCount(): Int = Island.torch?.let { if (it.isDimmable) it.steps else 1 } ?: 1
 
-    fun torchSliderWidth(): Float = torchCount() * TORCH_SLOT + (torchCount() - 1) * TORCH_SLOT_GAP
+    fun torchSliderLength(): Float = torchCount() * TORCH_SLOT + (torchCount() - 1) * TORCH_SLOT_GAP
 
-    fun torchFrame(): Frame {
-        val width = max(TORCH_MINIMUM_WIDTH, torchSliderWidth() + TORCH_PAD * 2f)
-        return Frame(width, TORCH_HEIGHT, TORCH_HEIGHT / 2f, Island.screenHeight * TORCH_RISE - TORCH_HEIGHT / 2f, 0f)
+    fun torchRect(): Rect {
+        val height = max(TORCH_MINIMUM_HEIGHT, torchSliderLength() + TORCH_PAD * 2f)
+        val right = Island.screenWidth - TORCH_EDGE
+        val top = Island.screenHeight * TORCH_RISE - height / 2f
+        return Rect(right - TORCH_WIDTH, top, right, top + height)
     }
 
-    private fun torchIndexAt(x: Float): Float {
-        val left = Island.screenWidth / 2f - torchSliderWidth() / 2f
-        return ((x - left - TORCH_SLOT / 2f) / (TORCH_SLOT + TORCH_SLOT_GAP)).coerceIn(0f, torchCount() - 1f)
+    fun torchOffRect(): Rect {
+        val torch = torchRect()
+        val right = torch.left - TORCH_OFF_GAP
+        val top = torch.center.y - TORCH_OFF_HEIGHT / 2f
+        return Rect(right - TORCH_OFF_WIDTH, top, right, top + TORCH_OFF_HEIGHT)
     }
 
-    private fun slideTorch(x: Float) {
-        torchAt = torchIndexAt(x)
+    fun mainRect(): Rect {
+        val box = target()
+        val left = Island.screenWidth / 2f + box.shift - box.width / 2f
+        return Rect(left, box.top, left + box.width, box.top + box.height)
+    }
+
+    private fun torchIndexAt(y: Float): Float {
+        val bottom = torchRect().center.y + torchSliderLength() / 2f
+        return ((bottom - y - TORCH_SLOT / 2f) / (TORCH_SLOT + TORCH_SLOT_GAP)).coerceIn(0f, torchCount() - 1f)
+    }
+
+    fun startTorchSlide(y: Float) {
+        if (!isTorchOpen || torchCount() < 2) return
+        isTorchSliding = true
+        torchTicked = torchAt.roundToInt()
+        slideTorch(y)
+    }
+
+    fun slideTorch(y: Float) {
+        if (!isTorchSliding) return
+        torchAt = torchIndexAt(y)
         val nearest = torchAt.roundToInt()
         if (nearest == torchTicked) return
         torchTicked = nearest
@@ -200,7 +222,7 @@ class MainBubble {
         Island.actions.setTorch(wanted)
     }
 
-    private fun finishTorchSlide() {
+    fun finishTorchSlide() {
         if (!isTorchSliding) return
         isTorchSliding = false
         val index = torchAt.roundToInt()
@@ -371,7 +393,6 @@ class MainBubble {
             Size.TimerPanel -> Frame(GROWN_WIDTH, 132f, 26f, grown, 0f)
             Size.TripPanel -> Frame(GROWN_WIDTH, 232f, 26f, grown, 0f)
             Size.Notifications -> Frame(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
-            Size.Torch -> torchFrame()
         }
     }
 
@@ -496,7 +517,7 @@ class MainBubble {
 
     fun onModsChanged() {
         readTorch()
-        if (isTorchShown != (mode == Mode.Torch)) {
+        if ((isTorchShown && isTorchFolded) != (mode == Mode.Torch)) {
             toClosed()
             return
         }
@@ -517,17 +538,9 @@ class MainBubble {
         notice = null
         notificationsDrop = 0f
         if ((Island.torch?.step ?: 0) == 0) isTorchFolded = false
-        if (isTorchShown) {
-            mode = Mode.Torch
-            readTorch()
-        }
-        if (isTorchShown && !isTorchFolded) {
-            accent = appearance.accent
-            size = Size.Torch
-            face = Face.Torch
-            return
-        }
+        readTorch()
         val owner = liveMods.firstOrNull()
+        if (owner == Mod.Torch) mode = Mode.Torch
         accent = owner?.let(::accentOf) ?: appearance.accent
         size = closedSizeOf(owner)
         face = closedFaceOf(owner)
@@ -736,7 +749,7 @@ class MainBubble {
     }
 
     fun onOutsideTap() {
-        if (mode == Mode.Torch && !isTorchFolded) {
+        if (isTorchOpen) {
             foldTorch(true)
             closedOutsideAt = SystemClock.uptimeMillis()
         }
@@ -809,10 +822,6 @@ class MainBubble {
         if (mode == Mode.Torch) {
             torchSwipeBase = Island.torch?.step ?: 1
             torchSwipeLevel = torchSwipeBase
-            if (isTorchFolded || torchCount() < 2) return
-            isTorchSliding = true
-            torchTicked = torchAt.roundToInt()
-            slideTorch(x)
             return
         }
         if (closedInTouch) return
@@ -866,7 +875,6 @@ class MainBubble {
     }
 
     fun onReleasedOnControl() {
-        finishTorchSlide()
         isAlertTouch = false
         releaseSwap()
         endHold()
@@ -881,7 +889,7 @@ class MainBubble {
 
     fun onMove(x: Float, y: Float) {
         if (mode == Mode.Torch) {
-            if (isTorchFolded) swipeTorch(x, y) else if (isTorchSliding) slideTorch(x)
+            swipeTorch(x, y)
             return
         }
         if (isAlertTouch) {
@@ -953,8 +961,7 @@ class MainBubble {
 
     fun onUp() {
         if (mode == Mode.Torch) {
-            if (!isTorchFolded) finishTorchSlide()
-            else if (!hasMoved && !Island.wasCancelled) {
+            if (!hasMoved && !Island.wasCancelled) {
                 Haptics.play(Haptic.Expand)
                 foldTorch(false)
             }
@@ -1156,9 +1163,11 @@ class MainBubble {
         const val TORCH_SLOT = 48f
         const val TORCH_SLOT_GAP = 16f
         const val TORCH_PAD = 16f
-        const val TORCH_HEIGHT = TORCH_SLOT + TORCH_PAD * 2f
-        const val TORCH_MINIMUM_WIDTH = 190f
-        const val TORCH_RISE = 0.72f
+        /* The flashlight lay across the middle of the screen over the mods it stopped; it stands upright at the right edge, the thumb's side, beside whatever Main is doing. */
+        const val TORCH_WIDTH = TORCH_SLOT + TORCH_PAD * 2f
+        const val TORCH_MINIMUM_HEIGHT = 190f
+        const val TORCH_RISE = 0.6f
+        const val TORCH_EDGE = 14f
         const val TORCH_OFF_WIDTH = 96f
         const val TORCH_OFF_HEIGHT = 46f
         const val TORCH_OFF_GAP = 14f
