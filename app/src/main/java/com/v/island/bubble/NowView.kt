@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.v.island.vas.Curves
+import androidx.compose.ui.graphics.Color
 import com.v.island.vas.Durations
 import com.v.island.vas.Faces
 import com.v.island.vas.Palette
@@ -130,6 +131,7 @@ fun NowView(now: NowBubble) {
                 else -> RestNow(now, media, appearance, isOpen = true)
             }
         }
+        SwipeMarkOverlay(now)
         if (now.ballShare > ART_GONE && media.art != null) {
             Image(
                 media.art, null,
@@ -147,6 +149,39 @@ fun NowView(now: NowBubble) {
 }
 
 private const val ART_GONE = 0.6f
+
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.SwipeMarkOverlay(now: NowBubble) {
+    val shown = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(now.markGeneration) {
+        if (now.markGeneration == 0) return@LaunchedEffect
+        shown.snapTo(0f)
+        shown.animateTo(1f, tween(MARK_IN, easing = Curves.grow))
+        shown.animateTo(0f, tween(MARK_OUT, MARK_HOLD, Curves.leave))
+    }
+    if (shown.value <= 0f) return
+    val mark = now.swipeMark
+    val side = if (mark == SwipeMark.Next) 1 else -1
+    Box(Modifier.matchParentSize().graphicsLayer { alpha = shown.value }.background(Color.Black.copy(alpha = MARK_SCRIM)))
+    androidx.compose.foundation.Canvas(
+        Modifier.align(Alignment.Center).size(MARK_SIZE.dp).graphicsLayer {
+            alpha = shown.value
+            scaleX = 0.6f + 0.4f * shown.value
+            scaleY = scaleX
+            if (mark == SwipeMark.Next || mark == SwipeMark.Previous) translationX = (shown.value - 1f) * side * MARK_TRAVEL * density
+            else translationY = (shown.value - 1f) * MARK_TRAVEL * density
+        },
+    ) {
+        if (mark == SwipeMark.Next || mark == SwipeMark.Previous) drawSkipArrow(side) else drawPlayPause(mark == SwipeMark.Pause)
+    }
+}
+
+private const val MARK_IN = 140
+private const val MARK_HOLD = 260
+private const val MARK_OUT = 220
+private const val MARK_SCRIM = 0.45f
+private const val MARK_SIZE = 26f
+private const val MARK_TRAVEL = 16f
 
 private fun Modifier.layoutAt(rect: () -> Rect): Modifier = this.then(
     Modifier.layout { measurable, _ ->

@@ -598,6 +598,11 @@ private fun PlayPauseMark(skip: PlayerSwipe, modifier: Modifier) {
         },
     ) {
         drawCircle(Color.Black.copy(alpha = 0.45f))
+        drawPlayPause(isPausing)
+    }
+}
+
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPlayPause(isPausing: Boolean) {
         val unit = size.minDimension
         if (isPausing) {
             val bar = androidx.compose.ui.geometry.Size(unit * 0.12f, unit * 0.4f)
@@ -614,7 +619,6 @@ private fun PlayPauseMark(skip: PlayerSwipe, modifier: Modifier) {
             }
             drawPath(path, Color.White)
         }
-    }
 }
 
 @Composable
@@ -625,7 +629,10 @@ private fun SkipArrow(skip: PlayerSwipe, modifier: Modifier) {
             translationX = skip.arrowShift() * density
             alpha = skip.arrow.value.coerceIn(0f, 1f)
         },
-    ) {
+    ) { drawSkipArrow(side) }
+}
+
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSkipArrow(side: Int) {
         val width = 2.4.dp.toPx()
         val middle = size.height / 2f
         val tip = if (side > 0) size.width * 0.85f else size.width * 0.15f
@@ -634,7 +641,6 @@ private fun SkipArrow(skip: PlayerSwipe, modifier: Modifier) {
         drawLine(Color.White, Offset(tail, middle), Offset(tip, middle), width, StrokeCap.Round)
         drawLine(Color.White, Offset(tip - head, middle - size.height * 0.3f), Offset(tip, middle), width, StrokeCap.Round)
         drawLine(Color.White, Offset(tip - head, middle + size.height * 0.3f), Offset(tip, middle), width, StrokeCap.Round)
-    }
 }
 
 private const val PLAYER_HOLD_OFF = 17f

@@ -340,6 +340,16 @@ class NowBubble {
         poseScale = frame.scale
     }
 
+    var swipeMark by mutableStateOf(SwipeMark.Next)
+        private set
+    var markGeneration by mutableIntStateOf(0)
+        private set
+
+    private fun flashMark(mark: SwipeMark) {
+        swipeMark = mark
+        markGeneration += 1
+    }
+
     fun hold() {
         Haptics.play(Haptic.Expand)
         Island.media?.packageName?.takeIf { it.isNotEmpty() }?.let(Island.actions::openApp)
@@ -350,6 +360,7 @@ class NowBubble {
         if (kotlin.math.abs(across) > SWIPE && kotlin.math.abs(across) > kotlin.math.abs(down)) {
             Haptics.play(Haptic.Expand)
             Island.actions.mediaControl(if (across > 0f) "previous" else "next")
+            flashMark(if (across > 0f) SwipeMark.Previous else SwipeMark.Next)
             return true
         }
         if (kotlin.math.abs(down) > SWIPE && kotlin.math.abs(down) > kotlin.math.abs(across)) {
@@ -357,6 +368,7 @@ class NowBubble {
             val isBig = if (isInPanel) isExpanded else isLockOpen
             if ((isBig || isInPanel) && down > 0f) {
                 Haptics.play(Haptic.Expand)
+                flashMark(if (Island.media?.isPlaying == true) SwipeMark.Pause else SwipeMark.Play)
                 Island.actions.mediaControl(if (Island.media?.isPlaying == true) "pause" else "play")
                 return true
             }
@@ -396,3 +408,5 @@ class NowBubble {
         const val CATCH_ENTERED = 0.8f
     }
 }
+
+enum class SwipeMark { Next, Previous, Play, Pause }

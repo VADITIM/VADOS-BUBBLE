@@ -1,3 +1,3 @@
-# 0.7.71
+# 0.7.72
 
-- Main stays hidden while the Now pill flies home from the Dashboard, so the drop becomes Main instead of meeting a second pill.
+- Now pill swipes flash the player's skip arrow or play-pause mark over a dark scrim inside the pill.
