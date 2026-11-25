@@ -1,3 +1,3 @@
-# 0.7.54
+# 0.7.55
 
-Connector and toggle buttons keep their spin when you leave the Dashboard instead of snapping back to their original rotation. When a button changes its icon, the icon now pops briefly rather than shrinking away. A new setting, Clock and status size without pills, sets how large their text and icons are when the pill backgrounds are off, and the battery is bigger in that mode.
+With the clock and status pill backgrounds off, the fade behind the status bar is now always black and a little stronger, and their text and icons are always white, so they stay readable over white pages. The Bluetooth charge ring in the status pill now shows as soon as a headset is connected instead of waiting for its battery level to change.

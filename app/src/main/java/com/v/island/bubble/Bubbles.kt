@@ -198,7 +198,7 @@ fun ClockView(clock: ClockBubble) {
 /* The time and the corner were two faces cross-faded by AnimatedContent, so opening the Dashboard rebuilt the whole reading; the hours and minutes are the same at both sizes, and only the seconds change form and the date arrives, as handOverClock in js/clock.js did. */
 @Composable
 private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
-    val ink = sideInk(isBarePill())
+    val ink = Color.White
     val clockScale = appearance.clockScale * bareGrow()
     val isCornered = clock.isCornered
     val now = rememberNow(1000)
@@ -383,7 +383,7 @@ fun StatusView(status: StatusBubble) {
 private fun StatusSlotView(slot: StatusSlot, appearance: Appearance, isAway: Boolean, order: Int) {
     if (slot is StatusSlot.Reading) {
         // The reading was inked white regardless of the bar, so it vanished over a light page while the bodies were off.
-        AwayText(slot.text, type(0.56f, sideInk(isBarePill()), appearance.statusFont, appearance.statusScale * bareGrow(), weight = FontWeight.Bold), isAway, order)
+        AwayText(slot.text, type(0.56f, Color.White, appearance.statusFont, appearance.statusScale * bareGrow(), weight = FontWeight.Bold), isAway, order)
         return
     }
     Box(Modifier.popAway(isAway, order)) { StatusSlotContent(slot, appearance) }
@@ -391,7 +391,7 @@ private fun StatusSlotView(slot: StatusSlot, appearance: Appearance, isAway: Boo
 
 @Composable
 private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
-    val ink = sideInk(isBarePill())
+    val ink = Color.White
     val glyph = (appearance.compactHeight - 13f) * bareGrow()
     val modGlyph = (appearance.compactHeight - 8f) * bareGrow()
     when (slot) {
@@ -458,7 +458,6 @@ private fun bareGrow() = if (isBarePill()) Island.appearance.bareScale else 1f
 
 private const val BARE_BATTERY = 1.2f
 
-private fun sideInk(isBare: Boolean) = if (isBare && Island.isBarLight) Color.Black else Color.White
 
 @Composable
 private fun BoxScope.BatteryReading(charge: Charge, isBare: Boolean, tall: Float, appearance: Appearance, colour: Color, fill: () -> Float, isOverFill: Boolean) {

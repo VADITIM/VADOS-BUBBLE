@@ -318,6 +318,9 @@ object ConnectivityWatch {
                 runCatching { adapter.closeProfileProxy(profile, proxy) }
                 devices.forEach { device ->
                     runCatching { device.name }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { found.add(it) }
+                    // The charge only arrived on the headset's own level-changed broadcast, so a headset connected before the service started showed no ring until its level moved; the device is asked directly.
+                    val charge = runCatching { device.javaClass.getMethod("getBatteryLevel").invoke(device) as Int }.getOrDefault(-1)
+                    if (charge in 0..100) pairedCharge = charge
                 }
                 pairedNames.clear()
                 pairedNames.addAll(found)
