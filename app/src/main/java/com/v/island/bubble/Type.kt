@@ -324,9 +324,6 @@ private const val SCRAMBLE_SETTLED = -1_000_000_000L
 
 fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))
 
-/* The player and the Now bubble typed at the menu's 6ms a character, so a title was finished before the face had faded in and read as no animation at all; media labels type at TYPE_MILLIS in the retired js/mods/media.js. */
-const val MEDIA_TYPE_CHARACTER = 60f
-
 private const val TYPE_CHARACTER = 6f
 private const val TYPE_BUDGET = 400f
 
