@@ -1,3 +1,3 @@
-# 0.7.68
+# 0.7.69
 
-- battery and stats pills slide in from past the screen top over 620ms starting at 88% scale.
+- battery and stats pills enter over 480ms from 70% scale.
