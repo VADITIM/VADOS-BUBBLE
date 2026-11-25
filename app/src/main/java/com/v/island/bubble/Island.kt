@@ -48,6 +48,8 @@ object Island {
     private val main = Handler(Looper.getMainLooper())
 
     var appearance by mutableStateOf(Appearance())
+
+    val isPlayerOpen: Boolean get() = bubble.size == Size.Player
     var screenWidth by mutableStateOf(360f)
     var screenHeight by mutableStateOf(780f)
     var density = 3f

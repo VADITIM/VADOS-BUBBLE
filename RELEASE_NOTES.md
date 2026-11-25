@@ -1,3 +1,3 @@
-# 0.7.8
+# 0.7.9
 
-The closed Main pill is narrower: the gap kept around the camera fits the S25's actual cutout, and the Media artwork tile is less wide.
+The expanded player is 30% shorter and rises over the Clock and Status bubbles, which shrink into it while it is open. Media now uses the accent colour you set instead of the app's own colour.

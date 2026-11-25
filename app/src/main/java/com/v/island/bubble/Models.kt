@@ -35,7 +35,6 @@ data class Notice(
 @Immutable
 data class Media(
     val app: String,
-    val accent: Color,
     val packageName: String,
     val title: String,
     val artist: String,
@@ -44,7 +43,10 @@ data class Media(
     val position: Long,
     val art: ImageBitmap?,
     val receivedAt: Long,
-)
+) {
+    /* The media accent was the playing app's brand colour, so Spotify's green coloured the visualizer and the artist whatever accent was set; it follows the set accent now. */
+    val accent: Color get() = Island.appearance.accent
+}
 
 @Immutable
 data class Timer(
@@ -221,7 +223,6 @@ object Payloads {
     fun media(json: JSONObject?) = json?.let {
         Media(
             app = it.optString("app"),
-            accent = it.accent(),
             packageName = it.optString("package"),
             title = it.optString("title"),
             artist = it.optString("artist"),

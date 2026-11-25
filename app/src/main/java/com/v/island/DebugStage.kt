@@ -277,7 +277,6 @@ object DebugStage {
         val style = AppStyles.byKey("spotify") ?: AppStyles.generic
         return JSONObject()
             .put("app", style.key)
-            .put("accent", style.accent)
             .put("package", style.packageName)
             .put("title", "Staged Song")
             .put("artist", "Debug Stage")

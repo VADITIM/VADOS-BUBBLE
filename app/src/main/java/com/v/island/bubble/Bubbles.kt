@@ -79,6 +79,8 @@ private fun FloatingBubble(
     onUp: (Boolean) -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val isEaten = Island.isPlayerOpen
+    val eaten = animateFloatAsState(if (isEaten) 0f else 1f, tween(Durations.GROW, easing = Curves.sweep), label = "eaten")
     val width = animateFloatAsState(target.width, tween(Durations.GROW, easing = Curves.bubble), label = "width")
     val height = animateFloatAsState(target.height, tween(Durations.GROW, easing = Curves.bubble), label = "height")
     val left = animateFloatAsState(target.shift, tween(Durations.GROW, easing = Curves.split), label = "left")
@@ -89,22 +91,22 @@ private fun FloatingBubble(
     Blob(Island.liquid) {
         val density = Island.density
         val offset = drag()
-        val wide = width.value * grown.value
-        val tall = height.value * grown.value
+        val wide = width.value * grown.value * eaten.value
+        val tall = height.value * grown.value * eaten.value
         val x = left.value + (width.value - wide) / 2f + offset.x
         val y = top.value + (height.value - tall) / 2f + offset.y
-        BlobShape(Rect(x * density, y * density, (x + wide) * density, (y + tall) * density), radius.value * grown.value * density, border)
+        BlobShape(Rect(x * density, y * density, (x + wide) * density, (y + tall) * density), radius.value * grown.value * eaten.value * density, border)
     }
 
     val padLeft = target.shift - GRACE
     val padWidth = target.width + GRACE * 2f
     val padHeight = target.top + target.height + GRAB
-    SideEffect { Island.regions[region] = Rect(padLeft, 0f, padLeft + padWidth, padHeight) }
+    SideEffect { if (isEaten) Island.regions.remove(region) else Island.regions[region] = Rect(padLeft, 0f, padLeft + padWidth, padHeight) }
 
     Box(
         Modifier
             .offset { IntOffset((padLeft * Island.density).roundToInt(), 0) }
-            .size(padWidth.dp, padHeight.dp)
+            .size(if (isEaten) 0.dp else padWidth.dp, if (isEaten) 0.dp else padHeight.dp)
             .pointerInput(region) { followTouch(padLeft, onDown, onMove, onUp) },
     ) {
         Box(
@@ -121,8 +123,8 @@ private fun FloatingBubble(
                 }
                 .graphicsLayer {
                     val offset = drag()
-                    scaleX = grown.value
-                    scaleY = grown.value
+                    scaleX = grown.value * eaten.value
+                    scaleY = grown.value * eaten.value
                     transformOrigin = TransformOrigin.Center
                     translationX = offset.x * Island.density
                     translationY = offset.y * Island.density

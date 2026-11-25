@@ -287,7 +287,7 @@ class MainBubble {
                 Frame(ALERT_WIDTH, tall, CENTRE_RADIUS, grown + (Island.screenHeight - tall) / 2f - Island.screenHeight * CENTRE_LIFT, 0f)
             }
             Size.Picture -> Frame(GROWN_WIDTH, pictureHeight, 26f, grown, 0f)
-            Size.Player -> Frame(GROWN_WIDTH, 304f, 34f, grown, 0f)
+            Size.Player -> Frame(GROWN_WIDTH, PLAYER_HEIGHT, 34f, grab, 0f)
             Size.TimerPanel -> Frame(GROWN_WIDTH, 132f, 26f, grown, 0f)
             Size.TripPanel -> Frame(GROWN_WIDTH, 232f, 26f, grown, 0f)
             Size.Notifications -> Frame(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
@@ -972,6 +972,8 @@ class MainBubble {
         /* Mirrors --edge-over in the retired pill.css: how far past the screen's top edge the closed bubble rises while the Dashboard stands open. */
         const val EDGE_OVER = 20f
         const val GROWN_WIDTH = 340f
+        /* The player stood under the Clock and Status row at 304 tall and pushed most of the screen down; it is 30% shorter and rises into that row, swallowing both bubbles while it is open. */
+        const val PLAYER_HEIGHT = 213f
         const val ALERT_WIDTH = 300f
         const val ALERT_HEIGHT = 155f
         const val ALERT_IMAGE_HEIGHT = 190f

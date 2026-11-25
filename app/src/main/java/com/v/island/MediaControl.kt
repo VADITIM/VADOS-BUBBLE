@@ -285,7 +285,6 @@ object MediaControl {
         if (art === ART_PENDING) return
         val payload = JSONObject()
             .put("app", AppStyles.of(current.packageName).key)
-            .put("accent", AppStyles.of(current.packageName).accent)
             .put("package", current.packageName)
             .put("title", title)
             .put("artist", artist)
