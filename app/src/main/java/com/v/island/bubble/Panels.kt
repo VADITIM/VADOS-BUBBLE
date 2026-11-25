@@ -127,9 +127,9 @@ fun AlertFace(bubble: MainBubble, appearance: Appearance) {
     val isEdged = bubble.size == Size.Alert
     Box(
         Modifier.fillMaxSize().padding(
-            start = if (isEdged) ((Island.screenWidth - MainBubble.ALERT_WIDTH) / 2f).dp else 0.dp,
-            end = if (isEdged) ((Island.screenWidth - MainBubble.ALERT_WIDTH) / 2f).dp else 0.dp,
-            top = if (isEdged) appearance.grab.dp else 0.dp,
+            start = if (isEdged) ((Island.screenWidth - MainBubble.ALERT_WIDTH) / 2f + MainBubble.ALERT_OVERHANG).dp else 0.dp,
+            end = if (isEdged) ((Island.screenWidth - MainBubble.ALERT_WIDTH) / 2f + MainBubble.ALERT_OVERHANG).dp else 0.dp,
+            top = if (isEdged) (appearance.grab + MainBubble.ALERT_OVERHANG).dp else 0.dp,
         ),
         contentAlignment = Alignment.Center,
     ) {

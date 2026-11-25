@@ -1,3 +1,3 @@
-# 0.7.46
+# 0.7.47
 
-Fixed the crash when the bubbles started (the clock pill failed to lay out).
+For testing, an Alert's pill now runs past the top and side edges of the screen, so its border no longer shows along them; its content stays where it was.

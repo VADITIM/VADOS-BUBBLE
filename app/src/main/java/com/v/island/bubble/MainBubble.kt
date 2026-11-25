@@ -443,7 +443,8 @@ class MainBubble {
                 val box = layout()
                 Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
             }
-            Size.Alert -> Frame(Island.screenWidth, alertHeight() + grab, 24f, 0f, 0f)
+            // Stopping at the screen edges left the rounded border showing along them; the glass runs past the edges so only its bottom corners are seen.
+            Size.Alert -> Frame(Island.screenWidth + ALERT_OVERHANG * 2f, alertHeight() + grab + ALERT_OVERHANG, 24f, -ALERT_OVERHANG, 0f)
             Size.Image -> Frame(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grab, 0f)
             Size.AlertCentre -> {
                 val tall = alertHeight()
@@ -1224,6 +1225,7 @@ class MainBubble {
         /* The player stood under the Clock and Status row at 304 tall and pushed most of the screen down; it is 30% shorter and rises into that row, swallowing both bubbles while it is open. */
         const val PLAYER_HEIGHT = 213f
         const val ALERT_WIDTH = 300f
+        const val ALERT_OVERHANG = 40f
         const val ALERT_HEIGHT = 155f
         const val ALERT_IMAGE_HEIGHT = 190f
         const val ALERT_LINES = 4
