@@ -776,6 +776,8 @@ class MainBubble {
         if (hasHeld || closedInTouch) return
         if (!size.isClosed || mode == Mode.Extended) {
             grantHoldWander()
+            /* A swipe on the player to skip, pause or close still let the hold run out and opened the app; a panel touch that travels is a gesture, never a hold. */
+            if (panelMod() != null && hypot(x - startX, y - startY) > HOLD_BLOCK) endHold()
             if (size == Size.Notifications && isInScrollBand(startX)) {
                 hasMoved = true
                 endHold()

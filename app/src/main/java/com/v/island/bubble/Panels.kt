@@ -361,7 +361,8 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
             TypedText(media.artist.uppercase(), type(0.8f, media.accent, appearance.mainFont, appearance.mainScale, spacing = 0.1f, lineHeight = 1.25f), Durations.CONTENT_DROP + 120, maxLines = 1, interval = MEDIA_TYPE_CHARACTER)
         }
         Box(
-            Modifier.align(Alignment.BottomCenter).padding(bottom = (52f - band / 2f).dp).fillMaxWidth().height(band.dp)
+            /* The shorter player left the grown scrub band taller than twice its 52 rest, so its bottom padding went negative and dragging the timeline crashed the app; the band is moved by an offset, which may go below the edge. */
+            Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, ((band / 2f - 52f) * density).roundToInt()) }.fillMaxWidth().height(band.dp)
                 .pointerInput(media.duration) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
