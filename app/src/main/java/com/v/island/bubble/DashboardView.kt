@@ -353,7 +353,11 @@ fun DashboardPanel(dashboard: Dashboard) {
     val nowTall = animateFloatAsState(if (now.isInPanel && Island.media != null) now.restHeight else 0f, tween(NowBubble.GROW, easing = Curves.bubble), label = "nowTall")
     val geometry = PanelGeometry(screenWidth, screenHeight, nowTall.value)
     SideEffect { dashboard.nowBottom = geometry.top + geometry.knobTop - NowBubble.PANEL_GAP }
-    if (!isOpen && !dashboard.isLeaving) return
+    var hasOpened by remember { mutableStateOf(false) }
+    if (isOpen) hasOpened = true
+    // Every open built the whole panel from nothing on the main thread, so the first frames of the open ran 30 to 90 ms; it now stays composed and hidden after the first open.
+    if (!hasOpened) return
+    val isHidden = !isOpen && !dashboard.isLeaving
     val appearance = Island.appearance
     val paired = Island.connectivity?.paired
     val pairedCount = paired?.names?.size ?: 0
@@ -367,7 +371,7 @@ fun DashboardPanel(dashboard: Dashboard) {
             dashboard.pairedTurn += 1
         }
     }
-    Box(Modifier.fillMaxSize().then(if (isOpen) Modifier.pointerInput(dashboard) { ground(dashboard) } else Modifier)) {
+    Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (isHidden) 0f else 1f }.then(if (isOpen) Modifier.pointerInput(dashboard) { ground(dashboard) } else Modifier)) {
         Box(
             Modifier
                 .offset { IntOffset((geometry.left * Island.density).roundToInt(), (geometry.top * Island.density).roundToInt()) }
