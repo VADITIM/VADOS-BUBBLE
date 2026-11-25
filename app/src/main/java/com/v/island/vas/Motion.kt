@@ -10,6 +10,7 @@ object Curves {
     val grow: Easing = CubicBezierEasing(0.22f, 1.12f, 0.36f, 1f)
     val bubble: Easing = CubicBezierEasing(0.2f, 1.7f, 0.35f, 1f)
     val reach: Easing = CubicBezierEasing(0.2f, 1.24f, 0.35f, 1f)
+    val settle: Easing = CubicBezierEasing(0.2f, 1.1f, 0.35f, 1f)
     val sling: Easing = CubicBezierEasing(0.1f, 1.45f, 0.3f, 1f)
     val split: Easing = CubicBezierEasing(0.2f, 1.7f, 0.35f, 1f)
     val powerTwoOut: Easing = CubicBezierEasing(0.5f, 1f, 0.89f, 1f)

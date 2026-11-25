@@ -300,7 +300,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
     val band by animateFloatAsState(if (bubble.isScrubbing) 110f else 52f, tween(220, easing = Curves.grow), label = "band")
     val isFolding = bubble.face == Face.Media
     val fold = remember { Animatable(1f) }
-    LaunchedEffect(isFolding) { fold.animateTo(if (isFolding) 1f else 0f, tween(LONG_GROW, easing = if (isFolding) Curves.reach else Curves.grow)) }
+    LaunchedEffect(isFolding) { fold.animateTo(if (isFolding) 1f else 0f, tween(LONG_GROW, easing = if (isFolding) Curves.settle else Curves.bubble)) }
     val closedWidth = bubble.layout().main
     val closedHeight = appearance.compactHeight
     val density = Island.density
@@ -382,7 +382,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
         ) {
             if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
-        val isWaveMoving = isFolding || fold.value > 0f
+        val isWaveMoving = isFolding || fold.value > 0f || fold.isRunning
         if (isWaveMoving) {
             FoldingWave(media, if (isFolding) 1f else ratio, ratio, { fold.value }, Modifier.foldInto({ fold.value }, { width, height ->
                 Rect(WAVE_SIDE * density, height - (WAVE_REST_BAND * 1.5f) * density, width - WAVE_SIDE * density, height - (WAVE_REST_BAND / 2f) * density)
