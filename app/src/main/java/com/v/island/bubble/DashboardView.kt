@@ -1055,9 +1055,10 @@ private fun Ring(reading: String, isSearching: Boolean, colour: Color, appearanc
         arrive.snapTo(0f)
         arrive.animateTo(1f, tween(RING_POP_SPREAD + RING_POP_IN, easing = LinearEasing))
     }
-    val transition = rememberInfiniteTransition(label = "ring")
-    val spin = transition.animateFloat(0f, 360f, infiniteRepeatable(tween(RING_SPIN, easing = LinearEasing)), label = "spin")
-    val hop = transition.animateFloat(0f, DOT_HOP.toFloat(), infiniteRepeatable(tween(DOT_HOP, easing = LinearEasing)), label = "hop")
+    // The panel stays composed while hidden, so an always-running spin drew 120 frames a second with the Dashboard closed.
+    val isRunning = Island.dashboard.isOpen || Island.dashboard.isLeaving
+    val spin = if (isRunning) rememberInfiniteTransition(label = "ring").animateFloat(0f, 360f, infiniteRepeatable(tween(RING_SPIN, easing = LinearEasing)), label = "spin") else remember { mutableStateOf(0f) }
+    val hop = if (isRunning) rememberInfiniteTransition(label = "hop").animateFloat(0f, DOT_HOP.toFloat(), infiniteRepeatable(tween(DOT_HOP, easing = LinearEasing)), label = "hop") else remember { mutableStateOf(0f) }
     val style = TextStyle(color = colour, fontFamily = Faces.mono, fontSize = (9f * appearance.connectorsScale).sp)
     Canvas(modifier) {
         val unit = size.minDimension / (RING_CENTER * 2f)
