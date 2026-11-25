@@ -202,6 +202,8 @@ class NowBubble {
         applyFrame(frames.first())
         launchFlight {
             run(milliseconds) { applyFrame(Sling.at(frames, it), drift(to.center, from.center) * (1f - it)) }
+            /* Taps were refused until the labels finished typing although the pill had already landed; it is at rest from the moment the flight ends. */
+            phase = NowPhase.Rest
             coroutineScope {
                 launch {
                     run(opening, Sling.POP_EASE) {
@@ -219,7 +221,6 @@ class NowBubble {
                     areLabelsShown = true
                 }
             }
-            phase = NowPhase.Rest
         }
     }
 

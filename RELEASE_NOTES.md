@@ -1,3 +1,3 @@
-# 0.7.69
+# 0.7.70
 
-- battery and stats pills enter over 480ms from 70% scale.
+- Now pill tappable as soon as it lands; connectors and sliders raised by 5% of the screen height; the expanded Now pill centres between the sliders and the toggles instead of pushing the toggles off-screen.

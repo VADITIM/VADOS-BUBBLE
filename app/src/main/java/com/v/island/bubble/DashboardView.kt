@@ -115,19 +115,20 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     val lift = max(0f, (band - Dashboard.KNOB_SIZE) / 2f)
     val firstDivider = statsTall + Dashboard.GAP + DIVIDER_SHIFT
     val systemTop = firstDivider + 1f + DIVIDER_ROOM + Dashboard.GAP
-    val knobPush = max(0f, nowTall - NowBubble.COMPACT_HEIGHT)
-    val knobTop = if (isWide) height - Dashboard.KNOB_SIZE - WIDE_KNOB_LIFT else height - lift * KNOB_LIFT_SHARE - Dashboard.KNOB_SIZE + knobPush
+    val raise = SYSTEM_RAISE + screenHeight * SYSTEM_RAISE_SHARE
+    val knobTop = if (isWide) height - Dashboard.KNOB_SIZE - WIDE_KNOB_LIFT else height - lift * KNOB_LIFT_SHARE - Dashboard.KNOB_SIZE
     /* Mirrors html.lock-live in pill.css: with the Now bubble standing over the toggles the lower divider sits a gap above it, so the room over the bubble and under it are one measurement. */
-    val secondDivider = if (nowTall > 0f) min(height - band - Dashboard.GAP - DIVIDER_SHIFT, knobTop - knobPush - NowBubble.PANEL_GAP * 2f - min(nowTall, NowBubble.COMPACT_HEIGHT)) - 1f
+    val secondDivider = if (nowTall > 0f) min(height - band - Dashboard.GAP - DIVIDER_SHIFT, knobTop - NowBubble.PANEL_GAP * 2f - min(nowTall, NowBubble.COMPACT_HEIGHT)) - 1f
     else height - band - Dashboard.GAP - DIVIDER_SHIFT - 1f
     val systemBottom = secondDivider - DIVIDER_ROOM - Dashboard.GAP
     val systemTall = systemBottom - systemTop
-    val gridTop = if (isWide) (height - GRID_TALL) / 2f else systemTop + (systemTall - GRID_TALL) / 2f - SYSTEM_RAISE
+    val gridTop = if (isWide) (height - GRID_TALL) / 2f else systemTop + (systemTall - GRID_TALL) / 2f - raise
     val gridRow = (GRID_TALL - Dashboard.GAP * 2f) / 3f
     val vitalsCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP + VITALS_TALL / 2f
     val transferCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP * 2f + VITALS_TALL + TRANSFER_TALL / 2f
-    val levelsCentre = if (isWide) height / 2f else systemTop + systemTall / 2f - SYSTEM_RAISE
-    val nowRest = if (isWide || knobPush > 0f) knobTop - NowBubble.PANEL_GAP else (levelsCentre + LEVELS_TALL / 2f + knobTop + NowBubble.COMPACT_HEIGHT) / 2f
+    val levelsCentre = if (isWide) height / 2f else systemTop + systemTall / 2f - raise
+    /* The expanded Now pill pushed the toggles down by its extra height, off the foot of the screen; it grows into the room between the sliders and the toggles instead. */
+    val nowRest = if (isWide) knobTop - NowBubble.PANEL_GAP else min(knobTop - NowBubble.PANEL_GAP, (levelsCentre + LEVELS_TALL / 2f + knobTop + max(nowTall, NowBubble.COMPACT_HEIGHT)) / 2f)
 
     fun modeCentre(row: Int) = gridTop + row * (gridRow + Dashboard.GAP) + gridRow / 2f
 }
@@ -1522,6 +1523,7 @@ private const val SOLO_SWELL_STEP = 16L
 private const val STATS_SHARE = 0.27f
 private const val TOGGLE_SHARE = 0.275f
 private const val SYSTEM_RAISE = 4f
+private const val SYSTEM_RAISE_SHARE = 0.05f
 private const val STATS_DROP = 4f
 private const val STATS_INSET = 10f
 private const val WEATHER_TALL = 17.6f
