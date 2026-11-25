@@ -78,12 +78,15 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
     val slide = remember { Animatable(0f) }
     val arrival = remember { Animatable(0f) }
     val iconPop = remember { Animatable(0f) }
+    val backing = remember { Animatable(0f) }
     var isPressing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         delay(delayMilliseconds.toLong())
         launch { delay(ICON_POP_AFTER); iconPop.animateTo(1f, tween(360, easing = Curves.split)) }
         arrival.animateTo(1f, tween(191, easing = ROW_ARRIVE))
+        delay(BACKING_AFTER)
+        backing.animateTo(1f, tween(BACKING_FADE))
     }
     Row(
         Modifier.fillMaxWidth()
@@ -94,7 +97,7 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
                 translationY = (1f - arrival.value) * 10f * density
             }
             .clip(RoundedCornerShape(22.dp))
-            .background(Palette.textBright.copy(alpha = if (isPressing) 0.11f else 0.05f))
+            .background(Palette.textBright.copy(alpha = (if (isPressing) 0.11f else 0.05f) * backing.value))
             .pointerInput(group.id) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -208,6 +211,8 @@ private const val ROW_STAGGER_LIMIT = 10
 private const val BODY_TYPE_AFTER = 174
 private const val SWIPE_SLOP = 10f
 private const val ICON_POP_AFTER = 60L
+private const val BACKING_AFTER = 260L
+private const val BACKING_FADE = 320
 private const val ICON_POP_TILT = -26f
 private const val SWIPE_DISMISS = 90f
 private const val SWIPE_AWAY = 400f

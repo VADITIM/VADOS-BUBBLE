@@ -1,3 +1,3 @@
-# 0.7.35
+# 0.7.36
 
-Notifications start sliding in, one after another, once the menu has grown 70% of the way, instead of waiting until it has nearly landed. The system notifications pill is taller, so its corners match the menu above it rather than being fully round.
+Each notification's background in the menu now fades in shortly after its row has slid into place, instead of arriving with it.
