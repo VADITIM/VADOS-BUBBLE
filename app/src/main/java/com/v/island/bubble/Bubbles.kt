@@ -260,9 +260,12 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                     }
                 }
             }
-            AnimatedVisibility(isCornered && secondsForm, enter = EnterTransition.None, exit = fadeOut(tween(DATE_FADE))) {
-                Box(Modifier.padding(top = DATE_TOP.dp).widthIn(max = DATE_WIDE.dp).clipToBounds().graphicsLayer { alpha = 0.75f }) {
-                    PopText(date, dateStyle, 0, Modifier.wrapContentWidth(Alignment.Start, unbounded = true))
+            // A hidden AnimatedVisibility lays out no child at all, so the layout found two children instead of three and crashed; the date stands in a Box that is always there.
+            Box {
+                AnimatedVisibility(isCornered && secondsForm, enter = EnterTransition.None, exit = fadeOut(tween(DATE_FADE))) {
+                    Box(Modifier.padding(top = DATE_TOP.dp).widthIn(max = DATE_WIDE.dp).clipToBounds().graphicsLayer { alpha = 0.75f }) {
+                        PopText(date, dateStyle, 0, Modifier.wrapContentWidth(Alignment.Start, unbounded = true))
+                    }
                 }
             }
         },

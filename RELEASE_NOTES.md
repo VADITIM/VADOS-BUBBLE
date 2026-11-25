@@ -1,3 +1,3 @@
-# 0.7.45
+# 0.7.46
 
-For testing, an Alert's pill now reaches the top and both sides of the screen; its content stays exactly where it was. The messaging bubble and its separate app launcher icon are gone.
+Fixed the crash when the bubbles started (the clock pill failed to lay out).
