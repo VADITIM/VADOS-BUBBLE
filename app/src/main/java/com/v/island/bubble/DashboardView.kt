@@ -1120,9 +1120,7 @@ private fun levelFrame(name: String, isCall: Boolean, held: String?): LevelFrame
     val half = LEVELS_WIDE / 2f + KNOB_GAP / 2f
     if (held != null) {
         val inset = LEVELS_WIDE * 0.1f
-        // A held bar during a call took the whole column's height, so the media bar under the finger stretched to the top while it was dragged and its fill ran away from the finger; it keeps its own height and only widens.
-        val own = levelFrame(name, isCall, null)
-        return if (held == "brightness") LevelFrame(0f, 0f, inset, 0f) else LevelFrame(inset, if (name == "brightness") 0f else own.top, 0f, if (name == "brightness") 0f else own.bottom)
+        return if (held == "brightness") LevelFrame(0f, 0f, inset, 0f) else LevelFrame(inset, 0f, 0f, 0f)
     }
     return when (name) {
         "brightness" -> LevelFrame(0f, 0f, half, 0f)
@@ -1201,8 +1199,9 @@ private fun Level(
                     dashboard.isControlTouch = true
                     dashboard.isLevelTouch = true
                     isHolding = true
-                    val tall = size.height.toFloat()
-                    val from = down.position.y
+                    // The held bar grows to the full column while dragged, so its local touch point slid with its moving top and the fill ran away from the finger; the touch is read against the column and the full height.
+                    val tall = LEVELS_TALL * density
+                    val from = down.position.y + top() * density
                     val start = dashboard.levelShare(name)
                     var sent = Dashboard.valueAt(name, start).roundToInt()
                     var isDraggingNow = false
@@ -1214,7 +1213,7 @@ private fun Level(
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) break
-                        val travelled = from - change.position.y
+                        val travelled = from - (change.position.y + top() * density)
                         if (!isDraggingNow) {
                             if (abs(travelled) / density < LEVEL_SLOP) continue
                             isDraggingNow = true
