@@ -97,7 +97,7 @@ fun mediaTileHeight(appearance: Appearance) = appearance.compactHeight - 2f * ME
 
 fun mediaTileWidth(appearance: Appearance) = mediaTileHeight(appearance) * MEDIA_TILE_RATIO
 
-/* The closed Media face was a round thumbnail, so nothing showed whose song it was; the artwork is a wide tile, padded from the pill by the same distance on every side and rounded concentric with it, and a new song pushes the old tile out past the left edge while the new one follows in. */
+/* The wide tile stretched the artwork and faded its left edge into the pill; it is a circle now, padded from the pill by the same distance on every side, and a new song still pushes the old one out past the left edge. */
 @Composable
 fun MediaFace(appearance: Appearance) {
     val media = Island.media
@@ -115,7 +115,7 @@ fun MediaFace(appearance: Appearance) {
     ) {
         AnimatedContent(
             targetState = media,
-            modifier = Modifier.size(travel.dp, mediaTileHeight(appearance).dp).clipToBounds().fadeStart(MEDIA_TILE_INSET.dp),
+            modifier = Modifier.size(travel.dp, mediaTileHeight(appearance).dp).clipToBounds(),
             contentKey = { song -> song?.let { it.title + "|" + it.artist } },
             contentAlignment = Alignment.CenterEnd,
             transitionSpec = {
@@ -125,7 +125,7 @@ fun MediaFace(appearance: Appearance) {
             },
             label = "mediaTile",
         ) { song ->
-            Box(Modifier.graphicsLayer { translationX = -(1f - entry.value) * travel * Island.density }.size(tile.dp, mediaTileHeight(appearance).dp).clip(RoundedCornerShape((appearance.compactHeight / 2f - MEDIA_TILE_INSET).dp)).background(Palette.sunken)) {
+            Box(Modifier.graphicsLayer { translationX = -(1f - entry.value) * travel * Island.density }.size(tile.dp, mediaTileHeight(appearance).dp).clip(CircleShape).background(Palette.sunken)) {
                 val art = song?.art
                 if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
@@ -233,7 +233,7 @@ fun TripFace(appearance: Appearance) {
 }
 
 const val SWEEP_CYCLE = 12_000L
-const val MEDIA_TILE_RATIO = 1.5f
+const val MEDIA_TILE_RATIO = 1f
 const val MEDIA_TILE_INSET = 3f
 /* The artwork sat as close to the pill's left edge as to its top and bottom and looked pressed against the curve. */
 const val MEDIA_TILE_LEAD = 5f

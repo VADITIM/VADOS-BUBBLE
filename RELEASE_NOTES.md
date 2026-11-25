@@ -1,3 +1,3 @@
-# 0.7.61
+# 0.7.62
 
-In the Dashboard, the Bluetooth charge ring now sits inside the button, just under the text that runs around it, like an underline.
+While music plays, the artwork in the main pill is now a circle instead of a wide stretched tile, and its left edge no longer fades out.
