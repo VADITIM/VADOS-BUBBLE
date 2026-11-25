@@ -1,3 +1,3 @@
-# 0.7.12
+# 0.7.13
 
-Dragging the player's timeline no longer crashes the app, and swiping on the player to skip, pause, play or close no longer opens the music app with a buzz; only a still hold does.
+Pulling the expanded player down now shows the pause or play mark over the artwork: it slides down with your finger, ticks once it would act, and flashes as you let go.
