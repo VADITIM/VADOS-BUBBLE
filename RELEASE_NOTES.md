@@ -1,3 +1,3 @@
-# 0.7.47
+# 0.7.48
 
-For testing, an Alert's pill now runs past the top and side edges of the screen, so its border no longer shows along them; its content stays where it was.
+Opening the notifications menu while something is playing, timing or calling leaves that pill where it is: it wobbles and the menu shoots out of it. Scrolling the notifications menu now drifts on after you let go, also when you let go over a notification.

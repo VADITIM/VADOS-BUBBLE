@@ -433,10 +433,17 @@ class MainBubble {
         return frame.copy(top = -EDGE_OVER, height = appearance.compactHeight + EDGE_OVER)
     }
 
-    private fun frame(): Frame {
+    // Opening the menu over a live mod grew the mod's own pill into it, so the mod vanished while the menu was open; the mod keeps a pill where it stood and the menu shoots out of it.
+    val stayMod: Mod? get() = if (size == Size.Notifications) liveMods.firstOrNull() else null
+
+    fun stayFrame(mod: Mod) = frame(closedSizeOf(mod))
+
+    fun stayFace(mod: Mod) = closedFaceOf(mod)
+
+    private fun frame(of: Size = size): Frame {
         val grab = appearance.grab
         val grown = grab + GROWN_PAD
-        return when (size) {
+        return when (of) {
             Size.Idle -> if (isLent) Frame(lentSide(), lentSide(), lentSide() / 2f, grab + (appearance.compactHeight - lentSide()) / 2f, 0f)
             else Frame(appearance.compactWidth, appearance.compactHeight, appearance.compactHeight / 2f, grab, layout().mainX)
             Size.Playing, Size.Timing, Size.Calling, Size.Travelling, Size.TorchIdle -> {
@@ -951,6 +958,8 @@ class MainBubble {
     }
 
     fun onReleasedOnControl() {
+        // A scroll let go over a row ended on the row's tap and never reached the fling, so the list stopped dead under the finger; it drifts on here too.
+        driftNotifications()
         isAlertTouch = false
         releaseSwap()
         endHold()
@@ -1085,7 +1094,7 @@ class MainBubble {
         }
         endHold()
         untoy()
-        if (scrollMode == ScrollMode.Along && size == Size.Notifications) flingNotifications(if (SystemClock.uptimeMillis() - lastScrollAt > FLING_STALE) 0f else scrollSpeed)
+        driftNotifications()
         if (hasMoved || hasHeld || closedInTouch) return
         tap()
     }
@@ -1123,12 +1132,18 @@ class MainBubble {
         }
     }
 
+    private fun driftNotifications() {
+        if (scrollMode != ScrollMode.Along || size != Size.Notifications) return
+        flingNotifications(if (SystemClock.uptimeMillis() - lastScrollAt > FLING_STALE) 0f else scrollSpeed)
+        scrollMode = ScrollMode.Undecided
+    }
+
     private fun flingNotifications(speed: Float) {
         if (abs(speed) < FLING_FLOOR) return
         flingJob = Island.scope.launch {
             notificationsScroll.scroll {
                 var last = 0f
-                AnimationState(0f, speed).animateDecay(exponentialDecay()) {
+                AnimationState(0f, speed).animateDecay(exponentialDecay(FLING_FRICTION)) {
                     val step = value - last
                     last = value
                     if (abs(scrollBy(step) - step) > 0.5f) cancelAnimation()
@@ -1273,8 +1288,9 @@ class MainBubble {
         const val CLEAR_STAGGER = 35L
         const val CLEAR_FLIGHT = 240L
         private const val SCROLL_SLOP = 8f
-        private const val FLING_FLOOR = 300f
-        private const val FLING_STALE = 80L
+        private const val FLING_FLOOR = 150f
+        private const val FLING_STALE = 120L
+        private const val FLING_FRICTION = 0.6f
         const val SYSTEM_FOOT = 28f
         const val OUTSIDE_LATCH = 120L
         const val DRAG_COMMIT = 10f

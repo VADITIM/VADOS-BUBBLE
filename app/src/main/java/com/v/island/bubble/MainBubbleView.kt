@@ -4,7 +4,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -21,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -70,6 +74,7 @@ fun MainBubbleView(bubble: MainBubble) {
         label = "rise",
     )
     val centre = Island.screenWidth / 2f
+    StayPill(bubble, centre)
 
     Blob(Island.liquid) {
         val density = Island.density
@@ -167,6 +172,47 @@ fun MainBubbleView(bubble: MainBubble) {
         }
     }
 }
+
+@Composable
+private fun StayPill(bubble: MainBubble, centre: Float) {
+    val mod = bubble.stayMod
+    val kept = remember { arrayOfNulls<Mod>(1) }
+    if (mod != null) kept[0] = mod
+    val shown = kept[0] ?: return
+    val wobble = remember { Animatable(1f) }
+    val presence = animateFloatAsState(if (mod != null) 1f else 0f, if (mod != null) snap() else tween(0, Durations.COLLAPSE), label = "stay")
+    LaunchedEffect(mod != null) {
+        if (mod == null) return@LaunchedEffect
+        wobble.snapTo(1f)
+        wobble.animateTo(STAY_SQUASH, tween(STAY_SQUASH_TIME, easing = Curves.leave))
+        wobble.animateTo(1f, spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMedium))
+    }
+    if (presence.value <= 0f) return
+    val frame = bubble.stayFrame(shown)
+    val density = Island.density
+    Blob(Island.liquid) {
+        val wide = frame.width * wobble.value
+        val tall = frame.height * (2f - wobble.value)
+        val left = centre + frame.shift - wide / 2f
+        val upper = frame.top + (frame.height - tall) / 2f
+        BlobShape(Rect(left * density, upper * density, (left + wide) * density, (upper + tall) * density), tall / 2f * density, bubble.border(), presence.value)
+    }
+    Box(
+        Modifier
+            .offset { IntOffset(((centre + frame.shift - frame.width / 2f) * density).roundToInt(), (frame.top * density).roundToInt()) }
+            .size(frame.width.dp, frame.height.dp)
+            .graphicsLayer {
+                scaleX = wobble.value
+                scaleY = 2f - wobble.value
+                alpha = presence.value
+                clip = true
+                shape = androidx.compose.foundation.shape.RoundedCornerShape((frame.height / 2f).dp)
+            },
+    ) { FaceContent(bubble.stayFace(shown), bubble, Island.appearance) }
+}
+
+private const val STAY_SQUASH = 1.12f
+private const val STAY_SQUASH_TIME = 110
 
 private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre)
 const val LONG_GROW = 460
