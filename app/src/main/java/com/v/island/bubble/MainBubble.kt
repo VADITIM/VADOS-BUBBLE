@@ -1003,8 +1003,9 @@ class MainBubble {
         const val SATELLITE_GAP = 8f
         const val SATELLITE_GAP_ASIDE = 4f
         const val CHIP_ROOM = 12f
-        const val HOLE_WIDTH = 34f
-        const val HOLE_GAP = 40f
+        /* The hole was reserved at 34 wide and the glyphs kept 40 apart around it, so a closed pill spent a third of its width on air; the S25's cutout spec is 19.3dp wide (dumpsys display), and the glyphs now clear it by about 3dp a side. */
+        const val HOLE_WIDTH = 20f
+        const val HOLE_GAP = 26f
         const val DOT_SIZE = 6f
         const val DOT_GAP = 5f
         const val GONE_GRACE = 900L

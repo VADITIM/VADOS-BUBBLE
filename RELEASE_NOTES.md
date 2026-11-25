@@ -1,3 +1,3 @@
-# 0.7.7
+# 0.7.8
 
-The closed Media bubble keeps its visualizer on the right. Its artwork tile is padded evenly and rounded to match the bubble, and when the song changes the old artwork slides out to the left as the new one slides in.
+The closed Main pill is narrower: the gap kept around the camera fits the S25's actual cutout, and the Media artwork tile is less wide.

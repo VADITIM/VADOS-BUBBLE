@@ -219,7 +219,7 @@ fun TripFace(appearance: Appearance) {
 }
 
 const val SWEEP_CYCLE = 12_000L
-const val MEDIA_TILE_RATIO = 1.8f
+const val MEDIA_TILE_RATIO = 1.5f
 const val EQUALIZER_BARS = 5
 const val WAVE_BARS = 54
 private const val WAVE_BEAT = 480f
