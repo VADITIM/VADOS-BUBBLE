@@ -1,3 +1,3 @@
-# 0.7.58
+# 0.7.59
 
-The Bluetooth charge ring in the status pill is smaller, while the Bluetooth icon inside keeps its larger size.
+In the Dashboard, the Bluetooth button now shows the headset charge as a coloured ring around its icon instead of a number beside it.

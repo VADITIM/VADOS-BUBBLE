@@ -1005,16 +1005,20 @@ private fun ModeButton(dashboard: Dashboard, name: String, centre: Float, geomet
         )
         val paired = Island.connectivity?.paired
         if (name == "bluetooth" && paired != null && paired.names.size == 1 && paired.charge >= 0) {
-            BasicText(
-                paired.charge.toString(),
-                Modifier.align(Alignment.CenterStart).offset(x = (GRID_COLUMN / 2f - GRID_ICON / 2f + 13f).dp),
-                style = TextStyle(
-                    color = if (paired.charge <= BATTERY_CRITICAL) PAIRED_CRITICAL else Color.White,
-                    fontFamily = Faces.mono,
-                    fontSize = (8f * appearance.connectorsScale).sp,
-                    lineHeight = (8f * appearance.connectorsScale).sp,
-                ),
-            )
+            val charge = paired.charge
+            Canvas(Modifier.size(GRID_ICON.dp).graphicsLayer {
+                rotationZ = turn.rotation
+                val grown = 0.55f + 0.45f * turn.growth
+                scaleX = grown
+                scaleY = grown
+            }) {
+                val width = 2.dp.toPx()
+                val ring = androidx.compose.ui.geometry.Size(size.width - width, size.height - width)
+                val corner = Offset(width / 2f, width / 2f)
+                val colour = StatusBubble.levelColour(charge)
+                drawArc(colour.copy(alpha = 0.22f), 0f, 360f, false, corner, ring, style = Stroke(width))
+                drawArc(colour, -90f, 360f * charge.coerceIn(0, 100) / 100f, false, corner, ring, style = Stroke(width, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            }
         }
     }
 }
@@ -1494,7 +1498,6 @@ private const val VITAL_DROP = 10f
 private const val STATUS_ACTION_DELAY = 120
 private val DOWNLOAD_COLOUR = Color(0xFFF09B3A)
 private val UPLOAD_COLOUR = Color(0xFF3A8CFF)
-private val PAIRED_CRITICAL = Color(0xFFB33A3A)
 private val MIC_OFF = Color(0xFFFF3B30)
 private val RECORD_RED = Color(0xFFE5342B)
 private val POWER_RED = Color(0xFFE5342B)
