@@ -201,7 +201,7 @@ class NowBubble {
         areLabelsShown = false
         applyFrame(frames.first())
         launchFlight {
-            run(milliseconds) { applyFrame(Sling.at(frames, it)) }
+            run(milliseconds) { applyFrame(Sling.at(frames, it), drift(to.center, from.center) * (1f - it)) }
             coroutineScope {
                 launch {
                     run(opening, Sling.POP_EASE) {
@@ -252,7 +252,7 @@ class NowBubble {
                     launch { dropReadings((shot.milliseconds * Sling.THROW_CIRCLE).toInt()) }
                     run(shot.milliseconds) {
                         val frame = Sling.at(frames, it)
-                        applyFrame(frame)
+                        applyFrame(frame, drift(from.center, to.center) * it)
                         ballShare = closing(it)
                         entering(frame, from.width + (ball - from.width) * closing(it))
                     }
@@ -276,7 +276,7 @@ class NowBubble {
                 val frames = Sling.frames(backOffset, hold, offset, Sling.DRAW_SQUEEZE, drop, Sling.between(Sling.SHOT_OVER) * LEAVE_OVER_SHARE, reach, room = room) { ball to ball }
                 run(Sling.between(Sling.SHOT_MILLISECONDS).toInt()) {
                     val frame = Sling.at(frames, it)
-                    applyFrame(frame)
+                    applyFrame(frame, drift(from.center, to.center) * it)
                     entering(frame, ball)
                 }
             }
@@ -329,9 +329,12 @@ class NowBubble {
         timelineShown = 1f
     }
 
-    private fun applyFrame(frame: Sling.Frame) {
-        poseX = frame.x
-        poseY = frame.y
+    /* A flight was aimed at the rest and Main boxes as they stood at launch, so the Dashboard settling or Main moving mid-flight left the drop landing beside them; the pose follows both while it flies. */
+    private fun drift(launchRest: Offset, launchMain: Offset): Offset = (launchRest - rest().center) + (mainRect().center - launchMain)
+
+    private fun applyFrame(frame: Sling.Frame, shift: Offset = Offset.Zero) {
+        poseX = frame.x + shift.x
+        poseY = frame.y + shift.y
         poseScale = frame.scale
     }
 

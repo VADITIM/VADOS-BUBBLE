@@ -68,7 +68,7 @@ fun NowView(now: NowBubble) {
     val width = animateFloatAsState(now.restWidth, if (isStanding) tween(NowBubble.GROW, easing = Curves.split) else snap<Float>(), label = "nowWidth")
     val height = animateFloatAsState(now.restHeight, if (isStanding) tween(NowBubble.GROW, easing = Curves.bubble) else snap<Float>(), label = "nowHeight")
     val radius = animateFloatAsState(now.restRadius, if (isStanding) tween(NowBubble.GROW) else snap<Float>(), label = "nowRadius")
-    val bottom = animateFloatAsState(now.restBottom, if (isStanding && !now.isInPanel) tween(NowBubble.GROW, easing = Curves.grow) else snap<Float>(), label = "nowBottom")
+    val bottom = animateFloatAsState(now.restBottom, if (isStanding) tween(NowBubble.GROW, easing = Curves.grow) else snap<Float>(), label = "nowBottom")
     val press = animateFloatAsState(if (now.isPressing) 1.03f else 1f, tween(320, easing = Curves.split), label = "nowPress")
 
     val isTouchable = (now.phase == NowPhase.Rest || now.phase == NowPhase.Arriving) && Island.media != null
@@ -113,7 +113,13 @@ fun NowView(now: NowBubble) {
             }
             .pointerInput(now) { followNow(now) },
     ) {
-        Box(Modifier.wrapContentSize(unbounded = true).requiredSize(width.value.dp, height.value.dp).graphicsLayer {
+        /* Reading the growing size in composition recomposed the whole face every frame of an expand, which is what stuttered; the size is read at layout only. */
+        Box(Modifier.layout { measurable, _ ->
+            val wide = (width.value * Island.density).roundToInt()
+            val tall = (height.value * Island.density).roundToInt()
+            val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(wide, tall))
+            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+        }.graphicsLayer {
             val scale = now.poseScale * press.value
             scaleX = scale
             scaleY = scale
@@ -177,8 +183,8 @@ private fun Labels(now: NowBubble, media: Media, titleSize: Float, artistSize: F
     Column(Modifier.fillMaxWidth()) {
         if (now.areLabelsShown) {
             key(now.labelsGeneration, media.title, media.artist) {
-                TypedText(media.title, titleStyle, 0, Modifier.fillMaxWidth(), isLine = true, interval = MEDIA_TYPE_CHARACTER)
-                TypedText(media.artist.uppercase(), artistStyle, 120, Modifier.fillMaxWidth().padding(top = artistGap.dp), isLine = true, interval = MEDIA_TYPE_CHARACTER)
+                ScrambleText(media.title, titleStyle, 0, Modifier.fillMaxWidth(), if (isCentred) Alignment.CenterHorizontally else Alignment.Start)
+                ScrambleText(media.artist.uppercase(), artistStyle, 120, Modifier.fillMaxWidth().padding(top = artistGap.dp), if (isCentred) Alignment.CenterHorizontally else Alignment.Start)
             }
         } else {
             BasicText(" ", style = titleStyle)
@@ -197,7 +203,7 @@ private fun CompactNow(now: NowBubble, media: Media) {
         Art(media, Modifier.size(26.dp), 8f)
         Box(Modifier.weight(1f).sprig { now.metaShown }) {
             if (now.areLabelsShown) key(now.labelsGeneration, media.title) {
-                TypedText(media.title, type(0.74f, Palette.textBright, Faces.mono), 0, Modifier.fillMaxWidth(), isLine = true, interval = MEDIA_TYPE_CHARACTER)
+                ScrambleText(media.title, type(0.74f, Palette.textBright, Faces.mono), 0, Modifier.fillMaxWidth())
             }
         }
     }

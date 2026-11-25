@@ -1,3 +1,3 @@
-# 0.7.65
+# 0.7.66
 
-- the compact Now pill in the Dashboard sits centred between the sliders and the toggles.
+- Now pill flights follow the rest and Main boxes while flying, the panel pill eases between rests, expanding no longer recomposes every frame, and its labels symbol-type.

@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -261,7 +262,7 @@ private const val AWAY_OUT = 90
 private const val AWAY_STAGGER = 8
 
 @Composable
-fun ScrambleText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier) {
+fun ScrambleText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier, alignment: Alignment.Horizontal = Alignment.Start) {
     var previous by remember { androidx.compose.runtime.mutableStateOf("") }
     val starts = remember { androidx.compose.runtime.mutableStateListOf<Long>() }
     var now by remember { mutableLongStateOf(0L) }
@@ -283,7 +284,7 @@ fun ScrambleText(text: String, style: TextStyle, delayMilliseconds: Int, modifie
     }
     val hidden = style.copy(color = Color.Transparent)
     Box((if (lineWidth > roomWidth) modifier.fadeEnd() else modifier).clipToBounds().onSizeChanged { roomWidth = it.width }) {
-        androidx.compose.foundation.layout.Row(Modifier.wrapContentWidth(Alignment.Start, unbounded = true).onSizeChanged { lineWidth = it.width }) {
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().wrapContentWidth(if (lineWidth > roomWidth) Alignment.Start else alignment, unbounded = true).onSizeChanged { lineWidth = it.width }) {
             text.forEachIndexed { index, actual ->
                 val local = (now - (starts.getOrNull(index) ?: Long.MAX_VALUE)).toFloat() / SCRAMBLE_SPIN
                 Box {
