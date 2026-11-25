@@ -19,7 +19,7 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 
-enum class NowMod { Torch, Recording }
+enum class NowMod { Recording }
 
 @Stable
 class ClockBubble {
@@ -37,11 +37,7 @@ class ClockBubble {
     private var downY = 0f
 
     val owner: NowMod?
-        get() = when {
-            (Island.torch?.step ?: 0) > 0 -> NowMod.Torch
-            Island.recording != null -> NowMod.Recording
-            else -> null
-        }
+        get() = if (Island.recording != null) NowMod.Recording else null
 
     val isNowStanding: Boolean get() = owner != null
 
@@ -49,7 +45,7 @@ class ClockBubble {
 
     val isCornered: Boolean get() = Island.dashboard.isOpen
 
-    val isOpen: Boolean get() = !isCornered && (owner == NowMod.Torch || (owner == NowMod.Recording && isRecordingOpen))
+    val isOpen: Boolean get() = !isCornered && owner == NowMod.Recording && isRecordingOpen
 
     fun target(): Frame {
         val appearance = Island.appearance
@@ -62,7 +58,6 @@ class ClockBubble {
         }
         val width = when (owner) {
             NowMod.Recording -> RECORDING_WIDTH
-            NowMod.Torch -> TORCH_WIDTH
             null -> timeWidth
         }
         return Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, CLOCK_LEFT)
@@ -123,11 +118,6 @@ class ClockBubble {
         }
     }
 
-    fun setTorchStep(step: Int) {
-        Haptics.play(Haptic.Tap)
-        Island.actions.setTorch(step)
-    }
-
     fun stopRecording() {
         val action = Island.recording?.actions?.lastOrNull() ?: return
         Haptics.play(Haptic.Tap)
@@ -141,9 +131,6 @@ class ClockBubble {
         const val NOW_PANEL_WIDTH = 300f
         const val NOW_PANEL_HEIGHT = 190f
         const val RECORDING_WIDTH = 112f
-        const val TORCH_WIDTH = 116f
-        const val NOW_SLOT = 40f
-        const val NOW_SLOT_GAP = 14f
         private const val HOLD_BLOCK = 18f
         private const val DRAG_RADIUS = 40f
     }

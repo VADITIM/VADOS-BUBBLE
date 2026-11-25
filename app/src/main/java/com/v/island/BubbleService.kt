@@ -338,7 +338,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, canvasParams)
-        proxies = listOf(Region.Shield, Region.Dashboard, Region.Now, Region.Clear, Region.Main, Region.Status, Region.Clock, Region.Alert).associateWith { Proxy(it) }
+        proxies = listOf(Region.Shield, Region.Dashboard, Region.Now, Region.Clear, Region.Torch, Region.Main, Region.Status, Region.Clock, Region.Alert).associateWith { Proxy(it) }
         proxies.values.forEach { windowManager.addView(it.view, it.params) }
         applyBarLock()
         instance = this

@@ -30,14 +30,14 @@ import kotlin.math.sin
 
 enum class Mod { Timer, Media, Call, Trip }
 
-enum class Mode { Idle, Haptic, Alert, Extended }
+enum class Mode { Idle, Haptic, Alert, Extended, Torch }
 
 enum class Size(val isClosed: Boolean) {
     Idle(true), Playing(true), Timing(true), Calling(true), Travelling(true),
-    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false),
+    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), Torch(false),
 }
 
-enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications }
+enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, Torch }
 
 data class Frame(val width: Float, val height: Float, val radius: Float, val top: Float, val shift: Float)
 
@@ -132,7 +132,49 @@ class MainBubble {
     var clearedMods by mutableStateOf(emptySet<Mod>())
         private set
 
-    fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods && !Island.now.isStolen(mod)
+    fun isLive(mod: Mod): Boolean = isPresent(mod) && mod !in clearedMods && !Island.now.isStolen(mod) && !isTorchShown
+
+    val isTorchShown: Boolean get() = (Island.torch?.step ?: 0) > 0 && !Island.dashboard.isOpen
+
+    var torchAt by mutableFloatStateOf(0f)
+        private set
+    var isTorchSliding by mutableStateOf(false)
+        private set
+    private var torchTicked = 0
+
+    fun torchCount(): Int = Island.torch?.let { if (it.isDimmable) it.steps else 1 } ?: 1
+
+    fun torchSliderWidth(): Float = torchCount() * TORCH_SLOT + (torchCount() - 1) * TORCH_SLOT_GAP
+
+    fun torchFrame(): Frame {
+        val width = max(TORCH_MINIMUM_WIDTH, torchSliderWidth() + TORCH_PAD * 2f)
+        return Frame(width, TORCH_HEIGHT, TORCH_HEIGHT / 2f, Island.screenHeight * TORCH_RISE - TORCH_HEIGHT / 2f, 0f)
+    }
+
+    private fun torchIndexAt(x: Float): Float {
+        val left = Island.screenWidth / 2f - torchSliderWidth() / 2f
+        return ((x - left - TORCH_SLOT / 2f) / (TORCH_SLOT + TORCH_SLOT_GAP)).coerceIn(0f, torchCount() - 1f)
+    }
+
+    private fun slideTorch(x: Float) {
+        torchAt = torchIndexAt(x)
+        val nearest = torchAt.roundToInt()
+        if (nearest == torchTicked) return
+        torchTicked = nearest
+        Haptics.play(Haptic.Tap)
+    }
+
+    private fun finishTorchSlide() {
+        if (!isTorchSliding) return
+        isTorchSliding = false
+        val index = torchAt.roundToInt()
+        torchAt = index.toFloat()
+        if (index + 1 != Island.torch?.step) Island.actions.setTorch(index + 1)
+    }
+
+    private fun readTorch() {
+        if (!isTorchSliding) torchAt = ((Island.torch?.step ?: 1) - 1).coerceAtLeast(0).toFloat()
+    }
 
     val hasPresentMods: Boolean get() = modOrder.any(::isPresent)
 
@@ -291,6 +333,7 @@ class MainBubble {
             Size.TimerPanel -> Frame(GROWN_WIDTH, 132f, 26f, grown, 0f)
             Size.TripPanel -> Frame(GROWN_WIDTH, 232f, 26f, grown, 0f)
             Size.Notifications -> Frame(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
+            Size.Torch -> torchFrame()
         }
     }
 
@@ -412,6 +455,11 @@ class MainBubble {
     }
 
     fun onModsChanged() {
+        readTorch()
+        if (isTorchShown != (mode == Mode.Torch)) {
+            toClosed()
+            return
+        }
         clearedMods = clearedMods.filter(::isPresent).toSet()
         if (mode == Mode.Idle) toClosed()
         if (size == Size.TimerPanel && Island.timer == null) toClosed()
@@ -428,6 +476,14 @@ class MainBubble {
         mode = Mode.Idle
         notice = null
         notificationsDrop = 0f
+        if (isTorchShown) {
+            mode = Mode.Torch
+            accent = appearance.accent
+            size = Size.Torch
+            face = Face.Torch
+            readTorch()
+            return
+        }
         val owner = liveMods.firstOrNull()
         accent = owner?.let(::accentOf) ?: appearance.accent
         size = closedSizeOf(owner)
@@ -445,7 +501,7 @@ class MainBubble {
     }
 
     fun onNotice(next: Notice, isDark: Boolean = false) {
-        if (Island.isLandscape) return
+        if (Island.isLandscape || mode == Mode.Torch) return
         dwellJob?.cancel()
         goneJob?.cancel()
         val hasImage = next.picture != null
@@ -703,6 +759,13 @@ class MainBubble {
         pullDrop = 0f
         gate = DragGate()
         heldStep = null
+        if (mode == Mode.Torch) {
+            if (torchCount() < 2) return
+            isTorchSliding = true
+            torchTicked = torchAt.roundToInt()
+            slideTorch(x)
+            return
+        }
         if (closedInTouch) return
         /* The bubble itself answers an Alert the way its band does, as alertOwnsTouch in bridge.js claimed mainHolds: a pull down on the card focuses it instead of only an upward swipe being heard. */
         isAlertTouch = mode == Mode.Alert
@@ -754,6 +817,7 @@ class MainBubble {
     }
 
     fun onReleasedOnControl() {
+        finishTorchSlide()
         isAlertTouch = false
         releaseSwap()
         endHold()
@@ -767,6 +831,10 @@ class MainBubble {
     }
 
     fun onMove(x: Float, y: Float) {
+        if (mode == Mode.Torch) {
+            if (isTorchSliding) slideTorch(x)
+            return
+        }
         if (isAlertTouch) {
             lastX = x
             lastY = y
@@ -835,6 +903,10 @@ class MainBubble {
     }
 
     fun onUp() {
+        if (mode == Mode.Torch) {
+            finishTorchSlide()
+            return
+        }
         if (isAlertTouch) {
             isAlertTouch = false
             onAlertUp(lastX, lastY)
@@ -1026,5 +1098,16 @@ class MainBubble {
         const val OUTSIDE_LATCH = 120L
         const val DRAG_COMMIT = 10f
         const val DRAG_WINDOW = 110L
+        /* Mirrors NOW_SLOT and NOW_SLOT_GAP in js/now.js. */
+        const val TORCH_SLOT = 40f
+        const val TORCH_SLOT_GAP = 14f
+        /* The flashlight stood at the top in the Clock's 190-tall panel, out of the thumb's reach; it is a pill around its level row just below the screen's middle. */
+        const val TORCH_PAD = 14f
+        const val TORCH_HEIGHT = TORCH_SLOT + TORCH_PAD * 2f
+        const val TORCH_MINIMUM_WIDTH = 160f
+        const val TORCH_RISE = 0.6f
+        const val TORCH_OFF_WIDTH = 84f
+        const val TORCH_OFF_HEIGHT = 40f
+        const val TORCH_OFF_GAP = 12f
     }
 }

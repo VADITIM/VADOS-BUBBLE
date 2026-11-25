@@ -84,18 +84,20 @@ fun MainBubbleView(bubble: MainBubble) {
 
     val padLeft = centre + target.shift - target.width / 2f - GRAB - BLEED
     val padWidth = target.width + (GRAB + BLEED) * 2f
-    val padHeight = target.top + target.height + GRAB
-    SideEffect { Island.regions[Region.Main] = Rect(padLeft, 0f, padLeft + padWidth, padHeight) }
+    /* The pad ran from the screen's top down to the bubble, which was harmless at the bar but would have made the whole column above the flashlight at thumb height untouchable for the app beneath. */
+    val padTop = if (bubble.size == Size.Torch) target.top - GRAB else 0f
+    val padHeight = target.top + target.height + GRAB - padTop
+    SideEffect { Island.regions[Region.Main] = Rect(padLeft, padTop, padLeft + padWidth, padTop + padHeight) }
 
     Box(
         Modifier
-            .offset { IntOffset((padLeft * Island.density).roundToInt(), 0) }
+            .offset { IntOffset((padLeft * Island.density).roundToInt(), (padTop * Island.density).roundToInt()) }
             .size(padWidth.dp, padHeight.dp)
-            .pointerInput(bubble) {
+            .pointerInput(bubble, padTop) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val density = Island.density
-                    bubble.onDown((down.position.x / density) + padLeft, down.position.y / density)
+                    bubble.onDown((down.position.x / density) + padLeft, down.position.y / density + padTop)
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -103,7 +105,7 @@ fun MainBubbleView(bubble: MainBubble) {
                             if (!change.isConsumed) bubble.onUp() else bubble.onReleasedOnControl()
                             break
                         }
-                        bubble.onMove(change.position.x / density + padLeft, change.position.y / density)
+                        bubble.onMove(change.position.x / density + padLeft, change.position.y / density + padTop)
                     }
                 }
             },
@@ -122,7 +124,7 @@ fun MainBubbleView(bubble: MainBubble) {
                     )
                     layout(placeable.width, placeable.height) {
                         val left = (centre + shift.value - width.value / 2f - padLeft) * density
-                        placeable.place(left.roundToInt(), (top.value * density).roundToInt())
+                        placeable.place(left.roundToInt(), ((top.value - padTop) * density).roundToInt())
                     }
                 }
                 .graphicsLayer {
@@ -163,7 +165,7 @@ fun MainBubbleView(bubble: MainBubble) {
     }
 }
 
-private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre)
+private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre, Size.Torch)
 const val LONG_GROW = 460
 /* A grown face kept its open size while it faded over the collapsing bubble; it goes in the first frames of the collapse, as .face:not(.showing) does. */
 private const val GROWN_FADE = 90
@@ -204,5 +206,6 @@ private fun FaceContent(face: Face, bubble: MainBubble, appearance: Appearance) 
         Face.TimerPanel -> TimerPanel(bubble, appearance)
         Face.TripPanel -> TripPanel(bubble, appearance)
         Face.Notifications -> NotificationsFace(bubble, appearance)
+        Face.Torch -> TorchFace(bubble)
     }
 }

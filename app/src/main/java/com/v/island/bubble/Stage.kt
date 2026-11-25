@@ -28,6 +28,7 @@ fun IslandStage() {
             StatusView(Island.status)
             ClearButton(Island.bubble)
             MainBubbleView(Island.bubble)
+            TorchOffView(Island.bubble)
             DarkAlertView()
             AlertBand(Island.bubble)
         }

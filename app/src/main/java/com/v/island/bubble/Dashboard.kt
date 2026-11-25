@@ -85,6 +85,7 @@ class Dashboard {
         Island.bubble.toClosedIfExtended()
         Island.clock.closePanel()
         isOpen = true
+        Island.bubble.onModsChanged()
         Island.now.enterPanel()
         generation += 1
         areReadingsHeld = true
@@ -111,6 +112,7 @@ class Dashboard {
         if (!isOpen) return
         endSolo()
         isOpen = false
+        Island.bubble.onModsChanged()
         Island.now.leavePanel(thrown)
         isLeaving = true
         generation += 1

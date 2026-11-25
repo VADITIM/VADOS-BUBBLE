@@ -266,11 +266,6 @@ private const val DATE_FADE = 140
 private const val CORNER_GROW = 1.15f
 private const val CORNER_PADDING = 11.2f
 
-private val TORCH_GLYPH = Glyph(
-    0f, 0f, 24f, 24f,
-    listOf(GlyphLayer("M8.4 2h7.2a1 1 0 0 1 .97 1.24l-.9 3.6a1 1 0 0 1-.97.76H9.3a1 1 0 0 1-.97-.76l-.9-3.6A1 1 0 0 1 8.4 2zm1.1 7.6h5a1 1 0 0 1 1 1V21a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V10.6a1 1 0 0 1 1-1z", LayerKind.Fill, 0f)),
-)
-
 @Composable
 private fun NowClosed(clock: ClockBubble, appearance: Appearance) {
     val recording = Island.recording
@@ -280,16 +275,10 @@ private fun NowClosed(clock: ClockBubble, appearance: Appearance) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (clock.owner == NowMod.Recording) {
-            Canvas(Modifier.size(glyphSize(appearance).dp)) {
-                drawCircle(Color.White.copy(alpha = if (recording?.isPaused == true) 0.55f else 1f), size.minDimension * 7f / 24f)
-            }
-            BasicText(clockReading(now - (recording?.since ?: now)), style = type(0.62f, Palette.textBright, appearance.clockFont, appearance.clockScale))
-        } else {
-            GlyphIcon(TORCH_GLYPH, Color.White, Modifier.size(glyphSize(appearance).dp))
-            val torch = Island.torch
-            if (torch?.isDimmable == true) BasicText("${torch.step}/${torch.steps}", style = type(0.62f, Palette.textBright, appearance.clockFont, appearance.clockScale))
+        Canvas(Modifier.size(glyphSize(appearance).dp)) {
+            drawCircle(Color.White.copy(alpha = if (recording?.isPaused == true) 0.55f else 1f), size.minDimension * 7f / 24f)
         }
+        BasicText(clockReading(now - (recording?.since ?: now)), style = type(0.62f, Palette.textBright, appearance.clockFont, appearance.clockScale))
     }
 }
 
@@ -300,58 +289,15 @@ private fun NowPanel(clock: ClockBubble, appearance: Appearance) {
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val isRecording = clock.owner == NowMod.Recording
         RevealLabel(
-            if (isRecording) "RECORDING" else "FLASHLIGHT",
+            "RECORDING",
             type(0.63f, Palette.textLabel, appearance.clockFont, spacing = 0.19f),
             appearance.accent,
             modifier = Modifier.align(Alignment.Start),
         )
-        if (isRecording) {
-            val now = rememberNow(1000)
-            BasicText(clockReading(now - (Island.recording?.since ?: now)), style = type(1.6f, Palette.textBright, appearance.clockFont, spacing = 0.08f))
-            PillButton("Stop", true, Palette.danger, appearance) { clock.stopRecording() }
-        } else {
-            TorchSlider(clock)
-            Box(Modifier.size(1.dp))
-        }
-    }
-}
-
-@Composable
-private fun TorchSlider(clock: ClockBubble) {
-    val torch = Island.torch ?: return
-    val count = if (torch.isDimmable) torch.steps else 1
-    val at = animateFloatAsState((torch.step - 1).coerceAtLeast(0).toFloat(), tween(Durations.GROW, easing = Curves.bubble), label = "torch")
-    val slot = ClockBubble.NOW_SLOT
-    val gap = ClockBubble.NOW_SLOT_GAP
-    Box(
-        Modifier.size((count * slot + (count - 1) * gap).dp, slot.dp)
-            .pointerInput(count) {
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    down.consume()
-                    var index = 0
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        change.consume()
-                        index = ((change.position.x / density) / (slot + gap)).toInt().coerceIn(0, count - 1)
-                        if (!change.pressed) break
-                    }
-                    clock.setTorchStep(index + 1)
-                }
-            },
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val unit = slot.dp.toPx()
-            val spacing = gap.dp.toPx()
-            for (index in 0 until count) {
-                drawCircle(Palette.borderControl, unit / 2f - 4.dp.toPx(), Offset(index * (unit + spacing) + unit / 2f, size.height / 2f), style = Stroke(1.dp.toPx()))
-            }
-            val x = at.value * (unit + spacing) + unit / 2f
-            drawCircle(Color.White, unit / 2f - 8.dp.toPx(), Offset(x, size.height / 2f))
-        }
+        val now = rememberNow(1000)
+        BasicText(clockReading(now - (Island.recording?.since ?: now)), style = type(1.6f, Palette.textBright, appearance.clockFont, spacing = 0.08f))
+        PillButton("Stop", true, Palette.danger, appearance) { clock.stopRecording() }
     }
 }
 
