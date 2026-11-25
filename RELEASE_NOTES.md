@@ -1,3 +1,3 @@
-# 0.7.17
+# 0.7.18
 
-Opening the player no longer shows the timeline fully played before it jumps back. It keeps the song's real progress as it unfolds. When a song ends and the next one starts by itself, the expanded artwork slides out to the right and the new one slides in from the left.
+Every Dashboard toggle has its own colour when it is on, instead of the one accent: hotspot green, airplane orange, mobile data cyan, GPS pink, wifi blue, Bluetooth indigo, eye comfort amber, Do not Disturb purple, dim lavender, recording red, rotate mint, microphone green, battery saver yellow (also the battery cell's edge while saving) and USB tan.

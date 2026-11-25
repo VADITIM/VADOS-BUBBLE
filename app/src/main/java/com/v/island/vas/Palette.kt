@@ -31,6 +31,23 @@ object Palette {
     val markTime = Color(0x525BC4FD)
     val markMoney = Color(0x4DFFDD1B)
 
+    val toggles = mapOf(
+        "hotspot" to Color(0xFF30D158),
+        "plane" to Color(0xFFFF9F0A),
+        "mobile" to Color(0xFF64D2FF),
+        "gps" to Color(0xFFFF375F),
+        "wifi" to Color(0xFF0A84FF),
+        "bluetooth" to Color(0xFF5E5CE6),
+        "augenkomfort" to Color(0xFFFFB340),
+        "modus" to Color(0xFFBF5AF2),
+        "dim" to Color(0xFF8E8CFF),
+        "recording" to Color(0xFFFF453A),
+        "rotate" to Color(0xFF63E6BE),
+        "mic" to Color(0xFF30D158),
+        "saver" to Color(0xFFFFD60A),
+        "usb" to Color(0xFFAC8E68),
+    )
+
     fun parse(css: String?, fallback: Color): Color {
         val value = css?.trim().orEmpty()
         if (!value.startsWith("#")) return fallback

@@ -553,7 +553,6 @@ private fun VitalRow(dashboard: Dashboard, index: Int, glyph: Glyph, colour: Col
 
 @Composable
 private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appearance: Appearance, modifier: Modifier) {
-    val accent = LocalAccent.current
     val charge = Island.charge
     val percent = charge?.percent ?: -1
     val isPlugged = charge?.isPlugged == true
@@ -564,7 +563,7 @@ private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appeara
     val edge = animateColorAsState(
         when {
             isLow -> BATTERY_LOW_EDGE
-            isSaving -> accent
+            isSaving -> Palette.toggles.getValue("saver")
             else -> colour.value
         },
         tween(500),
@@ -780,7 +779,7 @@ private fun TransferButton(dashboard: Dashboard, id: String, glyph: Glyph, onTap
 
 @Composable
 private fun UsbBubble(dashboard: Dashboard, geometry: PanelGeometry, appearance: Appearance, modifier: Modifier) {
-    val accent = LocalAccent.current
+    val accent = Palette.toggles.getValue("usb")
     val isOn = dashboard.isOn("usb")
     val colour = animateColorAsState(if (isOn) accent else Palette.textMuted, tween(200), label = "usb")
     val shape = SquircleShape(24.dp)
@@ -882,7 +881,7 @@ private fun modeGlyph(name: String, isOn: Boolean): Glyph = when (name) {
 
 @Composable
 private fun ModeButton(dashboard: Dashboard, name: String, centre: Float, geometry: PanelGeometry, appearance: Appearance) {
-    val accent = LocalAccent.current
+    val accent = Palette.toggles.getValue(name)
     val isOn = dashboard.isOn(name)
     val isAvailable = dashboard.isAvailable(name)
     val reading = ringReading(dashboard, name)
@@ -1249,7 +1248,7 @@ private fun KnobRow(dashboard: Dashboard, geometry: PanelGeometry, appearance: A
 
 @Composable
 private fun Knob(dashboard: Dashboard, name: String, slot: Int, geometry: PanelGeometry, appearance: Appearance) {
-    val accent = LocalAccent.current
+    val accent = Palette.toggles[name] ?: LocalAccent.current
     val isOpener = name == "comdirect"
     val isOn = !isOpener && dashboard.isOn(name)
     val isAvailable = dashboard.isAvailable(name)
