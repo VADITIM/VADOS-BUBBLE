@@ -1,7 +1,11 @@
 package com.v.island.bubble
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -100,6 +104,10 @@ fun MediaFace(appearance: Appearance) {
     val padding = (appearance.compactHeight - glyphSize(appearance)) / 2f
     val tile = mediaTileWidth(appearance)
     val travel = MEDIA_TILE_INSET + tile
+    val entry = remember { Animatable(0f) }
+    val pop = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { entry.animateTo(1f, tween(Durations.MORPH, easing = Curves.sweep)) }
+    LaunchedEffect(Unit) { pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) }
     Row(
         Modifier.fillMaxSize().padding(end = padding.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -117,12 +125,15 @@ fun MediaFace(appearance: Appearance) {
             },
             label = "mediaTile",
         ) { song ->
-            Box(Modifier.size(tile.dp, mediaTileHeight(appearance).dp).clip(RoundedCornerShape((appearance.compactHeight / 2f - MEDIA_TILE_INSET).dp)).background(Palette.sunken)) {
+            Box(Modifier.graphicsLayer { translationX = -(1f - entry.value) * travel * Island.density }.size(tile.dp, mediaTileHeight(appearance).dp).clip(RoundedCornerShape((appearance.compactHeight / 2f - MEDIA_TILE_INSET).dp)).background(Palette.sunken)) {
                 val art = song?.art
                 if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
         }
-        Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, modifier = Modifier.size(glyphSize(appearance).dp))
+        Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, isRising = true, modifier = Modifier.size(glyphSize(appearance).dp).graphicsLayer {
+            scaleX = pop.value
+            scaleY = pop.value
+        })
     }
 }
 
@@ -244,16 +255,16 @@ fun waveShape(media: Media?): FloatArray {
 }
 
 @Composable
-fun Wave(media: Media?, bars: Int, ratio: () -> Float, modifier: Modifier = Modifier) {
+fun Wave(media: Media?, bars: Int, ratio: () -> Float, modifier: Modifier = Modifier, isRising: Boolean = false) {
     val shape = remember(media?.title, media?.artist) { waveShape(media) }
     var frame by remember { mutableLongStateOf(0L) }
     val isPlaying = media?.isPlaying == true
-    val energy = remember { floatArrayOf(WAVE_REST, 0f) }
+    val energy = remember { floatArrayOf(if (isRising) 0f else WAVE_REST, 0f, if (isPlaying && !isRising) 1f else 0f) }
     LaunchedEffect(isPlaying, Island.isStageHidden) {
         if (Island.isStageHidden) return@LaunchedEffect
         while (true) {
             withFrameMillis { frame = it }
-            if (!isPlaying && energy[0] <= WAVE_REST + 0.005f) break
+            if (!isPlaying && energy[0] <= WAVE_REST + 0.005f && energy[2] <= 0.005f) break
         }
     }
     val accent = media?.accent ?: Color.White
@@ -264,6 +275,8 @@ fun Wave(media: Media?, bars: Int, ratio: () -> Float, modifier: Modifier = Modi
         energy[1] += ((if (isPlaying) pulse(since) else 0f) - energy[1]) * 0.35f
         val wanted = if (isPlaying) 0.36f + energy[1] * 0.16f else WAVE_REST
         energy[0] += (wanted - energy[0]) * 0.24f
+        energy[2] += ((if (isPlaying) 1f else 0f) - energy[2]) * if (isPlaying) 0.12f else 0.07f
+        val motion = energy[2]
         val middle = size.height / 2f
         val step = size.width / bars
         val thickness = max(2f, step * 0.62f)
@@ -278,8 +291,9 @@ fun Wave(media: Media?, bars: Int, ratio: () -> Float, modifier: Modifier = Modi
                 continue
             }
             val form = shape[min(WAVE_BARS - 1, (share * WAVE_BARS).toInt())]
-            val ripple = if (isPlaying) pulse((since - index * 7 + WAVE_BEAT) % WAVE_BEAT) else 0f
-            val wobble = if (isPlaying) 0.5f + 0.28f * sin(now / (170f + form * 90f) + index * 2.1f) + 0.22f * sin(now / (95f + form * 40f) + index * 0.6f) else 0f
+            /* Pausing zeroed the ripple and wobble on the next frame, so the wave froze flat instead of settling; both now fade with the playing motion. */
+            val ripple = motion * pulse((since - index * 7 + WAVE_BEAT) % WAVE_BEAT)
+            val wobble = motion * (0.5f + 0.28f * sin(now / (170f + form * 90f) + index * 2.1f) + 0.22f * sin(now / (95f + form * 40f) + index * 0.6f))
             val bass = ripple * (0.35f + 0.65f * (1f - share).pow(1.4f))
             val level = min(1f, form * (energy[0] * 0.55f + wobble * 0.3f + bass * 0.45f))
             val reach = dot / 2f + max(0f, level * (middle - 2f) - dot / 2f)

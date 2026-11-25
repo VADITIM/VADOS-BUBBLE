@@ -1,3 +1,3 @@
-# 0.7.27
+# 0.7.28
 
-The volume bar in the dashboard no longer goes silent while some of it is still filled: the quiet steps at the bottom stay, and only an empty bar mutes. The notification center drops its heading so the notifications start right at the top, and the number of notifications now sits in a small circle to the right of the trash can.
+When music appears in the main pill, the artwork now slides in from outside the pill's left edge and the wave pops in with its bars rising. Pausing lets the wave calm down to rest instead of stopping dead.
