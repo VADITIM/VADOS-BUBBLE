@@ -1,10 +1,21 @@
 package com.v.island.bubble
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import com.v.island.vas.Durations
 import com.v.island.vas.LocalAccent
 
 @Composable
@@ -13,6 +24,7 @@ fun IslandStage() {
     CompositionLocalProvider(LocalAccent provides appearance.accent) {
         val isLandscape = Island.isLandscape
         Box(Modifier.fillMaxSize()) {
+            BarScrim()
             if (!isLandscape) PanelShield(Island.bubble)
             DashboardScrim(Island.dashboard)
             LiquidLayer(
@@ -38,3 +50,20 @@ fun IslandStage() {
         }
     }
 }
+
+@Composable
+private fun BarScrim() {
+    val shown = animateFloatAsState(if (Island.appearance.hasSidePills) 0f else 1f, tween(Durations.GROW), label = "barScrim")
+    val tint = animateColorAsState(if (Island.isBarLight) Color.White else Color.Black, tween(Durations.GROW), label = "barTint")
+    if (shown.value <= 0f) return
+    Box(
+        Modifier.fillMaxWidth()
+            .height((Island.appearance.grab + Island.appearance.compactHeight + BAR_SCRIM_FADE).dp)
+            .graphicsLayer { alpha = shown.value }
+            .background(Brush.verticalGradient(0f to tint.value.copy(alpha = BAR_SCRIM_ALPHA), 0.55f to tint.value.copy(alpha = BAR_SCRIM_ALPHA * 0.6f), 1f to Color.Transparent)),
+    )
+}
+
+// The bar sample sees this scrim, so it stays light enough that a white page still reads light and the ink can flip.
+private const val BAR_SCRIM_ALPHA = 0.35f
+private const val BAR_SCRIM_FADE = 24f

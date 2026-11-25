@@ -124,13 +124,8 @@ fun AlertFace(bubble: MainBubble, appearance: Appearance) {
     val isLarge = isPicture
     /* The card is sized off what its content asks for, as measureAlert did, so the content is measured free of the box it stands in; only the picture card keeps a box of its own. */
     val isMeasured = bubble.size == Size.Alert || isCentred
-    val isEdged = bubble.size == Size.Alert
     Box(
-        Modifier.fillMaxSize().padding(
-            start = if (isEdged) ((Island.screenWidth - MainBubble.ALERT_WIDTH) / 2f + MainBubble.ALERT_OVERHANG).dp else 0.dp,
-            end = if (isEdged) ((Island.screenWidth - MainBubble.ALERT_WIDTH) / 2f + MainBubble.ALERT_OVERHANG).dp else 0.dp,
-            top = if (isEdged) (appearance.grab + MainBubble.ALERT_OVERHANG).dp else 0.dp,
-        ),
+        Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
         Column(

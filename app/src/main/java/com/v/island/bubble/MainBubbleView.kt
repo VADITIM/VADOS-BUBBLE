@@ -177,7 +177,8 @@ fun MainBubbleView(bubble: MainBubble) {
 private fun StayPill(bubble: MainBubble, centre: Float) {
     val mod = bubble.stayMod
     val kept = remember { arrayOfNulls<Mod>(1) }
-    if (mod != null) kept[0] = mod
+    // The face was only composed once the menu opened, so every icon started its entrance again; it stays composed, unseen, while any mod is live.
+    (mod ?: bubble.liveMods.firstOrNull())?.let { kept[0] = it }
     val shown = kept[0] ?: return
     val wobble = remember { Animatable(1f) }
     val presence = animateFloatAsState(if (mod != null) 1f else 0f, if (mod != null) snap() else tween(0, Durations.COLLAPSE), label = "stay")
@@ -187,10 +188,9 @@ private fun StayPill(bubble: MainBubble, centre: Float) {
         wobble.animateTo(STAY_SQUASH, tween(STAY_SQUASH_TIME, easing = Curves.leave))
         wobble.animateTo(1f, spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMedium))
     }
-    if (presence.value <= 0f) return
     val frame = bubble.stayFrame(shown)
     val density = Island.density
-    Blob(Island.liquid) {
+    if (presence.value > 0f) Blob(Island.liquid) {
         val wide = frame.width * wobble.value
         val tall = frame.height * (2f - wobble.value)
         val left = centre + frame.shift - wide / 2f

@@ -57,7 +57,8 @@ object TimerWatch {
             .put("remaining", remaining(summary) ?: JSONObject.NULL)
             .put(
                 "endsAt",
-                (endsAt(summary, statusBarNotification.postTime) ?: endsAtByChronometer(notification))
+                // The summary only reads whole minutes counted from the last post, so it won over the chronometer's exact end and every timer showed a rounded, drifting time; the chronometer goes first.
+                (endsAtByChronometer(notification) ?: endsAt(summary, statusBarNotification.postTime))
                     ?: JSONObject.NULL
             )
             
@@ -67,7 +68,8 @@ object TimerWatch {
             
             .put(
                 "isPaused",
-                endsAt(summary, statusBarNotification.postTime) == null &&
+                endsAtByChronometer(notification) == null &&
+                    endsAt(summary, statusBarNotification.postTime) == null &&
                     remaining(summary) != null
             )
             .put("actions", actions(notification))

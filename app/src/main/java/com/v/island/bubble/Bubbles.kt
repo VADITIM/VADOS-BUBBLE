@@ -175,7 +175,7 @@ fun ClockView(clock: ClockBubble) {
         Region.Clock, target, Palette.border,
         if (clock.isPressing) 1.03f else 1f, { clock.drag },
         clock::onDown, clock::onMove, clock::onUp,
-        isBare = isBarePill() && !clock.isCornered && !clock.isNowStanding,
+        isBare = isBarePill() && !clock.isNowStanding,
     ) {
         AnimatedContent(
             targetState = if (clock.isCornered) 0 else if (clock.isOpen) 2 else if (clock.isNowStanding) 1 else 0,
@@ -198,7 +198,7 @@ fun ClockView(clock: ClockBubble) {
 /* The time and the corner were two faces cross-faded by AnimatedContent, so opening the Dashboard rebuilt the whole reading; the hours and minutes are the same at both sizes, and only the seconds change form and the date arrives, as handOverClock in js/clock.js did. */
 @Composable
 private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
-    val ink = sideInk(isBarePill() && !clock.isCornered)
+    val ink = sideInk(isBarePill())
     val isCornered = clock.isCornered
     val now = rememberNow(1000)
     val calendar = java.util.Calendar.getInstance().apply { timeInMillis = now }
@@ -346,7 +346,7 @@ fun StatusView(status: StatusBubble) {
         Region.Status, status.target(), Palette.border,
         if (status.isPressing) 1.03f else 1f, { status.drag },
         status::onDown, status::onMove, status::onUp,
-        isBare = isBarePill() && !isCornered,
+        isBare = isBarePill(),
     ) {
         /* The settings and power glyphs were scaled in as one Row from its middle, so both grew out of the gap between them; each pops from its own centre now. */
         AnimatedContent(
@@ -389,7 +389,7 @@ private fun StatusSlotView(slot: StatusSlot, appearance: Appearance, isAway: Boo
 
 @Composable
 private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
-    val ink = sideInk(isBarePill() && !Island.dashboard.isOpen)
+    val ink = sideInk(isBarePill())
     val glyph = appearance.compactHeight - 13f
     val modGlyph = appearance.compactHeight - 8f
     when (slot) {
