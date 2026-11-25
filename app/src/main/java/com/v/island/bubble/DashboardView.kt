@@ -115,9 +115,10 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     val lift = max(0f, (band - Dashboard.KNOB_SIZE) / 2f)
     val firstDivider = statsTall + Dashboard.GAP + DIVIDER_SHIFT
     val systemTop = firstDivider + 1f + DIVIDER_ROOM + Dashboard.GAP
-    val knobTop = if (isWide) height - Dashboard.KNOB_SIZE - WIDE_KNOB_LIFT else height - lift * KNOB_LIFT_SHARE - Dashboard.KNOB_SIZE
+    val knobPush = max(0f, nowTall - NowBubble.COMPACT_HEIGHT)
+    val knobTop = if (isWide) height - Dashboard.KNOB_SIZE - WIDE_KNOB_LIFT else height - lift * KNOB_LIFT_SHARE - Dashboard.KNOB_SIZE + knobPush
     /* Mirrors html.lock-live in pill.css: with the Now bubble standing over the toggles the lower divider sits a gap above it, so the room over the bubble and under it are one measurement. */
-    val secondDivider = if (nowTall > 0f) min(height - band - Dashboard.GAP - DIVIDER_SHIFT, knobTop - NowBubble.PANEL_GAP * 2f - nowTall) - 1f
+    val secondDivider = if (nowTall > 0f) min(height - band - Dashboard.GAP - DIVIDER_SHIFT, knobTop - knobPush - NowBubble.PANEL_GAP * 2f - min(nowTall, NowBubble.COMPACT_HEIGHT)) - 1f
     else height - band - Dashboard.GAP - DIVIDER_SHIFT - 1f
     val systemBottom = secondDivider - DIVIDER_ROOM - Dashboard.GAP
     val systemTall = systemBottom - systemTop
@@ -349,7 +350,7 @@ fun DashboardPanel(dashboard: Dashboard) {
         else Island.regions.remove(Region.Dashboard)
     }
     val now = Island.now
-    val nowTall = animateFloatAsState(if (now.isInPanel && Island.media != null) now.restHeight else 0f, tween(NowBubble.GROW, easing = Curves.grow), label = "nowTall")
+    val nowTall = animateFloatAsState(if (now.isInPanel && Island.media != null) now.restHeight else 0f, tween(NowBubble.GROW, easing = Curves.bubble), label = "nowTall")
     val geometry = PanelGeometry(screenWidth, screenHeight, nowTall.value)
     SideEffect { dashboard.nowBottom = geometry.top + geometry.knobTop - NowBubble.PANEL_GAP }
     if (!isOpen && !dashboard.isLeaving) return

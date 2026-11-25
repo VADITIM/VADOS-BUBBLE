@@ -1,3 +1,3 @@
-# 0.7.37
+# 0.7.38
 
-Fixes the crash from 0.7.34: the smaller corner clock made its line height impossible to compute, so the app crashed on every frame. Also fixes a crash when the screen turned before the service had finished starting.
+The media pill in the Dashboard now grows downwards when expanded and pushes the toggles down instead of growing up. Its corners match the other pills: fully round when compact, the same as the open panels when expanded. Its slingshot out of the main pill is slower so it can be seen, the throw back home overshoots much less and stays on screen, and the song artwork no longer stretches across the whole pill while it unfolds.

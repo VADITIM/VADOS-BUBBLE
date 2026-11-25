@@ -191,8 +191,8 @@ class NowBubble {
         val backOffset = Offset(-launch.x * back, -launch.y * back)
         val hold = offset + launch * (reach * Sling.SHOT_LEAD)
         val frames = Sling.frames(offset, hold, backOffset, drop, Sling.DRAW_SQUEEZE, Sling.between(Sling.SHOT_OVER), reach)
-        val milliseconds = Sling.between(Sling.SHOT_MILLISECONDS).toInt()
-        val opening = Sling.between(Sling.DRAW_MILLISECONDS).toInt()
+        val milliseconds = (Sling.between(Sling.SHOT_MILLISECONDS) * ARRIVE_STRETCH).toInt()
+        val opening = (Sling.between(Sling.DRAW_MILLISECONDS) * ARRIVE_STRETCH).toInt()
         phase = NowPhase.Arriving
         opacity = 1f
         ballShare = 1f
@@ -246,7 +246,7 @@ class NowBubble {
                 val shot = Sling.throwShot(thrown, offset, room, ball / 2f)
                 val closing = { step: Float -> Sling.smoothly(min(1f, step / Sling.THROW_CIRCLE)) }
                 val frames = Sling.frames(
-                    Offset.Zero, shot.hold, offset, 1f, drop, shot.over, shot.reach, shot.launch, room,
+                    Offset.Zero, shot.hold, offset, 1f, drop, shot.over * LEAVE_OVER_SHARE, shot.reach, shot.launch, room,
                 ) { step -> (from.width + (ball - from.width) * closing(step)) to from.height }
                 coroutineScope {
                     launch { dropReadings((shot.milliseconds * Sling.THROW_CIRCLE).toInt()) }
@@ -272,7 +272,8 @@ class NowBubble {
                     }
                 }
                 val hold = backOffset + launch * (reach * Sling.SHOT_LEAD)
-                val frames = Sling.frames(backOffset, hold, offset, Sling.DRAW_SQUEEZE, drop, Sling.between(Sling.SHOT_OVER), reach)
+                val room = Rect(-from.center.x, -from.center.y, Island.screenWidth - from.center.x, Island.screenHeight - from.center.y)
+                val frames = Sling.frames(backOffset, hold, offset, Sling.DRAW_SQUEEZE, drop, Sling.between(Sling.SHOT_OVER) * LEAVE_OVER_SHARE, reach, room = room) { ball to ball }
                 run(Sling.between(Sling.SHOT_MILLISECONDS).toInt()) {
                     val frame = Sling.at(frames, it)
                     applyFrame(frame)
@@ -369,8 +370,10 @@ class NowBubble {
         const val COMPACT_WIDTH = 190f
         const val RADIUS = 34f
         const val OPEN_RADIUS = 44f
-        const val PANEL_RADIUS = 40f
-        const val COMPACT_RADIUS = 16f
+        const val PANEL_RADIUS = 26f
+        const val COMPACT_RADIUS = COMPACT_HEIGHT / 2f
+        const val ARRIVE_STRETCH = 1.6f
+        const val LEAVE_OVER_SHARE = 0.4f
         const val INSET = 16f
         const val BOTTOM = 20f
         const val PANEL_GAP = 16f

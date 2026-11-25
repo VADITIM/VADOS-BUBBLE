@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,7 +68,7 @@ fun NowView(now: NowBubble) {
     val width = animateFloatAsState(now.restWidth, if (isStanding) tween(NowBubble.GROW, easing = Curves.split) else snap<Float>(), label = "nowWidth")
     val height = animateFloatAsState(now.restHeight, if (isStanding) tween(NowBubble.GROW, easing = Curves.bubble) else snap<Float>(), label = "nowHeight")
     val radius = animateFloatAsState(now.restRadius, if (isStanding) tween(NowBubble.GROW) else snap<Float>(), label = "nowRadius")
-    val bottom = animateFloatAsState(now.restBottom, if (isStanding) tween(NowBubble.GROW, easing = Curves.grow) else snap<Float>(), label = "nowBottom")
+    val bottom = animateFloatAsState(now.restBottom, if (isStanding && !now.isInPanel) tween(NowBubble.GROW, easing = Curves.grow) else snap<Float>(), label = "nowBottom")
     val press = animateFloatAsState(if (now.isPressing) 1.03f else 1f, tween(320, easing = Curves.split), label = "nowPress")
 
     val isTouchable = (now.phase == NowPhase.Rest || now.phase == NowPhase.Arriving) && Island.media != null
@@ -123,11 +124,23 @@ fun NowView(now: NowBubble) {
                 else -> RestNow(now, media, appearance, isOpen = true)
             }
         }
-        if (now.ballShare > 0f && media.art != null) {
-            Image(media.art, null, Modifier.fillMaxSize().graphicsLayer { alpha = now.ballShare.coerceIn(0f, 1f) }, contentScale = ContentScale.Crop)
+        if (now.ballShare > ART_GONE && media.art != null) {
+            Image(
+                media.art, null,
+                Modifier.align(Alignment.Center).requiredSize(min(width.value, height.value).dp).graphicsLayer {
+                    alpha = ((now.ballShare - ART_GONE) / (1f - ART_GONE)).coerceIn(0f, 1f)
+                    scaleX = now.poseScale * press.value
+                    scaleY = now.poseScale * press.value
+                    clip = true
+                    shape = CircleShape
+                },
+                contentScale = ContentScale.Crop,
+            )
         }
     }
 }
+
+private const val ART_GONE = 0.6f
 
 private fun Modifier.layoutAt(rect: () -> Rect): Modifier = this.then(
     Modifier.layout { measurable, _ ->
