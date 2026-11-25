@@ -1207,8 +1207,8 @@ class MainBubble {
         const val NOTIFICATIONS_HOMING = 460L
         const val NOTIFICATIONS_FOOT = 16f
         const val CLEAR_SIZE = 44f
-        const val SYSTEM_ROW = 40f
-        const val SYSTEM_PAD = 6f
+        const val SYSTEM_ROW = 44f
+        const val SYSTEM_PAD = 10f
         const val CLEAR_GAP = 12f
         /* Mirrors the top transition on #notifications-clear in pill.css. */
         const val CLEAR_TOP_MILLISECONDS = 460

@@ -200,7 +200,9 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
 /* Mirrors the notification-row-in keyframes in pill.css. */
 private val ROW_ARRIVE = androidx.compose.animation.core.CubicBezierEasing(0.25f, 0.46f, 0.45f, 0.94f)
 
-private const val ROW_ENTER_DELAY = 104
+/* The rows waited a fixed 104 after the menu started growing, so they arrived only once it had nearly landed; they start when the grow has covered 70% of its distance. */
+private val ROW_ENTER_DELAY = (0..100).first { Curves.open.transform(it / 100f) >= ROW_ENTER_SHARE } * LONG_GROW / 100
+private const val ROW_ENTER_SHARE = 0.7f
 private const val ROW_STAGGER = 30
 private const val ROW_STAGGER_LIMIT = 10
 private const val BODY_TYPE_AFTER = 174
