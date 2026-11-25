@@ -181,7 +181,7 @@ private fun StayPill(bubble: MainBubble, centre: Float) {
     (mod ?: bubble.liveMods.firstOrNull())?.let { kept[0] = it }
     val shown = kept[0] ?: return
     val wobble = remember { Animatable(1f) }
-    val presence = animateFloatAsState(if (mod != null) 1f else 0f, if (mod != null) snap() else tween(0, Durations.COLLAPSE), label = "stay")
+    val presence = animateFloatAsState(if (mod != null) 1f else 0f, if (mod != null) snap() else tween(0, LONG_GROW), label = "stay")
     LaunchedEffect(mod != null) {
         if (mod == null) return@LaunchedEffect
         wobble.snapTo(1f)
@@ -244,6 +244,10 @@ private fun faceTransition(from: Face, to: Face): ContentTransform {
     }
     if (from == Face.Player && to == Face.Media) {
         return ContentTransform(fadeIn(tween(PLAYER_FOLD_HANDOVER, LONG_GROW - PLAYER_FOLD_HANDOVER)), fadeOut(tween(PLAYER_FOLD_HANDOVER, LONG_GROW)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
+    }
+    /* A live mod's face faded in over the collapsing menu at a third of the way home, while the stay pill holding that mod was still shown, so the menu read as Main redrawing itself; the stay pill is Main until the menu is home, and the face takes over only then. */
+    if (from == Face.Notifications && to != Face.Idle && to in CLOSED_FACES) {
+        return ContentTransform(fadeIn(tween(0, LONG_GROW)), fadeOut(tween(GROWN_FADE)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
     }
     val arriving = if (to in CLOSED_FACES) Durations.COLLAPSE / 2 else Durations.CONTENT_DROP
     return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(if (to in CLOSED_FACES) GROWN_FADE else 120)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
