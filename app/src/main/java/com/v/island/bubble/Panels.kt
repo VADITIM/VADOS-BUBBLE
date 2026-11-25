@@ -299,17 +299,8 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
     Box(Modifier.fillMaxSize()) {
         val art = media.art
         Box(
+            /* The swipe was read inside the art it moves, so every pixel of shift moved the finger's local position back by as much and the drag lagged and jumped; the gesture is read before the shift. */
             Modifier.fillMaxSize()
-                .graphicsLayer {
-                    translationX = skip.artShift() * density
-                    compositingStrategy = CompositingStrategy.Offscreen
-                }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(Brush.horizontalGradient(0f to Color.Transparent, 0.13f to Color.Black, 0.87f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
-                    drawRect(Brush.verticalGradient(0f to Color.Transparent, 0.09f to Color.Black, 0.91f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
-                }
-                .background(Palette.sunken)
                 .pointerInput(skip) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -351,7 +342,17 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                             }
                         }
                     }
-                },
+                }
+                .graphicsLayer {
+                    translationX = skip.artShift() * density
+                    compositingStrategy = CompositingStrategy.Offscreen
+                }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(Brush.horizontalGradient(0f to Color.Transparent, 0.13f to Color.Black, 0.87f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                    drawRect(Brush.verticalGradient(0f to Color.Transparent, 0.09f to Color.Black, 0.91f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                }
+                .background(Palette.sunken)
         ) {
             if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
