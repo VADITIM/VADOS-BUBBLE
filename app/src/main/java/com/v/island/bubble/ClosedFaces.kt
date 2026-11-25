@@ -1,5 +1,12 @@
 package com.v.island.bubble
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +31,10 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.unit.IntOffset
+import com.v.island.vas.Curves
+import com.v.island.vas.Durations
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -80,21 +90,36 @@ fun ArtCircle(media: Media?, diameter: Float, modifier: Modifier = Modifier) {
 
 fun mediaTileWidth(appearance: Appearance) = glyphSize(appearance) * MEDIA_TILE_RATIO
 
-/* The closed Media face was a round thumbnail and a five-bar equalizer, so nothing said what was playing; the artwork is a wide rounded tile left of the punch hole and the title stands right of it, fading where it runs out of room. */
+/* The closed Media face was a round thumbnail, so nothing showed whose song it was; the artwork is a wide tile, padded from the pill by the same distance on every side and rounded concentric with it, and a new song pushes the old tile out past the left edge while the new one follows in. */
 @Composable
 fun MediaFace(appearance: Appearance) {
     val media = Island.media
+    val padding = (appearance.compactHeight - glyphSize(appearance)) / 2f
     val tile = mediaTileWidth(appearance)
-    ModRow(appearance, glyphInset(appearance)) {
-        Box(Modifier.size(tile.dp, glyphSize(appearance).dp).clip(RoundedCornerShape((glyphSize(appearance) * MEDIA_TILE_ROUNDING).dp)).background(Palette.sunken)) {
-            val art = media?.art
-            if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    val travel = padding + tile
+    Row(
+        Modifier.fillMaxSize().padding(end = padding.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimatedContent(
+            targetState = media,
+            modifier = Modifier.size(travel.dp, glyphSize(appearance).dp).clipToBounds().fadeStart(padding.dp),
+            contentKey = { song -> song?.let { it.title + "|" + it.artist } },
+            contentAlignment = Alignment.CenterEnd,
+            transitionSpec = {
+                val spec = tween<IntOffset>(Durations.MORPH, easing = Curves.sweep)
+                val shift = { _: Int -> -(travel * Island.density).toInt() }
+                (slideInHorizontally(spec, shift) + fadeIn(tween(Durations.MORPH))) togetherWith (slideOutHorizontally(spec, shift) + fadeOut(tween(Durations.MORPH)))
+            },
+            label = "mediaTile",
+        ) { song ->
+            Box(Modifier.size(tile.dp, glyphSize(appearance).dp).clip(RoundedCornerShape((appearance.compactHeight / 2f - padding).dp)).background(Palette.sunken)) {
+                val art = song?.art
+                if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
         }
-        FadingLine(
-            media?.title.orEmpty(),
-            type(0.62f, Palette.textBright, appearance.mainFont, appearance.mainScale, weight = FontWeight.SemiBold),
-            Modifier.width(tile.dp),
-        )
+        Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, modifier = Modifier.size(glyphSize(appearance).dp))
     }
 }
 
@@ -195,7 +220,7 @@ fun TripFace(appearance: Appearance) {
 
 const val SWEEP_CYCLE = 12_000L
 const val MEDIA_TILE_RATIO = 1.8f
-private const val MEDIA_TILE_ROUNDING = 0.35f
+const val EQUALIZER_BARS = 5
 const val WAVE_BARS = 54
 private const val WAVE_BEAT = 480f
 private const val WAVE_REST = 0.12f

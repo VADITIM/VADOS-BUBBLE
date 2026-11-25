@@ -70,6 +70,17 @@ fun Modifier.fadeEnd(reach: Dp = 22.dp): Modifier = graphicsLayer { compositingS
         )
     }
 
+fun Modifier.fadeStart(reach: Dp): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fade = reach.toPx().coerceAtMost(size.width)
+        drawRect(
+            brush = Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = fade),
+            size = Size(fade, size.height),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+
 fun Modifier.fadeTop(reach: Dp = 24.dp): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()

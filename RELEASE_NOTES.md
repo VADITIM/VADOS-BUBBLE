@@ -1,3 +1,3 @@
-# 0.7.6
+# 0.7.7
 
-The closed Media bubble shows the artwork as a wide rounded tile left of the camera and the song title right of it, fading where it runs out of room.
+The closed Media bubble keeps its visualizer on the right. Its artwork tile is padded evenly and rounded to match the bubble, and when the song changes the old artwork slides out to the left as the new one slides in.
