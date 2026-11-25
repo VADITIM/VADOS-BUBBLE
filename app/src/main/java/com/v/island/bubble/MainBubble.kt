@@ -34,10 +34,10 @@ enum class Mode { Idle, Haptic, Alert, Extended, Torch }
 
 enum class Size(val isClosed: Boolean) {
     Idle(true), Playing(true), Timing(true), Calling(true), Travelling(true),
-    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), Torch(false),
+    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), Torch(false), TorchIdle(true),
 }
 
-enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, Torch }
+enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, Torch, TorchIdle }
 
 data class Frame(val width: Float, val height: Float, val radius: Float, val top: Float, val shift: Float)
 
@@ -141,6 +141,9 @@ class MainBubble {
     var isTorchSliding by mutableStateOf(false)
         private set
     private var torchTicked = 0
+    private var torchSwipeBase = 0
+    private var torchSwipeLevel = 0
+    private var isTorchFolded = false
 
     fun torchCount(): Int = Island.torch?.let { if (it.isDimmable) it.steps else 1 } ?: 1
 
@@ -162,6 +165,33 @@ class MainBubble {
         if (nearest == torchTicked) return
         torchTicked = nearest
         Haptics.play(Haptic.Tap)
+        Island.actions.setTorch(nearest + 1)
+    }
+
+    private fun foldTorch(isFolded: Boolean) {
+        isTorchFolded = isFolded
+        isTorchSliding = false
+        toClosed()
+    }
+
+    private fun swipeTorch(x: Float, y: Float) {
+        val across = x - startX
+        val down = y - startY
+        if (hasPulled || hypot(across, down) <= HOLD_BLOCK) return
+        hasMoved = true
+        if (!hasSwiped && down > PULL_TRIGGER && down > abs(across)) {
+            hasPulled = true
+            Haptics.play(Haptic.Expand)
+            foldTorch(false)
+            return
+        }
+        if (!hasSwiped && abs(across) <= abs(down)) return
+        hasSwiped = true
+        val wanted = (torchSwipeBase + (across / TORCH_SWIPE_STEP).toInt()).coerceIn(1, torchCount())
+        if (wanted == torchSwipeLevel) return
+        torchSwipeLevel = wanted
+        Haptics.play(Haptic.Tap)
+        Island.actions.setTorch(wanted)
     }
 
     private fun finishTorchSlide() {
@@ -334,6 +364,7 @@ class MainBubble {
             Size.TripPanel -> Frame(GROWN_WIDTH, 232f, 26f, grown, 0f)
             Size.Notifications -> Frame(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
             Size.Torch -> torchFrame()
+            Size.TorchIdle -> Frame(appearance.compactWidth + appearance.modWidth + 4f, appearance.compactHeight, appearance.compactHeight / 2f, grab, 0f)
         }
     }
 
@@ -476,11 +507,12 @@ class MainBubble {
         mode = Mode.Idle
         notice = null
         notificationsDrop = 0f
+        if ((Island.torch?.step ?: 0) == 0) isTorchFolded = false
         if (isTorchShown) {
             mode = Mode.Torch
             accent = appearance.accent
-            size = Size.Torch
-            face = Face.Torch
+            size = if (isTorchFolded) Size.TorchIdle else Size.Torch
+            face = if (isTorchFolded) Face.TorchIdle else Face.Torch
             readTorch()
             return
         }
@@ -693,6 +725,10 @@ class MainBubble {
     }
 
     fun onOutsideTap() {
+        if (mode == Mode.Torch && !isTorchFolded) {
+            foldTorch(true)
+            closedOutsideAt = SystemClock.uptimeMillis()
+        }
         if (mode == Mode.Extended) {
             toClosed()
             closedOutsideAt = SystemClock.uptimeMillis()
@@ -760,7 +796,9 @@ class MainBubble {
         gate = DragGate()
         heldStep = null
         if (mode == Mode.Torch) {
-            if (torchCount() < 2) return
+            torchSwipeBase = Island.torch?.step ?: 1
+            torchSwipeLevel = torchSwipeBase
+            if (isTorchFolded || torchCount() < 2) return
             isTorchSliding = true
             torchTicked = torchAt.roundToInt()
             slideTorch(x)
@@ -832,7 +870,7 @@ class MainBubble {
 
     fun onMove(x: Float, y: Float) {
         if (mode == Mode.Torch) {
-            if (isTorchSliding) slideTorch(x)
+            if (isTorchFolded) swipeTorch(x, y) else if (isTorchSliding) slideTorch(x)
             return
         }
         if (isAlertTouch) {
@@ -904,7 +942,11 @@ class MainBubble {
 
     fun onUp() {
         if (mode == Mode.Torch) {
-            finishTorchSlide()
+            if (!isTorchFolded) finishTorchSlide()
+            else if (!hasMoved && !Island.wasCancelled) {
+                Haptics.play(Haptic.Expand)
+                foldTorch(false)
+            }
             return
         }
         if (isAlertTouch) {
@@ -1098,16 +1140,16 @@ class MainBubble {
         const val OUTSIDE_LATCH = 120L
         const val DRAG_COMMIT = 10f
         const val DRAG_WINDOW = 110L
-        /* Mirrors NOW_SLOT and NOW_SLOT_GAP in js/now.js. */
-        const val TORCH_SLOT = 40f
-        const val TORCH_SLOT_GAP = 14f
-        /* The flashlight stood at the top in the Clock's 190-tall panel, out of the thumb's reach; it is a pill around its level row just below the screen's middle. */
-        const val TORCH_PAD = 14f
+        /* The flashlight at 60% of the screen on 40 slots still sat above the thumb and read small; it stands lower on larger slots than now.js's NOW_SLOT. */
+        const val TORCH_SLOT = 48f
+        const val TORCH_SLOT_GAP = 16f
+        const val TORCH_PAD = 16f
         const val TORCH_HEIGHT = TORCH_SLOT + TORCH_PAD * 2f
-        const val TORCH_MINIMUM_WIDTH = 160f
-        const val TORCH_RISE = 0.6f
-        const val TORCH_OFF_WIDTH = 84f
-        const val TORCH_OFF_HEIGHT = 40f
-        const val TORCH_OFF_GAP = 12f
+        const val TORCH_MINIMUM_WIDTH = 190f
+        const val TORCH_RISE = 0.72f
+        const val TORCH_OFF_WIDTH = 96f
+        const val TORCH_OFF_HEIGHT = 46f
+        const val TORCH_OFF_GAP = 14f
+        const val TORCH_SWIPE_STEP = 36f
     }
 }

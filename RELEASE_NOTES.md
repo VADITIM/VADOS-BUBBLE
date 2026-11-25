@@ -1,3 +1,3 @@
-# 0.7.22
+# 0.7.23
 
-The flashlight opens out of the main pill instead of the Clock bubble, as a short pill just below the middle of the screen where the thumb is. Press and drag anywhere on it to pull the level; the level dots melt into each other the way the WebView build's did and tick as you pass each one. The Flashlight label is gone: an Off pill stands on its own above it. While the flashlight is on, the mods in the main pill step aside and come back when it goes off, and new notifications do not pop over it.
+The flashlight sits lower and larger, and its level changes as your finger passes each dot instead of on release. Off is bigger and red, and on the way out it flies up into the main pill rather than sinking into where the flashlight was. A tap anywhere else folds the flashlight into the main pill, showing the torch on the left and the level on the right: tap it or pull it down to open it again, swipe left or right to step the level down or up.

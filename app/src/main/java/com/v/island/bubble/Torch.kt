@@ -8,7 +8,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
@@ -82,8 +85,24 @@ fun TorchFace(bubble: MainBubble) {
 }
 
 @Composable
+fun TorchIdleFace(appearance: Appearance) {
+    val torch = Island.torch
+    Row(
+        Modifier.fillMaxSize().padding(start = glyphInset(appearance).dp, end = IDLE_END.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GlyphIcon(Glyphs.torch, Color.White, Modifier.size(glyphSize(appearance).dp))
+        BasicText(
+            if (torch?.isDimmable == true) "${torch.step}/${torch.steps}" else "On",
+            style = type(0.62f, Palette.textBright, appearance.mainFont, appearance.mainScale, spacing = 0.02f),
+        )
+    }
+}
+
+@Composable
 fun TorchOffView(bubble: MainBubble) {
-    val isShown = bubble.mode == Mode.Torch
+    val isShown = bubble.mode == Mode.Torch && bubble.size == Size.Torch
     val rise = animateFloatAsState(
         if (isShown) 1f else 0f,
         if (isShown) tween(LONG_GROW, OFF_DELAY, Curves.open) else tween(OFF_LEAVE, easing = Curves.leave),
@@ -91,7 +110,9 @@ fun TorchOffView(bubble: MainBubble) {
     )
     val home = bubble.torchFrame()
     val restTop = home.top - MainBubble.TORCH_OFF_GAP - MainBubble.TORCH_OFF_HEIGHT
-    val hiddenTop = home.top + home.height / 2f - MainBubble.TORCH_OFF_HEIGHT / 2f
+    /* The Off pill sank back into the flashlight's old place on the way out while the flashlight itself flew up to the bar; it leaves upward into the main pill and only rises out of the flashlight on the way in. */
+    val origin = if (isShown) home.top + home.height / 2f else Island.appearance.grab + Island.appearance.compactHeight / 2f
+    val hiddenTop = origin - MainBubble.TORCH_OFF_HEIGHT / 2f
     val left = Island.screenWidth / 2f - MainBubble.TORCH_OFF_WIDTH / 2f
 
     Blob(Island.liquid) {
@@ -120,7 +141,7 @@ fun TorchOffView(bubble: MainBubble) {
             .pressable(pressedScale = 0.92f, haptic = Haptic.Dismiss) { if (isShown) Island.actions.setTorch(0) },
         contentAlignment = Alignment.Center,
     ) {
-        BasicText("Off", style = type(0.7f, Palette.textBright, Island.appearance.mainFont, Island.appearance.mainScale, spacing = 0.04f))
+        BasicText("Off", style = type(0.86f, Palette.danger, Island.appearance.mainFont, Island.appearance.mainScale, spacing = 0.04f))
     }
 }
 
@@ -141,3 +162,4 @@ private val GOO_MATRIX = ColorMatrix(
 private const val OFF_DELAY = 160
 private const val OFF_LEAVE = 200
 private const val OFF_SEED = 0.4f
+private const val IDLE_END = 10f

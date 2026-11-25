@@ -171,7 +171,7 @@ const val LONG_GROW = 460
 private const val GROWN_FADE = 90
 private const val PLAYER_FOLD_HANDOVER = 120
 
-private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, Face.Trip)
+private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, Face.Trip, Face.TorchIdle)
 
 private fun faceTransition(from: Face, to: Face): ContentTransform {
     val isHandOver = from in CLOSED_FACES && to in CLOSED_FACES
@@ -207,5 +207,6 @@ private fun FaceContent(face: Face, bubble: MainBubble, appearance: Appearance) 
         Face.TripPanel -> TripPanel(bubble, appearance)
         Face.Notifications -> NotificationsFace(bubble, appearance)
         Face.Torch -> TorchFace(bubble)
+        Face.TorchIdle -> TorchIdleFace(appearance)
     }
 }
