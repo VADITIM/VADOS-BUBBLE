@@ -226,6 +226,35 @@ fun PopText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Mo
     }
 }
 
+@Composable
+fun Modifier.popAway(isAway: Boolean, order: Int): Modifier {
+    val stagger = order * Durations.POP_STAGGER
+    val pop = androidx.compose.animation.core.animateFloatAsState(
+        if (isAway) 0f else 1f,
+        if (isAway) tween(Durations.POP_OUT, stagger, Curves.leave) else tween(Durations.POP_IN, stagger, Curves.enter),
+        label = "away",
+    )
+    return graphicsLayer {
+        scaleX = pop.value
+        scaleY = pop.value
+        alpha = pop.value.coerceIn(0f, 1f)
+        rotationZ = (1f - pop.value) * AWAY_TURN
+    }
+}
+
+@Composable
+fun AwayText(text: String, style: TextStyle, isAway: Boolean, firstOrder: Int, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Row(modifier) {
+        text.forEachIndexed { index, character ->
+            androidx.compose.runtime.key(index) {
+                BasicText(character.toString(), Modifier.popAway(isAway, firstOrder + index), style = style, maxLines = 1, softWrap = false)
+            }
+        }
+    }
+}
+
+private const val AWAY_TURN = -40f
+
 fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))
 
 /* The player and the Now bubble typed at the menu's 6ms a character, so a title was finished before the face had faded in and read as no animation at all; media labels type at TYPE_MILLIS in the retired js/mods/media.js. */

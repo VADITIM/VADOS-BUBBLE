@@ -81,7 +81,6 @@ private fun FloatingBubble(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val isEaten = Island.isPlayerOpen
-    val eaten = animateFloatAsState(if (isEaten) 0f else 1f, tween(Durations.GROW, easing = Curves.sweep), label = "eaten")
     val width = animateFloatAsState(target.width, tween(Durations.GROW, easing = Curves.bubble), label = "width")
     val height = animateFloatAsState(target.height, tween(Durations.GROW, easing = Curves.bubble), label = "height")
     val left = animateFloatAsState(target.shift, tween(Durations.GROW, easing = Curves.split), label = "left")
@@ -92,11 +91,11 @@ private fun FloatingBubble(
     Blob(Island.liquid) {
         val density = Island.density
         val offset = drag()
-        val wide = width.value * grown.value * eaten.value
-        val tall = height.value * grown.value * eaten.value
+        val wide = width.value * grown.value
+        val tall = height.value * grown.value
         val x = left.value + (width.value - wide) / 2f + offset.x
         val y = top.value + (height.value - tall) / 2f + offset.y
-        BlobShape(Rect(x * density, y * density, (x + wide) * density, (y + tall) * density), radius.value * grown.value * eaten.value * density, border)
+        BlobShape(Rect(x * density, y * density, (x + wide) * density, (y + tall) * density), radius.value * grown.value * density, border)
     }
 
     val padLeft = target.shift - GRACE
@@ -124,8 +123,8 @@ private fun FloatingBubble(
                 }
                 .graphicsLayer {
                     val offset = drag()
-                    scaleX = grown.value * eaten.value
-                    scaleY = grown.value * eaten.value
+                    scaleX = grown.value
+                    scaleY = grown.value
                     transformOrigin = TransformOrigin.Center
                     translationX = offset.x * Island.density
                     translationY = offset.y * Island.density
@@ -197,6 +196,9 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
     val calendar = java.util.Calendar.getInstance().apply { timeInMillis = now }
     fun pad(value: Int) = value.toString().padStart(2, '0')
     val seconds = pad(calendar.get(java.util.Calendar.SECOND))
+    val time = "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}"
+    /* The bubble slid under the player and shrank to nothing, so the Clock vanished while the player was open; it stays where it is and only its characters turn out, one by one, and back in when the player closes. */
+    val isAway = Island.isPlayerOpen
     val grow = animateFloatAsState(if (isCornered) CORNER_GROW else 1f, tween(Durations.GROW, easing = Curves.split), label = "clockGrow")
     var secondsForm by remember { mutableStateOf(isCornered) }
     val secondsPop = remember { Animatable(1f) }
@@ -215,9 +217,11 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            BasicText(
-                "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}",
-                style = type(0.68f * grow.value, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.5f - 0.3f * (grow.value - 1f) / (CORNER_GROW - 1f)),
+            AwayText(
+                time,
+                type(0.68f * grow.value, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.5f - 0.3f * (grow.value - 1f) / (CORNER_GROW - 1f)),
+                isAway,
+                0,
             )
             Box(
                 Modifier.graphicsLayer {
@@ -233,8 +237,8 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                 } else {
                     Column(Modifier.padding(start = 2.dp).graphicsLayer { alpha = 0.6f }, horizontalAlignment = Alignment.CenterHorizontally) {
                         val digit = type(0.29f, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 0.95f)
-                        BasicText(seconds.substring(0, 1), style = digit)
-                        BasicText(seconds.substring(1, 2), style = digit)
+                        BasicText(seconds.substring(0, 1), Modifier.popAway(isAway, time.length), style = digit)
+                        BasicText(seconds.substring(1, 2), Modifier.popAway(isAway, time.length + 1), style = digit)
                     }
                 }
             }
@@ -380,7 +384,7 @@ fun StatusView(status: StatusBubble) {
                     status.slots().forEachIndexed { index, slot ->
                         key(slot.name) {
                             Box(Modifier.padding(start = if (index == 0) 0.dp else if (slot is StatusSlot.Battery) 5.4.dp else 1.9.dp)) {
-                                StatusSlotView(slot, appearance)
+                                StatusSlotView(slot, appearance, Island.isPlayerOpen, index * 2)
                             }
                         }
                     }
@@ -391,7 +395,16 @@ fun StatusView(status: StatusBubble) {
 }
 
 @Composable
-private fun StatusSlotView(slot: StatusSlot, appearance: Appearance) {
+private fun StatusSlotView(slot: StatusSlot, appearance: Appearance, isAway: Boolean, order: Int) {
+    if (slot is StatusSlot.Reading) {
+        AwayText(slot.text, type(0.56f, Color.White, appearance.statusFont, appearance.statusScale, weight = FontWeight.Bold), isAway, order)
+        return
+    }
+    Box(Modifier.popAway(isAway, order)) { StatusSlotContent(slot, appearance) }
+}
+
+@Composable
+private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
     val glyph = appearance.compactHeight - 17f
     val modGlyph = appearance.compactHeight - 10f
     when (slot) {

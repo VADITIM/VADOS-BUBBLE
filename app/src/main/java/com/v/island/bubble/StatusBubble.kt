@@ -123,7 +123,6 @@ class StatusBubble {
             return Frame(CORNER_WIDE, Dashboard.CORNER_TALL, Dashboard.CORNER_RADIUS, Dashboard.CORNER_INSET, Island.screenWidth - Dashboard.CORNER_INSET - CORNER_WIDE)
         }
         val width = contentWidth + 17.6f
-        if (Island.isPlayerOpen) return Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab + ClockBubble.EATEN_DROP, Island.screenWidth - STATUS_RIGHT - width - ClockBubble.EATEN_PULL)
         return Frame(width, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab, Island.screenWidth - STATUS_RIGHT - width)
     }
 

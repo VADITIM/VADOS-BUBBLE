@@ -53,7 +53,6 @@ class ClockBubble {
 
     fun target(): Frame {
         val appearance = Island.appearance
-        if (Island.isPlayerOpen) return Frame(timeWidth, appearance.compactHeight, appearance.compactHeight / 2f, appearance.grab + EATEN_DROP, CLOCK_LEFT + EATEN_PULL)
         if (isCornered) {
             return Frame(cornerWidth, Dashboard.CORNER_TALL, Dashboard.CORNER_RADIUS, Dashboard.CORNER_INSET, Dashboard.CORNER_INSET)
         }
@@ -138,8 +137,6 @@ class ClockBubble {
 
     companion object {
         const val CLOCK_LEFT = 14f
-        const val EATEN_PULL = 46f
-        const val EATEN_DROP = 24f
         const val CLOCK_PULL = 34f
         const val NOW_PANEL_WIDTH = 300f
         const val NOW_PANEL_HEIGHT = 190f

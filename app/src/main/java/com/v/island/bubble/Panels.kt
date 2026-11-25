@@ -17,6 +17,16 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineScope
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -282,8 +292,8 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
     val position = if (bubble.isScrubbing) bubble.scrubPosition
     else media.position + if (media.isPlaying) android.os.SystemClock.elapsedRealtime() - media.receivedAt else 0L
     val ratio = if (media.duration > 0) (position.toFloat() / media.duration).coerceIn(0f, 1f) else 0f
-    var artDrag by remember { mutableFloatStateOf(0f) }
-    val artShift by animateFloatAsState(artDrag, tween(210, easing = Curves.grow), label = "art")
+    val skip = remember { PlayerSkip() }
+    val scope = rememberCoroutineScope()
     var waveWidth by remember { mutableIntStateOf(1) }
     val band by animateFloatAsState(if (bubble.isScrubbing) 110f else 52f, tween(220, easing = Curves.grow), label = "band")
     Box(Modifier.fillMaxSize()) {
@@ -291,7 +301,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
         Box(
             Modifier.fillMaxSize()
                 .graphicsLayer {
-                    translationX = artShift * density
+                    translationX = skip.artShift() * density
                     compositingStrategy = CompositingStrategy.Offscreen
                 }
                 .drawWithContent {
@@ -300,7 +310,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                     drawRect(Brush.verticalGradient(0f to Color.Transparent, 0.09f to Color.Black, 0.91f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
                 }
                 .background(Palette.sunken)
-                .pointerInput(media.packageName) {
+                .pointerInput(skip) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         var across = 0f
@@ -314,18 +324,14 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                             if (axis == PlayerAxis.None && hypot(across, downward) > PLAYER_HOLD_OFF) {
                                 axis = if (abs(across) > abs(downward)) PlayerAxis.Across else PlayerAxis.Along
                             }
-                            if (axis == PlayerAxis.Across) artDrag = across * PLAYER_DRAG_FOLLOW
+                            if (axis == PlayerAxis.Across) skip.follow(scope, across)
                             if (!change.pressed) {
                                 change.consume()
                                 when {
-                                    axis == PlayerAxis.Across && abs(across) > PLAYER_SWIPE -> {
-                                        Haptics.play(Haptic.Tap)
-                                        Island.actions.mediaControl(if (across > 0) "next" else "previous")
-                                        artDrag = sign(across) * PLAYER_THROW
-                                    }
+                                    axis == PlayerAxis.Across -> skip.release(scope)
                                     axis == PlayerAxis.Along && downward > PLAYER_PULL -> {
                                         Haptics.play(Haptic.Tap)
-                                        Island.actions.mediaControl(if (media.isPlaying) "pause" else "play")
+                                        Island.actions.mediaControl(if (Island.media?.isPlaying == true) "pause" else "play")
                                     }
                                     axis == PlayerAxis.Along && downward < -PLAYER_PULL -> {
                                         Haptics.play(Haptic.Dismiss)
@@ -336,7 +342,6 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                                         bubble.toClosed()
                                     }
                                 }
-                                artDrag = 0f
                                 break
                             }
                         }
@@ -345,6 +350,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
         ) {
             if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
+        SkipArrow(skip, Modifier.align(if (skip.arrowSide > 0) Alignment.CenterStart else Alignment.CenterEnd))
         Column(
             Modifier.fillMaxWidth()
                 .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Black.copy(alpha = 0.08f), Color.Transparent)))
@@ -416,11 +422,89 @@ private fun seekAt(x: Float, width: Int, duration: Long): Long =
 
 private enum class PlayerAxis { None, Across, Along }
 
+private class PlayerSkip {
+    val drag = Animatable(0f)
+    val kick = Animatable(0f)
+    val push = Animatable(0f)
+    val arrow = Animatable(0f)
+    var armedSide by mutableIntStateOf(0)
+    var arrowSide by mutableIntStateOf(1)
+
+    fun artShift(): Float = drag.value + kick.value + push.value
+
+    fun arrowShift(): Float = (1f - arrow.value) * -arrowSide * SKIP_ARROW_TRAVEL + push.value
+
+    fun follow(scope: CoroutineScope, across: Float) {
+        scope.launch { drag.snapTo(across * PLAYER_DRAG_FOLLOW) }
+        val side = if (abs(across) > PLAYER_SWIPE) sign(across).toInt() else 0
+        if (side == armedSide) return
+        armedSide = side
+        if (side == 0) {
+            scope.launch { arrow.animateTo(0f, tween(160, easing = Curves.leave)) }
+            return
+        }
+        arrowSide = side
+        Haptics.play(Haptic.Release)
+        scope.launch {
+            kick.animateTo(side * SKIP_BOUNCE, tween(90, easing = Curves.powerTwoOut))
+            kick.animateTo(0f, spring(dampingRatio = 0.45f, stiffness = 520f))
+        }
+        scope.launch { arrow.animateTo(1f, tween(Durations.CONTENT_DROP + 60, easing = Curves.grow)) }
+    }
+
+    fun release(scope: CoroutineScope) {
+        val side = armedSide
+        armedSide = 0
+        if (side == 0) {
+            scope.launch { drag.animateTo(0f, tween(210, easing = Curves.grow)) }
+            scope.launch { arrow.animateTo(0f, tween(160, easing = Curves.leave)) }
+            return
+        }
+        val title = Island.media?.title
+        Haptics.play(Haptic.Tap)
+        Island.actions.mediaControl(if (side > 0) "next" else "previous")
+        scope.launch {
+            push.animateTo(side * PLAYER_THROW, tween(SKIP_OUT, easing = Curves.powerTwoIn))
+            withTimeoutOrNull(SKIP_WAIT) { snapshotFlow { Island.media?.title }.first { it != title } }
+            drag.snapTo(0f)
+            arrow.snapTo(0f)
+            push.snapTo(-side * PLAYER_THROW)
+            push.animateTo(0f, tween(Durations.MORPH, easing = Curves.grow))
+        }
+    }
+}
+
+@Composable
+private fun SkipArrow(skip: PlayerSkip, modifier: Modifier) {
+    val side = skip.arrowSide
+    Canvas(
+        modifier.padding(horizontal = SKIP_ARROW_INSET.dp).size(SKIP_ARROW_SIZE.dp).graphicsLayer {
+            translationX = skip.arrowShift() * density
+            alpha = skip.arrow.value.coerceIn(0f, 1f)
+        },
+    ) {
+        val width = 2.4.dp.toPx()
+        val middle = size.height / 2f
+        val tip = if (side > 0) size.width * 0.85f else size.width * 0.15f
+        val tail = if (side > 0) size.width * 0.15f else size.width * 0.85f
+        val head = size.width * 0.3f * side
+        drawLine(Color.White, Offset(tail, middle), Offset(tip, middle), width, StrokeCap.Round)
+        drawLine(Color.White, Offset(tip - head, middle - size.height * 0.3f), Offset(tip, middle), width, StrokeCap.Round)
+        drawLine(Color.White, Offset(tip - head, middle + size.height * 0.3f), Offset(tip, middle), width, StrokeCap.Round)
+    }
+}
+
 private const val PLAYER_HOLD_OFF = 17f
-private const val PLAYER_SWIPE = 105f
+private const val PLAYER_SWIPE = 74f
 private const val PLAYER_PULL = 48f
-private const val PLAYER_DRAG_FOLLOW = 0.85f
+private const val PLAYER_DRAG_FOLLOW = 1f
 private const val PLAYER_THROW = 340f
+private const val SKIP_BOUNCE = 14f
+private const val SKIP_ARROW_TRAVEL = 48f
+private const val SKIP_ARROW_INSET = 22f
+private const val SKIP_ARROW_SIZE = 26f
+private const val SKIP_OUT = 200
+private const val SKIP_WAIT = 900L
 
 @Composable
 fun PillButton(title: String, isLead: Boolean, accent: Color, appearance: Appearance, onClick: () -> Unit) {
