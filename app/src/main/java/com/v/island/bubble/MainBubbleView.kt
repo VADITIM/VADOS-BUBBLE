@@ -209,8 +209,13 @@ private fun StayPill(bubble: MainBubble, centre: Float) {
                 clip = true
                 shape = androidx.compose.foundation.shape.RoundedCornerShape((frame.height / 2f).dp)
             },
-    ) { FaceContent(bubble.stayFace(shown), bubble, Island.appearance) }
+    ) {
+        /* The stay pill's unseen face is composed before Main's, so it took the one-shot caught, still and swap entrances and Main's face entered afresh every time. */
+        androidx.compose.runtime.CompositionLocalProvider(LocalIsStayFace provides true) { FaceContent(bubble.stayFace(shown), bubble, Island.appearance) }
+    }
 }
+
+val LocalIsStayFace = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 private const val STAY_SQUASH = 1.22f
 private const val STAY_SQUASH_TIME = 70

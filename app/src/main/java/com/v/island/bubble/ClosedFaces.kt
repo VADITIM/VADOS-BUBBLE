@@ -81,7 +81,8 @@ class Arrival(val glyph: Animatable<Float, AnimationVector1D>, val pop: Animatab
 
 @Composable
 fun rememberArrival(mod: Mod): Arrival {
-    val travel = remember { Island.bubble.takeSwapArrival(mod) }
+    val isStay = LocalIsStayFace.current
+    val travel = remember { if (isStay) null else Island.bubble.takeSwapArrival(mod) }
     val arrival = remember { Arrival(Animatable(travel ?: 0f), Animatable(if (travel == null) 1f else 0f), travel != null) }
     LaunchedEffect(Unit) {
         if (travel == null) return@LaunchedEffect
@@ -130,7 +131,8 @@ fun MediaFace(appearance: Appearance) {
     val tile = mediaTileWidth(appearance)
     val travel = MEDIA_TILE_INSET + tile
     val arrival = rememberArrival(Mod.Media)
-    val entrance = remember { Island.bubble.takeMediaEntrance().let { if (arrival.isSwapped) MediaEntrance.Placed else it } }
+    val isStay = LocalIsStayFace.current
+    val entrance = remember { if (isStay) MediaEntrance.Full else Island.bubble.takeMediaEntrance().let { if (arrival.isSwapped) MediaEntrance.Placed else it } }
     val entry = remember { Animatable(if (entrance == MediaEntrance.Full) 0f else 1f) }
     val pop = remember { Animatable(if (entrance == MediaEntrance.Still) 1f else 0f) }
     LaunchedEffect(Unit) { entry.animateTo(1f, tween(Durations.MORPH, easing = Curves.sweep)) }
@@ -157,7 +159,7 @@ fun MediaFace(appearance: Appearance) {
                 if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
         }
-        Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, isRising = true, modifier = Modifier.size(glyphSize(appearance).dp).graphicsLayer {
+        Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, isRising = entrance != MediaEntrance.Still, modifier = Modifier.size(glyphSize(appearance).dp).graphicsLayer {
             scaleX = if (arrival.isSwapped) arrival.pop.value else pop.value
             scaleY = if (arrival.isSwapped) arrival.pop.value else pop.value
         })

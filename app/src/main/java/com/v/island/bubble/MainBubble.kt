@@ -606,6 +606,7 @@ class MainBubble {
 
     fun toClosed() {
         dwellJob?.cancel()
+        swapArrival = null
         if (Island.isScreenDark) Island.sleepDark()
         val wasOpen = !size.isClosed
         if (wasOpen) closedInTouch = Island.isTouchDown
@@ -1222,7 +1223,7 @@ class MainBubble {
 
     val isSwapArriving: Boolean get() = swapArrival != null
 
-    fun takeSwapArrival(mod: Mod): Float? = swapArrival?.takeIf { it.first == mod }?.second.also { swapArrival = null }
+    fun takeSwapArrival(mod: Mod): Float? = swapArrival?.takeIf { it.first == mod }?.second?.also { swapArrival = null }
 
     private fun rotate(direction: Int) {
         val live = liveMods
