@@ -143,7 +143,7 @@ fun TypedText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: 
     TypedRun(text, shown, isTyping, style, modifier, maxLines, isLine)
 }
 
-/* The menu typed with no caret and Media expanded with its own; every typed text draws the same caret now, V/AS components/09-typewriter.md §10: a sharp block 0.42em wide, blinking at 250ms, standing after the last typed character only while typing. */
+/* The menu typed with no caret and Media expanded with its own; every typed text draws the same caret now, a sharp bar 0.08em wide (V/AS components/09-typewriter.md §3; the 0.42em block of §10 read as a cursor block, not a |), blinking at 250ms, standing after the last typed character only while typing. */
 @Composable
 fun TypedRun(text: String, shown: Int, isTyping: Boolean, style: TextStyle, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, isLine: Boolean = false) {
     var isOverflowing by remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -183,13 +183,16 @@ fun TypedRun(text: String, shown: Int, isTyping: Boolean, style: TextStyle, modi
     )
 }
 
-/* Mirrors the .typing::after caret in the retired pill.css (width 0.42em, margin-left 0.12em, vertical-align -0.12em); the blink is V/AS's 250ms Android caret. */
-private const val CARET_WIDTH = 0.42f
-private const val CARET_GAP = 0.12f
-private const val CARET_DROP = 0.12f
+/* Mirrors .tw-caret in V/AS components/09-typewriter.md §3 (width 0.08em, margin-left 0.04em, translateY 0.08em); the blink is V/AS's 250ms Android caret. */
+private const val CARET_WIDTH = 0.08f
+private const val CARET_GAP = 0.04f
+private const val CARET_DROP = 0.08f
 private const val CARET_BLINK = 250L
 
 fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))
+
+/* The player and the Now bubble typed at the menu's 6ms a character, so a title was finished before the face had faded in and read as no animation at all; media labels type at TYPE_MILLIS in the retired js/mods/media.js. */
+const val MEDIA_TYPE_CHARACTER = 60f
 
 private const val TYPE_CHARACTER = 6f
 private const val TYPE_BUDGET = 400f

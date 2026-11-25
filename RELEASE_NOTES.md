@@ -1,3 +1,4 @@
-# 0.7.3
+# 0.7.4
 
-- One typewriter everywhere: the Notifications menu, Media, the Now bubble, the Dashboard date and the dark-screen alert all type behind the same sharp block caret, shown only while typing.
+- The typing caret is a thin sharp bar instead of a block.
+- Media expanded and the Now bubble type their title and artist again, at the old media speed, starting once the player is visible.

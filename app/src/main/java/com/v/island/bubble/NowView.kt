@@ -164,8 +164,8 @@ private fun Labels(now: NowBubble, media: Media, titleSize: Float, artistSize: F
     Column(Modifier.fillMaxWidth()) {
         if (now.areLabelsShown) {
             key(now.labelsGeneration, media.title, media.artist) {
-                TypedText(media.title, titleStyle, 0, Modifier.fillMaxWidth(), isLine = true)
-                TypedText(media.artist.uppercase(), artistStyle, 120, Modifier.fillMaxWidth().padding(top = artistGap.dp), isLine = true)
+                TypedText(media.title, titleStyle, 0, Modifier.fillMaxWidth(), isLine = true, interval = MEDIA_TYPE_CHARACTER)
+                TypedText(media.artist.uppercase(), artistStyle, 120, Modifier.fillMaxWidth().padding(top = artistGap.dp), isLine = true, interval = MEDIA_TYPE_CHARACTER)
             }
         } else {
             BasicText(" ", style = titleStyle)
@@ -184,7 +184,7 @@ private fun CompactNow(now: NowBubble, media: Media) {
         Art(media, Modifier.size(26.dp), 8f)
         Box(Modifier.weight(1f).sprig { now.metaShown }) {
             if (now.areLabelsShown) key(now.labelsGeneration, media.title) {
-                TypedText(media.title, type(0.74f, Palette.textBright, Faces.mono), 0, Modifier.fillMaxWidth(), isLine = true)
+                TypedText(media.title, type(0.74f, Palette.textBright, Faces.mono), 0, Modifier.fillMaxWidth(), isLine = true, interval = MEDIA_TYPE_CHARACTER)
             }
         }
     }

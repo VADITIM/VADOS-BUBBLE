@@ -60,6 +60,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.v.island.vas.Curves
+import com.v.island.vas.Durations
 import com.v.island.vas.Haptic
 import com.v.island.vas.Haptics
 import com.v.island.vas.Palette
@@ -336,9 +337,9 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                 .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Black.copy(alpha = 0.08f), Color.Transparent)))
                 .padding(start = 16.8.dp, end = 16.8.dp, top = 13.6.dp, bottom = 41.6.dp),
         ) {
-            TypedText(media.title, type(1.02f, Palette.textBright, appearance.mainFont, appearance.mainScale, lineHeight = 1.25f), 0, maxLines = 1)
+            TypedText(media.title, type(1.02f, Palette.textBright, appearance.mainFont, appearance.mainScale, lineHeight = 1.25f), Durations.CONTENT_DROP, maxLines = 1, interval = MEDIA_TYPE_CHARACTER)
             Spacer(Modifier.height(4.dp))
-            TypedText(media.artist.uppercase(), type(0.8f, media.accent, appearance.mainFont, appearance.mainScale, spacing = 0.1f, lineHeight = 1.25f), 120, maxLines = 1)
+            TypedText(media.artist.uppercase(), type(0.8f, media.accent, appearance.mainFont, appearance.mainScale, spacing = 0.1f, lineHeight = 1.25f), Durations.CONTENT_DROP + 120, maxLines = 1, interval = MEDIA_TYPE_CHARACTER)
         }
         Box(
             Modifier.align(Alignment.BottomCenter).padding(bottom = (52f - band / 2f).dp).fillMaxWidth().height(band.dp)
