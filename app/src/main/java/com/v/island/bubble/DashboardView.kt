@@ -100,22 +100,30 @@ private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Fl
     val top = Dashboard.CORNER_INSET + Dashboard.CORNER_TALL + Dashboard.QUICK_CLEARANCE
     val width = screenWidth - Dashboard.MARGIN * 2f
     val height = screenHeight - top - Dashboard.MARGIN
-    val statsTall = height * STATS_SHARE
+    /* Landscape laid the portrait column across a screen 278 tall, so the sections overran each other and the foot; the stats stand top-left, the toggles run along the foot and the system section is the right-hand end, where the thumb holding the phone is. */
+    val isWide = screenWidth > screenHeight
+    val systemWide = if (isWide) GRID_COLUMN * 2f + KNOB_GAP + Dashboard.GAP + LEVELS_WIDE + LEVELS_INSET else width
+    val systemLeft = if (isWide) width - systemWide else 0f
+    val wideDivider = systemLeft - WIDE_DIVIDER_ROOM - 1f
+    val knobWide = if (isWide) wideDivider - WIDE_DIVIDER_ROOM else width + Dashboard.MARGIN * 2f
+    val statsWide = if (isWide) WIDE_STATS else width
+    val systemFit = if (isWide) min(1f, height / LEVELS_TALL) else 1f
+    val statsTall = if (isWide) height - Dashboard.KNOB_SIZE - Dashboard.GAP else height * STATS_SHARE
     val band = height * TOGGLE_SHARE
     val lift = max(0f, (band - Dashboard.KNOB_SIZE) / 2f)
     val firstDivider = statsTall + Dashboard.GAP + DIVIDER_SHIFT
     val systemTop = firstDivider + 1f + DIVIDER_ROOM + Dashboard.GAP
-    val knobTop = height - lift - Dashboard.KNOB_SIZE
+    val knobTop = if (isWide) height - Dashboard.KNOB_SIZE else height - lift - Dashboard.KNOB_SIZE
     /* Mirrors html.lock-live in pill.css: with the Now bubble standing over the toggles the lower divider sits a gap above it, so the room over the bubble and under it are one measurement. */
     val secondDivider = if (nowTall > 0f) min(height - band - Dashboard.GAP - DIVIDER_SHIFT, knobTop - NowBubble.PANEL_GAP * 2f - nowTall) - 1f
     else height - band - Dashboard.GAP - DIVIDER_SHIFT - 1f
     val systemBottom = secondDivider - DIVIDER_ROOM - Dashboard.GAP
     val systemTall = systemBottom - systemTop
-    val gridTop = systemTop + (systemTall - GRID_TALL) / 2f
+    val gridTop = if (isWide) (height - GRID_TALL) / 2f else systemTop + (systemTall - GRID_TALL) / 2f
     val gridRow = (GRID_TALL - Dashboard.GAP * 2f) / 3f
     val vitalsCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP + VITALS_TALL / 2f
     val transferCentre = STATS_DROP + WEATHER_TALL + Dashboard.GAP * 2f + VITALS_TALL + TRANSFER_TALL / 2f
-    val levelsCentre = systemTop + systemTall / 2f
+    val levelsCentre = if (isWide) height / 2f else systemTop + systemTall / 2f
 
     fun modeCentre(row: Int) = gridTop + row * (gridRow + Dashboard.GAP) + gridRow / 2f
 }
@@ -363,9 +371,10 @@ fun DashboardPanel(dashboard: Dashboard) {
                 .size(geometry.width.dp, geometry.height.dp),
         ) {
             StatsSection(dashboard, geometry, appearance)
-            Divider(dashboard, geometry.firstDivider, geometry.width, appearance)
+            if (geometry.isWide) WideDivider(dashboard, geometry, appearance)
+            else Divider(dashboard, geometry.firstDivider, geometry.width, appearance)
             SystemSection(dashboard, geometry, appearance)
-            Divider(dashboard, geometry.secondDivider, geometry.width, appearance)
+            if (!geometry.isWide) Divider(dashboard, geometry.secondDivider, geometry.width, appearance)
             KnobRow(dashboard, geometry, appearance)
             ModsToggle(dashboard, geometry)
             Mark(dashboard, geometry)
@@ -398,6 +407,20 @@ private fun Divider(dashboard: Dashboard, top: Float, panelWide: Float, appearan
             .size(wide.dp, 1.dp)
             .graphicsLayer { alpha = shown * 0.5f }
             .background(Brush.horizontalGradient(listOf(Color.Transparent, Palette.textMuted, Color.Transparent)), RoundedCornerShape(1.dp)),
+    )
+}
+
+@Composable
+private fun WideDivider(dashboard: Dashboard, geometry: PanelGeometry, appearance: Appearance) {
+    if (!appearance.hasDividers) return
+    val shown = appearing(dashboard, 180)
+    val tall = geometry.height * WIDE_DIVIDER_SHARE
+    Box(
+        Modifier
+            .offset { IntOffset((geometry.wideDivider * Island.density).roundToInt(), (((geometry.height - tall) / 2f) * Island.density).roundToInt()) }
+            .size(1.dp, tall.dp)
+            .graphicsLayer { alpha = shown * 0.5f }
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Palette.textMuted, Color.Transparent)), RoundedCornerShape(1.dp)),
     )
 }
 
@@ -445,14 +468,17 @@ private fun QuickBubble(modifier: Modifier, shape: androidx.compose.ui.graphics.
 private fun StatsSection(dashboard: Dashboard, geometry: PanelGeometry, appearance: Appearance) {
     Column(
         Modifier
-            .size(geometry.width.dp, geometry.statsTall.dp)
+            .size(geometry.statsWide.dp, geometry.statsTall.dp)
             .padding(top = STATS_DROP.dp, start = STATS_INSET.dp, end = STATS_INSET.dp),
         verticalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp),
     ) {
         WeatherLine(dashboard, appearance)
         Row(Modifier.fillMaxWidth().height(VITALS_TALL.dp), horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp)) {
-            VitalsBubble(dashboard, geometry, appearance, Modifier.weight(1f).fillMaxHeight())
-            BatteryBubble(dashboard, geometry, appearance, Modifier.width(SIDE_WIDE.dp).fillMaxHeight())
+            if (geometry.isWide) BatteryBubble(dashboard, geometry, appearance, Modifier.weight(1f).fillMaxHeight())
+            else {
+                VitalsBubble(dashboard, geometry, appearance, Modifier.weight(1f).fillMaxHeight())
+                BatteryBubble(dashboard, geometry, appearance, Modifier.width(SIDE_WIDE.dp).fillMaxHeight())
+            }
         }
         Row(Modifier.fillMaxWidth().height(TRANSFER_TALL.dp), horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp)) {
             TransferStrip(dashboard, appearance, Modifier.weight(1f).fillMaxHeight())
@@ -813,8 +839,12 @@ private fun SystemSection(dashboard: Dashboard, geometry: PanelGeometry, appeara
     )
     Row(
         Modifier
-            .offset { IntOffset(0, (geometry.gridTop * Island.density).roundToInt()) }
-            .size(geometry.width.dp, GRID_TALL.dp),
+            .offset { IntOffset((geometry.systemLeft * Island.density).roundToInt(), (geometry.gridTop * Island.density).roundToInt()) }
+            .size(geometry.systemWide.dp, GRID_TALL.dp)
+            .graphicsLayer {
+                scaleX = geometry.systemFit
+                scaleY = geometry.systemFit
+            },
         horizontalArrangement = Arrangement.spacedBy(Dashboard.GAP.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1192,10 +1222,14 @@ private fun Level(
 
 @Composable
 private fun KnobRow(dashboard: Dashboard, geometry: PanelGeometry, appearance: Appearance) {
-    val windowWide = geometry.width + Dashboard.MARGIN * 2f
+    val windowWide = geometry.knobWide
     Box(
         Modifier
             .offset { IntOffset(0, (geometry.knobTop * Island.density).roundToInt()) }
+            .then(if (geometry.isWide) Modifier.drawWithContent {
+                val room = WIDE_KNOB_ROOM.dp.toPx()
+                clipRect(0f, -room, size.width, size.height + room) { this@drawWithContent.drawContent() }
+            } else Modifier)
             /* size() was held to the panel's width, so the window bled past the left margin only and left both margins as a gap on the right; requiredSize overhangs both sides equally. */
             .requiredSize(windowWide.dp, Dashboard.KNOB_SIZE.dp)
             .pointerInput(dashboard) {
@@ -1429,6 +1463,10 @@ private const val LEVEL_STEP = 1
 private const val DIVIDER_ROOM = 34f
 private const val DIVIDER_SHIFT = -18f
 private const val DIVIDER_SHARE = 0.46f
+private const val WIDE_STATS = 260f
+private const val WIDE_KNOB_ROOM = 28f
+private const val WIDE_DIVIDER_ROOM = 10f
+private const val WIDE_DIVIDER_SHARE = 0.46f
 private const val MODS_SIZE = 22f
 private const val MODS_TOP = -18f
 private const val RING_RADIUS = 30f

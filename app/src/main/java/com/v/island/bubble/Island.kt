@@ -75,6 +75,7 @@ object Island {
     val regions = mutableStateMapOf<Region, Rect>()
     val liquid = Liquid()
     var onBlobsDrawn: () -> Unit = {}
+    var onDashboardLeft: () -> Unit = {}
 
     lateinit var actions: HostActions
     var scope: CoroutineScope = uiScope()

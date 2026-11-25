@@ -125,6 +125,7 @@ class Dashboard {
             delay(maxOf(Durations.GROW, DROPPED).toLong() + 40)
             isLeaving = false
             releaseToggles()
+            Island.onDashboardLeft()
         }
     }
 

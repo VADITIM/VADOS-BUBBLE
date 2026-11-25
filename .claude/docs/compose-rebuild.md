@@ -37,6 +37,7 @@ Ported (unverified on the phone):
 - **Now bubble** (unverified): the flight is drawn against the rest box it was aimed at (`NowStand` frozen for a leave, sizes snapped while flying), and the mod changes hands when 80% of the drop stands inside Main (`CATCH_ENTERED`), not at the shot's end. `NowBubble.kt`/`NowView.kt`/`Sling.kt` port `js/lock.js` and `js/sling.js`. On the keyguard and in the Dashboard the media mod leaves Main (`isStolen`) for its own bubble, slung out of Main as a ball and opened in place; it flies home on unlock or when the panel closes, thrown along the flick that closed it, and Main bumps as it melts in. Tap opens/closes it (lock 124↔546, panel compact 190×44↔124), hold opens the app, sideways skips, down pauses when big, the wave scrubs. In the panel the lower divider stands a gap above it.
 
 - **Symbol typewriter** (unverified): `ScrambleText` in `Type.kt` ports VADOS-SHELL's `ScrambleText.qml`: each character stands hidden at its own width, then spins one turn through `SCRAMBLE_SYMBOLS` and settles on its letter at 65% of its 260 spin, 45 apart (capped to a 900 budget); a changed text retypes from the first character that differs. The player title and artist use it.
+- **Landscape Dashboard** (unverified): the Dashboard launcher shows the stage in landscape until the close has played; only the Dashboard and the corner bubbles are drawn and touchable, and the panel takes the wide layout (stats top-left, knobs along the foot, system section at the right end).
 - **Media entrance** (unverified): the closed Media face slides its artwork in from outside the left edge and pops the equalizer in with its bars rising; on pause the wave's motion fades to rest instead of stopping.
 - **Player fold** (unverified): Media to Player and back is one movement. The art and wave lerp between their small-pill rects and their panel places over `LONG_GROW` (`foldInto`, `FoldingWave` in `Panels.kt`), closing removes the text at once, and `faceTransition` holds the player face through the collapse. Only the close fills the wave; opening keeps the played ratio. A song change nobody asked for carries the art left to right.
 - **Main bounce** (unverified): a mod expands on `Curves.open` (1.5, a little under the Clock's 1.7), and goes home on `Curves.settle` (1.18), gentler than the old `reach`; the player fold follows both.
@@ -51,7 +52,7 @@ Not ported yet, in order:
 2. The slung dashboard alert; the alert zone's hint glow (`ALERT_ZONE_SHOWN`/`ALERT_ZONE_GLOW`)
 3. The lock screen: notification stacks and their proxies, edge proxies; the Now bubble's FLIP of art and labels between its sizes, its rubber-band drag, `--lock-x`, Main's swell as the drop closes in
 4. Messaging bubbles and the pull out of the Clock
-5. Landscape stage and the summoned panels
+5. Landscape: the corner double tap, the Now bubble in the landscape panel, and the summoned panels in a portrait fullscreen app
 6. Morphs between faces, pop stagger per part, label masks, minute tick on the clock
 7. The control panel (`panel.html`, `MainActivity`) — still a WebView; then `dna.css`, `fonts/` and `icons/` leave `assets/`
 8. Watchers emitting typed models directly instead of JSON, and bitmaps instead of data URIs

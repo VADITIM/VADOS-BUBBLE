@@ -46,6 +46,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private const val TAP_MILLIS = 40L
         private const val SHADE_STRIP = 48
         private const val ROTATION_SETTLE = 600L
+        private val LANDSCAPE_REGIONS = setOf(Region.Dashboard, Region.Clock, Region.Status)
         private const val TOGGLE_SETTLE_MILLIS = 2_500L
         private const val TOGGLE_RECHECK_MILLIS = 400L
         private const val LEVEL_SETTLE_SLACK = 3
@@ -75,7 +76,9 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         fun toggleStatusPanel() = Island.post {
-            if (instance != null) Island.dashboard.toggle()
+            val service = instance ?: return@post
+            if (service.isLandscape && !Island.dashboard.isOpen) service.showLandscapeStage()
+            Island.dashboard.toggle()
         }
 
         fun toggleMessaging() = Unit
@@ -235,7 +238,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
                 params.y = (rect.top * density).roundToInt()
                 params.width = (rect.width * density).roundToInt()
                 params.height = (rect.height * density).roundToInt()
-                params.flags = proxyFlags()
+                params.flags = proxyFlags(region)
             }
             relayout(view, params)
         }
@@ -262,6 +265,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private var shadeGuardParams: WindowManager.LayoutParams? = null
     private var isFullScreen = false
     private var isLandscape = false
+    private var isLandscapeStage = false
     private var isScreenOff = false
     private var isBarOurs = false
     private var screenWatch: BroadcastReceiver? = null
@@ -306,6 +310,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         readScreen()
         Island.appearance = Appearance.read(preferences)
         Island.onBlobsDrawn = ::requestPaneSync
+        Island.onDashboardLeft = ::hideLandscapeStage
 
         owner.start()
         composeView = ComposeView(this).apply {
@@ -416,6 +421,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     override fun onConfigurationChanged(configuration: Configuration) {
         super.onConfigurationChanged(configuration)
         isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        isLandscapeStage = false
         readScreen()
         canvasParams.width = screenWidth()
         canvasParams.height = screenHeight()
@@ -439,6 +445,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             togglesWorker.shutdownNow()
             levelsWorker.shutdownNow()
             Island.onBlobsDrawn = {}
+            Island.onDashboardLeft = {}
             Island.stop()
             proxies.values.forEach { runCatching { windowManager.removeView(it.view) } }
             shadeGuard?.let { runCatching { windowManager.removeView(it) } }
@@ -481,10 +488,23 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         applyVisibility()
     }
 
-    private fun isHidden() = isScreenOff || isLandscape || isFullScreen
+    /* Landscape hid the stage outright, so the Dashboard launcher opened a panel nobody could see; the stage is shown in landscape for as long as the Dashboard is open or leaving, and nothing but the Dashboard is drawn on it. */
+    private fun isHidden() = isScreenOff || (isLandscape && !isLandscapeStage) || (!isLandscape && isFullScreen)
 
-    private fun proxyFlags() =
-        if (isHidden()) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else BASE_FLAGS
+    private fun showLandscapeStage() {
+        if (isLandscapeStage || isScreenOff) return
+        isLandscapeStage = true
+        applyVisibility()
+    }
+
+    private fun hideLandscapeStage() {
+        if (!isLandscapeStage || Island.dashboard.isOpen) return
+        isLandscapeStage = false
+        applyVisibility()
+    }
+
+    private fun proxyFlags(region: Region) =
+        if (isHidden() || (isLandscape && region !in LANDSCAPE_REGIONS)) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else BASE_FLAGS
 
     private fun applyVisibility() {
         val isHidden = isHidden()
@@ -498,7 +518,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             Island.bubble.toClosedIfExtended()
         } else requestPaneSync()
         proxies.values.forEach { proxy ->
-            proxy.placed?.let { proxy.params.flags = proxyFlags() }
+            proxy.placed?.let { proxy.params.flags = proxyFlags(proxy.region) }
             relayout(proxy.view, proxy.params)
         }
         shadeGuardParams?.let { guardParams ->
@@ -850,7 +870,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         relayout(band.view, band.params)
         val restore = {
             if (band.placed != null) {
-                band.params.flags = proxyFlags()
+                band.params.flags = proxyFlags(Region.Alert)
                 relayout(band.view, band.params)
             }
         }

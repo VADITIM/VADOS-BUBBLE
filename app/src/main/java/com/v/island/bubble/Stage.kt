@@ -5,15 +5,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import com.v.island.vas.LocalAccent
 
 @Composable
 fun IslandStage() {
     val appearance = Island.appearance
     CompositionLocalProvider(LocalAccent provides appearance.accent) {
-        Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (Island.isLandscape) 0f else 1f }) {
-            PanelShield(Island.bubble)
+        val isLandscape = Island.isLandscape
+        Box(Modifier.fillMaxSize()) {
+            if (!isLandscape) PanelShield(Island.bubble)
             DashboardScrim(Island.dashboard)
             LiquidLayer(
                 Island.liquid,
@@ -21,17 +21,19 @@ fun IslandStage() {
                 melt = { Island.appearance.melt * Island.density },
                 hairline = Island.density,
             )
-            SatellitesView(Island.bubble)
+            if (!isLandscape) SatellitesView(Island.bubble)
             DashboardPanel(Island.dashboard)
-            NowView(Island.now)
+            if (!isLandscape) NowView(Island.now)
             ClockView(Island.clock)
             StatusView(Island.status)
-            ClearButton(Island.bubble)
-            MainBubbleView(Island.bubble)
-            TorchView(Island.bubble)
-            TorchOffView(Island.bubble)
-            DarkAlertView()
-            AlertBand(Island.bubble)
+            if (!isLandscape) {
+                ClearButton(Island.bubble)
+                MainBubbleView(Island.bubble)
+                TorchView(Island.bubble)
+                TorchOffView(Island.bubble)
+                DarkAlertView()
+                AlertBand(Island.bubble)
+            }
         }
     }
 }
