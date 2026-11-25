@@ -1,3 +1,3 @@
-# 0.7.13
+# 0.7.14
 
-Pulling the expanded player down now shows the pause or play mark over the artwork: it slides down with your finger, ticks once it would act, and flashes as you let go.
+The expanded player's title and artist now type in the way VADOS-SHELL does: each character spins in through a run of symbols and settles on its letter, one after another. A new song only retypes from the first character that changed.

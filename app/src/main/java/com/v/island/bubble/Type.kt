@@ -10,7 +10,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -254,6 +258,67 @@ fun AwayText(text: String, style: TextStyle, isAway: Boolean, firstOrder: Int, m
 }
 
 private const val AWAY_TURN = -40f
+
+@Composable
+fun ScrambleText(text: String, style: TextStyle, delayMilliseconds: Int, modifier: Modifier = Modifier) {
+    var previous by remember { androidx.compose.runtime.mutableStateOf("") }
+    val starts = remember { androidx.compose.runtime.mutableStateListOf<Long>() }
+    var now by remember { mutableLongStateOf(0L) }
+    var lineWidth by remember { mutableIntStateOf(0) }
+    var roomWidth by remember { mutableIntStateOf(0) }
+    LaunchedEffect(text) {
+        val from = firstDifference(previous, text)
+        val count = text.length - from
+        val stagger = if (count > 1) minOf(SCRAMBLE_STAGGER, maxOf(0L, SCRAMBLE_BUDGET - SCRAMBLE_SPIN) / (count - 1)) else SCRAMBLE_STAGGER
+        val begin = System.currentTimeMillis() + if (previous.isEmpty()) delayMilliseconds else 0
+        val placed = List(text.length) { index -> if (index < from) starts.getOrElse(index) { SCRAMBLE_SETTLED } else begin + (index - from) * stagger }
+        starts.clear()
+        starts.addAll(placed)
+        previous = text
+        val end = (placed.maxOrNull() ?: 0L) + SCRAMBLE_SPIN
+        do {
+            now = androidx.compose.runtime.withFrameMillis { System.currentTimeMillis() }
+        } while (now < end)
+    }
+    val hidden = style.copy(color = Color.Transparent)
+    Box((if (lineWidth > roomWidth) modifier.fadeEnd() else modifier).clipToBounds().onSizeChanged { roomWidth = it.width }) {
+        androidx.compose.foundation.layout.Row(Modifier.wrapContentWidth(Alignment.Start, unbounded = true).onSizeChanged { lineWidth = it.width }) {
+            text.forEachIndexed { index, actual ->
+                val local = (now - (starts.getOrNull(index) ?: Long.MAX_VALUE)).toFloat() / SCRAMBLE_SPIN
+                Box {
+                    BasicText(actual.toString(), style = hidden, maxLines = 1, softWrap = false)
+                    if (actual != ' ' && local > 0f) {
+                        val isResolved = local >= SCRAMBLE_SETTLE
+                        val eased = 1f - (1f - local.coerceAtMost(1f)).let { it * it * it }
+                        val step = (local / SCRAMBLE_SETTLE * SCRAMBLE_CYCLES).toInt()
+                        BasicText(
+                            if (isResolved) actual.toString() else SCRAMBLE_SYMBOLS[(index * 7 + step * 3) % SCRAMBLE_SYMBOLS.length].toString(),
+                            Modifier.matchParentSize().wrapContentWidth(unbounded = true).graphicsLayer { rotationZ = if (local >= 1f) 0f else (1f - eased) * 360f },
+                            style = style,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun firstDifference(previous: String, next: String): Int {
+    val shared = minOf(previous.length, next.length)
+    for (index in 0 until shared) if (previous[index] != next[index]) return index
+    return shared
+}
+
+/* Mirrors scrambleSymbols in the shell's config/Appearance.qml and the scramble timings in its config/Motion.qml; the budget caps a long title the way typeBudget does there. */
+private const val SCRAMBLE_SYMBOLS = "&$~|=+-/\\#*%"
+private const val SCRAMBLE_STAGGER = 45L
+private const val SCRAMBLE_SPIN = 260L
+private const val SCRAMBLE_SETTLE = 0.65f
+private const val SCRAMBLE_CYCLES = 4
+private const val SCRAMBLE_BUDGET = 900L
+private const val SCRAMBLE_SETTLED = -1_000_000_000L
 
 fun typeInterval(characters: Int): Float = minOf(TYPE_CHARACTER, TYPE_BUDGET / characters.coerceAtLeast(1))
 

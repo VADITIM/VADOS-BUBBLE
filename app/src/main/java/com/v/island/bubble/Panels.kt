@@ -362,9 +362,9 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                 .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Black.copy(alpha = 0.08f), Color.Transparent)))
                 .padding(start = 16.8.dp, end = 16.8.dp, top = 13.6.dp, bottom = 41.6.dp),
         ) {
-            TypedText(media.title, type(1.02f, Palette.textBright, appearance.mainFont, appearance.mainScale, lineHeight = 1.25f), Durations.CONTENT_DROP, maxLines = 1, interval = MEDIA_TYPE_CHARACTER)
+            ScrambleText(media.title, type(1.02f, Palette.textBright, appearance.mainFont, appearance.mainScale, lineHeight = 1.25f), Durations.CONTENT_DROP)
             Spacer(Modifier.height(4.dp))
-            TypedText(media.artist.uppercase(), type(0.8f, media.accent, appearance.mainFont, appearance.mainScale, spacing = 0.1f, lineHeight = 1.25f), Durations.CONTENT_DROP + 120, maxLines = 1, interval = MEDIA_TYPE_CHARACTER)
+            ScrambleText(media.artist.uppercase(), type(0.8f, media.accent, appearance.mainFont, appearance.mainScale, spacing = 0.1f, lineHeight = 1.25f), Durations.CONTENT_DROP + 120)
         }
         Box(
             /* The shorter player left the grown scrub band taller than twice its 52 rest, so its bottom padding went negative and dragging the timeline crashed the app; the band is moved by an offset, which may go below the edge. */
