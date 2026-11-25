@@ -88,7 +88,10 @@ fun ArtCircle(media: Media?, diameter: Float, modifier: Modifier = Modifier) {
     }
 }
 
-fun mediaTileWidth(appearance: Appearance) = glyphSize(appearance) * MEDIA_TILE_RATIO
+/* The tile stood at the glyph's height with 5 of pill around it and read as small; it is as tall as the pill less a slight padding, the same above, below and to its left. */
+fun mediaTileHeight(appearance: Appearance) = appearance.compactHeight - 2f * MEDIA_TILE_INSET
+
+fun mediaTileWidth(appearance: Appearance) = mediaTileHeight(appearance) * MEDIA_TILE_RATIO
 
 /* The closed Media face was a round thumbnail, so nothing showed whose song it was; the artwork is a wide tile, padded from the pill by the same distance on every side and rounded concentric with it, and a new song pushes the old tile out past the left edge while the new one follows in. */
 @Composable
@@ -96,7 +99,7 @@ fun MediaFace(appearance: Appearance) {
     val media = Island.media
     val padding = (appearance.compactHeight - glyphSize(appearance)) / 2f
     val tile = mediaTileWidth(appearance)
-    val travel = padding + tile
+    val travel = MEDIA_TILE_INSET + tile
     Row(
         Modifier.fillMaxSize().padding(end = padding.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -104,7 +107,7 @@ fun MediaFace(appearance: Appearance) {
     ) {
         AnimatedContent(
             targetState = media,
-            modifier = Modifier.size(travel.dp, glyphSize(appearance).dp).clipToBounds().fadeStart(padding.dp),
+            modifier = Modifier.size(travel.dp, mediaTileHeight(appearance).dp).clipToBounds().fadeStart(MEDIA_TILE_INSET.dp),
             contentKey = { song -> song?.let { it.title + "|" + it.artist } },
             contentAlignment = Alignment.CenterEnd,
             transitionSpec = {
@@ -114,7 +117,7 @@ fun MediaFace(appearance: Appearance) {
             },
             label = "mediaTile",
         ) { song ->
-            Box(Modifier.size(tile.dp, glyphSize(appearance).dp).clip(RoundedCornerShape((appearance.compactHeight / 2f - padding).dp)).background(Palette.sunken)) {
+            Box(Modifier.size(tile.dp, mediaTileHeight(appearance).dp).clip(RoundedCornerShape((appearance.compactHeight / 2f - MEDIA_TILE_INSET).dp)).background(Palette.sunken)) {
                 val art = song?.art
                 if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
@@ -220,6 +223,7 @@ fun TripFace(appearance: Appearance) {
 
 const val SWEEP_CYCLE = 12_000L
 const val MEDIA_TILE_RATIO = 1.5f
+const val MEDIA_TILE_INSET = 3f
 const val EQUALIZER_BARS = 5
 const val WAVE_BARS = 54
 private const val WAVE_BEAT = 480f

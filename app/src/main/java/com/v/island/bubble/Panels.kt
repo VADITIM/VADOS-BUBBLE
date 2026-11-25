@@ -307,7 +307,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
     val glyph = glyphSize(appearance)
     val inset = (appearance.compactHeight - glyph) / 2f
     val tile = mediaTileWidth(appearance)
-    val tileRadius = appearance.compactHeight / 2f - inset
+    val tileRadius = appearance.compactHeight / 2f - MEDIA_TILE_INSET
     val shownTitle = remember { arrayOf(media.title) }
     val shownArt = remember { arrayOf(media.art) }
     LaunchedEffect(media.title) {
@@ -322,7 +322,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
             /* The swipe was read inside the art it moves, so every pixel of shift moved the finger's local position back by as much and the drag lagged and jumped; the gesture is read before the shift. */
             Modifier.foldInto({ fold.value }, { width, height -> Rect(0f, 0f, width, height) }) { width, _ ->
                 val left = (width - closedWidth * density) / 2f
-                Rect(left + inset * density, inset * density, left + (inset + tile) * density, (closedHeight - inset) * density)
+                Rect(left + MEDIA_TILE_INSET * density, MEDIA_TILE_INSET * density, left + (MEDIA_TILE_INSET + tile) * density, (closedHeight - MEDIA_TILE_INSET) * density)
             }
                 .pointerInput(skip) {
                     awaitEachGesture {

@@ -1,3 +1,3 @@
-# 0.7.20
+# 0.7.21
 
-The main pill bounces a little less when a mod expands and a little more when it settles home on close.
+The artwork tile on the left of the closed Media pill is taller: it fills the pill with a slight 3 of padding, the same above, below and to its left.
