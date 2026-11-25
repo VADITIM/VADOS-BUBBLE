@@ -1006,7 +1006,7 @@ private fun ModeButton(dashboard: Dashboard, name: String, centre: Float, geomet
         val paired = Island.connectivity?.paired
         if (name == "bluetooth" && paired != null && paired.names.size == 1 && paired.charge >= 0) {
             val charge = paired.charge
-            Canvas(Modifier.size(GRID_ICON.dp).graphicsLayer {
+            Canvas(Modifier.size((GRID_ICON - CHARGE_INSET * 2f * appearance.connectorsScale).dp).graphicsLayer {
                 rotationZ = turn.rotation
                 val grown = 0.55f + 0.45f * turn.growth
                 scaleX = grown
@@ -1526,6 +1526,7 @@ private const val GRID_TALL = 233f
 private const val GRID_ICON = 60f
 private const val GRID_COLUMN = 80f
 private const val RING_SIZE = 78f
+private const val CHARGE_INSET = 7f
 private const val KNOB_GAP = 5f
 private const val KNOB_ICON = 27f
 private const val LEVELS_WIDE = 108f
