@@ -1101,7 +1101,8 @@ class MainBubble {
 
     private fun tap() {
         if (mode == Mode.Extended) {
-            if (panelMod() != null) return
+            // A tap inside the menu that no row took fell through to closing it, so tapping its empty side shut the menu; only a tap outside it closes it, in onDown.
+            if (panelMod() != null || size == Size.Notifications) return
             Haptics.play(Haptic.Tap)
             toClosed()
             return
