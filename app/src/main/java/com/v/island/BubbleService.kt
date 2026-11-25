@@ -420,6 +420,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
 
     override fun onConfigurationChanged(configuration: Configuration) {
         super.onConfigurationChanged(configuration)
+        // A configuration change delivered before onServiceConnected read the window manager that is only set there and crashed the restart.
+        if (!::windowManager.isInitialized) return
         isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         isLandscapeStage = false
         readScreen()

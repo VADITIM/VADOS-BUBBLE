@@ -199,7 +199,8 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
     val time = "${calendar.get(java.util.Calendar.HOUR_OF_DAY)}:${pad(calendar.get(java.util.Calendar.MINUTE))}"
     /* The bubble slid under the player and shrank to nothing, so the Clock vanished while the player was open; it stays where it is and only its characters turn out, one by one, and back in when the player closes. */
     val isAway = Island.isPlayerOpen
-    val grow = animateFloatAsState(if (isCornered) CORNER_GROW else 1f, tween(Durations.GROW, easing = Curves.split), label = "clockGrow")
+    val corner = animateFloatAsState(if (isCornered) 1f else 0f, tween(Durations.GROW, easing = Curves.split), label = "clockCorner")
+    val grow = 1f + (CORNER_GROW - 1f) * corner.value
     var secondsForm by remember { mutableStateOf(isCornered) }
     val secondsPop = remember { Animatable(1f) }
     LaunchedEffect(isCornered) {
@@ -219,7 +220,8 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AwayText(
                 time,
-                type(0.68f * grow.value, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.5f - 0.3f * (grow.value - 1f) / (CORNER_GROW - 1f)),
+                /* The corner line height was read off the grow over CORNER_GROW - 1, which is 0/0 once the corner stopped growing the clock, and the NaN crashed every frame; it follows its own 0 to 1 progress. */
+                type(0.68f * grow, Color.White, appearance.clockFont, appearance.clockScale, weight = FontWeight.Medium, lineHeight = 1.5f - 0.3f * corner.value),
                 isAway,
                 0,
             )
