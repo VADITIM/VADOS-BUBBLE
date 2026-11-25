@@ -1,3 +1,3 @@
-# 0.7.16
+# 0.7.17
 
-Opening and closing the expanded player is one movement now. Closing drops the text at once while the artwork travels back into the small pill's tile on the left, and the timeline shrinks into the small wave on the right. Opening runs the same path in reverse, out to their full places.
+Opening the player no longer shows the timeline fully played before it jumps back. It keeps the song's real progress as it unfolds. When a song ends and the next one starts by itself, the expanded artwork slides out to the right and the new one slides in from the left.

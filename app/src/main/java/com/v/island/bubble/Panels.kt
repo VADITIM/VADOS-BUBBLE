@@ -308,8 +308,16 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
     val inset = (appearance.compactHeight - glyph) / 2f
     val tile = mediaTileWidth(appearance)
     val tileRadius = appearance.compactHeight / 2f - inset
+    val shownTitle = remember { arrayOf(media.title) }
+    val shownArt = remember { arrayOf(media.art) }
+    LaunchedEffect(media.title) {
+        if (media.title == shownTitle[0]) return@LaunchedEffect
+        shownTitle[0] = media.title
+        if (!skip.isSkipping && !isFolding) skip.carry(shownArt[0])
+    }
+    SideEffect { if (skip.heldArt == null && media.title == shownTitle[0]) shownArt[0] = media.art }
     Box(Modifier.fillMaxSize()) {
-        val art = media.art
+        val art = skip.heldArt ?: media.art
         Box(
             /* The swipe was read inside the art it moves, so every pixel of shift moved the finger's local position back by as much and the drag lagged and jumped; the gesture is read before the shift. */
             Modifier.foldInto({ fold.value }, { width, height -> Rect(0f, 0f, width, height) }) { width, _ ->
@@ -376,7 +384,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
         }
         val isWaveMoving = isFolding || fold.value > 0f
         if (isWaveMoving) {
-            FoldingWave(media, ratio, { fold.value }, Modifier.foldInto({ fold.value }, { width, height ->
+            FoldingWave(media, if (isFolding) 1f else ratio, ratio, { fold.value }, Modifier.foldInto({ fold.value }, { width, height ->
                 Rect(WAVE_SIDE * density, height - (WAVE_REST_BAND * 1.5f) * density, width - WAVE_SIDE * density, height - (WAVE_REST_BAND / 2f) * density)
             }) { width, _ ->
                 val right = (width + closedWidth * density) / 2f
@@ -470,10 +478,10 @@ private fun Modifier.foldInto(fold: () -> Float, from: (Float, Float) -> Rect, t
 }
 
 @Composable
-private fun FoldingWave(media: Media, ratio: Float, fold: () -> Float, modifier: Modifier) {
+private fun FoldingWave(media: Media, closedRatio: Float, ratio: Float, fold: () -> Float, modifier: Modifier) {
     val progress = fold().coerceIn(0f, 1f)
     val bars = (WAVE_BARS + (EQUALIZER_BARS - WAVE_BARS) * progress).roundToInt()
-    Wave(media, bars, ratio = { ratio + (1f - ratio) * progress }, modifier = modifier)
+    Wave(media, bars, ratio = { ratio + (closedRatio - ratio) * progress }, modifier = modifier)
 }
 
 private class PlayerSwipe {
@@ -483,6 +491,16 @@ private class PlayerSwipe {
     val arrow = Animatable(0f)
     var armedSide by mutableIntStateOf(0)
     var arrowSide by mutableIntStateOf(1)
+    var heldArt by mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    var isSkipping = false
+
+    suspend fun carry(previous: androidx.compose.ui.graphics.ImageBitmap?) {
+        heldArt = previous
+        push.animateTo(PLAYER_THROW, tween(SKIP_OUT, easing = Curves.powerTwoIn))
+        heldArt = null
+        push.snapTo(-PLAYER_THROW)
+        push.animateTo(0f, tween(Durations.MORPH, easing = Curves.grow))
+    }
 
     fun artShift(): Float = drag.value + kick.value + push.value
 
@@ -543,6 +561,7 @@ private class PlayerSwipe {
         val title = Island.media?.title
         Haptics.play(Haptic.Tap)
         Island.actions.mediaControl(if (side > 0) "next" else "previous")
+        isSkipping = true
         scope.launch {
             push.animateTo(side * PLAYER_THROW, tween(SKIP_OUT, easing = Curves.powerTwoIn))
             withTimeoutOrNull(SKIP_WAIT) { snapshotFlow { Island.media?.title }.first { it != title } }
@@ -550,6 +569,7 @@ private class PlayerSwipe {
             arrow.snapTo(0f)
             push.snapTo(-side * PLAYER_THROW)
             push.animateTo(0f, tween(Durations.MORPH, easing = Curves.grow))
+            isSkipping = false
         }
     }
 }

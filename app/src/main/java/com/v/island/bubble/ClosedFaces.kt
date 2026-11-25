@@ -253,7 +253,6 @@ fun Wave(media: Media?, bars: Int, ratio: () -> Float, modifier: Modifier = Modi
         }
     }
     val accent = media?.accent ?: Color.White
-    val isWhole = bars != WAVE_BARS
     Canvas(modifier) {
         val now = frame.toFloat()
         val position = media?.let { it.position + if (it.isPlaying) android.os.SystemClock.elapsedRealtime() - it.receivedAt else 0L } ?: 0L
@@ -269,7 +268,8 @@ fun Wave(media: Media?, bars: Int, ratio: () -> Float, modifier: Modifier = Modi
         for (index in 0 until bars) {
             val share = (index + 0.5f) / bars
             val x = index * step + (step - thickness) / 2f
-            if (!isWhole && share > played) {
+            /* Any bar count but the timeline's drew every bar whole, so the opening player's wave, counting its bars up, showed fully played until the last frame; what is played is the ratio alone. */
+            if (share > played) {
                 drawCircle(Color.White.copy(alpha = 0.32f), dot / 2f, Offset(x + thickness / 2f, middle))
                 continue
             }
