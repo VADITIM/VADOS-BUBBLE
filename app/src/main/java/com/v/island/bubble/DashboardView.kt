@@ -1012,7 +1012,7 @@ private fun ModeButton(dashboard: Dashboard, name: String, centre: Float, geomet
                 scaleX = grown
                 scaleY = grown
             }) {
-                val width = 2.dp.toPx()
+                val width = 1.2.dp.toPx()
                 val ring = androidx.compose.ui.geometry.Size(size.width - width, size.height - width)
                 val corner = Offset(width / 2f, width / 2f)
                 val colour = StatusBubble.levelColour(charge)

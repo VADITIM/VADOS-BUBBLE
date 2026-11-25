@@ -1,3 +1,3 @@
-# 0.7.59
+# 0.7.60
 
-In the Dashboard, the Bluetooth button now shows the headset charge as a coloured ring around its icon instead of a number beside it.
+The Bluetooth charge rings are back to their full size but drawn with a thinner line, in both the status pill and the Dashboard.
