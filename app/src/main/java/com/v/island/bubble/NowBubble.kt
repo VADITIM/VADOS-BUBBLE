@@ -36,7 +36,8 @@ class NowBubble {
         private set
     var isLockOpen by mutableStateOf(false)
         private set
-    private var isHomeHeld by mutableStateOf(false)
+    var isHomeHeld by mutableStateOf(false)
+        private set
     private var isLocked = false
 
     var poseX by mutableFloatStateOf(0f)

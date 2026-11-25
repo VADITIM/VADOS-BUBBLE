@@ -142,7 +142,8 @@ class MainBubble {
     val liveMods: List<Mod> get() = if (isTorchShown && isTorchDocked) listOf(Mod.Torch) + modOrder.filter(::isLive) else modOrder.filter(::isLive)
 
     /* Folding the torch put Main into its folded face the moment the finger lifted, so Main changed under the flashlight still flying home; Main keeps what it was until the flight lands, and with nothing of its own to show it lends itself to the torch as a hidden circle the torch grows out of and lands back into. */
-    val isLent: Boolean get() = (isTorchOpen || isTorchFlying) && !isTorchDocked && size == Size.Idle && modOrder.none(::isLive)
+    /* Leaving the Dashboard drew Main's idle pill at the punch hole while the Now pill was still flying home to become it, so two pills stood at once; Main stays lent until the drop melts into it. */
+    val isLent: Boolean get() = ((isTorchOpen || isTorchFlying) && !isTorchDocked || Island.now.isHomeHeld) && size == Size.Idle && modOrder.none(::isLive)
 
     var isTorchFlying by mutableStateOf(false)
         private set

@@ -1,3 +1,3 @@
-# 0.7.70
+# 0.7.71
 
-- Now pill tappable as soon as it lands; connectors and sliders raised by 5% of the screen height; the expanded Now pill centres between the sliders and the toggles instead of pushing the toggles off-screen.
+- Main stays hidden while the Now pill flies home from the Dashboard, so the drop becomes Main instead of meeting a second pill.
