@@ -1,3 +1,3 @@
-# 0.7.44
+# 0.7.45
 
-Opening the Dashboard, the clock's time slides straight to its final place while the pill grows; the small seconds pop out, the large seconds pop in beside it without moving it, and then the date appears, no longer cut off. The clock and status pills stay put while the notifications menu is open.
+For testing, an Alert's pill now reaches the top and both sides of the screen; its content stays exactly where it was. The messaging bubble and its separate app launcher icon are gone.

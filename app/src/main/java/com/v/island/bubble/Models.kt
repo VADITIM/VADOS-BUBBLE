@@ -152,19 +152,6 @@ data class Vitals(val storage: Vital?, val ram: Vital?)
 @Immutable
 data class Weather(val celsius: Double, val sky: String)
 
-@Immutable
-data class Conversation(
-    val id: String,
-    val packageName: String,
-    val accent: Color,
-    val title: String,
-    val isGroup: Boolean,
-    val unread: Int,
-    val isLive: Boolean,
-    val updatedAt: Long,
-    val messages: List<Message>,
-)
-
 object Payloads {
     /* The cache held 48 entries whatever their size, keyed by their whole base64 text, and decoded pictures at full resolution, so a few photos in a row ran the service out of memory; it is now bounded by bytes and pictures are decoded no larger than the screen needs. */
     private val decoded = object : android.util.LruCache<String, ImageBitmap>(IMAGE_CACHE_BYTES) {
@@ -344,21 +331,4 @@ object Payloads {
         "critical" -> BatteryEvent.Critical
         else -> null
     }
-
-    fun conversations(array: JSONArray): List<Conversation> =
-        (0 until array.length()).mapNotNull { index ->
-            array.optJSONObject(index)?.let {
-                Conversation(
-                    id = it.optString("id"),
-                    packageName = it.optString("package"),
-                    accent = it.accent(),
-                    title = it.optString("title"),
-                    isGroup = it.optBoolean("isGroup"),
-                    unread = it.optInt("unread"),
-                    isLive = it.optBoolean("isLive"),
-                    updatedAt = it.optLong("updatedAt"),
-                    messages = messages(it.optJSONArray("messages")),
-                )
-            }
-        }
 }

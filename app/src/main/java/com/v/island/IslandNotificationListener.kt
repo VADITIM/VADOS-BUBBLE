@@ -232,11 +232,6 @@ class IslandNotificationListener : NotificationListenerService() {
         publishTimer()
         publishCall()
         publishTrip()
-        runCatching { activeNotifications }.getOrNull().orEmpty()
-            .filter { MessagingWatch.isMessaging(it) }
-            .sortedBy { it.postTime }
-            .forEach { MessagingWatch.collect(this, it) }
-        MessagingWatch.publish(this)
         iconWorker.execute { shade() }
     }
 
@@ -279,10 +274,6 @@ class IslandNotificationListener : NotificationListenerService() {
         traceVerdict(statusBarNotification)
         if (statusBarNotification.packageName == "com.discord") traceDiscord(statusBarNotification.notification)
         if (statusBarNotification.packageName == DbWatch.PACKAGE) DbWatch.dump(this, statusBarNotification)
-        if (MessagingWatch.isMessaging(statusBarNotification)) {
-            MessagingWatch.dump(statusBarNotification)
-            MessagingWatch.collect(this, statusBarNotification)
-        }
         if (DbWatch.isTrip(statusBarNotification)) {
             publishTrip()
             return
@@ -380,7 +371,6 @@ class IslandNotificationListener : NotificationListenerService() {
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) {
         NotificationLog.forget(statusBarNotification.key)
         icons.remove(statusBarNotification.key)
-        if (MessagingWatch.isMessaging(statusBarNotification)) MessagingWatch.gone(this, statusBarNotification.key)
         
         
         BubbleService.deliverGone(statusBarNotification.key)

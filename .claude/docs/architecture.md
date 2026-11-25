@@ -28,7 +28,6 @@ One file per source of truth, each pushing a JSON payload or `null`:
 | `AlarmWatch` | an alarm ringing, told apart by its full-screen intent — recognised only so that nothing is drawn for it |
 | `BatteryWatch`, `MicrophoneAccess` | charge, sensor privacy |
 | `ConnectivityWatch` | the default network and its name, USB, tethering, and what is paired over bluetooth |
-| `MessagingWatch` | Telegram's conversation notifications, kept as one thread per conversation in memory; only the conversations allowed in Settings reach the page |
 
 **A notification is listed and announced if the shade would draw words for it.** Its title and text are read through every field a style may carry them in — big title, conversation title, big text, inbox lines, the last message, sub-text, ticker — not only `EXTRA_TITLE`/`EXTRA_TEXT`, and a group summary is skipped only while a child of its group is standing; a summary alone is the notification (Reddit posts some that way). The `KILL_GRACE` re-check asks the same question again, so a summary whose child landed during the grace is not announced twice.
 
@@ -152,7 +151,6 @@ reads "Start the bubbles" afterwards and re-adds the component the way the Acces
 and cannot end up adding a second copy of it. It kills the service, never the process:
 the panel is the thing being worked and has to survive the press.
 
-**`MessagingPanelActivity` ("VADOS Messaging") is a third launcher entry of the same kind**, for a Good Lock gesture: `BubbleService.toggleMessaging()` → `window.onToggleMessaging()`, which pulls the leading messaging bubble out of the Clock to just under it, or docks it back if it is out. It is not `showWhenLocked`, since no messaging bubble is drawn on the keyguard.
 
 **There is a second activity, and it is not a screen.** `StatusPanelActivity` is a launcher entry
 whose whole body is `BubbleService.toggleStatusPanel()` and `finish()`. It exists because One UI's

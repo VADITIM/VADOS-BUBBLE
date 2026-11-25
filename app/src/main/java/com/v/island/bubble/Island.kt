@@ -72,7 +72,6 @@ object Island {
     var transfer by mutableStateOf<Transfer?>(null)
     var connectivity by mutableStateOf<Connectivity?>(null)
     var charge by mutableStateOf<Charge?>(null)
-    var conversations by mutableStateOf<List<Conversation>>(emptyList())
 
     var isTouchDown = false
     var wasCancelled = false

@@ -443,7 +443,7 @@ class MainBubble {
                 val box = layout()
                 Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
             }
-            Size.Alert -> Frame(ALERT_WIDTH, alertHeight(), 24f, grab, 0f)
+            Size.Alert -> Frame(Island.screenWidth, alertHeight() + grab, 24f, 0f, 0f)
             Size.Image -> Frame(ALERT_WIDTH, ALERT_IMAGE_HEIGHT, 24f, grab, 0f)
             Size.AlertCentre -> {
                 val tall = alertHeight()

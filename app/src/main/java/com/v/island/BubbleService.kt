@@ -81,8 +81,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             Island.dashboard.toggle()
         }
 
-        fun toggleMessaging() = Unit
-
         fun toggleNotifications() = Island.post {
             if (instance == null) return@post
             if (Island.bubble.size == com.v.island.bubble.Size.Notifications) Island.bubble.toClosed()
@@ -121,11 +119,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
 
         fun deliverCount(count: Int) = Island.post { Island.unread = count }
-
-        fun deliverMessaging(conversations: JSONArray) {
-            val parsed = Payloads.conversations(conversations)
-            Island.post { Island.conversations = parsed }
-        }
 
         fun deliverTimer(timer: JSONObject?) {
             val parsed = Payloads.timer(timer)

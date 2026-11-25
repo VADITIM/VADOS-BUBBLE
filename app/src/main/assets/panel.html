@@ -645,11 +645,6 @@
 
   <div id="fields"></div>
 
-  <section class="module stagger" id="messaging" data-group="Messaging">
-    <span class="module-label">Messaging bubbles</span>
-    <div id="conversations"></div>
-    <p class="note">Telegram conversations seen since the bubbles started. Only the ones set to bubble get a messaging bubble.</p>
-  </section>
 </section>
 
 <section class="screen" data-screen="debug" data-accent="#ffb020" data-side="right">
@@ -670,16 +665,6 @@
       <button class="wide" onclick="Panel.sendDebugNotifications()">Send 5 random notifications</button>
       <button class="wide" onclick="Panel.simulateDarkAlert()">Simulate always-on alert</button>
     </div>
-  </section>
-
-  <section class="module stagger">
-    <span class="module-label">Messaging</span>
-    <div class="actions">
-      <button class="wide" onclick="Panel.simulateMessaging()">Simulate messaging bubble</button>
-      <button class="wide" onclick="Panel.simulateMessagingReply()">Simulate my reply</button>
-      <button class="wide" onclick="Panel.clearMessaging()">Clear all threads</button>
-    </div>
-    <pre class="note" id="messaging-trace">—</pre>
   </section>
 
   <section class="module stagger">
@@ -1307,34 +1292,8 @@
     const serviceToggle = document.getElementById('service-toggle');
     serviceToggle.textContent = state.serviceRunning ? 'Force stop the bubbles' : 'Start the bubbles';
     serviceToggle.classList.toggle('running', state.serviceRunning);
-    paintConversations(state.conversations || []);
   };
 
-  function paintConversations(conversations) {
-    const list = document.getElementById('conversations');
-    list.replaceChildren(...conversations.map(conversation => {
-      const row = document.createElement('div');
-      row.className = 'row';
-      const name = document.createElement('span');
-      name.className = 'row-name';
-      name.textContent = conversation.title || conversation.id;
-      const button = document.createElement('button');
-      button.className = 'grant' + (conversation.isAllowed ? ' granted' : '');
-      button.textContent = conversation.isAllowed ? 'bubbles' : 'allow';
-      button.addEventListener('click', () => {
-        Panel.allowConversation(conversation.id, !conversation.isAllowed);
-        Panel.triggerHaptic();
-      });
-      row.append(name, button);
-      return row;
-    }));
-    if (!conversations.length) {
-      const empty = document.createElement('p');
-      empty.className = 'note';
-      empty.textContent = 'No Telegram conversation yet.';
-      list.appendChild(empty);
-    }
-  }
 
   
   function buildStates() {
@@ -1412,7 +1371,7 @@
 
   let activeGroup = 'All';
   function applyGroupFilter() {
-    for (const module of document.querySelectorAll('#fields .module, #messaging')) {
+    for (const module of document.querySelectorAll('#fields .module')) {
       module.hidden = activeGroup !== 'All' && module.dataset.group !== activeGroup;
     }
   }
@@ -1420,7 +1379,7 @@
     const groupNav = document.getElementById('group-nav');
     const groups = ['All', ...new Set(
       FIELDS.filter(field => field.screen !== 'debug').map(field => field.group)
-    ), 'Messaging'];
+    )];
     for (const group of groups) {
       const button = document.createElement('button');
       button.textContent = group;
@@ -1515,9 +1474,7 @@
   
   
   const trace = document.getElementById('trace');
-  const messagingTrace = document.getElementById('messaging-trace');
   setInterval(() => {
     trace.textContent = Panel.readTrace();
-    messagingTrace.textContent = Panel.readMessaging();
   }, 400);
 </script>
