@@ -129,7 +129,51 @@ class MainBubble {
     private val appearance get() = Island.appearance
 
     /* A folded torch was its own size beside the mods and left an active Media hiding it, and an open one stopped every mod although it stands apart at the right edge; it is the leading mod only while folded, every other mod a satellite beside it. */
-    val liveMods: List<Mod> get() = if (isTorchShown && isTorchFolded) listOf(Mod.Torch) + modOrder.filter(::isLive) else modOrder.filter(::isLive)
+    val liveMods: List<Mod> get() = if (isTorchShown && isTorchDocked) listOf(Mod.Torch) + modOrder.filter(::isLive) else modOrder.filter(::isLive)
+
+    /* Folding the torch put Main into its folded face the moment the finger lifted, so Main changed under the flashlight still flying home; Main keeps what it was until the flight lands, and with nothing of its own to show it lends itself to the torch as a hidden circle the torch grows out of and lands back into. */
+    val isLent: Boolean get() = (isTorchOpen || isTorchFlying) && !isTorchDocked && size == Size.Idle && modOrder.none(::isLive)
+
+    var isTorchFlying by mutableStateOf(false)
+        private set
+    var isTorchDocked by mutableStateOf(false)
+        private set
+    private var wasTorchOpen = false
+    private var flightJob: Job? = null
+
+    var landing by mutableFloatStateOf(0f)
+        private set
+
+    private fun syncTorch() {
+        val isOpen = isTorchOpen
+        if (isOpen == wasTorchOpen) return
+        wasTorchOpen = isOpen
+        flightJob?.cancel()
+        if (isOpen) {
+            isTorchFlying = false
+            isTorchDocked = false
+            return
+        }
+        isTorchFlying = true
+        flightJob = Island.scope.launch {
+            delay(TORCH_FLIGHT.toLong())
+            val hadMods = modOrder.any(::isLive)
+            isTorchFlying = false
+            isTorchDocked = isTorchShown && isTorchFolded
+            toClosed()
+            if (hadMods) land()
+        }
+    }
+
+    private fun land() {
+        Island.scope.launch(androidx.compose.ui.platform.AndroidUiDispatcher.Main) {
+            androidx.compose.animation.core.animate(0f, 1f, animationSpec = androidx.compose.animation.core.tween(LAND_MILLISECONDS, easing = androidx.compose.animation.core.LinearEasing)) { step, _ ->
+                landing = if (step < 0.25f) LAND_SWELL * BUMP_RISE.transform(step / 0.25f)
+                else LAND_SWELL * (1f - com.v.island.vas.Curves.bubble.transform((step - 0.25f) / 0.75f))
+            }
+            landing = 0f
+        }
+    }
 
     var clearedMods by mutableStateOf(emptySet<Mod>())
         private set
@@ -168,6 +212,8 @@ class MainBubble {
         return Rect(right - TORCH_OFF_WIDTH, top, right, top + TORCH_OFF_HEIGHT)
     }
 
+    fun lentSide(): Float = appearance.compactHeight * TORCH_LANDING
+
     fun mainRect(): Rect {
         val box = target()
         val left = Island.screenWidth / 2f + box.shift - box.width / 2f
@@ -199,6 +245,7 @@ class MainBubble {
     private fun foldTorch(isFolded: Boolean) {
         isTorchFolded = isFolded
         isTorchSliding = false
+        syncTorch()
         toClosed()
     }
 
@@ -377,7 +424,8 @@ class MainBubble {
         val grab = appearance.grab
         val grown = grab + GROWN_PAD
         return when (size) {
-            Size.Idle -> Frame(appearance.compactWidth, appearance.compactHeight, appearance.compactHeight / 2f, grab, layout().mainX)
+            Size.Idle -> if (isLent) Frame(lentSide(), lentSide(), lentSide() / 2f, grab + (appearance.compactHeight - lentSide()) / 2f, 0f)
+            else Frame(appearance.compactWidth, appearance.compactHeight, appearance.compactHeight / 2f, grab, layout().mainX)
             Size.Playing, Size.Timing, Size.Calling, Size.Travelling, Size.TorchIdle -> {
                 val box = layout()
                 Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
@@ -517,7 +565,9 @@ class MainBubble {
 
     fun onModsChanged() {
         readTorch()
-        if ((isTorchShown && isTorchFolded) != (mode == Mode.Torch)) {
+        if ((Island.torch?.step ?: 0) == 0) isTorchFolded = false
+        syncTorch()
+        if ((isTorchShown && isTorchDocked) != (mode == Mode.Torch)) {
             toClosed()
             return
         }
@@ -537,7 +587,10 @@ class MainBubble {
         mode = Mode.Idle
         notice = null
         notificationsDrop = 0f
-        if ((Island.torch?.step ?: 0) == 0) isTorchFolded = false
+        if ((Island.torch?.step ?: 0) == 0) {
+            isTorchFolded = false
+            isTorchDocked = false
+        }
         readTorch()
         val owner = liveMods.firstOrNull()
         if (owner == Mod.Torch) mode = Mode.Torch
@@ -1168,8 +1221,13 @@ class MainBubble {
         const val TORCH_MINIMUM_HEIGHT = 190f
         const val TORCH_RISE = 0.6f
         const val TORCH_EDGE = 14f
-        const val TORCH_OFF_WIDTH = 96f
-        const val TORCH_OFF_HEIGHT = 46f
+        /* The Off pill was a labelled pill beside the flashlight; it is a round button carrying the struck-through torch. */
+        const val TORCH_OFF_WIDTH = 52f
+        const val TORCH_OFF_HEIGHT = 52f
+        const val TORCH_FLIGHT = 420
+        const val TORCH_LANDING = 0.8f
+        const val LAND_SWELL = 0.1f
+        const val LAND_MILLISECONDS = 460
         const val TORCH_OFF_GAP = 14f
         const val TORCH_SWIPE_STEP = 36f
     }

@@ -61,7 +61,9 @@ fun MainBubbleView(bubble: MainBubble) {
     val top = animateFloatAsState(target.top, tween(growth, easing = if (isClosed) Curves.settle else Curves.open), label = "top")
     val shift = animateFloatAsState(target.shift, follow, label = "shift")
     val radius = animateFloatAsState(target.radius, tween(growth, easing = FastOutSlowInEasing), label = "radius")
-    val scale = animateFloatAsState(bubble.holdScale, tween(Durations.HOLD, easing = Curves.bubble), label = "hold")
+    val held = animateFloatAsState(bubble.holdScale, tween(Durations.HOLD, easing = Curves.bubble), label = "hold")
+    val scale = androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { held.value * (1f + bubble.landing) } }
+    val shown = animateFloatAsState(if (bubble.isLent) 0f else 1f, if (bubble.isLent) tween(Durations.GROW) else snap(), label = "lent")
     val rise = animateFloatAsState(
         if (bubble.isRisen) MainBubble.EDGE_OVER else 0f,
         if (bubble.isRisen) tween(Durations.CONTENT_DROP, Durations.GROW, Curves.grow) else tween(Durations.CONTENT_DROP, easing = Curves.grow),
@@ -79,6 +81,7 @@ fun MainBubbleView(bubble: MainBubble) {
             Rect(left * density, upper * density, (left + grownWidth) * density, (upper + grownHeight) * density),
             radius.value * scale.value * density,
             bubble.border(),
+            shown.value,
         )
     }
 
@@ -129,6 +132,7 @@ fun MainBubbleView(bubble: MainBubble) {
                 .graphicsLayer {
                     scaleX = scale.value
                     scaleY = scale.value
+                    alpha = shown.value
                     transformOrigin = TransformOrigin(0.5f, 0f)
                     translationX = bubble.drag.x * Island.density
                     translationY = (bubble.drag.y + bubble.bumpLift) * Island.density

@@ -60,13 +60,25 @@ private fun lerp(from: Rect, to: Rect, progress: Float) = Rect(
 
 private fun Rect.scaled(density: Float) = Rect(left * density, top * density, right * density, bottom * density)
 
+private fun circle(centre: Offset, side: Float) = Rect(centre.x - side / 2f, centre.y - side / 2f, centre.x + side / 2f, centre.y + side / 2f)
+
+/* Both pills flew home the way they came out and reached the bar as two shapes; they round off early on the way up, close on one point and land as one slightly smaller circle. */
+private fun flight(from: Rect, home: Offset, side: Float, progress: Float): Rect {
+    val flown = 1f - progress
+    val round = (flown * ROUNDING).coerceAtMost(1f)
+    val width = from.width + (side - from.width) * round
+    val height = from.height + (side - from.height) * round
+    val centre = from.center + (home - from.center) * flown
+    return Rect(centre.x - width / 2f, centre.y - height / 2f, centre.x + width / 2f, centre.y + height / 2f)
+}
+
 /* The flashlight was a size of Main and stopped every running mod while it stood open; it is a pill of its own that travels out of Main to the right edge and back, and Main keeps its mods meanwhile. */
 @Composable
 fun TorchView(bubble: MainBubble) {
     val isOpen = bubble.isTorchOpen
     val travel = animateFloatAsState(
         if (isOpen) 1f else 0f,
-        if (isOpen) tween(LONG_GROW, easing = Curves.open) else tween(Durations.GROW, easing = FastOutSlowInEasing),
+        if (isOpen) tween(LONG_GROW, easing = Curves.open) else tween(MainBubble.TORCH_FLIGHT, easing = FastOutSlowInEasing),
         label = "torchTravel",
     )
     val content = animateFloatAsState(if (isOpen) 1f else 0f, if (isOpen) snap() else tween(CONTENT_LEAVE), label = "torchContent")
@@ -75,8 +87,8 @@ fun TorchView(bubble: MainBubble) {
     Blob(Island.liquid) {
         val progress = travel.value
         if (progress <= 0.01f) return@Blob null
-        val shape = lerp(bubble.mainRect(), home, progress)
-        BlobShape(shape.scaled(Island.density), shape.width / 2f * Island.density, Palette.border)
+        val shape = if (isOpen) lerp(bubble.mainRect(), home, progress) else flight(home, bubble.mainRect().center, bubble.lentSide(), progress)
+        BlobShape(shape.scaled(Island.density), minOf(shape.width, shape.height) / 2f * Island.density, Palette.border)
     }
 
     SideEffect {
@@ -186,7 +198,7 @@ fun TorchIdleFace(appearance: Appearance) {
         GlyphIcon(Glyphs.torch, Color.White, Modifier.size(glyphSize(appearance).dp))
         BasicText(
             if (torch?.isDimmable == true) "${torch.step}/${torch.steps}" else "On",
-            style = type(0.62f, Palette.textBright, appearance.mainFont, appearance.mainScale, spacing = 0.02f),
+            style = type(IDLE_TYPE, Palette.textBright, appearance.mainFont, appearance.mainScale, spacing = 0.02f),
         )
     }
 }
@@ -197,7 +209,7 @@ fun TorchOffView(bubble: MainBubble) {
     val isShown = bubble.isTorchOpen
     val rise = animateFloatAsState(
         if (isShown) 1f else 0f,
-        if (isShown) tween(LONG_GROW, OFF_DELAY, Curves.open) else tween(Durations.GROW, easing = FastOutSlowInEasing),
+        if (isShown) tween(LONG_GROW, OFF_DELAY, Curves.open) else tween(MainBubble.TORCH_FLIGHT, easing = FastOutSlowInEasing),
         label = "torchOff",
     )
     val label = animateFloatAsState(
@@ -206,12 +218,16 @@ fun TorchOffView(bubble: MainBubble) {
         label = "torchOffLabel",
     )
     val rest = bubble.torchOffRect()
+    val placed = {
+        val progress = rise.value
+        if (isShown) lerp(circle(bubble.torchRect().center, MainBubble.TORCH_OFF_HEIGHT * OFF_SEED), rest, progress)
+        else flight(rest, bubble.mainRect().center, bubble.lentSide(), progress)
+    }
 
     Blob(Island.liquid) {
-        val progress = rise.value
-        if (progress <= 0.01f) return@Blob null
-        val shape = lerp(bubble.mainRect(), rest, progress)
-        BlobShape(shape.scaled(Island.density), shape.height / 2f * Island.density, Palette.border)
+        if (rise.value <= 0.01f) return@Blob null
+        val shape = placed()
+        BlobShape(shape.scaled(Island.density), minOf(shape.width, shape.height) / 2f * Island.density, Palette.border)
     }
 
     SideEffect {
@@ -220,7 +236,7 @@ fun TorchOffView(bubble: MainBubble) {
     }
 
     if (rise.value <= 0.01f) return
-    val shape = lerp(bubble.mainRect(), rest, rise.value)
+    val shape = placed()
     Box(
         Modifier
             .offset { IntOffset((shape.left * Island.density).roundToInt(), (shape.top * Island.density).roundToInt()) }
@@ -229,7 +245,7 @@ fun TorchOffView(bubble: MainBubble) {
             .pressable(pressedScale = 0.92f, haptic = Haptic.Dismiss) { if (isShown) Island.actions.setTorch(0) },
         contentAlignment = Alignment.Center,
     ) {
-        BasicText("Off", style = type(0.86f, Palette.danger, Island.appearance.mainFont, Island.appearance.mainScale, spacing = 0.04f))
+        GlyphIcon(Glyphs.torchOff, Palette.danger, Modifier.size(OFF_GLYPH.dp))
     }
 }
 
@@ -247,7 +263,13 @@ private val GOO_MATRIX = ColorMatrix(
         0f, 0f, 0f, 22f, -10f * 255f,
     ),
 )
-private const val OFF_DELAY = 160
+/* The Off pill grew out of Main beside the flashlight; it leaves the flashlight's side once the flashlight has landed. */
+private const val OFF_DELAY = 300
+private const val OFF_SEED = 0.3f
+private const val OFF_GLYPH = 24f
+private const val ROUNDING = 2.5f
+/* The folded level sat at the glyph's type size and reached into the punch hole on a narrow pill. */
+private const val IDLE_TYPE = 0.52f
 private const val LABEL_ARRIVE = 160
 private const val CONTENT_LEAVE = 70
 private const val IDLE_END = 10f
