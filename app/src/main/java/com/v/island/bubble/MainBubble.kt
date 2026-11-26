@@ -126,9 +126,8 @@ class MainBubble {
     private var scrollOrigin = 0
     private var scrollMode = ScrollMode.Undecided
     private var scrollFromY = 0f
-    private var lastScrollY = 0f
     private var lastScrollAt = 0L
-    private var scrollSpeed = 0f
+    private val scrollVelocity = androidx.compose.ui.input.pointer.util.VelocityTracker()
     private var flingJob: Job? = null
     var expandedGroup by mutableStateOf<String?>(null)
     private var gate = DragGate()
@@ -605,6 +604,7 @@ class MainBubble {
     }
 
     fun toClosed() {
+        android.util.Log.d("IslandBubble", "probe toClosed size=$size mode=$mode", Throwable())
         dwellJob?.cancel()
         swapArrival = null
         if (Island.isScreenDark) Island.sleepDark()
@@ -720,18 +720,18 @@ class MainBubble {
     }
 
     fun fitNotifications() {
-        val highest = appearance.grab + GROWN_PAD
+        val grownTop = appearance.grab + GROWN_PAD
         val tall = Island.screenHeight
         val below = CLEAR_GAP + CLEAR_SIZE + systemOffset()
-        val floor = (tall * 0.35f).roundToInt().toFloat()
-        val ceiling = (tall * 0.85f).roundToInt() - below
         val list = if (notificationsList >= 0f) notificationsList else groups.sumOf { group -> rowHeight(group).toDouble() }.toFloat()
-        val wanted = list + 20f
-        val height = max(floor, min(ceiling, wanted))
-        val lowest = max(highest, tall - height - below - NOTIFICATIONS_FOOT)
+        val wanted = if (groups.isEmpty()) NOTIFICATIONS_EMPTY else list + 20f
+        val full = tall - NOTIFICATIONS_TOP - below - NOTIFICATIONS_FOOT
+        val height = min(full, wanted)
+        val lowest = tall - height - below - NOTIFICATIONS_FOOT
+        val highest = min(grownTop + tall * NOTIFICATIONS_LOWER, lowest)
         val top = (lowest + (highest - lowest) * appearance.notificationsRise).roundToInt().toFloat()
         notificationsHeight = height
-        notificationsDrop = top - highest
+        notificationsDrop = top - grownTop
     }
 
     /* The height was guessed from line counts, so a long message overflowed and a short list left a gap; the menu is now sized off its rows as they are laid out, as notificationsWindow did off scrollHeight. */
@@ -782,8 +782,9 @@ class MainBubble {
     }
 
     fun openGroup(group: NoticeGroup) {
+        hasHeld = true
         Island.actions.openNotification(group.head.key)
-        Haptics.play(Haptic.Tap)
+        Haptics.play(Haptic.Expand)
         toClosed()
     }
 
@@ -902,7 +903,7 @@ class MainBubble {
         flingJob?.cancel()
         scrollOrigin = notificationsScroll.value
         scrollMode = ScrollMode.Undecided
-        scrollSpeed = 0f
+        scrollVelocity.resetTracking()
         hasMoved = false
         hasHeld = false
         hasSwiped = false
@@ -926,6 +927,7 @@ class MainBubble {
             onAlertDown(x, y)
             return
         }
+        android.util.Log.d("IslandBubble", "probe onDown x=$x y=$y holds=${holds(x, y)} mode=$mode size=$size closedInTouch=$closedInTouch")
         if (mode == Mode.Extended && size == Size.Notifications && !holds(x, y)) {
             toClosed()
             closedInTouch = true
@@ -1008,18 +1010,17 @@ class MainBubble {
                         scrollMode = ScrollMode.Along
                         scrollOrigin = notificationsScroll.value
                         scrollFromY = y
-                        lastScrollY = y
                         lastScrollAt = SystemClock.uptimeMillis()
+                        scrollVelocity.resetTracking()
                     }
                 }
                 if (scrollMode == ScrollMode.Along) {
                     hasMoved = true
                     endHold()
                     val now = SystemClock.uptimeMillis()
-                    if (now > lastScrollAt) scrollSpeed = scrollSpeed * 0.4f + (lastScrollY - y) * Island.density * 1000f / (now - lastScrollAt) * 0.6f
-                    lastScrollY = y
+                    scrollVelocity.addPosition(now, androidx.compose.ui.geometry.Offset(0f, y * Island.density))
                     lastScrollAt = now
-                    val wanted = (scrollOrigin - (y - scrollFromY) * Island.density).roundToInt()
+                    val wanted = (scrollOrigin - (y - scrollFromY) * Island.density * SCROLL_GAIN).roundToInt()
                     notificationsScroll.dispatchRawDelta(wanted - notificationsScroll.value.toFloat())
                     return
                 }
@@ -1145,7 +1146,7 @@ class MainBubble {
 
     private fun driftNotifications() {
         if (scrollMode != ScrollMode.Along || size != Size.Notifications) return
-        flingNotifications(if (SystemClock.uptimeMillis() - lastScrollAt > FLING_STALE) 0f else scrollSpeed)
+        flingNotifications(if (SystemClock.uptimeMillis() - lastScrollAt > FLING_STALE) 0f else -scrollVelocity.calculateVelocity().y * SCROLL_GAIN * FLING_SHARE)
         scrollMode = ScrollMode.Undecided
     }
 
@@ -1299,6 +1300,9 @@ class MainBubble {
         const val DOT_GAP = 5f
         const val GONE_GRACE = 900L
         const val NOTIFICATIONS_HOMING = 460L
+        const val NOTIFICATIONS_LOWER = 0.15f
+        const val NOTIFICATIONS_TOP = 48f
+        const val NOTIFICATIONS_EMPTY = 96f
         const val NOTIFICATIONS_FOOT = 16f
         const val CLEAR_SIZE = 44f
         const val SYSTEM_ROW = 44f
@@ -1311,7 +1315,9 @@ class MainBubble {
         private const val SCROLL_SLOP = 8f
         private const val FLING_FLOOR = 150f
         private const val FLING_STALE = 120L
-        private const val FLING_FRICTION = 0.6f
+        private const val FLING_FRICTION = 1.5f
+        private const val FLING_SHARE = 0.8f
+        private const val SCROLL_GAIN = 1.2f
         const val SYSTEM_FOOT = 28f
         const val OUTSIDE_LATCH = 120L
         const val DRAG_COMMIT = 10f

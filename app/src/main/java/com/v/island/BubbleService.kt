@@ -581,6 +581,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         if (action != MotionEvent.ACTION_MOVE) {
             lastTouch = "$region proxy heard ${MotionEvent.actionToString(action)} at ${(event.rawX / Island.density).toInt()}, ${(event.rawY / Island.density).toInt()}"
+            android.util.Log.d("IslandBubble", "probe $lastTouch")
         }
         val forwarded = MotionEvent.obtain(event)
         forwarded.setLocation(event.rawX - canvasParams.x, event.rawY - canvasParams.y)

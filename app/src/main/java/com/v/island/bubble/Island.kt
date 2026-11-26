@@ -165,6 +165,7 @@ object Island {
 
     fun onOutsideTap(x: Float, y: Float) {
         val isOurs = regions.values.any { it.contains(androidx.compose.ui.geometry.Offset(x, y)) }
+        android.util.Log.d("IslandBubble", "probe outside x=$x y=$y isOurs=$isOurs")
         if (isOurs) return
         bubble.onOutsideTap()
         clock.onOutsideTap()

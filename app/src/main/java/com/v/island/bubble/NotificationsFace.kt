@@ -35,6 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import com.v.island.vas.Durations
+import kotlin.math.roundToInt
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -85,35 +89,74 @@ fun NotificationsFace(bubble: MainBubble, appearance: Appearance) {
 private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, isLast: Boolean, appearance: Appearance) {
     val entry = group.head
     val delayMilliseconds = ROW_ENTER_DELAY + minOf(index, ROW_STAGGER_LIMIT) * ROW_STAGGER
-    val slide = remember { Animatable(0f) }
+    val drag = remember { Animatable(0f) }
+    val trash = remember { Animatable(0f) }
+    val collapse = remember { Animatable(0f) }
     val arrival = remember { Animatable(0f) }
     val iconPop = remember { Animatable(0f) }
     val backing = remember { Animatable(0f) }
     var isPressing by remember { mutableStateOf(false) }
+    var isDragging by remember { mutableStateOf(false) }
+    var held by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var trashSide by remember { androidx.compose.runtime.mutableIntStateOf(1) }
     var fullHeight by remember { mutableStateOf(0f) }
     val isExpanded = bubble.expandedGroup == group.id
     val ceiling = Island.screenHeight * ROW_CEILING_SHARE
     val isCut = !isExpanded && fullHeight > ceiling
+    var isResizing by remember { mutableStateOf(false) }
+    var seenExpanded by remember { mutableStateOf(isExpanded) }
+    if (seenExpanded != isExpanded) {
+        seenExpanded = isExpanded
+        isResizing = true
+    }
+    LaunchedEffect(seenExpanded, isResizing) {
+        if (!isResizing) return@LaunchedEffect
+        delay(ROW_RESIZE + 40L)
+        isResizing = false
+    }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         delay(delayMilliseconds.toLong())
-        launch { delay(ICON_POP_AFTER); iconPop.animateTo(1f, tween(360, easing = Curves.split)) }
+        launch { delay(ICON_POP_AFTER); iconPop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = ICON_POP_DAMPING, stiffness = ICON_POP_STIFFNESS)) }
         arrival.animateTo(1f, tween(191, easing = ROW_ARRIVE))
         delay(BACKING_AFTER)
         backing.animateTo(1f, tween(BACKING_FADE))
     }
-    Row(
+    fun offset() = if (isDragging) held else drag.value
+    Box(
         Modifier.fillMaxWidth()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, (placeable.height * (1f - collapse.value)).roundToInt()) { placeable.place(0, 0) }
+            }
+            .clipToBounds()
             .padding(start = 5.6.dp, end = 5.6.dp, bottom = if (isLast) 0.dp else 6.4.dp)
             .graphicsLayer {
-                translationX = slide.value * density
-                alpha = arrival.value * (1f - (abs(slide.value) / SWIPE_AWAY).coerceIn(0f, 1f))
+                alpha = arrival.value * (1f - collapse.value)
                 translationY = (1f - arrival.value) * 10f * density
-            }
-            .animateContentSize(tween(ROW_RESIZE, easing = Curves.split))
+            },
+    ) {
+        if (isDragging || drag.value != 0f || trash.value != 0f) Box(Modifier.matchParentSize().padding(horizontal = TRASH_INSET.dp), contentAlignment = if (trashSide > 0) Alignment.CenterStart else Alignment.CenterEnd) {
+            GlyphIcon(
+                TRASH,
+                Palette.danger,
+                Modifier.size(TRASH_SIZE.dp).graphicsLayer {
+                    val peek = (abs(offset()) / SWIPE_DISMISS).coerceIn(0f, 1f) * TRASH_PEEK
+                    val pop = trash.value
+                    alpha = maxOf(peek, pop.coerceIn(0f, 1f))
+                    scaleX = 0.5f + 0.2f * peek / TRASH_PEEK + 0.3f * pop
+                    scaleY = scaleX
+                    translationX = -trashSide * (1f - maxOf(peek / TRASH_PEEK, pop).coerceIn(0f, 1f)) * TRASH_TRAVEL * density
+                },
+            )
+        }
+        Row(
+        Modifier.fillMaxWidth()
+            .graphicsLayer { translationX = offset() * density }
+            .animateContentSize(if (isResizing) tween(ROW_RESIZE, easing = Curves.split) else androidx.compose.animation.core.snap())
             .heightIn(max = if (isExpanded) androidx.compose.ui.unit.Dp.Infinity else ceiling.dp)
             .clip(RoundedCornerShape(22.dp))
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .graphicsLayer { compositingStrategy = if (isCut) CompositingStrategy.Offscreen else CompositingStrategy.Auto }
             .drawWithContent {
                 drawContent()
                 if (!isCut) return@drawWithContent
@@ -124,31 +167,67 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
             .pointerInput(group.id) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
+                    val holdAt = down.uptimeMillis + Durations.HOLD
                     isPressing = true
                     var isSwiping = false
                     var isScrolling = false
+                    var isArmed = false
                     while (true) {
-                        val event = awaitPointerEvent()
+                        val event = if (isSwiping || isScrolling) awaitPointerEvent()
+                        else withTimeoutOrNull(maxOf(1L, holdAt - android.os.SystemClock.uptimeMillis())) { awaitPointerEvent() }
+                        if (event == null) {
+                            isPressing = false
+                            bubble.openGroup(group)
+                            do {
+                                val rest = awaitPointerEvent()
+                                rest.changes.forEach { it.consume() }
+                            } while (rest.changes.any { it.pressed })
+                            break
+                        }
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         val across = (change.position.x - down.position.x) / density
                         val vertical = (change.position.y - down.position.y) / density
                         if (!isSwiping && !isScrolling) {
-                            if (abs(across) > SWIPE_SLOP && abs(across) > abs(vertical)) isSwiping = true
-                            else if (abs(vertical) > SWIPE_SLOP) isScrolling = true
+                            if (abs(across) > SWIPE_SLOP && abs(across) > abs(vertical)) {
+                                isSwiping = true
+                                isDragging = true
+                                scope.launch { trash.stop(); drag.stop() }
+                            } else if (abs(vertical) > SWIPE_SLOP) isScrolling = true
                         }
                         if (isSwiping || isScrolling) isPressing = false
-                        if (isSwiping) scope.launch { slide.snapTo(across) }
+                        if (isSwiping) {
+                            held = across
+                            if (across != 0f && !isArmed) trashSide = kotlin.math.sign(across).toInt()
+                            val shouldArm = abs(across) > SWIPE_DISMISS
+                            if (shouldArm != isArmed) {
+                                isArmed = shouldArm
+                                if (shouldArm) {
+                                    Haptics.play(Haptic.Release)
+                                    scope.launch { trash.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = TRASH_DAMPING, stiffness = TRASH_STIFFNESS)) }
+                                } else scope.launch { trash.animateTo(0f, tween(160, easing = Curves.leave)) }
+                            }
+                        }
                         if (!change.pressed) {
                             isPressing = false
                             if (isSwiping) {
                                 change.consume()
-                                if (abs(across) > SWIPE_DISMISS) {
-                                    Haptics.play(Haptic.Dismiss)
-                                    scope.launch {
-                                        slide.animateTo(SWIPE_AWAY * kotlin.math.sign(across), tween(200, easing = Curves.grow))
+                                val from = held
+                                val side = kotlin.math.sign(from)
+                                val isThrown = isArmed
+                                scope.launch {
+                                    drag.snapTo(from)
+                                    isDragging = false
+                                    if (isThrown) {
+                                        Haptics.play(Haptic.Dismiss)
+                                        launch {
+                                            trash.animateTo(TRASH_FLASH, tween(120, easing = Curves.powerTwoOut))
+                                            trash.animateTo(0f, tween(200, easing = Curves.leave))
+                                        }
+                                        drag.animateTo(side * SWIPE_AWAY, tween(SWIPE_OUT, easing = Curves.powerTwoIn))
+                                        collapse.animateTo(1f, tween(ROW_COLLAPSE, easing = Curves.split))
                                         bubble.dismissGroup(group)
-                                    }
-                                } else scope.launch { slide.animateTo(0f, tween(260, easing = Curves.enter)) }
+                                    } else drag.animateTo(0f, tween(210, easing = Curves.grow))
+                                }
                             } else if (!isScrolling) {
                                 change.consume()
                                 bubble.toggleGroup(group)
@@ -224,14 +303,14 @@ private fun NotificationRow(bubble: MainBubble, group: NoticeGroup, index: Int, 
                     group.head.actions.forEachIndexed { index, action ->
                         PillButton(action.title, index == 0, entry.accent, appearance) { bubble.groupAction(group, action) }
                     }
-                    PillButton("Open", group.head.actions.isEmpty(), entry.accent, appearance) { bubble.openGroup(group) }
-                    PillButton("Dismiss", false, entry.accent, appearance) {
+                    PillButton("Dismiss", group.head.actions.isEmpty(), entry.accent, appearance) {
                         Haptics.play(Haptic.Dismiss)
                         bubble.dismissGroup(group)
                     }
                 }
             }
         }
+    }
     }
 }
 
@@ -245,12 +324,23 @@ private const val ROW_STAGGER = 30
 private const val ROW_STAGGER_LIMIT = 10
 private const val BODY_TYPE_AFTER = 174
 private const val SWIPE_SLOP = 10f
-private const val ICON_POP_AFTER = 60L
+private const val ICON_POP_AFTER = 110L
+private const val ICON_POP_DAMPING = 0.48f
+private const val ICON_POP_STIFFNESS = 340f
 private const val BACKING_AFTER = 260L
 private const val BACKING_FADE = 320
-private const val ICON_POP_TILT = -26f
+private const val ICON_POP_TILT = -75f
 private const val SWIPE_DISMISS = 90f
 private const val SWIPE_AWAY = 400f
+private const val SWIPE_OUT = 200
+private const val ROW_COLLAPSE = 220
+private const val TRASH_SIZE = 22f
+private const val TRASH_INSET = 22f
+private const val TRASH_TRAVEL = 14f
+private const val TRASH_PEEK = 0.4f
+private const val TRASH_FLASH = 1.35f
+private const val TRASH_DAMPING = 0.45f
+private const val TRASH_STIFFNESS = 520f
 private const val ROW_CEILING_SHARE = 0.2f
 private const val ROW_PADDING = 12.8f
 private const val ROW_FADE = 28f

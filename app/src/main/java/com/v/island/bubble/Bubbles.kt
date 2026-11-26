@@ -697,7 +697,9 @@ fun PanelShield(bubble: MainBubble) {
     Box(
         Modifier.fillMaxSize().pointerInput(bubble) {
             awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false).consume()
+                val probe = awaitFirstDown(requireUnconsumed = false)
+                android.util.Log.d("IslandBubble", "probe shield x=${probe.position.x / Island.density} y=${probe.position.y / Island.density}")
+                probe.consume()
                 /* The shield closed the open panel only once the finger lifted, so a tap outside felt late; it closes on the touch and swallows the rest of the gesture. */
                 bubble.onOutsideTap()
                 while (true) {
@@ -715,4 +717,4 @@ private fun Modifier.pressableClear(bubble: MainBubble) = pressable(pressedScale
 private const val COUNT_SIZE = 34f
 private const val COUNT_GAP = 6f
 
-private val TRASH = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5", LayerKind.Stroke, 1.6f)))
+val TRASH = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5", LayerKind.Stroke, 1.6f)))

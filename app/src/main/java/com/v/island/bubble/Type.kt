@@ -176,9 +176,11 @@ fun TypedRun(text: String, shown: Int, isTyping: Boolean, style: TextStyle, modi
         append(text.substring(0, shown))
         withStyle(androidx.compose.ui.text.SpanStyle(color = Color.Transparent)) { append(text.substring(shown)) }
     }
+    Box(modifier) {
+    BasicText(text, Modifier.graphicsLayer { alpha = 0f }, style = style, maxLines = if (isLine) 1 else maxLines, softWrap = !isLine, overflow = TextOverflow.Clip)
     BasicText(
         typed,
-        (if (isLine && isOverflowing) modifier.fadeEnd() else modifier).drawWithContent {
+        (if (isLine && isOverflowing) Modifier.matchParentSize().fadeEnd() else Modifier.matchParentSize()).drawWithContent {
             drawContent()
             val laidOut = layout ?: return@drawWithContent
             if (!isTyping || !isCaretLit || laidOut.layoutInput.text.length != text.length) return@drawWithContent
@@ -198,6 +200,7 @@ fun TypedRun(text: String, shown: Int, isTyping: Boolean, style: TextStyle, modi
             layout = it
         },
     )
+    }
 }
 
 /* Mirrors .tw-caret in V/AS components/09-typewriter.md §3 (width 0.08em, margin-left 0.04em, translateY 0.08em); the blink is V/AS's 250ms Android caret. */
