@@ -27,6 +27,8 @@ object Palette {
     val dangerHard = Color(0xFFDC143C)
 
     val camera = Color(0xFFF09B3A)
+    val download = Color(0xFFF09B3A)
+    val upload = Color(0xFF3A8CFF)
     val link = Color(0xFF6FB3FF)
     val markTime = Color(0x525BC4FD)
     val markMoney = Color(0x4DFFDD1B)

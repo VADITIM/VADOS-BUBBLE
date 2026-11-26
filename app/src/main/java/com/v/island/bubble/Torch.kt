@@ -192,14 +192,16 @@ private fun TorchFace(bubble: MainBubble, isOpen: Boolean) {
 @Composable
 fun TorchIdleFace(appearance: Appearance) {
     val torch = Island.torch
+    val arrival = rememberArrival(Mod.Torch)
     Row(
         Modifier.fillMaxSize().padding(start = glyphInset(appearance).dp, end = IDLE_END.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        GlyphIcon(Glyphs.torch, Color.White, Modifier.size(glyphSize(appearance).dp))
+        GlyphIcon(Glyphs.torch, Color.White, Modifier.size(glyphSize(appearance).dp).travelled(arrival))
         BasicText(
             if (torch?.isDimmable == true) "${torch.step}/${torch.steps}" else "On",
+            Modifier.popped(arrival),
             style = type(IDLE_TYPE, Palette.textBright, appearance.mainFont, appearance.mainScale, spacing = 0.02f),
         )
     }

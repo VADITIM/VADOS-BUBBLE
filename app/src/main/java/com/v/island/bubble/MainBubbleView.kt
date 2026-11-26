@@ -226,10 +226,14 @@ const val LONG_GROW = 460
 private const val GROWN_FADE = 90
 private const val PLAYER_FOLD_HANDOVER = 120
 
-private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, Face.Trip, Face.TorchIdle)
+private val CLOSED_FACES = setOf(Face.Idle, Face.Media, Face.Timer, Face.Call, Face.Trip, Face.TorchIdle, Face.Transfer)
 
 private fun faceTransition(from: Face, to: Face): ContentTransform {
     val isHandOver = from in CLOSED_FACES && to in CLOSED_FACES
+    /* The transfer's arrow and ring make their own entrance, and the face they replace has already cleared itself in the yield; a pop on top of that drew the arrival twice. */
+    if (isHandOver && to == Face.Transfer) {
+        return ContentTransform(EnterTransition.None, fadeOut(tween(Durations.POP_OUT)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
+    }
     if (isHandOver && to == Face.Media && Island.bubble.mediaEntrance == MediaEntrance.Placed) {
         return ContentTransform(EnterTransition.None, fadeOut(tween(Durations.POP_OUT)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
     }
@@ -272,5 +276,6 @@ private fun FaceContent(face: Face, bubble: MainBubble, appearance: Appearance) 
         Face.TripPanel -> TripPanel(bubble, appearance)
         Face.Notifications -> NotificationsFace(bubble, appearance)
         Face.TorchIdle -> TorchIdleFace(appearance)
+        Face.Transfer -> TransferFace(bubble, appearance)
     }
 }

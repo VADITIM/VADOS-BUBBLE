@@ -81,7 +81,6 @@ class StatusBubble {
         val attached = Island.connectivity
         val shown = mutableListOf<StatusSlot>()
         if (attached?.isUsb == true) shown += StatusSlot.Mark("usb", Glyphs.usb)
-        Island.transfer?.let { shown += StatusSlot.Mark("transfer", if (it.isUpload) Glyphs.upload else Glyphs.download, if (it.isUpload) Color(0xFF3A8CFF) else Color(0xFFF09B3A)) }
         when (modus()) {
             "hotspot" -> shown += StatusSlot.Mark("modus", Glyphs.hotspot)
             "bluetooth" -> {

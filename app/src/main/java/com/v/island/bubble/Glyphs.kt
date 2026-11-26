@@ -12,6 +12,8 @@ object Glyphs {
     val usb = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M6.5 6.5h11a5.5 5.5 0 0 1 0 11h-11a5.5 5.5 0 0 1 0-11zM8.5 10.5h7a1.5 1.5 0 0 1 0 3h-7a1.5 1.5 0 0 1 0-3z", LayerKind.FillEvenOdd, 0.0f)))
     val download = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4L11 12.2zM5 18h14v2H5z", LayerKind.Fill, 0.0f)))
     val upload = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M12 3l5.7 5.7-1.4 1.4L13 6.8V16h-2V6.8L7.7 10.1 6.3 8.7zM5 18h14v2H5z", LayerKind.Fill, 0.0f)))
+    val arrowDown = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M11 4h2v12.2l4.6-4.6 1.4 1.4L12 20l-7-7 1.4-1.4 4.6 4.6z", LayerKind.Fill, 0.0f)))
+    val arrowUp = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M11 20h2V7.8l4.6 4.6 1.4-1.4L12 4l-7 7 1.4 1.4L11 7.8z", LayerKind.Fill, 0.0f)))
     val transferDone = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M9.8 16.2 5.6 12l-1.4 1.4 5.6 5.6L20.4 7.9 19 6.5z", LayerKind.Fill, 0.0f)))
     val transferHold = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M7 5h3.5v14H7zm6.5 0H17v14h-3.5z", LayerKind.Fill, 0.0f)))
     val transferResume = Glyph(0f, 0f, 24f, 24f, listOf(GlyphLayer("M7 4l12 8-12 8z", LayerKind.Fill, 0.0f)))

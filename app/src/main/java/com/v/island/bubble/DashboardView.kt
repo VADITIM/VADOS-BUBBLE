@@ -766,7 +766,7 @@ private fun TransferStrip(dashboard: Dashboard, appearance: Appearance, modifier
     val shown = appearing(dashboard, 200)
     val transfer = Island.transfer
     val accent = LocalAccent.current
-    val isDone = transfer != null && transfer.total > 0 && transfer.done >= transfer.total
+    val isDone = transfer != null && (transfer.state == TransferState.Done || transfer.total > 0 && transfer.done >= transfer.total)
     val share = when {
         transfer == null -> 0f
         isDone || transfer.total <= 0 -> 1f
@@ -795,7 +795,7 @@ private fun TransferStrip(dashboard: Dashboard, appearance: Appearance, modifier
             Canvas(Modifier.fillMaxWidth().height(7.dp)) {
                 val corner = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
                 drawRoundRect(Palette.sunken, cornerRadius = corner)
-                drawRoundRect(if (transfer.isUpload) UPLOAD_COLOUR else DOWNLOAD_COLOUR, size = size.copy(width = size.width * fill.value.coerceIn(0f, 1f)), cornerRadius = corner)
+                drawRoundRect(if (transfer.isUpload) Palette.upload else Palette.download, size = size.copy(width = size.width * fill.value.coerceIn(0f, 1f)), cornerRadius = corner)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.6.dp, Alignment.End)) {
                 val hold = transfer.actions.firstOrNull { HOLD_WORDS.containsMatchIn(it.title) }
@@ -1501,8 +1501,6 @@ private const val VITAL_GAUGE = 420
 private const val VITAL_GAUGE_LAG = 120
 private const val VITAL_DROP = 10f
 private const val STATUS_ACTION_DELAY = 120
-private val DOWNLOAD_COLOUR = Color(0xFFF09B3A)
-private val UPLOAD_COLOUR = Color(0xFF3A8CFF)
 private val MIC_OFF = Color(0xFFFF3B30)
 private val RECORD_RED = Color(0xFFE5342B)
 private val POWER_RED = Color(0xFFE5342B)

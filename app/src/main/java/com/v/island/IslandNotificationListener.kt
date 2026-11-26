@@ -173,11 +173,36 @@ class IslandNotificationListener : NotificationListenerService() {
 
         fun publishNowMods() {
             if (instance == null) return
+            val active = transfer()
+            shownTransfer = active?.key
+            deliverNowMods(active?.let { NowWatch.describeTransfer(it) })
+        }
+
+        private fun deliverNowMods(transfer: JSONObject?) {
             BubbleService.deliverNowMods(
                 JSONObject()
                     .put("recording", recording()?.let { NowWatch.describeRecording(it) } ?: JSONObject.NULL)
-                    .put("transfer", transfer()?.let { NowWatch.describeTransfer(it) } ?: JSONObject.NULL)
+                    .put("transfer", transfer ?: JSONObject.NULL)
             )
+        }
+
+        private val transferRatios = HashMap<String, Float>()
+        private var shownTransfer: String? = null
+
+        fun trackTransfer(statusBarNotification: StatusBarNotification) {
+            transferRatios[statusBarNotification.key] = NowWatch.ratioOf(statusBarNotification)
+            publishNowMods()
+        }
+
+        // A finished download is rewritten without its bar, so it no longer read as a transfer and nothing republished: the bubble kept the last tick forever. A tracked key that loses its bar or goes away is told across once as done or failed.
+        fun endTransfer(statusBarNotification: StatusBarNotification, isRemoved: Boolean): Boolean {
+            val lastRatio = transferRatios.remove(statusBarNotification.key) ?: return false
+            if (statusBarNotification.key == shownTransfer) {
+                val outcome = NowWatch.outcomeOf(statusBarNotification, lastRatio, isRemoved)
+                deliverNowMods(NowWatch.describeTransfer(statusBarNotification).put("state", outcome))
+            }
+            publishNowMods()
+            return true
         }
 
         
@@ -305,7 +330,12 @@ class IslandNotificationListener : NotificationListenerService() {
             MediaControl.offer { standInFor(statusBarNotification) }
             return
         }
-        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
+        if (NowWatch.isTransfer(statusBarNotification)) {
+            trackTransfer(statusBarNotification)
+            return
+        }
+        if (endTransfer(statusBarNotification, isRemoved = false)) return
+        if (NowWatch.isRecording(statusBarNotification)) {
             publishNowMods()
             return
         }
@@ -377,7 +407,7 @@ class IslandNotificationListener : NotificationListenerService() {
         if (TimerWatch.isTimer(statusBarNotification)) publishTimer()
         if (CallWatch.isCall(statusBarNotification)) publishCall()
         if (DbWatch.isTrip(statusBarNotification)) publishTrip()
-        if (NowWatch.isRecording(statusBarNotification) || NowWatch.isTransfer(statusBarNotification)) {
+        if (!endTransfer(statusBarNotification, isRemoved = true) && NowWatch.isRecording(statusBarNotification)) {
             publishNowMods()
         }
         

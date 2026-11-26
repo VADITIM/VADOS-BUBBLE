@@ -77,7 +77,13 @@ fun IdleFace(appearance: Appearance) {
     }
 }
 
-class Arrival(val glyph: Animatable<Float, AnimationVector1D>, val pop: Animatable<Float, AnimationVector1D>, val isSwapped: Boolean)
+class Arrival(
+    val glyph: Animatable<Float, AnimationVector1D>,
+    val pop: Animatable<Float, AnimationVector1D>,
+    val isSwapped: Boolean,
+    val away: Animatable<Float, AnimationVector1D> = Animatable(0f),
+    val slide: Animatable<Float, AnimationVector1D> = Animatable(0f),
+)
 
 @Composable
 fun rememberArrival(mod: Mod): Arrival {
@@ -89,20 +95,30 @@ fun rememberArrival(mod: Mod): Arrival {
         launch { arrival.glyph.animateTo(0f, tween(SWAP_TRAVEL, easing = Curves.split)) }
         arrival.pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
     }
+    val isYielding = !isStay && Island.bubble.transferStage == TransferStage.Yielding
+    LaunchedEffect(isYielding) {
+        if (isYielding) {
+            arrival.away.animateTo(1f, tween(MainBubble.TRANSFER_YIELD_POP.toInt(), easing = Curves.leave))
+            arrival.slide.animateTo(1f, tween(MainBubble.TRANSFER_YIELD_SLIDE.toInt(), easing = Curves.sweep))
+        } else if (Island.bubble.transferStage == TransferStage.None) {
+            arrival.slide.snapTo(0f)
+            arrival.away.snapTo(0f)
+        }
+    }
     return arrival
 }
 
-fun Modifier.travelled(arrival: Arrival) = graphicsLayer { translationX = arrival.glyph.value * Island.density }
+fun Modifier.travelled(arrival: Arrival) = graphicsLayer { translationX = (arrival.glyph.value + arrival.slide.value * Island.bubble.yieldTravel) * Island.density }
 
 fun Modifier.popped(arrival: Arrival) = graphicsLayer {
-    scaleX = arrival.pop.value
-    scaleY = arrival.pop.value
+    scaleX = arrival.pop.value * (1f - arrival.away.value)
+    scaleY = arrival.pop.value * (1f - arrival.away.value)
 }
 
 const val SWAP_TRAVEL = 380
 
 @Composable
-private fun ModRow(appearance: Appearance, endPadding: Float, content: @Composable () -> Unit) {
+fun ModRow(appearance: Appearance, endPadding: Float, content: @Composable () -> Unit) {
     Row(
         Modifier.fillMaxSize().padding(start = glyphInset(appearance).dp, end = endPadding.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -160,8 +176,8 @@ fun MediaFace(appearance: Appearance) {
             }
         }
         Wave(media, bars = EQUALIZER_BARS, ratio = { 1f }, isRising = entrance != MediaEntrance.Still, modifier = Modifier.size(glyphSize(appearance).dp).graphicsLayer {
-            scaleX = if (arrival.isSwapped) arrival.pop.value else pop.value
-            scaleY = if (arrival.isSwapped) arrival.pop.value else pop.value
+            scaleX = (if (arrival.isSwapped) arrival.pop.value else pop.value) * (1f - arrival.away.value)
+            scaleY = (if (arrival.isSwapped) arrival.pop.value else pop.value) * (1f - arrival.away.value)
         })
     }
 }
@@ -351,6 +367,7 @@ fun SatelliteFace(mod: Mod, appearance: Appearance, diameter: Float) {
             Mod.Call -> Avatar(Island.call, Island.call?.accent ?: appearance.accent, diameter - 6f)
             Mod.Trip -> TripMark(Island.trip?.accent ?: appearance.accent, diameter - 6f, appearance)
             Mod.Torch -> GlyphIcon(Glyphs.torch, Color.White, Modifier.size((diameter - 8f).dp))
+            Mod.Transfer -> Island.bubble.transferShown?.let { GlyphIcon(if (it.isUpload) Glyphs.arrowUp else Glyphs.arrowDown, Island.bubble.accentOf(Mod.Transfer), Modifier.size((diameter - 8f).dp)) }
         }
     }
 }

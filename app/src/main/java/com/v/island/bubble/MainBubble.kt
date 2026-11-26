@@ -32,16 +32,18 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
 
-enum class Mod { Timer, Media, Call, Trip, Torch }
+enum class Mod { Timer, Media, Call, Trip, Torch, Transfer }
+
+enum class TransferStage { None, Yielding, Leading, Finishing, Returning }
 
 enum class Mode { Idle, Haptic, Alert, Extended, Torch }
 
 enum class Size(val isClosed: Boolean) {
     Idle(true), Playing(true), Timing(true), Calling(true), Travelling(true),
-    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), TorchIdle(true),
+    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), TorchIdle(true), Transferring(true),
 }
 
-enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, TorchIdle }
+enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, TorchIdle, Transfer }
 
 data class Frame(val width: Float, val height: Float, val radius: Float, val top: Float, val shift: Float)
 
@@ -138,7 +140,87 @@ class MainBubble {
     private val appearance get() = Island.appearance
 
     /* A folded torch was its own size beside the mods and left an active Media hiding it, and an open one stopped every mod although it stands apart at the right edge; it is the leading mod only while folded, every other mod a satellite beside it. */
-    val liveMods: List<Mod> get() = if (isTorchShown && isTorchDocked) listOf(Mod.Torch) + modOrder.filter(::isLive) else modOrder.filter(::isLive)
+    val liveMods: List<Mod> get() {
+        val own = if (isTorchShown && isTorchDocked) listOf(Mod.Torch) + modOrder.filter(::isLive) else modOrder.filter(::isLive)
+        return if (isTransferLeading) listOf(Mod.Transfer) + own else own
+    }
+
+    var transferStage by mutableStateOf(TransferStage.None)
+        private set
+    var transferShown by mutableStateOf<Transfer?>(null)
+        private set
+    var yieldTravel by mutableFloatStateOf(0f)
+        private set
+    private var yielded: Mod? = null
+    private var yieldBirth = 0f
+    private var transferJob: Job? = null
+
+    val isTransferLeading: Boolean get() = transferStage == TransferStage.Leading || transferStage == TransferStage.Finishing || transferStage == TransferStage.Returning
+
+    /* A transfer was a mark in the Status bubble nobody watched; it leads Main, and a mod already there first clears its readings, slides its glyph aside and is shot out as a satellite holding it, so the transfer never lands on top of something still drawn. */
+    private fun syncTransfer() {
+        val incoming = Island.transfer
+        when (transferStage) {
+            TransferStage.None -> if (incoming != null && incoming.state == TransferState.Active) beginTransfer(incoming)
+            TransferStage.Yielding, TransferStage.Leading -> when {
+                incoming == null -> finishTransfer(TransferState.Failed)
+                incoming.state != TransferState.Active && incoming.key == transferShown?.key -> finishTransfer(incoming.state, incoming)
+                incoming.state == TransferState.Active -> transferShown = incoming
+            }
+            TransferStage.Finishing, TransferStage.Returning -> Unit
+        }
+    }
+
+    private fun beginTransfer(incoming: Transfer) {
+        transferShown = incoming
+        val leader = liveMods.firstOrNull()
+        yielded = leader
+        yieldBirth = glyphAligned(layout())
+        if (leader == null || !size.isClosed || mode != Mode.Idle) {
+            transferStage = TransferStage.Leading
+            settleTransfer()
+            return
+        }
+        val box = layout()
+        yieldTravel = if (satelliteSide > 0) box.main - appearance.compactHeight else -(glyphSize(appearance) + glyphInset(appearance))
+        yieldBirth = glyphAligned(box) + yieldTravel
+        transferStage = TransferStage.Yielding
+        transferJob = Island.scope.launch {
+            delay(TRANSFER_YIELD_POP + TRANSFER_YIELD_SLIDE)
+            transferStage = TransferStage.Leading
+            settleTransfer()
+        }
+    }
+
+    private fun finishTransfer(state: TransferState, last: Transfer? = null) {
+        transferJob?.cancel()
+        if (last != null) transferShown = last
+        transferShown = transferShown?.copy(state = state)
+        transferStage = TransferStage.Finishing
+        settleTransfer()
+        transferJob = Island.scope.launch {
+            delay(if (state == TransferState.Done) TRANSFER_FINISH_DONE else TRANSFER_FINISH_FAILED)
+            val back = yielded?.takeIf(::isLive)
+            val isMerging = back != null && size.isClosed && mode == Mode.Idle
+            if (isMerging) {
+                transferStage = TransferStage.Returning
+                delay(TRANSFER_MERGE)
+            }
+            val mergedAt = glyphAligned(layout())
+            transferStage = TransferStage.None
+            transferShown = null
+            yielded = null
+            yieldTravel = 0f
+            settleTransfer()
+            /* The mod coming home was composed afresh at Main's edge while its satellite vanished; its glyph travels over from where the satellite melted in and its readings pop back. */
+            if (isMerging && back != null && liveMods.firstOrNull() == back) swapArrival = back to mergedAt - glyphAligned(layout())
+            syncTransfer()
+        }
+    }
+
+    private fun settleTransfer() {
+        if (mode == Mode.Idle || mode == Mode.Torch) toClosed()
+    }
 
     /* Folding the torch put Main into its folded face the moment the finger lifted, so Main changed under the flashlight still flying home; Main keeps what it was until the flight lands, and with nothing of its own to show it lends itself to the torch as a hidden circle the torch grows out of and lands back into. */
     /* Leaving the Dashboard drew Main's idle pill at the punch hole while the Now pill was still flying home to become it, so two pills stood at once; Main stays lent until the drop melts into it. */
@@ -322,6 +404,7 @@ class MainBubble {
     }
 
     private fun isPresent(mod: Mod): Boolean = when (mod) {
+        Mod.Transfer -> isTransferLeading
         Mod.Timer -> Island.timer != null
         Mod.Media -> Island.media != null
         Mod.Call -> Island.call != null
@@ -335,6 +418,7 @@ class MainBubble {
         Mod.Call -> Island.call?.accent
         Mod.Trip -> Island.trip?.accent
         Mod.Torch -> null
+        Mod.Transfer -> transferShown?.let { if (it.isUpload) com.v.island.vas.Palette.upload else com.v.island.vas.Palette.download }
     } ?: appearance.accent
 
     private fun satelliteSize() = appearance.compactHeight * SATELLITE_SHARE
@@ -399,7 +483,11 @@ class MainBubble {
         val live = liveMods
         if (live.size < 2 || !size.isClosed) return emptyList()
         val box = layout()
-        val trader = { mod: Mod -> SatellitePlacement(mod, box.satelliteX, box.satellite, glyphAligned(box), 1f) }
+        val isMerging = transferStage == TransferStage.Returning
+        val trader = { mod: Mod ->
+            val isYielded = mod == yielded
+            SatellitePlacement(mod, if (isYielded && isMerging) glyphAligned(box) else box.satelliteX, box.satellite, if (isYielded) yieldBirth else glyphAligned(box), 1f)
+        }
         if (live.size == 2 || satelliteLimit() == 1) return listOf(trader(live[1]))
         val inSide = box.inSide
         val traded = live[if (inSide == satelliteSide) 1 else 2]
@@ -450,7 +538,7 @@ class MainBubble {
         return when (of) {
             Size.Idle -> if (isLent) Frame(lentSide(), lentSide(), lentSide() / 2f, grab + (appearance.compactHeight - lentSide()) / 2f, 0f)
             else Frame(appearance.compactWidth, appearance.compactHeight, appearance.compactHeight / 2f, grab, layout().mainX)
-            Size.Playing, Size.Timing, Size.Calling, Size.Travelling, Size.TorchIdle -> {
+            Size.Playing, Size.Timing, Size.Calling, Size.Travelling, Size.TorchIdle, Size.Transferring -> {
                 val box = layout()
                 Frame(box.main, appearance.compactHeight, appearance.compactHeight / 2f, grab, box.mainX)
             }
@@ -576,6 +664,7 @@ class MainBubble {
         Mod.Call -> Size.Calling
         Mod.Trip -> Size.Travelling
         Mod.Torch -> Size.TorchIdle
+        Mod.Transfer -> Size.Transferring
         null -> Size.Idle
     }
 
@@ -585,6 +674,7 @@ class MainBubble {
         Mod.Call -> Face.Call
         Mod.Trip -> Face.Trip
         Mod.Torch -> Face.TorchIdle
+        Mod.Transfer -> Face.Transfer
         null -> Face.Idle
     }
 
@@ -597,6 +687,7 @@ class MainBubble {
             return
         }
         clearedMods = clearedMods.filter(::isPresent).toSet()
+        syncTransfer()
         if (mode == Mode.Idle) toClosed()
         if (size == Size.TimerPanel && Island.timer == null) toClosed()
         if (size == Size.Player && Island.media == null) toClosed()
@@ -819,6 +910,7 @@ class MainBubble {
             Mod.Timer -> Island.timer?.key?.let(Island.actions::openNotification)
             Mod.Call -> Island.call?.key?.let(Island.actions::openNotification)
             Mod.Trip -> Island.trip?.key?.let(Island.actions::openNotification)
+            Mod.Transfer -> transferShown?.key?.let(Island.actions::openNotification)
             Mod.Torch, null -> Unit
         }
     }
@@ -1140,6 +1232,10 @@ class MainBubble {
                 toClosed()
             }
             Mod.Torch -> foldTorch(false)
+            Mod.Transfer -> {
+                transferShown?.key?.let(Island.actions::openNotification)
+                toClosed()
+            }
             null -> openNotifications()
         }
     }
@@ -1176,7 +1272,7 @@ class MainBubble {
 
     private fun dragSwap(travelled: Float): Boolean {
         val live = liveMods
-        if (live.size < 2) return false
+        if (live.size < 2 || transferStage != TransferStage.None) return false
         val towards = if (satelliteSide > 0) -travelled else travelled
         var progress = if (swapDirection > 0) towards else -towards
         if (progress < 0 && live.size > 2) {
@@ -1340,6 +1436,16 @@ class MainBubble {
         const val LAND_MILLISECONDS = 460
         const val TORCH_OFF_GAP = 14f
         const val TORCH_SWIPE_STEP = 36f
+        const val TRANSFER_YIELD_POP = 150L
+        const val TRANSFER_YIELD_SLIDE = 260L
+        const val TRANSFER_ARROW_DROP = 420
+        const val TRANSFER_RING_AFTER = 260L
+        const val TRANSFER_CHECK = 300
+        const val TRANSFER_SPARKLE = 420
+        const val TRANSFER_ARROW_EXIT = 280
+        const val TRANSFER_FINISH_DONE = 1100L
+        const val TRANSFER_FINISH_FAILED = 420L
+        const val TRANSFER_MERGE = 400L
     }
 }
 

@@ -97,10 +97,19 @@ data class Torch(val step: Int, val steps: Int, val isDimmable: Boolean)
 @Immutable
 data class Recording(val key: String, val label: String, val since: Long, val isPaused: Boolean, val actions: List<Action>)
 
+enum class TransferState { Active, Done, Failed }
+
+/* Mirrors TRANSFER_* in NowWatch.kt: the state a transfer payload carries across from the listener. */
+private const val TRANSFER_DONE = "done"
+private const val TRANSFER_FAILED = "failed"
+
 @Immutable
 data class Transfer(
     val key: String,
+    val packageName: String,
     val isUpload: Boolean,
+    val state: TransferState,
+    val isIndeterminate: Boolean,
     val label: String,
     val accent: Color,
     val done: Int,
@@ -280,7 +289,14 @@ object Payloads {
     fun transfer(json: JSONObject?) = json?.let {
         Transfer(
             key = it.optString("key"),
+            packageName = it.optString("package"),
             isUpload = it.optString("mod") == "upload",
+            state = when (it.optString("state")) {
+                TRANSFER_DONE -> TransferState.Done
+                TRANSFER_FAILED -> TransferState.Failed
+                else -> TransferState.Active
+            },
+            isIndeterminate = it.optBoolean("indeterminate"),
             label = it.optString("label"),
             accent = it.accent(),
             done = it.optInt("done"),

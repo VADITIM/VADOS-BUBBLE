@@ -39,7 +39,7 @@ object DebugStage {
     )
 
     
-    private fun transfer(kind: String, name: String, done: Int) {
+    private fun transfer(kind: String, name: String, done: Int, state: String = NowWatch.TRANSFER_ACTIVE) {
         BubbleService.deliverNowMods(
             JSONObject()
                 .put("recording", JSONObject.NULL)
@@ -47,7 +47,9 @@ object DebugStage {
                     "transfer",
                     JSONObject()
                         .put("mod", kind)
+                        .put("state", state)
                         .put("key", "stage-transfer")
+                        .put("package", "com.android.chrome")
                         .put("label", name)
                         .put("accent", "#4285f4")
                         .put("since", System.currentTimeMillis() - 30_000)
@@ -61,6 +63,20 @@ object DebugStage {
     }
 
     
+    private fun runTransfer(kind: String, name: String, after: Long = 0L, stopAt: Int = 100, ending: String = NowWatch.TRANSFER_DONE) {
+        var tick = 0
+        while (tick * TRANSFER_STEP <= stopAt) {
+            val done = tick * TRANSFER_STEP
+            handler.postDelayed({ transfer(kind, name, done) }, after + tick * TRANSFER_TICK)
+            tick++
+        }
+        handler.postDelayed({ transfer(kind, name, stopAt, ending) }, after + tick * TRANSFER_TICK)
+        handler.postDelayed({ BubbleService.deliverNowMods(JSONObject().put("recording", JSONObject.NULL).put("transfer", JSONObject.NULL)) }, after + (tick + 1) * TRANSFER_TICK)
+    }
+
+    private const val TRANSFER_STEP = 10
+    private const val TRANSFER_TICK = 280L
+
     private fun attached(
         link: String,
         level: Int,
@@ -207,8 +223,23 @@ object DebugStage {
                     .put("transfer", JSONObject.NULL)
             )
 
-            "download" -> transfer("download", "Kaufvertrag.pdf", 62)
-            "upload" -> transfer("upload", "IMG_4471.heic", 88)
+            "download" -> runTransfer("download", "Kaufvertrag.pdf")
+            "upload" -> runTransfer("upload", "IMG_4471.heic")
+            "download-media" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                runTransfer("download", "Kaufvertrag.pdf", after = 1200L)
+            }
+            "upload-timer" -> {
+                clear()
+                BubbleService.deliverTimer(timer(isPaused = false))
+                runTransfer("upload", "IMG_4471.heic", after = 1200L)
+            }
+            "download-cancel" -> {
+                clear()
+                BubbleService.deliverMedia(media(isPlaying = true))
+                runTransfer("download", "Kaufvertrag.pdf", after = 1200L, stopAt = 40, ending = NowWatch.TRANSFER_FAILED)
+            }
 
             
             "connectivity" -> attached(link = "wifi", level = 3)

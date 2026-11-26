@@ -286,6 +286,15 @@ of fact as a cable being in. It stands over there as one slot beside USB — an 
 the file is moving, and a tick for a moment when it lands — and it gave up the reading and the
 timeline it had here, because a slot is not a bubble and the shape it can take is not the same shape.
 
+On the Compose build (2026-11-26) it moved again, to **Main**, as a mod that leads while it lasts: a
+slot in the Status bubble was easy to miss, and a file arriving is something the person is usually
+waiting for. It leads rather than queueing because it is short-lived and its ending (the check) is
+the point of showing it; a mod already in Main yields and is shot out as a satellite, then merges back
+when the transfer is done. Detection widened at the same time (indeterminate bars, `CATEGORY_PROGRESS`,
+known transfer apps, English and German words), and the end of a transfer is now told across once as
+done or failed, because an app rewriting its notification to "complete" left the old bubble stuck on
+the last tick. Kotlin only detects and classifies; every visual is in the Compose faces.
+
 There was a second bubble out there for them, standing on the chip a few pixels right of the clock.
 There is not any more, and the reason is that the two wanted the same corner: the clock had to leave
 whenever a mod came out, the row had to stand aside for both of them, and most of the motion at that
