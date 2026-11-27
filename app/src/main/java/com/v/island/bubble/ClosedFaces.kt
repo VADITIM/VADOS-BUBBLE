@@ -87,15 +87,14 @@ class Arrival(
 
 @Composable
 fun rememberArrival(mod: Mod): Arrival {
-    val isStay = LocalIsStayFace.current
-    val travel = remember { if (isStay) null else Island.bubble.takeSwapArrival(mod) }
+    val travel = remember { Island.bubble.takeSwapArrival(mod) }
     val arrival = remember { Arrival(Animatable(travel ?: 0f), Animatable(if (travel == null) 1f else 0f), travel != null) }
     LaunchedEffect(Unit) {
         if (travel == null) return@LaunchedEffect
         launch { arrival.glyph.animateTo(0f, tween(SWAP_TRAVEL, easing = Curves.split)) }
         arrival.pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
     }
-    val isYielding = !isStay && Island.bubble.transferStage == TransferStage.Yielding
+    val isYielding = Island.bubble.transferStage == TransferStage.Yielding
     LaunchedEffect(isYielding) {
         if (isYielding) {
             arrival.away.animateTo(1f, tween(MainBubble.TRANSFER_YIELD_POP.toInt(), easing = Curves.leave))
@@ -147,8 +146,7 @@ fun MediaFace(appearance: Appearance) {
     val tile = mediaTileWidth(appearance)
     val travel = MEDIA_TILE_INSET + tile
     val arrival = rememberArrival(Mod.Media)
-    val isStay = LocalIsStayFace.current
-    val entrance = remember { if (isStay) MediaEntrance.Full else Island.bubble.takeMediaEntrance().let { if (arrival.isSwapped) MediaEntrance.Placed else it } }
+    val entrance = remember { Island.bubble.takeMediaEntrance().let { if (arrival.isSwapped) MediaEntrance.Placed else it } }
     val entry = remember { Animatable(if (entrance == MediaEntrance.Full) 0f else 1f) }
     val pop = remember { Animatable(if (entrance == MediaEntrance.Still) 1f else 0f) }
     LaunchedEffect(Unit) { entry.animateTo(1f, tween(Durations.MORPH, easing = Curves.sweep)) }

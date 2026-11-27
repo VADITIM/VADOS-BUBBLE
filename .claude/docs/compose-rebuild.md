@@ -1,6 +1,6 @@
 # Compose rebuild
 
-The `compose` branch replaces the WebView canvas (`pill.html`, `pill.css`, `js/`) with Jetpack Compose. `main` keeps the WebView app and its releases until this branch reaches parity; then it merges. Each push to `compose` builds in CI and attaches the APK as a workflow artifact (no release). Same application id, so installing it replaces the WebView build and keeps its grants.
+The `compose` branch replaced the WebView canvas (`pill.html`, `pill.css`, `js/`) with Jetpack Compose and is the default branch since 2026-11-27: all work, pushes and releases happen on `compose`, and `main` is the frozen WebView app, never pushed to. Each push to `compose` builds in CI and attaches the APK as a workflow artifact; a manual run publishes the release. Same application id, so installing it replaces the WebView build and keeps its grants.
 
 ## What changed in the foundation
 

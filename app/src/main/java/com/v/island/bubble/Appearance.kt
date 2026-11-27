@@ -19,8 +19,6 @@ data class Appearance(
     val dwellMilliseconds: Long = 5_700,
     val identity: Int = 2,
     val nowPushes: Boolean = false,
-    val notificationsRise: Float = 0.5f,
-    val isClearCornered: Boolean = false,
     val dateFormat: Int = 0,
     val blurRadius: Int = 50,
     val scrimBlurRadius: Int = 35,
@@ -36,7 +34,7 @@ data class Appearance(
     val statusScale: Float = 1f,
     val headingScale: Float = 1f,
     val contentScale: Float = 1f,
-    val showBatteryPercent: Boolean = false,
+    val isBatteryWhite: Boolean = false,
     val hasSidePills: Boolean = true,
     val bareScale: Float = 1.15f,
     val batteryFont: FontFamily = Faces.tanker,
@@ -44,8 +42,10 @@ data class Appearance(
     val statsScale: Float = 1f,
     val connectorsScale: Float = 1f,
     val hasDividers: Boolean = false,
-    val isFastDashboard: Boolean = false,
+    val statusIconScales: Map<StatusIcon, Float> = emptyMap(),
 ) {
+    fun iconScale(icon: StatusIcon): Float = statusIconScales[icon] ?: 1f
+
     companion object {
         /* Mirrors MELT_MAX in the retired js/state.js: the goo preference is a share of it. */
         const val MELT_MAXIMUM = 6f
@@ -64,13 +64,9 @@ data class Appearance(
                     value(Preferences.BACKGROUND_ALPHA) / 100f,
                 ),
                 accent = Color(0xFF000000 or (value(Preferences.ACCENT).toLong() and 0xFFFFFF)),
-                melt = MELT_MAXIMUM * value(Preferences.GOO) / 100f,
-                modWidth = value(Preferences.MOD_WIDTH).toFloat(),
                 dwellMilliseconds = maxOf(500L, value(Preferences.ALERT_DWELL) * 100L),
                 identity = value(Preferences.NOTIFICATION_IDENTITY),
                 nowPushes = value(Preferences.NOW_PUSHES) == 1,
-                notificationsRise = value(Preferences.NOTIFICATIONS_RISE) / 100f,
-                isClearCornered = value(Preferences.NOTIFICATIONS_CLEAR_CORNER) == 1,
                 dateFormat = value(Preferences.DATE_FORMAT),
                 blurRadius = value(Preferences.BLUR),
                 scrimBlurRadius = value(Preferences.SCRIM_BLUR),
@@ -86,7 +82,7 @@ data class Appearance(
                 statusScale = scale(Preferences.FONT_SIZE_STATUS),
                 headingScale = scale(Preferences.FONT_SIZE_NOTIFICATION_HEADING),
                 contentScale = scale(Preferences.FONT_SIZE_NOTIFICATION_CONTENT),
-                showBatteryPercent = value(Preferences.STATUS_BATTERY_PERCENT) == 1,
+                isBatteryWhite = value(Preferences.STATUS_BATTERY_WHITE) == 1,
                 hasSidePills = value(Preferences.SIDE_PILLS) != 0,
                 bareScale = scale(Preferences.SIDE_PILLS_SIZE),
                 batteryFont = Faces.stack(value(Preferences.FONT_BATTERY)),
@@ -94,7 +90,7 @@ data class Appearance(
                 statsScale = scale(Preferences.FONT_SIZE_STATS),
                 connectorsScale = scale(Preferences.FONT_SIZE_CONNECTORS),
                 hasDividers = value(Preferences.QUICK_DIVIDERS) != 0,
-                isFastDashboard = value(Preferences.FAST_DASHBOARD) != 0,
+                statusIconScales = StatusIcon.entries.associateWith { scale(it.sizeKey) },
             )
         }
     }

@@ -4,3 +4,4 @@ build/
 local.properties
 .claude/skills/vas/
 .claude/settings.local.json
+.kotlin/

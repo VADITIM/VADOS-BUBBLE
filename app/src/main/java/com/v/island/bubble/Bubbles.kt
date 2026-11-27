@@ -20,8 +20,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.animateContentSize
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -56,12 +54,21 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
@@ -70,6 +77,10 @@ import com.v.island.vas.Curves
 import com.v.island.vas.Durations
 import com.v.island.vas.Palette
 import com.v.island.vas.pressable
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
@@ -255,9 +266,17 @@ private fun ClockFace(clock: ClockBubble, appearance: Appearance) {
                 if (secondsForm) {
                     PopText(":$seconds", type(0.68f * CORNER_GROW, ink, appearance.clockFont, clockScale, weight = FontWeight.Medium, lineHeight = 1.2f), 0)
                 } else {
-                    Column(Modifier.padding(start = SECONDS_GAP.dp).graphicsLayer { alpha = 0.6f }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(Modifier.offset(x = SECONDS_GAP.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         BasicText(seconds.substring(0, 1), Modifier.popAway(isAway, time.length), style = digit)
-                        BasicText(seconds.substring(1, 2), Modifier.popAway(isAway, time.length + 1), style = digit)
+                        BasicText(
+                            seconds.substring(1, 2),
+                            Modifier.layout { measurable, constraints ->
+                                val placeable = measurable.measure(constraints)
+                                val pull = SECONDS_PULL.dp.roundToPx()
+                                layout(placeable.width, placeable.height - pull) { placeable.place(0, -pull) }
+                            }.popAway(isAway, time.length + 1),
+                            style = digit,
+                        )
                     }
                 }
             }
@@ -296,9 +315,13 @@ private const val SECONDS_TURN = -14f
 private const val DATE_FADE = 140
 private const val DATE_WIDE = 70f
 private const val DATE_TOP = 2.4f
-private const val SECONDS_SIZE = 0.36f
-private const val SECONDS_LINE = 0.78f
-private const val SECONDS_GAP = 1f
+/* The stacked seconds were small with a loose gap between the digits; they are larger and set tighter, the stack standing as tall as it did. */
+private const val SECONDS_SIZE = 0.42f
+private const val SECONDS_LINE = 0.54f
+/* The stacked seconds stood at 60% of their ink, so they read as a separate dimmer label; they take the same ink as the hours and minutes. */
+private const val SECONDS_GAP = 2f
+/* Shrinking the digits' line height did not close the step between them, since each one still stood as tall as its glyph; the lower digit is drawn up into the upper one's box. */
+private const val SECONDS_PULL = 3f
 
 /* Mirrors --corner-grow-scale and the corner's 0.7rem side padding in the retired pill.css. */
 private const val CORNER_GROW = 1.0f
@@ -383,7 +406,7 @@ fun StatusView(status: StatusBubble) {
 private fun StatusSlotView(slot: StatusSlot, appearance: Appearance, isAway: Boolean, order: Int) {
     if (slot is StatusSlot.Reading) {
         // The reading was inked white regardless of the bar, so it vanished over a light page while the bodies were off.
-        AwayText(slot.text, type(0.56f, Color.White, appearance.statusFont, appearance.statusScale * bareGrow(), weight = FontWeight.Bold), isAway, order)
+        AwayText(slot.text, type(0.56f, Color.White, appearance.statusFont, appearance.statusScale * appearance.iconScale(slot.icon) * bareGrow(), weight = FontWeight.Bold), isAway, order)
         return
     }
     Box(Modifier.popAway(isAway, order)) { StatusSlotContent(slot, appearance) }
@@ -392,11 +415,12 @@ private fun StatusSlotView(slot: StatusSlot, appearance: Appearance, isAway: Boo
 @Composable
 private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
     val ink = Color.White
-    val glyph = (appearance.compactHeight - 13f) * bareGrow()
-    val modGlyph = (appearance.compactHeight - 8f) * bareGrow()
+    val iconScale = appearance.iconScale(slot.icon)
+    val glyph = (appearance.compactHeight - 13f) * bareGrow() * iconScale
+    val modGlyph = (appearance.compactHeight - 8f) * bareGrow() * iconScale
     when (slot) {
         is StatusSlot.Mark -> GlyphIcon(slot.glyph, if (slot.tint == Color.White) ink else slot.tint, Modifier.size(glyph.dp))
-        is StatusSlot.Reading -> BasicText(slot.text, style = type(0.56f, ink, appearance.statusFont, appearance.statusScale * bareGrow(), weight = FontWeight.Bold))
+        is StatusSlot.Reading -> BasicText(slot.text, style = type(0.56f, ink, appearance.statusFont, appearance.statusScale * iconScale * bareGrow(), weight = FontWeight.Bold))
         is StatusSlot.Paired -> Box(Modifier.size(modGlyph.dp), contentAlignment = Alignment.Center) {
             val colour = StatusBubble.levelColour(slot.charge)
             Canvas(Modifier.fillMaxSize()) {
@@ -408,47 +432,61 @@ private fun StatusSlotContent(slot: StatusSlot, appearance: Appearance) {
             }
             GlyphIcon(Glyphs.bluetooth, ink, Modifier.size((modGlyph * 0.72f).dp))
         }
-        is StatusSlot.Announce -> GlyphIcon(
-            when (slot.event) {
-                BatteryEvent.Plugged -> Glyphs.batteryCharging
-                BatteryEvent.Low -> Glyphs.batteryMark("M7.5 10V14" + Glyphs.BATTERY_CELL)
-                BatteryEvent.Critical -> Glyphs.batteryMark(Glyphs.BATTERY_CRITICAL)
-            },
-            StatusBubble.ANNOUNCE_COLOURS.getValue(slot.event),
-            Modifier.size(modGlyph.dp),
-        )
-        is StatusSlot.Battery -> MiniBattery(slot.charge, if (isBarePill()) modGlyph * BARE_BATTERY else modGlyph, appearance, ink)
+        is StatusSlot.Battery -> {
+            val charge = when (slot.announcing) {
+                BatteryEvent.Plugged -> slot.charge.copy(isPlugged = true)
+                BatteryEvent.Low, BatteryEvent.Critical -> slot.charge.copy(isPlugged = false)
+                null -> slot.charge
+            }
+            val colour = when {
+                appearance.isBatteryWhite -> Color.White
+                slot.announcing != null -> StatusBubble.ANNOUNCE_COLOURS.getValue(slot.announcing)
+                else -> StatusBubble.chargeColour(charge)
+            }
+            MiniBattery(charge, if (isBarePill()) modGlyph * BARE_BATTERY else modGlyph, colour)
+        }
     }
 }
 
 @Composable
-private fun MiniBattery(charge: Charge, modGlyph: Float, appearance: Appearance, ink: Color) {
-    val colour = StatusBubble.chargeColour(charge)
+private fun MiniBattery(charge: Charge, modGlyph: Float, target: Color) {
+    val colour by androidx.compose.animation.animateColorAsState(target, tween(300), label = "batteryColour")
     val fill = animateFloatAsState(charge.percent / 100f, tween(500), label = "charge")
-    val isBare = !appearance.showBatteryPercent
-    val tall = modGlyph * if (isBare) 0.67f else 0.8f
-    val wide = modGlyph * if (isBare) 1.1f else 1.3f
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(wide.dp, tall.dp), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.fillMaxSize()) {
-                val outline = 1.5.dp.toPx()
-                val corner = modGlyph * 0.17f * density
-                drawRoundRect(Color(0xD92A2832), cornerRadius = CornerRadius(corner))
-                val inner = outline + 1.dp.toPx()
-                val well = size.width - outline * 2f
-                drawRoundRect(
-                    colour,
-                    topLeft = Offset(inner, inner),
-                    size = Size(minOf(well * fill.value, well - 2.dp.toPx()), size.height - inner * 2f),
-                    cornerRadius = CornerRadius((corner - 2.5f * density).coerceAtLeast(density)),
-                )
-                drawRoundRect(colour, topLeft = Offset(outline / 2f, outline / 2f), size = Size(size.width - outline, size.height - outline), cornerRadius = CornerRadius(corner - outline / 2f), style = Stroke(outline))
-            }
-            // The reading was black wherever it sat, so the part over the empty well vanished at low charge; it is white over the well and black over the fill.
-            BatteryReading(charge, isBare, tall, appearance, ink, { fill.value }, isOverFill = false)
-            BatteryReading(charge, isBare, tall, appearance, Color.Black, { fill.value }, isOverFill = true)
+    val bolt = animateFloatAsState(if (charge.isPlugged) 1f else 0f, BOLT_POP, label = "bolt")
+    Canvas(Modifier.size((modGlyph * 1.25f).dp, (modGlyph * 0.92f).dp).graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)) {
+        val outline = 1.5.dp.toPx()
+        val tall = size.height * 0.66f
+        val capWide = 1.75.dp.toPx()
+        val bodyWide = size.width - capWide - 1.dp.toPx()
+        val top = (size.height - tall) / 2f
+        val corner = tall * 0.32f
+        drawRoundRect(Color.White.copy(alpha = 0.16f), Offset(0f, top), Size(bodyWide, tall), CornerRadius(corner))
+        drawRoundRect(Color.White, Offset(outline / 2f, top + outline / 2f), Size(bodyWide - outline, tall - outline), CornerRadius(corner - outline / 2f), style = Stroke(outline))
+        drawRoundRect(Color.White, Offset(size.width - capWide, size.height / 2f - tall * 0.2f), Size(capWide, tall * 0.4f), CornerRadius(capWide / 2f))
+        val inset = outline + 1.25.dp.toPx()
+        val well = bodyWide - inset * 2f
+        drawRoundRect(
+            colour,
+            Offset(inset, top + inset),
+            Size((well * fill.value).coerceIn(well * 0.08f, well), tall - inset * 2f),
+            CornerRadius((corner - inset).coerceAtLeast(1.dp.toPx())),
+        )
+        if (bolt.value <= 0.01f) return@Canvas
+        val boltWide = tall * 0.78f
+        val left = bodyWide / 2f - boltWide / 2f
+        val path = Path().apply {
+            moveTo(left + boltWide * 0.70f, 0f)
+            lineTo(left + boltWide * 0.04f, size.height * 0.58f)
+            lineTo(left + boltWide * 0.46f, size.height * 0.56f)
+            lineTo(left + boltWide * 0.30f, size.height)
+            lineTo(left + boltWide * 0.96f, size.height * 0.42f)
+            lineTo(left + boltWide * 0.54f, size.height * 0.44f)
+            close()
         }
-        Box(Modifier.padding(start = 1.dp).size(1.5.dp, (tall * 0.34f).dp).background(colour, RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp)))
+        scale(bolt.value, Offset(bodyWide / 2f, size.height / 2f)) {
+            drawPath(path, Color.Black, style = Stroke(2.5.dp.toPx(), join = StrokeJoin.Round), blendMode = BlendMode.Clear)
+            drawPath(path, StatusBubble.CHARGING_COLOUR)
+        }
     }
 }
 
@@ -458,41 +496,7 @@ private fun bareGrow() = if (isBarePill()) Island.appearance.bareScale else 1f
 
 private const val BARE_BATTERY = 1.2f
 
-
-@Composable
-private fun BoxScope.BatteryReading(charge: Charge, isBare: Boolean, tall: Float, appearance: Appearance, colour: Color, fill: () -> Float, isOverFill: Boolean) {
-    if (isBare && !charge.isPlugged) return
-    Row(
-        Modifier.matchParentSize().drawWithContent {
-            val outline = 1.5.dp.toPx()
-            val well = size.width - outline * 2f
-            val edge = outline + 1.dp.toPx() + minOf(well * fill(), well - 2.dp.toPx())
-            if (isOverFill) clipRect(right = edge) { this@drawWithContent.drawContent() }
-            else clipRect(left = edge) { this@drawWithContent.drawContent() }
-        },
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (charge.isPlugged) Bolt(colour, Modifier.size((tall * if (isBare) 0.7f else 0.55f).dp))
-        if (!isBare) BasicText(if (charge.isPlugged) "${charge.percent}" else "${charge.percent}%", style = type(0.6f, colour, appearance.statusFont, appearance.statusScale, weight = FontWeight.Bold, lineHeight = 1f))
-    }
-}
-
-@Composable
-private fun Bolt(colour: Color, modifier: Modifier) {
-    Canvas(modifier) {
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(size.width * 0.62f, 0f)
-            lineTo(size.width * 0.12f, size.height * 0.58f)
-            lineTo(size.width * 0.48f, size.height * 0.58f)
-            lineTo(size.width * 0.38f, size.height)
-            lineTo(size.width * 0.88f, size.height * 0.42f)
-            lineTo(size.width * 0.52f, size.height * 0.42f)
-            close()
-        }
-        drawPath(path, colour)
-    }
-}
+val BOLT_POP = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.45f, stiffness = 420f)
 
 @Composable
 fun SatellitesView(bubble: MainBubble) {
@@ -548,66 +552,49 @@ fun SatellitesView(bubble: MainBubble) {
     }
 }
 
+/* The clear button hung under the menu and the system notices sat in glass at the foot, so both moved with every refit and stood apart from the entry cards; the button stands in the bottom right corner and the notices are cards like the entries. */
 @Composable
 fun ClearButton(bubble: MainBubble) {
     val isShown = bubble.size == com.v.island.bubble.Size.Notifications && bubble.groups.isNotEmpty()
-    val box = bubble.target()
-    val restTop = box.top + box.height + MainBubble.CLEAR_GAP
-    val settled = animateFloatAsState(restTop, tween(MainBubble.CLEAR_TOP_MILLISECONDS, easing = Curves.grow), label = "clearTop")
-    val left = Island.screenWidth / 2f - MainBubble.CLEAR_SIZE / 2f
-    /* Mirrors #notifications-clear in pill.css: it slides out from under the menu and grows from its top edge after the menu has opened, and goes back up under it on the way home. */
-    val drop = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(380, 220, Curves.split) else tween(220, easing = Curves.grow), label = "clearDrop")
-    val grown = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(320, 220, Curves.split) else tween(220, easing = Curves.grow), label = "clearGrow")
-    val glyph = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(0, 380) else tween(120), label = "clearGlyph")
+    val top = bubble.clearTop()
+    val left = Island.screenWidth / 2f + MainBubble.GROWN_WIDTH / 2f - MainBubble.CLEAR_SIZE - CORNER_INSET
+    val grown = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) spring(dampingRatio = CLEAR_DAMPING, stiffness = CLEAR_STIFFNESS) else tween(180, easing = Curves.leave), label = "clearGrow")
     if (grown.value <= 0.01f && !isShown) return
-    fun top() = settled.value - (1f - drop.value) * (MainBubble.CLEAR_SIZE + MainBubble.CLEAR_GAP)
-    val countLeft = left + MainBubble.CLEAR_SIZE + COUNT_GAP
-    fun countTop() = top() + (MainBubble.CLEAR_SIZE - COUNT_SIZE) / 2f
-    Blob(Island.liquid) {
-        val density = Island.density
-        val diameter = MainBubble.CLEAR_SIZE * grown.value
-        val x = left + (MainBubble.CLEAR_SIZE - diameter) / 2f
-        val y = top()
-        BlobShape(Rect(x * density, y * density, (x + diameter) * density, (y + diameter) * density), diameter / 2f * density, Palette.border)
-    }
-    Blob(Island.liquid) {
-        val density = Island.density
-        val diameter = COUNT_SIZE * grown.value
-        val x = countLeft + (COUNT_SIZE - diameter) / 2f
-        val y = countTop()
-        BlobShape(Rect(x * density, y * density, (x + diameter) * density, (y + diameter) * density), diameter / 2f * density, Palette.border)
-    }
+    val countLeft = left + (MainBubble.CLEAR_SIZE - COUNT_SIZE) / 2f
+    val countTop = top - COUNT_GAP - COUNT_SIZE
     Box(
         Modifier
-            .offset { IntOffset((countLeft * Island.density).roundToInt(), (countTop() * Island.density).roundToInt()) }
+            .offset { IntOffset((countLeft * Island.density).roundToInt(), (countTop * Island.density).roundToInt()) }
             .size(COUNT_SIZE.dp)
             .graphicsLayer {
                 scaleX = grown.value
                 scaleY = grown.value
-                alpha = glyph.value
-            },
+                alpha = grown.value.coerceIn(0f, 1f)
+            }
+            .background(Island.appearance.pillFill, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         val total = bubble.groups.sumOf { it.entries.size }
         if (total > 0) BasicText(total.toString(), style = type(0.62f, Palette.textBright, Island.appearance.headingFont, Island.appearance.headingScale))
     }
     SideEffect {
-        if (isShown) Island.regions[Region.Clear] = Rect(left, restTop, left + MainBubble.CLEAR_SIZE, restTop + MainBubble.CLEAR_SIZE)
+        if (isShown) Island.regions[Region.Clear] = Rect(left, top, left + MainBubble.CLEAR_SIZE, top + MainBubble.CLEAR_SIZE)
         else Island.regions.remove(Region.Clear)
     }
     Box(
         Modifier
-            .offset { IntOffset((left * Island.density).roundToInt(), (top() * Island.density).roundToInt()) }
+            .offset { IntOffset((left * Island.density).roundToInt(), (top * Island.density).roundToInt()) }
             .size(MainBubble.CLEAR_SIZE.dp)
             .graphicsLayer {
                 scaleX = grown.value
                 scaleY = grown.value
-                transformOrigin = TransformOrigin(0.5f, 0f)
+                alpha = grown.value.coerceIn(0f, 1f)
             }
-            .then(if (isShown) Modifier.pressableClear(bubble) else Modifier),
+            .then(if (isShown) Modifier.pressableClear(bubble) else Modifier)
+            .background(Island.appearance.pillFill, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        GlyphIcon(TRASH, Palette.textBright, Modifier.size(20.dp).graphicsLayer { alpha = glyph.value })
+        GlyphIcon(TRASH, Palette.danger, Modifier.size(20.dp))
     }
 }
 
@@ -615,58 +602,142 @@ fun ClearButton(bubble: MainBubble) {
 fun SystemPill(bubble: MainBubble) {
     val isShown = bubble.size == com.v.island.bubble.Size.Notifications && bubble.systemNotices.isNotEmpty()
     val height = bubble.systemHeight()
-    val restTop = Island.screenHeight - height - MainBubble.SYSTEM_FOOT
+    val restTop = bubble.systemTop()
+    /* A notch bitten around the count and clear bubbles read as broken glass; the count stands on the clear button and every notice stops a gap short of that column. */
+    val trim = if (bubble.groups.isNotEmpty()) MainBubble.CLEAR_SIZE + CORNER_INSET + COUNT_GAP else 12f
     val settled = animateFloatAsState(restTop, tween(MainBubble.CLEAR_TOP_MILLISECONDS, easing = Curves.grow), label = "systemTop")
     val left = Island.screenWidth / 2f - MainBubble.GROWN_WIDTH / 2f
-    val drop = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(380, 160, Curves.split) else tween(220, easing = Curves.grow), label = "systemDrop")
-    val grown = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(320, 160, Curves.split) else tween(220, easing = Curves.grow), label = "systemGrow")
-    val content = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(200, 340) else tween(120), label = "systemContent")
-    if (grown.value <= 0.01f && !isShown) return
-    fun top() = settled.value + (1f - drop.value) * (height + MainBubble.SYSTEM_FOOT)
-    Blob(Island.liquid) {
-        val density = Island.density
-        val shown = height * grown.value
-        val y = top() + height - shown
-        BlobShape(Rect(left * density, y * density, (left + MainBubble.GROWN_WIDTH) * density, (y + shown) * density), kotlin.math.min(26f, shown / 2f) * density, Palette.border)
-    }
+    val content = animateFloatAsState(if (isShown) 1f else 0f, if (isShown) tween(240, 60, Curves.split) else tween(160, easing = Curves.leave), label = "systemContent")
+    if (content.value <= 0.01f && !isShown) return
     SideEffect {
-        if (isShown) Island.regions[Region.System] = Rect(left, restTop, left + MainBubble.GROWN_WIDTH, restTop + height)
+        if (isShown) Island.regions[Region.System] = Rect(left, restTop, left + MainBubble.GROWN_WIDTH - trim + 12f, restTop + height)
         else Island.regions.remove(Region.System)
     }
     Column(
         Modifier
-            .offset { IntOffset((left * Island.density).roundToInt(), (top() * Island.density).roundToInt()) }
+            .offset { IntOffset((left * Island.density).roundToInt(), (settled.value * Island.density).roundToInt()) }
             .size(MainBubble.GROWN_WIDTH.dp, height.dp)
-            .graphicsLayer { alpha = content.value }
-            .padding(horizontal = 10.dp, vertical = MainBubble.SYSTEM_PAD.dp),
+            .padding(start = 12.dp, end = trim.dp, top = MainBubble.SYSTEM_PAD.dp, bottom = MainBubble.SYSTEM_PAD.dp),
+        verticalArrangement = Arrangement.spacedBy(SYSTEM_SEAM.dp),
     ) {
-        bubble.systemNotices.forEach { entry ->
+        val notices = bubble.systemNotices
+        notices.forEachIndexed { index, entry ->
             key(entry.key) {
                 val tint = systemTint(entry)
+                val drop = remember { Animatable(0f) }
+                val widen = remember { Animatable(0f) }
+                val reveal = remember { Animatable(0f) }
+                val leave = remember { Animatable(0f) }
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(SYSTEM_DROP_AFTER + index * SYSTEM_STAGGER)
+                    /* The pop to full width ran on its own clock, so it fired mid-fall and the drop's bounce and the widen's bounce landed apart; the widen and the title wait for the silhouette to reach its place. */
+                    launch {
+                        androidx.compose.runtime.snapshotFlow { drop.value }.first { it >= SYSTEM_LANDED }
+                        launch { widen.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = SYSTEM_WIDEN_DAMPING, stiffness = SYSTEM_WIDEN_STIFFNESS)) }
+                        kotlinx.coroutines.delay(SYSTEM_REVEAL_AFTER_LANDING)
+                        reveal.animateTo(1f, tween(SYSTEM_REVEAL, easing = Curves.powerTwoOut))
+                    }
+                    drop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = SYSTEM_DROP_DAMPING, stiffness = SYSTEM_DROP_STIFFNESS))
+                }
+                LaunchedEffect(isShown) { if (!isShown) leave.animateTo(1f, tween(SYSTEM_LEAVE, easing = Curves.leave)) }
+                androidx.compose.runtime.DisposableEffect(entry.key) {
+                    onDispose {
+                        bubble.systemBounds.remove(entry.key)
+                        Island.glass.remove(entry.key)
+                    }
+                }
+                SideEffect {
+                    Island.glass[entry.key] = glass@{
+                        if (!isShown || reveal.value < 1f) return@glass null
+                        val card = bubble.systemBounds[entry.key] ?: return@glass null
+                        val density = Island.density
+                        BlobShape(Rect(card.left * density, card.top * density, card.right * density, card.bottom * density), SYSTEM_OUTER * density, Color.Transparent, 1f - leave.value)
+                    }
+                }
+                val isRevealed by remember { androidx.compose.runtime.derivedStateOf { reveal.value >= 1f } }
+                if (isShown && !isRevealed) Blob(Island.liquid) {
+                    val card = bubble.systemBounds[entry.key] ?: return@Blob null
+                    val pill = bubble.target()
+                    val travel = drop.value
+                    val wide = SYSTEM_DROP_WIDTH + (card.width - SYSTEM_DROP_WIDTH) * systemWidth(drop.value, widen.value)
+                    val tall = SYSTEM_DROP_HEIGHT + (card.height - SYSTEM_DROP_HEIGHT) * travel
+                    val x = Island.screenWidth / 2f + pill.shift + (card.center.x - Island.screenWidth / 2f - pill.shift) * travel
+                    val y = pill.top + pill.height + (card.center.y - pill.top - pill.height) * travel
+                    val density = Island.density
+                    BlobShape(Rect((x - wide / 2f) * density, (y - tall / 2f) * density, (x + wide / 2f) * density, (y + tall / 2f) * density), minOf(tall / 2f, SYSTEM_OUTER) * density, bubble.border())
+                }
                 Row(
-                    Modifier.size(MainBubble.GROWN_WIDTH.dp - 20.dp, MainBubble.SYSTEM_ROW.dp)
-                        .padding(vertical = 3.dp)
+                    Modifier.fillMaxWidth().height(MainBubble.SYSTEM_ROW.dp - SYSTEM_SEAM.dp)
+                        .onGloballyPositioned { at ->
+                            val bounds = at.boundsInRoot()
+                            bubble.systemBounds[entry.key] = Rect(bounds.left / Island.density, bounds.top / Island.density, bounds.right / Island.density, bounds.bottom / Island.density)
+                        }
+                        .graphicsLayer {
+                            val card = bubble.systemBounds[entry.key] ?: return@graphicsLayer
+                            val pill = bubble.target()
+                            val behind = 1f - drop.value
+                            translationX = (Island.screenWidth / 2f + pill.shift - card.center.x) * behind * density
+                            translationY = (pill.top + pill.height - card.center.y) * behind * density
+                            scaleX = (SYSTEM_DROP_WIDTH + (card.width - SYSTEM_DROP_WIDTH) * systemWidth(drop.value, widen.value)) / card.width
+                            scaleY = (SYSTEM_DROP_HEIGHT + (card.height - SYSTEM_DROP_HEIGHT) * drop.value) / card.height
+                        }
                         .then(if (isShown) Modifier.pressable(pressedScale = 1.02f, haptic = null) { bubble.openSystem(entry) } else Modifier)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(tint.copy(alpha = 0.09f))
-                        .padding(horizontal = 8.dp),
+                        .clip(RoundedCornerShape(SYSTEM_OUTER.dp))
+                        .background(if (isShown && isRevealed) Island.appearance.pillFill else Color.Transparent)
+                        .padding(start = SYSTEM_ICON_INSET.dp, end = 12.dp)
+                        .graphicsLayer {
+                            val hazy = maxOf(1f - reveal.value, leave.value)
+                            alpha = reveal.value * (1f - leave.value)
+                            scaleX = 1f - SYSTEM_LEAVE_SHRINK * leave.value
+                            scaleY = scaleX
+                            translationY = -SYSTEM_LEAVE_RISE * leave.value * density
+                            renderEffect = if (hazy > 0.01f) androidx.compose.ui.graphics.BlurEffect(hazy * SYSTEM_BLUR * density, hazy * SYSTEM_BLUR * density, androidx.compose.ui.graphics.TileMode.Decal) else null
+                        },
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
                 ) {
                     Box(Modifier.size(26.dp).background(tint.copy(alpha = 0.22f), CircleShape), contentAlignment = Alignment.Center) {
                         val badge = entry.icon ?: entry.appIcon
                         if (badge != null) androidx.compose.foundation.Image(badge, null, Modifier.size(15.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint))
                     }
-                    Column(Modifier.weight(1f).clipToBounds()) {
-                        BasicText(entry.title.ifEmpty { entry.appName }, style = type(0.72f, Palette.textBright, Island.appearance.headingFont, Island.appearance.headingScale), maxLines = 1, softWrap = false)
-                        if (entry.text.isNotEmpty()) BasicText(entry.text, style = type(0.64f, Palette.textFaint, Island.appearance.contentFont, Island.appearance.contentScale), maxLines = 1, softWrap = false)
-                    }
-                    androidx.compose.foundation.Canvas(Modifier.size(6.dp)) { drawCircle(tint) }
+                    ScrambleText(entry.title.ifEmpty { entry.appName }, type(0.72f, Palette.textBright, Island.appearance.headingFont, Island.appearance.headingScale), (SYSTEM_DROP_AFTER + index * SYSTEM_STAGGER + SYSTEM_REVEAL_AT).toInt(), Modifier.weight(1f))
                 }
             }
         }
     }
 }
+
+private const val CORNER_INSET = 12f
+private const val CLEAR_DAMPING = 0.55f
+private const val CLEAR_STIFFNESS = 420f
+/* The system notices faded up in place as one block while the cards above dropped out of Main, and each carried a second line nobody read; each notice drops out of Main's bottom edge as liquid after the cards, its title blurs in over it, it leaves and flies home like a card, and it shows its title alone. The long drop bounced hard on the cards' spring and the title sat at the resting place while the silhouette was still falling; the drop is near critically damped and the notice rides the silhouette, its title scrambling in, its icon nearer the edge and no tint dot. */
+private const val SYSTEM_DROP_AFTER = 120L
+private const val SYSTEM_STAGGER = 30L
+private const val SYSTEM_DROP_DAMPING = 0.74f
+private const val SYSTEM_DROP_STIFFNESS = 620f
+private const val SYSTEM_LANDED = 0.92f
+private const val SYSTEM_REVEAL_AFTER_LANDING = 40L
+private const val SYSTEM_WIDEN_DAMPING = 0.6f
+private const val SYSTEM_WIDEN_STIFFNESS = 800f
+private const val SYSTEM_FALL_WIDEN = 0.2f
+
+private fun systemWidth(drop: Float, widen: Float): Float {
+    val falling = SYSTEM_FALL_WIDEN * drop.coerceIn(0f, 1f)
+    return falling + (1f - falling) * widen
+}
+private const val SYSTEM_ICON_INSET = 5f
+/* The notice rode its silhouette at full width, so once its title blurred in it stood wider than the narrowing drop under it; it is scaled to the silhouette's size for the whole drop. */
+private const val SYSTEM_DROP_WIDTH = 36f
+private const val SYSTEM_DROP_HEIGHT = 18f
+private const val SYSTEM_REVEAL_AT = 260L
+private const val SYSTEM_REVEAL = 140
+private const val SYSTEM_BLUR = 10f
+private const val SYSTEM_LEAVE = 110
+private const val SYSTEM_LEAVE_SHRINK = 0.08f
+private const val SYSTEM_LEAVE_RISE = 10f
+/* The notices stood 2.4dp apart with inner corners squared off, so the stack read as one joined slab; each is its own capsule with a clear gap. */
+private const val SYSTEM_SEAM = 6f
+private const val SYSTEM_OUTER = 18f
 
 private fun systemTint(entry: Notice): Color {
     val words = "${entry.packageName} ${entry.title} ${entry.text}".lowercase()
@@ -700,6 +771,24 @@ fun PanelShield(bubble: MainBubble) {
                 val probe = awaitFirstDown(requireUnconsumed = false)
                 android.util.Log.d("IslandBubble", "probe shield x=${probe.position.x / Island.density} y=${probe.position.y / Island.density}")
                 probe.consume()
+                val fromX = probe.position.x / Island.density
+                val fromY = probe.position.y / Island.density
+                if (bubble.pullsNotifications(fromX, fromY)) {
+                    var hasDropped = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == probe.id } ?: break
+                        change.consume()
+                        if (!change.pressed) break
+                        val down = (change.position.y / Island.density - fromY) * if (bubble.isNotificationsPulled) -1f else 1f
+                        if (!hasDropped && down > MainBubble.PULL_TRIGGER && down > abs(change.position.x / Island.density - fromX)) {
+                            hasDropped = true
+                            bubble.dropNotifications()
+                        }
+                    }
+                    if (!hasDropped) bubble.onOutsideTap()
+                    return@awaitEachGesture
+                }
                 /* The shield closed the open panel only once the finger lifted, so a tap outside felt late; it closes on the touch and swallows the rest of the gesture. */
                 bubble.onOutsideTap()
                 while (true) {

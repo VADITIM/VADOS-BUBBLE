@@ -4,10 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -24,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -53,18 +49,25 @@ fun MainBubbleView(bubble: MainBubble) {
     val isReturning = isClosed && !wasClosed[0]
     /* Mirrors --grow-ms on the grown sizes and html.notifications-homing in pill.css: the big boxes open and go home over 460ms, not the pill's 340. */
     val growth = if (bubble.size in LONG_SIZES || previous[0] in LONG_SIZES) LONG_GROW else Durations.GROW
+    val isMenu = bubble.size == Size.Notifications
+    /* Opening the Dashboard shrank Main to the punch hole on the closed pill's bouncy curve with its face still drawn, slower-looking than the menu's retract; both sweep down to a bare dot the same way. */
+    val isPunch = isMenu || bubble.isPunched
+    val wasMenu = previous[0] == Size.Notifications
     SideEffect {
         wasClosed[0] = isClosed
         previous[0] = bubble.size
     }
     /* A grown box collapsing on the 1.7 overshoot undershot the closed pill and slammed back, and the reach curve home still bounced too hard, so every return home rides the gentler settle curve; opening had no bounce at all on the grow curve, and the Clock's 1.7 overshoot was a little too much, so it takes a 1.5 one. */
-    val easing = if (isReturning) Curves.settle else if (isClosed) Curves.bubble else Curves.open
-    val follow = if (bubble.isDragging) snap<Float>() else tween(growth, easing = easing)
+    /* Main shrank to the punch hole on the open curve with its face still drawn, and the first drop sat over it, so the shrink never read; it sweeps down to a bare dot and only its face's return waits for the cards to melt home. */
+    val easing = if (isPunch) Curves.sweep else if (isReturning) Curves.settle else if (isClosed) Curves.bubble else Curves.open
+    val faceShown = animateFloatAsState(if (isPunch) 0f else 1f, if (isPunch) tween(MENU_FACE_OUT) else tween(MENU_FACE_IN, if (wasMenu) MENU_FACE_RETURN else 0), label = "menuFace")
+    val isAlertHome = isClosed && previous[0] in ALERT_SIZES && bubble.homing.isNotEmpty()
+    val follow = if (bubble.isDragging || isAlertHome) snap<Float>() else tween(growth, easing = easing)
     val width = animateFloatAsState(target.width, follow, label = "width")
-    val height = animateFloatAsState(target.height, tween(growth, easing = easing), label = "height")
-    val top = animateFloatAsState(target.top, tween(growth, easing = if (isClosed) Curves.settle else Curves.open), label = "top")
+    val height = animateFloatAsState(target.height, if (isAlertHome) snap() else tween(growth, easing = easing), label = "height")
+    val top = animateFloatAsState(target.top, if (isAlertHome) snap() else tween(growth, easing = if (isPunch) Curves.sweep else if (isClosed) Curves.settle else Curves.open), label = "top")
     val shift = animateFloatAsState(target.shift, follow, label = "shift")
-    val radius = animateFloatAsState(target.radius, tween(growth, easing = FastOutSlowInEasing), label = "radius")
+    val radius = animateFloatAsState(target.radius, if (isAlertHome) snap() else tween(growth, easing = FastOutSlowInEasing), label = "radius")
     val held = animateFloatAsState(bubble.holdScale, tween(Durations.HOLD, easing = Curves.bubble), label = "hold")
     val scale = androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { held.value * (1f + bubble.landing) } }
     val shown = animateFloatAsState(if (bubble.isLent) 0f else 1f, if (bubble.isLent) tween(Durations.GROW) else snap(), label = "lent")
@@ -74,14 +77,20 @@ fun MainBubbleView(bubble: MainBubble) {
         label = "rise",
     )
     val centre = Island.screenWidth / 2f
-    StayPill(bubble, centre)
+    val topTargets = remember { floatArrayOf(target.top, target.top) }
+    if (topTargets[0] != target.top) {
+        topTargets[1] = topTargets[0]
+        topTargets[0] = target.top
+    }
 
     Blob(Island.liquid) {
         val density = Island.density
+        // Main coming back down from past the screen edge as the Dashboard left overshot its resting top on the settle curve and bared the punch hole above it; the overshoot is taken as extra height upward so the top edge never passes its rest.
+        val cover = if (topTargets[1] < topTargets[0]) (top.value - topTargets[0]).coerceAtLeast(0f) else 0f
         val grownWidth = width.value * scale.value
-        val grownHeight = height.value * scale.value
+        val grownHeight = height.value * scale.value + cover
         val left = centre + shift.value - grownWidth / 2f + bubble.drag.x
-        val upper = top.value + bubble.drag.y + bubble.bumpLift
+        val upper = top.value - cover + bubble.drag.y + bubble.bumpLift
         BlobShape(
             Rect(left * density, upper * density, (left + grownWidth) * density, (upper + grownHeight) * density),
             radius.value * scale.value * density,
@@ -137,7 +146,7 @@ fun MainBubbleView(bubble: MainBubble) {
                 .graphicsLayer {
                     scaleX = scale.value
                     scaleY = scale.value
-                    alpha = shown.value
+                    alpha = shown.value * faceShown.value
                     transformOrigin = TransformOrigin(0.5f, 0f)
                     translationX = bubble.drag.x * Island.density
                     translationY = (bubble.drag.y + bubble.bumpLift) * Island.density
@@ -157,7 +166,7 @@ fun MainBubbleView(bubble: MainBubble) {
                 layout(constraints.maxWidth, constraints.maxHeight) { placeable.place((constraints.maxWidth - placeable.width) / 2, 0) }
             }) {
             AnimatedContent(
-                targetState = bubble.face,
+                targetState = bubble.mainFace,
                 transitionSpec = { faceTransition(initialState, targetState) },
                 label = "face",
                 modifier = Modifier.fillMaxSize(),
@@ -173,55 +182,12 @@ fun MainBubbleView(bubble: MainBubble) {
     }
 }
 
-@Composable
-private fun StayPill(bubble: MainBubble, centre: Float) {
-    val mod = bubble.stayMod
-    val kept = remember { arrayOfNulls<Mod>(1) }
-    // The face was only composed once the menu opened, so every icon started its entrance again; it stays composed, unseen, while any mod is live.
-    (mod ?: bubble.liveMods.firstOrNull())?.let { kept[0] = it }
-    val shown = kept[0] ?: return
-    val wobble = remember { Animatable(1f) }
-    val presence = animateFloatAsState(if (mod != null) 1f else 0f, if (mod != null) snap() else tween(0, LONG_GROW), label = "stay")
-    LaunchedEffect(mod != null) {
-        if (mod == null) return@LaunchedEffect
-        wobble.snapTo(1f)
-        /* The squash eased in, so the burst barely moved for its first frames and read as late; it leaps out at once and further. */
-        wobble.animateTo(STAY_SQUASH, tween(STAY_SQUASH_TIME, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
-        wobble.animateTo(1f, spring(dampingRatio = 0.3f, stiffness = Spring.StiffnessMedium))
-    }
-    val frame = bubble.stayFrame(shown)
-    val density = Island.density
-    if (presence.value > 0f) Blob(Island.liquid) {
-        val wide = frame.width * wobble.value
-        val tall = frame.height * (2f - wobble.value)
-        val left = centre + frame.shift - wide / 2f
-        val upper = frame.top + (frame.height - tall) / 2f
-        BlobShape(Rect(left * density, upper * density, (left + wide) * density, (upper + tall) * density), tall / 2f * density, bubble.border(), presence.value)
-    }
-    Box(
-        Modifier
-            .offset { IntOffset(((centre + frame.shift - frame.width / 2f) * density).roundToInt(), (frame.top * density).roundToInt()) }
-            .size(frame.width.dp, frame.height.dp)
-            .graphicsLayer {
-                scaleX = wobble.value
-                scaleY = 2f - wobble.value
-                alpha = presence.value
-                clip = true
-                shape = androidx.compose.foundation.shape.RoundedCornerShape((frame.height / 2f).dp)
-            },
-    ) {
-        /* The stay pill's unseen face is composed before Main's, so it took the one-shot caught, still and swap entrances and Main's face entered afresh every time. */
-        androidx.compose.runtime.CompositionLocalProvider(LocalIsStayFace provides true) { FaceContent(bubble.stayFace(shown), bubble, Island.appearance) }
-    }
-}
-
-val LocalIsStayFace = androidx.compose.runtime.staticCompositionLocalOf { false }
-
-private const val STAY_SQUASH = 1.22f
-private const val STAY_SQUASH_TIME = 70
-
-private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.Notifications, Size.Picture, Size.AlertCentre)
+private val ALERT_SIZES = setOf(Size.Alert, Size.AlertCentre, Size.Image)
+private val LONG_SIZES = setOf(Size.Player, Size.TimerPanel, Size.TripPanel, Size.TransferPanel, Size.Picture, Size.AlertCentre)
 const val LONG_GROW = 460
+private const val MENU_FACE_OUT = 100
+private const val MENU_FACE_IN = 180
+private const val MENU_FACE_RETURN = 300
 /* A grown face kept its open size while it faded over the collapsing bubble; it goes in the first frames of the collapse, as .face:not(.showing) does. */
 private const val GROWN_FADE = 90
 private const val PLAYER_FOLD_HANDOVER = 120
@@ -254,10 +220,6 @@ private fun faceTransition(from: Face, to: Face): ContentTransform {
     if (from == Face.Player && to == Face.Media) {
         return ContentTransform(fadeIn(tween(PLAYER_FOLD_HANDOVER, LONG_GROW - PLAYER_FOLD_HANDOVER)), fadeOut(tween(PLAYER_FOLD_HANDOVER, LONG_GROW)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
     }
-    /* A live mod's face faded in over the collapsing menu at a third of the way home, while the stay pill holding that mod was still shown, so the menu read as Main redrawing itself; the stay pill is Main until the menu is home, and the face takes over only then. */
-    if (from == Face.Notifications && to != Face.Idle && to in CLOSED_FACES) {
-        return ContentTransform(fadeIn(tween(0, LONG_GROW)), fadeOut(tween(GROWN_FADE)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
-    }
     val arriving = if (to in CLOSED_FACES) Durations.COLLAPSE / 2 else Durations.CONTENT_DROP
     return ContentTransform(fadeIn(tween(160, arriving)), fadeOut(tween(if (to in CLOSED_FACES) GROWN_FADE else 120)), sizeTransform = SizeTransform(clip = false) { _, _ -> snap() })
 }
@@ -277,5 +239,6 @@ private fun FaceContent(face: Face, bubble: MainBubble, appearance: Appearance) 
         Face.Notifications -> NotificationsFace(bubble, appearance)
         Face.TorchIdle -> TorchIdleFace(appearance)
         Face.Transfer -> TransferFace(bubble, appearance)
+        Face.TransferPanel -> TransferPanel(bubble, appearance)
     }
 }

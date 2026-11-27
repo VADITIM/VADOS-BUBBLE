@@ -48,7 +48,7 @@ jobs:
 
       - name: Publish release
         if: >-
-          github.ref == 'refs/heads/main' &&
+          github.ref == 'refs/heads/compose' &&
           (github.event_name == 'workflow_dispatch' ||
            (github.event_name == 'push' && vars.RELEASE_ON_PUSH == 'true'))
         env:

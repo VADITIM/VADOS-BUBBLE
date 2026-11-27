@@ -3,6 +3,7 @@ package com.v.island
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import com.v.island.bubble.Island
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -26,17 +27,6 @@ import org.json.JSONObject
 object DebugStage {
 
     private val handler = Handler(Looper.getMainLooper())
-
-    
-    private val SEQUENCE = listOf(
-        "idle", "media", "media-timer", "media-timer-call", "satellite-closing",
-        "mod-closing", "mod-to-idle", "alert-over-mod",
-        "clear", "alert", "alert-marked", "alert-stacking", "alert-image",
-        "timer-paused", "call-phone",
-        "now-flight", "torch", "recording", "download", "upload",
-        "connectivity", "connectivity-bluetooth", "connectivity-hotspot",
-        "battery-charging", "battery-low", "locked", "clear"
-    )
 
     
     private fun transfer(kind: String, name: String, done: Int, state: String = NowWatch.TRANSFER_ACTIVE) {
@@ -63,212 +53,42 @@ object DebugStage {
     }
 
     
-    private fun runTransfer(kind: String, name: String, after: Long = 0L, stopAt: Int = 100, ending: String = NowWatch.TRANSFER_DONE) {
+    private fun runTransfer(kind: String, name: String) {
         var tick = 0
-        while (tick * TRANSFER_STEP <= stopAt) {
+        while (tick * TRANSFER_STEP <= 100) {
             val done = tick * TRANSFER_STEP
-            handler.postDelayed({ transfer(kind, name, done) }, after + tick * TRANSFER_TICK)
+            handler.postDelayed({ transfer(kind, name, done) }, tick * TRANSFER_TICK)
             tick++
         }
-        handler.postDelayed({ transfer(kind, name, stopAt, ending) }, after + tick * TRANSFER_TICK)
-        handler.postDelayed({ BubbleService.deliverNowMods(JSONObject().put("recording", JSONObject.NULL).put("transfer", JSONObject.NULL)) }, after + (tick + 1) * TRANSFER_TICK)
+        handler.postDelayed({ transfer(kind, name, 100, NowWatch.TRANSFER_DONE) }, tick * TRANSFER_TICK)
+        handler.postDelayed({ BubbleService.deliverNowMods(JSONObject().put("recording", JSONObject.NULL).put("transfer", JSONObject.NULL)) }, (tick + 1) * TRANSFER_TICK)
     }
 
     private const val TRANSFER_STEP = 10
     private const val TRANSFER_TICK = 280L
-
-    private fun attached(
-        link: String,
-        level: Int,
-        bluetooth: JSONObject? = null,
-        hotspot: Boolean = false,
-        usb: Boolean = false
-    ) {
-        BubbleService.deliverConnectivity(
-            JSONObject()
-                .put("link", link)
-                .put("level", level)
-                .put("usb", usb)
-                .put("hotspot", hotspot)
-                .put("bluetooth", bluetooth ?: JSONObject.NULL)
-        )
-    }
-
-    
-    private const val STEP_MILLIS = 3500L
 
     fun run(name: String) {
         handler.removeCallbacksAndMessages(null)
         play(name)
     }
 
-    
-
-
-
-
-    fun sequence() {
-        handler.removeCallbacksAndMessages(null)
-        SEQUENCE.forEachIndexed { index, name ->
-            handler.postDelayed({ play(name) }, index * STEP_MILLIS)
-        }
-    }
-
     private fun play(name: String) {
         when (name) {
-            "idle" -> clear()
+            "idle" -> clearMods()
+            "clear" -> clearAll()
+            "reset" -> reset()
 
-            "media" -> { clear(); BubbleService.deliverMedia(media(isPlaying = true)) }
-            "media-paused" -> { clear(); BubbleService.deliverMedia(media(isPlaying = false)) }
-
-            "timer" -> { clear(); BubbleService.deliverTimer(timer(isPaused = false)) }
-            "timer-paused" -> { clear(); BubbleService.deliverTimer(timer(isPaused = true)) }
-
-            "call-volume" -> BubbleService.deliverCallVolume(true)
-            "call-volume-off" -> BubbleService.deliverCallVolume(false)
-
-            "call" -> { clear(); BubbleService.deliverCall(call(phone = false)) }
-            "call-phone" -> { clear(); BubbleService.deliverCall(call(phone = true)) }
-
-            
-            
-            
-            "media-timer" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                BubbleService.deliverTimer(timer(isPaused = false))
-            }
-            "media-timer-call" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                BubbleService.deliverTimer(timer(isPaused = false))
-                BubbleService.deliverCall(call(phone = false))
-            }
-
-            "alert" -> BubbleService.deliver(notification())
-            "alert-image" -> BubbleService.deliver(notification().put("imageBase64", picture()))
-            
-            
-            
-            
-            "alert-over-mod" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                handler.postDelayed({ BubbleService.deliver(notification()) }, 900L)
-            }
-
-            "torch" -> BubbleService.deliverTorch(torch())
-            "torch-off" -> BubbleService.deliverTorch(null)
-
-            "battery-charging" -> BubbleService.deliverBattery(battery("charging", 62))
-            "battery-low" -> BubbleService.deliverBattery(battery("low", 14))
-            "battery-critical" -> BubbleService.deliverBattery(battery("critical", 4))
-
-            "clear" -> { clear(); BubbleService.deliverTorch(null) }
-
-            
-            
-            
-            
-            "mod-closing" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                BubbleService.deliverTimer(timer(isPaused = false))
-                handler.postDelayed({ BubbleService.deliverTimer(null) }, 1400L)
-            }
-
-            
-            
-            
-            "satellite-closing" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                BubbleService.deliverTimer(timer(isPaused = false))
-                BubbleService.deliverCall(call(phone = false))
-                handler.postDelayed({ BubbleService.deliverCall(null) }, 1400L)
-            }
-
-            
-            
-            
-            "mod-to-idle" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                handler.postDelayed({ BubbleService.deliverMedia(null) }, 1600L)
-            }
-
-            
-            
-            
-            
-            
-            
-            "recording" -> BubbleService.deliverNowMods(
-                JSONObject()
-                    .put(
-                        "recording",
-                        JSONObject()
-                            .put("mod", "recording")
-                            .put("key", "stage-recording")
-                            .put("label", "Screen recorder")
-                            .put("since", System.currentTimeMillis() - 74_000L)
-                            .put("isPaused", false)
-                            .put(
-                                "actions",
-                                JSONArray()
-                                    .put(JSONObject().put("index", 0).put("title", "Pause"))
-                                    .put(JSONObject().put("index", 1).put("title", "Stop"))
-                            )
-                    )
-                    .put("transfer", JSONObject.NULL)
-            )
-
+            "media" -> { clearMods(); BubbleService.deliverMedia(media(isPlaying = true)) }
+            "timer" -> { clearMods(); BubbleService.deliverTimer(timer(isPaused = false)) }
+            "call" -> { clearMods(); BubbleService.deliverCall(call()) }
+            "recording" -> BubbleService.deliverNowMods(JSONObject().put("recording", recording()).put("transfer", JSONObject.NULL))
             "download" -> runTransfer("download", "Kaufvertrag.pdf")
             "upload" -> runTransfer("upload", "IMG_4471.heic")
-            "download-media" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                runTransfer("download", "Kaufvertrag.pdf", after = 1200L)
-            }
-            "upload-timer" -> {
-                clear()
-                BubbleService.deliverTimer(timer(isPaused = false))
-                runTransfer("upload", "IMG_4471.heic", after = 1200L)
-            }
-            "download-cancel" -> {
-                clear()
-                BubbleService.deliverMedia(media(isPlaying = true))
-                runTransfer("download", "Kaufvertrag.pdf", after = 1200L, stopAt = 40, ending = NowWatch.TRANSFER_FAILED)
-            }
+            "add-mod" -> addMod()
+            "remove-mod" -> removeMod()
 
-            
-            "connectivity" -> attached(link = "wifi", level = 3)
-            "connectivity-bluetooth" -> attached(
-                link = "wifi",
-                level = 4,
-                bluetooth = JSONObject().put("name", "Buds3 Pro").put("charge", 64)
-            )
-            "connectivity-hotspot" -> attached(link = "mobile", level = -1, hotspot = true)
-
-            
-            
-            "locked" -> {
-                BubbleService.deliverMedia(media(isPlaying = true))
-                BubbleService.stageLock(true)
-                handler.postDelayed({ BubbleService.stageLock(false) }, 2600L)
-            }
-
-            "now-flight" -> {
-                BubbleService.deliverTorch(torch())
-                handler.postDelayed({ BubbleService.deliverTorch(null) }, 2200L)
-            }
-
-            
-            
-            
-            
+            "alert" -> BubbleService.deliver(notification().put("imageBase64", picture()))
             "alert-stacking" -> {
-                clear()
                 BubbleService.deliver(conversation("Are you around this evening?"))
                 handler.postDelayed({
                     BubbleService.deliver(
@@ -288,21 +108,59 @@ object DebugStage {
                     )
                 }, 1800L)
             }
-
-            
-            
-            "alert-marked" -> BubbleService.deliver(
-                notification().put("text", "Termin 27.08.2026 um 14:30, Anzahlung 7,80€ fällig")
-            )
         }
     }
 
-    
-    private fun clear() {
+    private fun clearMods() {
         BubbleService.deliverMedia(null)
         BubbleService.deliverTimer(null)
         BubbleService.deliverCall(null)
+        BubbleService.deliverNowMods(JSONObject().put("recording", JSONObject.NULL).put("transfer", JSONObject.NULL))
     }
+
+    /* Clear only dropped media, timer and call, so a staged transfer, recording, trip, torch, Alert, open menu or the unread count stayed standing; it empties every one of them. */
+    private fun clearAll() {
+        clearMods()
+        BubbleService.clearStage()
+    }
+
+    private fun reset() {
+        clearAll()
+        handler.postDelayed({ BubbleService.republishReal() }, RESET_DELAY)
+    }
+
+    private const val RESET_DELAY = 400L
+
+    private fun addMod() {
+        when {
+            Island.media == null -> BubbleService.deliverMedia(media(isPlaying = true))
+            Island.timer == null -> BubbleService.deliverTimer(timer(isPaused = false))
+            Island.call == null -> BubbleService.deliverCall(call())
+            Island.recording == null -> BubbleService.deliverNowMods(JSONObject().put("recording", recording()).put("transfer", JSONObject.NULL))
+        }
+    }
+
+    private fun removeMod() {
+        when {
+            Island.recording != null -> BubbleService.deliverNowMods(JSONObject().put("recording", JSONObject.NULL).put("transfer", JSONObject.NULL))
+            Island.call != null -> BubbleService.deliverCall(null)
+            Island.timer != null -> BubbleService.deliverTimer(null)
+            Island.media != null -> BubbleService.deliverMedia(null)
+        }
+    }
+
+    private fun recording() = JSONObject()
+        .put("mod", "recording")
+        .put("key", "stage-recording")
+        .put("label", "Screen recorder")
+        .put("since", System.currentTimeMillis() - 74_000L)
+        .put("isPaused", false)
+        .put(
+            "actions",
+            JSONArray()
+                .put(JSONObject().put("index", 0).put("title", "Pause"))
+                .put(JSONObject().put("index", 1).put("title", "Stop"))
+        )
 
     private fun media(isPlaying: Boolean): JSONObject {
         val style = AppStyles.byKey("spotify") ?: AppStyles.generic
@@ -345,15 +203,15 @@ object DebugStage {
             )
     }
 
-    private fun call(phone: Boolean): JSONObject {
-        val style = if (phone) AppStyles.generic else AppStyles.byKey("discord") ?: AppStyles.generic
+    private fun call(): JSONObject {
+        val style = AppStyles.byKey("discord") ?: AppStyles.generic
         return JSONObject()
             .put("key", "stage:call")
             .put("app", style.key)
-            .put("accent", if (phone) "#25d366" else style.accent)
+            .put("accent", style.accent)
             .put("package", style.packageName)
-            .put("phone", phone)
-            .put("name", if (phone) "Staged Caller" else "staged-voice-channel")
+            .put("phone", false)
+            .put("name", "staged-voice-channel")
             .put("since", System.currentTimeMillis() - 95_000L)
             .put("avatarBase64", JSONObject.NULL)
     }
@@ -385,15 +243,6 @@ object DebugStage {
         .put("lines", JSONArray().apply {
             messages.forEach { put(JSONObject().put("text", it)) }
         })
-
-    private fun battery(state: String, percent: Int) =
-        JSONObject().put("state", state).put("level", percent)
-
-    private fun torch() = JSONObject()
-        .put("accent", "#ffffff")
-        .put("step", 3)
-        .put("steps", 5)
-        .put("dimmable", true)
 
     
 

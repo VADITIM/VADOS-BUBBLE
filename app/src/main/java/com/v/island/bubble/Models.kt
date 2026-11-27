@@ -32,7 +32,10 @@ data class Notice(
     val postedAt: Long,
     val isSystem: Boolean = false,
     val actions: List<Action> = emptyList(),
-)
+) {
+    /* The menu clustered and grouped on `app`, the style key, which is "generic" for every app without its own style, so all of them folded into one card; it clusters on the package. */
+    val owner: String get() = packageName.ifEmpty { app }
+}
 
 @Immutable
 data class Media(

@@ -30,6 +30,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -303,7 +305,19 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
     val band by animateFloatAsState(if (bubble.isScrubbing) 110f else 52f, tween(220, easing = Curves.grow), label = "band")
     val isFolding = bubble.face == Face.Media
     val fold = remember { Animatable(1f) }
-    LaunchedEffect(isFolding) { fold.animateTo(if (isFolding) 1f else 0f, tween(LONG_GROW, easing = if (isFolding) Curves.settle else Curves.open)) }
+    /* The artwork grew straight out of the small tile on the box's 460ms open curve and read as the backdrop snapping in; the tile is thrown to the player's centre first and spreads from there, so the fold runs linear and each leg brings its own curve. */
+    val equalizer = remember { Animatable(if (isFolding) 1f else 0f) }
+    val wipe = remember { Animatable(if (isFolding) 0f else 1f) }
+    LaunchedEffect(isFolding) {
+        if (isFolding) {
+            wipe.snapTo(0f)
+            equalizer.animateTo(1f, tween(Durations.POP_IN, easing = Curves.enter))
+            return@LaunchedEffect
+        }
+        launch { equalizer.animateTo(0f, tween(EQUALIZER_POP_OUT, easing = Curves.leave)) }
+        wipe.animateTo(1f, tween(WAVE_WIPE, easing = Curves.powerTwoOut))
+    }
+    LaunchedEffect(isFolding) { fold.animateTo(if (isFolding) 1f else 0f, if (isFolding) tween(LONG_GROW, easing = Curves.settle) else tween(ARTWORK_UNFOLD, easing = LinearEasing)) }
     val closedWidth = bubble.layout().main
     val closedHeight = appearance.compactHeight
     val density = Island.density
@@ -323,9 +337,15 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
         val art = skip.heldArt ?: media.art
         Box(
             /* The swipe was read inside the art it moves, so every pixel of shift moved the finger's local position back by as much and the drag lagged and jumped; the gesture is read before the shift. */
-            Modifier.foldInto({ fold.value }, { width, height -> Rect(0f, 0f, width, height) }) { width, _ ->
+            Modifier.layout { measurable, constraints ->
+                val width = constraints.maxWidth.toFloat()
+                val height = constraints.maxHeight.toFloat()
                 val left = (width - closedWidth * density) / 2f
-                Rect(left + MEDIA_TILE_INSET * density, MEDIA_TILE_INSET * density, left + (MEDIA_TILE_INSET + tile) * density, (closedHeight - MEDIA_TILE_INSET) * density)
+                val small = Rect(left + MEDIA_TILE_INSET * density, MEDIA_TILE_INSET * density, left + (MEDIA_TILE_INSET + tile) * density, (closedHeight - MEDIA_TILE_INSET) * density)
+                val centred = small.translate(width / 2f - small.center.x, height / 2f - small.center.y)
+                val box = lerp(lerp(small, centred, artworkThrow(fold.value)), Rect(0f, 0f, width, height), artworkSpread(fold.value))
+                val placeable = measurable.measure(Constraints.fixed(box.width.roundToInt().coerceAtLeast(1), box.height.roundToInt().coerceAtLeast(1)))
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(box.left.roundToInt(), box.top.roundToInt()) }
             }
                 .pointerInput(skip) {
                     awaitEachGesture {
@@ -374,11 +394,11 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                     translationY = skip.sink.value * density
                     compositingStrategy = CompositingStrategy.Offscreen
                     clip = true
-                    shape = RoundedCornerShape((tileRadius * fold.value.coerceIn(0f, 1f)).dp)
+                    shape = RoundedCornerShape((tileRadius * (1f - artworkSpread(fold.value)).coerceIn(0f, 1f)).dp)
                 }
                 .drawWithContent {
                     drawContent()
-                    val edge = 1f - fold.value.coerceIn(0f, 1f)
+                    val edge = artworkSpread(fold.value).coerceIn(0f, 1f)
                     drawRect(Brush.horizontalGradient(0f to Color.Transparent, 0.13f * edge to Color.Black, 1f - 0.13f * edge to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
                     drawRect(Brush.verticalGradient(0f to Color.Transparent, 0.09f * edge to Color.Black, 1f - 0.09f * edge to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
                 }
@@ -386,15 +406,19 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
         ) {
             if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
-        val isWaveMoving = isFolding || fold.value > 0f || fold.isRunning
-        if (isWaveMoving) {
-            FoldingWave(media, if (isFolding) 1f else ratio, ratio, { fold.value }, Modifier.foldInto({ fold.value }, { width, height ->
-                Rect(WAVE_SIDE * density, height - (WAVE_REST_BAND * 1.5f) * density, width - WAVE_SIDE * density, height - (WAVE_REST_BAND / 2f) * density)
-            }) { width, _ ->
-                val right = (width + closedWidth * density) / 2f
-                Rect(right - (inset + glyph) * density, inset * density, right - inset * density, (closedHeight - inset) * density)
-            })
-        }
+        /* The timeline flew out of the equalizer's corner to its place and back, so it crossed the artwork as a stretched strip; the equalizer pops out where it stands as the timeline wipes in left to right in its own place, and pops back in on the way home. */
+        if (equalizer.value > 0f) Box(
+            Modifier.layout { measurable, constraints ->
+                val right = (constraints.maxWidth + closedWidth * density) / 2f
+                val side = (glyph * density).roundToInt().coerceAtLeast(1)
+                val placeable = measurable.measure(Constraints.fixed(side, ((closedHeight - inset * 2f) * density).roundToInt().coerceAtLeast(1)))
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place((right - (inset + glyph) * density).roundToInt(), (inset * density).roundToInt()) }
+            }.graphicsLayer {
+                scaleX = equalizer.value
+                scaleY = equalizer.value
+                alpha = equalizer.value.coerceIn(0f, 1f)
+            },
+        ) { Wave(media, EQUALIZER_BARS, ratio = { 1f }, modifier = Modifier.fillMaxSize()) }
         if (isFolding) return@Box
         SkipArrow(skip, Modifier.align(if (skip.arrowSide > 0) Alignment.CenterStart else Alignment.CenterEnd))
         PlayPauseMark(skip, Modifier.align(Alignment.Center))
@@ -407,7 +431,7 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
             Spacer(Modifier.height(4.dp))
             ScrambleText(media.artist.uppercase(), type(0.8f, media.accent, appearance.mainFont, appearance.mainScale, spacing = 0.1f, lineHeight = 1.25f), Durations.CONTENT_DROP + 120)
         }
-        if (!isWaveMoving) Box(
+        Box(
             /* The shorter player left the grown scrub band taller than twice its 52 rest, so its bottom padding went negative and dragging the timeline crashed the app; the band is moved by an offset, which may go below the edge. */
             Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, ((band / 2f - 52f) * density).roundToInt()) }.fillMaxWidth().height(band.dp)
                 .pointerInput(media.duration) {
@@ -433,7 +457,9 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
                     }
                 },
         ) {
-            Wave(media, WAVE_BARS, ratio = { ratio }, modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp))
+            Wave(media, WAVE_BARS, ratio = { ratio }, modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp).drawWithContent {
+                clipRect(right = size.width * wipe.value) { this@drawWithContent.drawContent() }
+            })
         }
         Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
@@ -449,6 +475,15 @@ fun PlayerFace(bubble: MainBubble, appearance: Appearance) {
         }
     }
 }
+
+private const val ARTWORK_UNFOLD = 520
+private const val WAVE_WIPE = 300
+private const val EQUALIZER_POP_OUT = 160
+private const val ARTWORK_THROW_SHARE = 0.4f
+
+private fun artworkThrow(fold: Float): Float = Curves.grow.transform(((1f - fold) / ARTWORK_THROW_SHARE).coerceIn(0f, 1f))
+
+private fun artworkSpread(fold: Float): Float = Curves.settle.transform(((1f - fold - ARTWORK_THROW_SHARE) / (1f - ARTWORK_THROW_SHARE)).coerceIn(0f, 1f))
 
 private val SPEEDS = listOf(1f, 1.5f, 2f)
 
@@ -470,23 +505,8 @@ private fun seekAt(x: Float, width: Int, duration: Long): Long =
 
 private enum class PlayerAxis { None, Across, Along }
 
-private const val WAVE_SIDE = 12f
-private const val WAVE_REST_BAND = 52f
 
-private fun Modifier.foldInto(fold: () -> Float, from: (Float, Float) -> Rect, to: (Float, Float) -> Rect) = layout { measurable, constraints ->
-    val width = constraints.maxWidth.toFloat()
-    val height = constraints.maxHeight.toFloat()
-    val box = lerp(from(width, height), to(width, height), fold())
-    val placeable = measurable.measure(Constraints.fixed(box.width.roundToInt().coerceAtLeast(1), box.height.roundToInt().coerceAtLeast(1)))
-    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(box.left.roundToInt(), box.top.roundToInt()) }
-}
 
-@Composable
-private fun FoldingWave(media: Media, closedRatio: Float, ratio: Float, fold: () -> Float, modifier: Modifier) {
-    val progress = fold().coerceIn(0f, 1f)
-    val bars = (WAVE_BARS + (EQUALIZER_BARS - WAVE_BARS) * progress).roundToInt()
-    Wave(media, bars, ratio = { ratio + (closedRatio - ratio) * progress }, modifier = modifier)
-}
 
 private class PlayerSwipe {
     val drag = Animatable(0f)

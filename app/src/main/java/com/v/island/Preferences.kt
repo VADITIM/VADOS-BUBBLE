@@ -43,16 +43,6 @@ object Preferences {
 
 
 
-    const val GOO = "gooStrength"
-
-    
-    const val MOD_WIDTH = "modWidthDp"
-
-    
-
-
-
-
 
     const val NOW_PUSHES = "nowPushesRow"
 
@@ -64,72 +54,16 @@ object Preferences {
 
     const val ALERT_DWELL = "alertDwellTenths"
 
-    const val NOTIFICATIONS_RISE = "notificationsRise"
-
-    
-
-
-
-
-    const val EDGE_MERGE = "edgeMerge"
-
-    const val LABEL_SWEEP = "labelSweep"
-
-    const val STATUS_BATTERY_PERCENT = "statusBatteryPercent"
-
-    const val STATUS_BATTERY_PERCENT_LIGHT = "statusBatteryPercentLight"
-
-    const val STATUS_BATTERY_ICONS = "statusBatteryIcons"
-
-    
-
-
-
-
-    
-
-
-
-
-
-    const val LOCK_X = "lockOffsetDp"
-
-    
-
-
-
-
-
-
-    
-
-
-
-
-
-
-    
-
-
-    const val BAR_LOCKED = "barLocked"
+    const val STATUS_BATTERY_WHITE = "statusBatteryWhite"
 
     const val QUICK_DIVIDERS = "quickDividers"
 
-    const val DASH_ALERTS_DISABLED = "dashAlertsDisabled"
-
     const val LOCK_NOTES = "lockNotes"
-    const val LOCK_NOTES_HOME = "lockNotesHome"
-
-    const val FAST_DASHBOARD = "fastDashboard"
 
     const val SIDE_PILLS = "sidePills"
     const val SIDE_PILLS_SIZE = "sidePillsSize"
 
-    const val NOTIFICATIONS_CLEAR_CORNER = "notificationsClearCorner"
-
     const val ALERT_ZONE_SHOWN = "alertZoneShown"
-
-    const val ALERT_ZONE_GLOW = "alertZoneGlow"
 
     // Mirrors DATE_FORMATS in js/clock.js and the Date format labels in panel.html: an index into that list, which is written once on the page's side.
     const val DATE_FORMAT = "dateFormat"
@@ -156,6 +90,15 @@ object Preferences {
     const val FONT_SIZE_NOTIFICATION_HEADING = "fontSizeNotificationHeading"
     const val FONT_SIZE_NOTIFICATION_CONTENT = "fontSizeNotificationContent"
 
+    const val ICON_SIZE_USB = "iconSizeUsb"
+    const val ICON_SIZE_HOTSPOT = "iconSizeHotspot"
+    const val ICON_SIZE_BLUETOOTH = "iconSizeBluetooth"
+    const val ICON_SIZE_ZEN = "iconSizeZen"
+    const val ICON_SIZE_WIFI = "iconSizeWifi"
+    const val ICON_SIZE_ETHERNET = "iconSizeEthernet"
+    const val ICON_SIZE_MOBILE = "iconSizeMobile"
+    const val ICON_SIZE_BATTERY = "iconSizeBattery"
+
     private const val STORE = "island"
 
     
@@ -181,28 +124,14 @@ object Preferences {
         BLUR to 50,
         SCRIM_BLUR to 35,
         NOTIFICATION_IDENTITY to 2,
-        GOO to 100,
-        MOD_WIDTH to 40,
         NOW_PUSHES to 0,
         ALERT_DWELL to 57,
-        NOTIFICATIONS_RISE to 50,
-        EDGE_MERGE to 0,
-        LABEL_SWEEP to 1,
-        STATUS_BATTERY_PERCENT to 0,
-        STATUS_BATTERY_PERCENT_LIGHT to 0,
-        STATUS_BATTERY_ICONS to 0,
-        LOCK_X to 0,
-        BAR_LOCKED to 0,
+        STATUS_BATTERY_WHITE to 0,
         QUICK_DIVIDERS to 0,
-        DASH_ALERTS_DISABLED to 1,
         LOCK_NOTES to 1,
-        LOCK_NOTES_HOME to 0,
-        FAST_DASHBOARD to 0,
         SIDE_PILLS to 1,
         SIDE_PILLS_SIZE to 115,
-        NOTIFICATIONS_CLEAR_CORNER to 0,
         ALERT_ZONE_SHOWN to 0,
-        ALERT_ZONE_GLOW to 40,
         DATE_FORMAT to 0,
 
         FONT_CLOCK to 0,
@@ -225,7 +154,16 @@ object Preferences {
         FONT_SIZE_STATS to 100,
         FONT_SIZE_CONNECTORS to 100,
         FONT_SIZE_NOTIFICATION_HEADING to 100,
-        FONT_SIZE_NOTIFICATION_CONTENT to 100
+        FONT_SIZE_NOTIFICATION_CONTENT to 100,
+
+        ICON_SIZE_USB to 100,
+        ICON_SIZE_HOTSPOT to 100,
+        ICON_SIZE_BLUETOOTH to 100,
+        ICON_SIZE_ZEN to 100,
+        ICON_SIZE_WIFI to 100,
+        ICON_SIZE_ETHERNET to 100,
+        ICON_SIZE_MOBILE to 100,
+        ICON_SIZE_BATTERY to 100
     )
 
     /* Long-valued and deliberately outside `defaults`: that map is Int-only and asJson walks all of it, so a byte count listed there would be read back with getInt and throw. */

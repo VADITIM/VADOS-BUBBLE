@@ -138,7 +138,6 @@ object NowWatch {
         val notification = statusBarNotification.notification
         val extras = notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
         val style = AppStyles.of(statusBarNotification.packageName)
         return JSONObject()
             .put("mod", if (isUpload(statusBarNotification)) "upload" else "download")
@@ -155,7 +154,7 @@ object NowWatch {
             
             
             
-            .put("detail", text)
+            .put("detail", listOf(Notification.EXTRA_TEXT, Notification.EXTRA_SUB_TEXT, Notification.EXTRA_INFO_TEXT, Notification.EXTRA_BIG_TEXT).mapNotNull { extras.getCharSequence(it)?.toString()?.takeIf(String::isNotBlank) }.distinct().joinToString(" · "))
             .put("isPaused", isPaused(notification))
             .put("actions", actions(notification))
     }

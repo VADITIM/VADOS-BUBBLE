@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 
-enum class Region { Shield, Dashboard, Now, Main, Torch, TorchOff, Clock, Status, Clear, System, Alert }
+enum class Region { Shield, Dashboard, Now, Main, Menu, Torch, TorchOff, Clock, Status, Clear, System, Alert }
 
 @androidx.compose.runtime.Immutable
 class DarkAlert(val appName: String, val title: String, val text: String, val accent: androidx.compose.ui.graphics.Color, val generation: Int, val isAppending: Boolean, val revealKey: Int)
@@ -78,6 +78,7 @@ object Island {
     val regions = mutableStateMapOf<Region, Rect>()
     val liquid = Liquid()
     var onBlobsDrawn: () -> Unit = {}
+    val glass = HashMap<String, () -> BlobShape?>()
     var onDashboardLeft: () -> Unit = {}
 
     lateinit var actions: HostActions

@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -40,10 +41,10 @@ enum class Mode { Idle, Haptic, Alert, Extended, Torch }
 
 enum class Size(val isClosed: Boolean) {
     Idle(true), Playing(true), Timing(true), Calling(true), Travelling(true),
-    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), TorchIdle(true), Transferring(true),
+    Alert(false), Image(false), AlertCentre(false), Picture(false), Player(false), TimerPanel(false), TripPanel(false), Notifications(false), TorchIdle(true), Transferring(true), TransferPanel(false),
 }
 
-enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, TorchIdle, Transfer }
+enum class Face { Idle, Media, Timer, Call, Trip, Alert, Player, TimerPanel, TripPanel, Notifications, TorchIdle, Transfer, TransferPanel }
 
 data class Frame(val width: Float, val height: Float, val radius: Float, val top: Float, val shift: Float)
 
@@ -96,6 +97,11 @@ class MainBubble {
     var notificationsHeight by mutableFloatStateOf(320f)
         private set
     var notificationsDrop by mutableFloatStateOf(0f)
+    var isNotificationsPulled = false
+        private set
+    private var notificationsRoom = 0f
+    private var isMenuPull = false
+    private var hasDroppedMenu = false
         private set
     private var alertWanted by mutableFloatStateOf(ALERT_HEIGHT)
     private var notificationsList = -1f
@@ -104,6 +110,15 @@ class MainBubble {
     var isScrubbing by mutableStateOf(false)
     var scrubPosition by mutableStateOf(0L)
     val notificationsScroll = ScrollState(0)
+    var notificationsOverscroll by mutableFloatStateOf(0f)
+    private var bounceJob: Job? = null
+    val rowTops = HashMap<String, Float>()
+    val rowHeights = HashMap<String, Float>()
+    val rowBounds = HashMap<String, androidx.compose.ui.geometry.Rect>()
+    val systemBounds = HashMap<String, androidx.compose.ui.geometry.Rect>()
+    var homing by mutableStateOf(emptyList<androidx.compose.ui.geometry.Rect>())
+    var homingRound by mutableIntStateOf(0)
+        private set
 
     private var satelliteSide by mutableIntStateOf(1)
     private var swapDirection = 1
@@ -122,6 +137,7 @@ class MainBubble {
     private var hasSwiped = false
     private var hasPulled = false
     private var hasDismissed = false
+    private var isOffCards = false
     private var hasWandered = false
     private var holdPending = false
     private var pullDrop = 0f
@@ -132,6 +148,21 @@ class MainBubble {
     private val scrollVelocity = androidx.compose.ui.input.pointer.util.VelocityTracker()
     private var flingJob: Job? = null
     var expandedGroup by mutableStateOf<String?>(null)
+    var unfoldedApps by mutableStateOf(emptySet<String>())
+    var pulledApp by mutableStateOf<String?>(null)
+        private set
+    var clusterPull by mutableFloatStateOf(0f)
+        private set
+    private var pressedCluster: String? = null
+    private var isPressedFolded = false
+    private var isPullOpening = false
+    private var pullFromY = 0f
+    private var pullJob: Job? = null
+    var arrival: String? = null
+    var arrivalRound by mutableIntStateOf(0)
+        private set
+    var isAtEnd = true
+    var listOverflow = 0
     private var gate = DragGate()
     private var closedInTouch = false
     private var closedOutsideAt = -1_000L
@@ -165,14 +196,52 @@ class MainBubble {
             TransferStage.Yielding, TransferStage.Leading -> when {
                 incoming == null -> finishTransfer(TransferState.Failed)
                 incoming.state != TransferState.Active && incoming.key == transferShown?.key -> finishTransfer(incoming.state, incoming)
-                incoming.state == TransferState.Active -> transferShown = incoming
+                incoming.state == TransferState.Active -> {
+                    if (incoming.key != transferShown?.key) transferPace = null
+                    transferShown = incoming
+                    paceTransfer(incoming)
+                }
             }
             TransferStage.Finishing, TransferStage.Returning -> Unit
         }
     }
 
+    /* The time left is the app's own when its notification says it; otherwise it is measured off how fast the bar has moved since the transfer was first seen. */
+    private var transferPace: Pair<Long, Float>? = null
+    var transferLeft by mutableStateOf<Long?>(null)
+        private set
+
+    private fun paceTransfer(incoming: Transfer) {
+        val ratio = if (incoming.total > 0 && !incoming.isIndeterminate) incoming.done.toFloat() / incoming.total else return
+        val now = SystemClock.uptimeMillis()
+        val start = transferPace
+        if (start == null || incoming.isPaused || ratio < start.second) {
+            transferPace = now to ratio
+            transferLeft = null
+            return
+        }
+        val gained = ratio - start.second
+        val spent = now - start.first
+        transferLeft = if (gained > 0f && spent >= PACE_FLOOR) ((1f - ratio) / gained * spent).toLong() else null
+    }
+
+    fun transferAction(isStopping: Boolean) {
+        val transfer = transferShown ?: return
+        Haptics.play(Haptic.Tap)
+        if (isStopping) {
+            val stop = transfer.actions.firstOrNull { TRANSFER_STOP_WORDS.containsMatchIn(it.title) }
+            if (stop != null) Island.actions.transferAction(stop.index) else Island.actions.dismissNotification(transfer.key)
+            return
+        }
+        transfer.actions.firstOrNull { TRANSFER_HOLD_WORDS.containsMatchIn(it.title) }?.let { Island.actions.transferAction(it.index) }
+        transferPace = null
+    }
+
     private fun beginTransfer(incoming: Transfer) {
         transferShown = incoming
+        transferPace = null
+        transferLeft = null
+        paceTransfer(incoming)
         val leader = liveMods.firstOrNull()
         yielded = leader
         yieldBirth = glyphAligned(layout())
@@ -257,7 +326,7 @@ class MainBubble {
         }
     }
 
-    private fun land() {
+    fun land() {
         Island.scope.launch(androidx.compose.ui.platform.AndroidUiDispatcher.Main) {
             androidx.compose.animation.core.animate(0f, 1f, animationSpec = androidx.compose.animation.core.tween(LAND_MILLISECONDS, easing = androidx.compose.animation.core.LinearEasing)) { step, _ ->
                 landing = if (step < 0.25f) LAND_SWELL * BUMP_RISE.transform(step / 0.25f)
@@ -519,18 +588,19 @@ class MainBubble {
     val isPunched: Boolean get() = size.isClosed && Island.dashboard.isOpen && liveMods.isEmpty()
 
     fun target(): Frame {
+        /* A live mod kept its full pill while the menu was open, so the cards dropped out of a pill that never gave anything up; Main always shrinks to the punch hole and the cards shoot out while it shrinks. */
+        if (size == Size.Notifications) return punchFrame()
         val frame = frame()
-        if (isPunched) return Frame(lentSide(), lentSide(), lentSide() / 2f, appearance.grab + (appearance.compactHeight - lentSide()) / 2f, 0f)
+        if (isPunched) return punchFrame()
         if (!isRisen) return frame
         return frame.copy(top = -EDGE_OVER, height = appearance.compactHeight + EDGE_OVER)
     }
 
-    // Opening the menu over a live mod grew the mod's own pill into it, so the mod vanished while the menu was open; the mod keeps a pill where it stood and the menu shoots out of it.
-    val stayMod: Mod? get() = if (size == Size.Notifications) liveMods.firstOrNull() else null
+    private fun punchFrame() = Frame(lentSide(), lentSide(), lentSide() / 2f, appearance.grab + (appearance.compactHeight - lentSide()) / 2f, 0f)
 
-    fun stayFrame(mod: Mod) = frame(closedSizeOf(mod))
+    fun menuFrame() = frame(Size.Notifications)
 
-    fun stayFace(mod: Mod) = closedFaceOf(mod)
+    val mainFace: Face get() = if (face == Face.Notifications) Face.Idle else face
 
     private fun frame(of: Size = size): Frame {
         val grab = appearance.grab
@@ -553,6 +623,7 @@ class MainBubble {
             Size.Player -> Frame(GROWN_WIDTH, PLAYER_HEIGHT, 34f, grab, 0f)
             Size.TimerPanel -> Frame(GROWN_WIDTH, 132f, 26f, grown, 0f)
             Size.TripPanel -> Frame(GROWN_WIDTH, 232f, 26f, grown, 0f)
+            Size.TransferPanel -> Frame(GROWN_WIDTH, TRANSFER_PANEL_HEIGHT, 26f, grown, 0f)
             Size.Notifications -> Frame(GROWN_WIDTH, notificationsHeight, 26f, grown + notificationsDrop, 0f)
         }
     }
@@ -692,23 +763,32 @@ class MainBubble {
         if (size == Size.TimerPanel && Island.timer == null) toClosed()
         if (size == Size.Player && Island.media == null) toClosed()
         if (size == Size.TripPanel && Island.trip == null) toClosed()
+        if (size == Size.TransferPanel && (transferStage != TransferStage.Leading || transferShown?.state != TransferState.Active)) toClosed()
     }
 
     fun toClosed() {
         android.util.Log.d("IslandBubble", "probe toClosed size=$size mode=$mode", Throwable())
         dwellJob?.cancel()
         swapArrival = null
+        /* An Alert shrank back into Main on the pill's own settle curve while the menu's cards narrowed, rose and squashed home as liquid; the Alert's silhouette goes home the same way and Main stands closed to take it. */
+        if (!Island.isScreenDark && (size == Size.Alert || size == Size.AlertCentre || size == Size.Image)) {
+            val shown = target()
+            val left = Island.screenWidth / 2f + shown.shift - shown.width / 2f + drag.x
+            val top = shown.top + drag.y
+            homing = listOf(androidx.compose.ui.geometry.Rect(left, top, left + shown.width, top + shown.height))
+            homingRound++
+        }
         if (Island.isScreenDark) Island.sleepDark()
         val wasOpen = !size.isClosed
         if (wasOpen) closedInTouch = Island.isTouchDown
         if (size == Size.Notifications) {
             notificationsClosedAt = SystemClock.uptimeMillis()
-            /* The menu dropped the closed face, so closing it composed the media face afresh and its artwork slid in and the wave popped again under a mod that never left. */
-            mediaEntrance = MediaEntrance.Still
+            val menu = menuFrame()
+            homing = rowBounds.values.filter { it.height > HOMING_FLOOR && it.top < menu.top + menu.height }.sortedBy { it.top }.take(HOMING_LIMIT) + systemBounds.values.sortedBy { it.top }
+            homingRound++
         }
         mode = Mode.Idle
         notice = null
-        notificationsDrop = 0f
         if ((Island.torch?.step ?: 0) == 0) {
             isTorchFolded = false
             isTorchDocked = false
@@ -733,6 +813,10 @@ class MainBubble {
 
     fun onNotice(next: Notice, isDark: Boolean = false) {
         if (Island.isLandscape || mode == Mode.Torch) return
+        if (size == Size.Notifications) {
+            addToNotifications(next)
+            return
+        }
         dwellJob?.cancel()
         goneJob?.cancel()
         val hasImage = next.picture != null
@@ -799,30 +883,53 @@ class MainBubble {
         val (system, entries) = Island.actions.readNotifications().sortedByDescending { it.postedAt }.partition { it.isSystem }
         systemNotices = system
         val byId = LinkedHashMap<String, MutableList<Notice>>()
-        entries.forEach { entry -> byId.getOrPut(entry.app + "  " + entry.title) { mutableListOf() }.add(entry) }
-        groups = byId.map { (id, list) -> NoticeGroup(id, list.first(), list) }
-        Island.unread = 0
+        entries.forEach { entry -> byId.getOrPut(entry.owner + "  " + entry.title) { mutableListOf() }.add(entry) }
+        groups = clustered(byId.map { (id, list) -> NoticeGroup(id, list.first(), list) })
+        notificationsOverscroll = 0f
         expandedGroup = null
+        unfoldedApps = emptySet()
+        arrival = null
+        pullJob?.cancel()
+        pulledApp = null
+        clusterPull = 0f
+        isNotificationsPulled = false
+        homing = emptyList()
         becomeExtended()
         face = Face.Notifications
         fitNotifications()
         size = Size.Notifications
-        Island.scope.launch { notificationsScroll.scrollTo(0) }
+        isAtEnd = true
+        Island.scope.launch { notificationsScroll.scrollTo(notificationsScroll.maxValue) }
+    }
+
+    fun pullsNotifications(x: Float, y: Float): Boolean {
+        if (size != Size.Notifications || notificationsRoom < PULL_ROOM) return false
+        val tall = Island.screenHeight * ALERT_ZONE_HEIGHT_PART
+        return x >= Island.screenWidth - ALERT_ZONE_WIDTH && abs(y - Island.screenHeight / 2f) <= tall / 2f
+    }
+
+    /* The pull down was once per opening, so a menu dropped to thumb height was stuck there; the same strip lifts it back with a pull up. */
+    fun dropNotifications() {
+        isNotificationsPulled = !isNotificationsPulled
+        Haptics.play(Haptic.Release)
+        fitNotifications()
     }
 
     fun fitNotifications() {
         val grownTop = appearance.grab + GROWN_PAD
         val tall = Island.screenHeight
-        val below = CLEAR_GAP + CLEAR_SIZE + systemOffset()
+        val below = CLEAR_GAP + CLEAR_SIZE + SYSTEM_FOOT + systemOffset()
         val list = if (notificationsList >= 0f) notificationsList else groups.sumOf { group -> rowHeight(group).toDouble() }.toFloat()
         val wanted = if (groups.isEmpty()) NOTIFICATIONS_EMPTY else list + 20f
-        val full = tall - NOTIFICATIONS_TOP - below - NOTIFICATIONS_FOOT
+        val full = tall - NOTIFICATIONS_TOP - below
         val height = min(full, wanted)
-        val lowest = tall - height - below - NOTIFICATIONS_FOOT
-        val highest = min(grownTop + tall * NOTIFICATIONS_LOWER, lowest)
-        val top = (lowest + (highest - lowest) * appearance.notificationsRise).roundToInt().toFloat()
+        val lowest = tall - height - below
+        val highest = min(grownTop, lowest)
+        val top = (if (isNotificationsPulled) lowest else highest).roundToInt().toFloat()
+        notificationsRoom = lowest - highest
         notificationsHeight = height
         notificationsDrop = top - grownTop
+        android.util.Log.d("IslandBubble", "probe fit list=$list wanted=$wanted full=$full height=$height top=$top tall=$tall below=$below scrollMax=${notificationsScroll.maxValue}")
     }
 
     /* The height was guessed from line counts, so a long message overflowed and a short list left a gap; the menu is now sized off its rows as they are laid out, as notificationsWindow did off scrollHeight. */
@@ -839,7 +946,12 @@ class MainBubble {
 
     fun systemHeight() = if (systemNotices.isEmpty()) 0f else SYSTEM_PAD * 2f + systemNotices.size * SYSTEM_ROW
 
-    fun systemOffset() = if (systemNotices.isEmpty()) 0f else systemHeight() + SYSTEM_FOOT
+    /* The system notices stood stacked above the clear button, taking a row of the screen the cards could have had; the last one sits on the clear button's line and the notices are cut short around it and the count. */
+    fun systemTop() = clearTop() + CLEAR_SIZE / 2f + SYSTEM_ROW / 2f + SYSTEM_PAD - systemHeight()
+
+    fun systemOffset() = if (systemNotices.isEmpty()) 0f else clearTop() - systemTop()
+
+    fun clearTop() = Island.screenHeight - CLEAR_SIZE - SYSTEM_FOOT
 
     fun openSystem(entry: Notice) {
         Island.actions.openNotification(entry.key)
@@ -897,10 +1009,17 @@ class MainBubble {
         size = Size.TripPanel
     }
 
+    private fun openTransfer() {
+        becomeExtended()
+        face = Face.TransferPanel
+        size = Size.TransferPanel
+    }
+
     private fun panelMod(): Mod? = when (size) {
         Size.Player -> Mod.Media
         Size.TimerPanel -> Mod.Timer
         Size.TripPanel -> Mod.Trip
+        Size.TransferPanel -> Mod.Transfer
         else -> null
     }
 
@@ -1020,7 +1139,10 @@ class MainBubble {
             return
         }
         android.util.Log.d("IslandBubble", "probe onDown x=$x y=$y holds=${holds(x, y)} mode=$mode size=$size closedInTouch=$closedInTouch")
-        if (mode == Mode.Extended && size == Size.Notifications && !holds(x, y)) {
+        isMenuPull = pullsNotifications(x, y)
+        hasDroppedMenu = false
+        isOffCards = size == Size.Notifications && rowBounds.values.none { it.contains(androidx.compose.ui.geometry.Offset(x, y)) }
+        if (mode == Mode.Extended && size == Size.Notifications && !holds(x, y) && !isMenuPull) {
             toClosed()
             closedInTouch = true
             return
@@ -1071,9 +1193,10 @@ class MainBubble {
     }
 
     fun holds(x: Float, y: Float): Boolean {
-        val box = target()
+        val box = if (size == Size.Notifications) menuFrame() else target()
         val left = Island.screenWidth / 2f + box.shift - box.width / 2f
-        return x >= left && x <= left + box.width && y >= box.top && y <= box.top + box.height
+        val bottom = if (size == Size.Notifications) maxOf(box.top + box.height, clearTop() - systemOffset()) else box.top + box.height
+        return x >= left && x <= left + box.width && y >= box.top && y <= bottom
     }
 
     fun onMove(x: Float, y: Float) {
@@ -1092,19 +1215,58 @@ class MainBubble {
             grantHoldWander()
             /* A swipe on the player to skip, pause or close still let the hold run out and opened the app; a panel touch that travels is a gesture, never a hold. */
             if (panelMod() != null && hypot(x - startX, y - startY) > HOLD_BLOCK) endHold()
+            if (hasDroppedMenu) return
+            if (isMenuPull) {
+                val down = if (isNotificationsPulled) startY - y else y - startY
+                val across = abs(x - startX)
+                if (down > PULL_TRIGGER && down > across) {
+                    hasDroppedMenu = true
+                    hasMoved = true
+                    endHold()
+                    dropNotifications()
+                    return
+                }
+                if (hypot(across, down) < SCROLL_SLOP || down > across) return
+                isMenuPull = false
+            }
             // The list only scrolled from a band along its right edge, so a drag anywhere else did nothing and the menu read as stuck; it scrolls from anywhere once the drag is clearly vertical.
-            if (size == Size.Notifications && notificationsScroll.maxValue > 0 && scrollMode != ScrollMode.Across) {
+            /* A list that fit its menu could not scroll, so an upward drag on it fell through to the swipe that closes the panel and the menu shut under the finger; the menu always scrolls, rubber-banding when there is nothing to scroll. */
+            /* A drag on the frost beside the cards scrolled the list like a drag on a card, so the menu could not be swiped shut anywhere; off the cards an upward swipe closes it and the list stays put. */
+            if (size == Size.Notifications && isOffCards && !isMenuPull) {
+                if (hypot(x - startX, y - startY) > SCROLL_SLOP) {
+                    hasMoved = true
+                    endHold()
+                }
+                if (!hasDismissed && startY - y > PULL_TRIGGER && startY - y > abs(x - startX)) {
+                    hasDismissed = true
+                    toClosed()
+                }
+                return
+            }
+            if (size == Size.Notifications && scrollMode != ScrollMode.Across) {
                 if (scrollMode == ScrollMode.Undecided) {
                     val across = abs(x - startX)
                     val vertical = abs(y - startY)
                     if (across > SCROLL_SLOP && across > vertical) scrollMode = ScrollMode.Across
-                    else if (vertical > SCROLL_SLOP) {
+                    else if (vertical > SCROLL_SLOP && pressedCluster != null && (y > startY) == isPressedFolded && pullJob?.isActive != true) {
+                        scrollMode = ScrollMode.Pull
+                        beginClusterPull(pressedCluster!!, isPressedFolded, y)
+                    } else if (vertical > SCROLL_SLOP) {
                         scrollMode = ScrollMode.Along
-                        scrollOrigin = notificationsScroll.value
+                        bounceJob?.cancel()
+                        val held = notificationsOverscroll
+                        scrollOrigin = notificationsScroll.value + (if (held > 0f) -unrubber(held) else unrubber(-held)).roundToInt()
                         scrollFromY = y
                         lastScrollAt = SystemClock.uptimeMillis()
                         scrollVelocity.resetTracking()
                     }
+                }
+                if (scrollMode == ScrollMode.Pull) {
+                    hasMoved = true
+                    endHold()
+                    val travel = (y - pullFromY) / CLUSTER_PULL_SPAN
+                    clusterPull = ((if (isPullOpening) 0f else 1f) + travel).coerceIn(0f, 1f)
+                    return
                 }
                 if (scrollMode == ScrollMode.Along) {
                     hasMoved = true
@@ -1112,13 +1274,20 @@ class MainBubble {
                     val now = SystemClock.uptimeMillis()
                     scrollVelocity.addPosition(now, androidx.compose.ui.geometry.Offset(0f, y * Island.density))
                     lastScrollAt = now
-                    val wanted = (scrollOrigin - (y - scrollFromY) * Island.density * SCROLL_GAIN).roundToInt()
-                    notificationsScroll.dispatchRawDelta(wanted - notificationsScroll.value.toFloat())
+                    val wanted = scrollOrigin - (y - scrollFromY) * Island.density * SCROLL_GAIN
+                    val ceiling = notificationsScroll.maxValue.toFloat()
+                    notificationsScroll.dispatchRawDelta(wanted.coerceIn(0f, ceiling) - notificationsScroll.value.toFloat())
+                    isAtEnd = notificationsScroll.value >= notificationsScroll.maxValue
+                    notificationsOverscroll = when {
+                        wanted < 0f -> rubber(-wanted)
+                        wanted > ceiling -> -rubber(wanted - ceiling)
+                        else -> 0f
+                    }
                     return
                 }
                 if (scrollMode == ScrollMode.Undecided) return
             }
-            val isPanel = size == Size.Notifications || panelMod() != null || mode == Mode.Alert
+            val isPanel = panelMod() != null || mode == Mode.Alert
             if (!hasDismissed && isPanel && startY - y > PULL_TRIGGER && abs(x - startX) < 40f) {
                 hasDismissed = true
                 hasMoved = true
@@ -1162,7 +1331,8 @@ class MainBubble {
             hasDismissed = true
             hasMoved = true
             endHold()
-            Haptics.play(Haptic.Dismiss)
+            /* Closing the Notifications menu buzzed on every swipe and tap that shut it, which read as an error on something as routine as putting it away; it closes silently. */
+            if (size != Size.Notifications) Haptics.play(Haptic.Dismiss)
             toClosed()
         }
     }
@@ -1205,6 +1375,11 @@ class MainBubble {
     private fun tap() {
         if (mode == Mode.Extended) {
             // A tap inside the menu that no row took fell through to closing it, so tapping its empty side shut the menu; only a tap outside it closes it, in onDown.
+            /* A tap in the frost between the cards and the system notices landed inside the menu's box and was taken for its empty side, so the menu would not close there; a tap above or below every card closes it. */
+            if (size == Size.Notifications && rowBounds.values.none { lastY >= it.top && lastY <= it.bottom }) {
+                toClosed()
+                return
+            }
             if (panelMod() != null || size == Size.Notifications) return
             Haptics.play(Haptic.Tap)
             toClosed()
@@ -1232,18 +1407,80 @@ class MainBubble {
                 toClosed()
             }
             Mod.Torch -> foldTorch(false)
-            Mod.Transfer -> {
-                transferShown?.key?.let(Island.actions::openNotification)
-                toClosed()
-            }
+            Mod.Transfer -> if (transferStage == TransferStage.Leading && transferShown?.state == TransferState.Active) openTransfer() else toClosed()
             null -> openNotifications()
         }
     }
 
     private fun driftNotifications() {
+        pressedCluster = null
+        if (scrollMode == ScrollMode.Pull) {
+            settleClusterPull()
+            return
+        }
         if (scrollMode != ScrollMode.Along || size != Size.Notifications) return
+        if (notificationsOverscroll != 0f) {
+            scrollMode = ScrollMode.Undecided
+            bounceNotifications()
+            return
+        }
         flingNotifications(if (SystemClock.uptimeMillis() - lastScrollAt > FLING_STALE) 0f else -scrollVelocity.calculateVelocity().y * SCROLL_GAIN * FLING_SHARE)
         scrollMode = ScrollMode.Undecided
+    }
+
+    private fun rubberReach() = Island.screenHeight * Island.density * RUBBER_REACH
+
+    private fun rubber(distance: Float): Float = (1f - 1f / (distance * RUBBER_GIVE / rubberReach() + 1f)) * rubberReach()
+
+    private fun unrubber(shown: Float): Float = (rubberReach() / (rubberReach() - shown.coerceAtMost(rubberReach() * 0.99f)) - 1f) * rubberReach() / RUBBER_GIVE
+
+    private fun bounceNotifications() {
+        bounceJob = Island.scope.launch {
+            androidx.compose.animation.core.animate(notificationsOverscroll, 0f, animationSpec = androidx.compose.animation.core.spring(dampingRatio = RUBBER_DAMPING, stiffness = RUBBER_STIFFNESS)) { value, _ ->
+                notificationsOverscroll = value
+            }
+        }
+    }
+
+    private fun clustered(list: List<NoticeGroup>): List<NoticeGroup> = list.groupBy { it.head.owner }.values.flatten()
+
+    private fun addToNotifications(next: Notice) {
+        Haptics.play(Haptic.Release)
+        if (next.isSystem) {
+            systemNotices = listOf(next) + systemNotices.filter { it.key != next.key }
+            fitNotifications()
+            return
+        }
+        val id = next.owner + "  " + next.title
+        val existing = groups.firstOrNull { it.id == id }
+        val group = NoticeGroup(id, next, listOf(next) + existing?.entries.orEmpty().filter { it.key != next.key })
+        val scroll = notificationsScroll.value
+        val anchor = if (isAtEnd) null else groups.filter { it.id != id && (rowTops[it.id] ?: 0f) + (rowHeights[it.id] ?: 0f) > scroll }.minByOrNull { rowTops[it.id] ?: 0f }?.id
+        val held = anchor?.let { scroll - (rowTops[it] ?: 0f) }
+        groups = clustered(listOf(group) + groups.filter { it.id != id })
+        arrival = id
+        arrivalRound++
+        fitNotifications()
+        if (anchor == null || held == null) return
+        Island.scope.launch {
+            withFrameNanos { }
+            withFrameNanos { }
+            val top = rowTops[anchor] ?: return@launch
+            notificationsScroll.scrollTo((top + held).roundToInt())
+        }
+    }
+
+    private fun centreGroup(id: String) {
+        flingJob?.cancel()
+        flingJob = Island.scope.launch {
+            withFrameNanos { }
+            withFrameNanos { }
+            val top = rowTops[id] ?: return@launch
+            val tall = rowHeights[id] ?: return@launch
+            val viewport = (notificationsScroll.viewportSize - listOverflow).toFloat()
+            val target = if (tall >= viewport) top else top + tall / 2f - viewport / 2f
+            notificationsScroll.animateScrollTo(target.roundToInt().coerceAtLeast(0), tween(CENTRE_GLIDE, easing = com.v.island.vas.Curves.split))
+        }
     }
 
     private fun flingNotifications(speed: Float) {
@@ -1262,7 +1499,37 @@ class MainBubble {
 
     fun toggleGroup(group: NoticeGroup) {
         Haptics.play(Haptic.Tap)
+        isAtEnd = false
         expandedGroup = if (expandedGroup == group.id) null else group.id
+        if (expandedGroup == group.id) centreGroup(group.id)
+    }
+
+    fun pressCluster(app: String?, isFolded: Boolean) {
+        pressedCluster = app
+        isPressedFolded = isFolded
+    }
+
+    private fun beginClusterPull(app: String, isOpening: Boolean, y: Float) {
+        hasMoved = true
+        endHold()
+        isAtEnd = false
+        isPullOpening = isOpening
+        pullFromY = y
+        clusterPull = if (isOpening) 0f else 1f
+        pulledApp = app
+        if (isOpening) unfoldedApps = unfoldedApps + app
+    }
+
+    private fun settleClusterPull() {
+        scrollMode = ScrollMode.Undecided
+        val app = pulledApp ?: return
+        val isOpen = if (isPullOpening) clusterPull > CLUSTER_OPEN_AT else clusterPull > 1f - CLUSTER_OPEN_AT
+        if (isOpen == isPullOpening) Haptics.play(Haptic.Tap)
+        pullJob = Island.scope.launch {
+            animate(clusterPull, if (isOpen) 1f else 0f, animationSpec = tween(CLUSTER_SETTLE, easing = CLUSTER_EASE)) { value, _ -> clusterPull = value }
+            if (!isOpen) unfoldedApps = unfoldedApps - app
+            pulledApp = null
+        }
     }
 
     fun groupAction(group: NoticeGroup, action: Action) {
@@ -1356,6 +1623,10 @@ class MainBubble {
         const val GROWN_WIDTH = 340f
         /* The player stood under the Clock and Status row at 304 tall and pushed most of the screen down; it is 30% shorter and rises into that row, swallowing both bubbles while it is open. */
         const val PLAYER_HEIGHT = 213f
+        const val TRANSFER_PANEL_HEIGHT = 128f
+        private const val PACE_FLOOR = 1500L
+        val TRANSFER_HOLD_WORDS = Regex("pause|pausieren|anhalten|resume|fortsetzen|weiter", RegexOption.IGNORE_CASE)
+        val TRANSFER_STOP_WORDS = Regex("cancel|abbrechen|abbruch|stop|stopp|beenden", RegexOption.IGNORE_CASE)
         const val ALERT_WIDTH = 300f
         const val ALERT_GROWTH = 1.02f
         const val ALERT_HEIGHT = 155f
@@ -1395,13 +1666,18 @@ class MainBubble {
         const val DOT_SIZE = 6f
         const val DOT_GAP = 5f
         const val GONE_GRACE = 900L
-        const val NOTIFICATIONS_HOMING = 460L
-        const val NOTIFICATIONS_LOWER = 0.15f
+        const val NOTIFICATIONS_HOMING = 380L
+        const val PULL_ROOM = 24f
+        private const val CLUSTER_PULL_SPAN = 150f
+        private const val CLUSTER_OPEN_AT = 0.3f
+        private const val CLUSTER_SETTLE = 260
+        private val CLUSTER_EASE = androidx.compose.animation.core.CubicBezierEasing(0.2f, 1f, 0.35f, 1f)
+        private const val HOMING_FLOOR = 8f
+        private const val HOMING_LIMIT = 6
         const val NOTIFICATIONS_TOP = 48f
         const val NOTIFICATIONS_EMPTY = 96f
-        const val NOTIFICATIONS_FOOT = 16f
         const val CLEAR_SIZE = 44f
-        const val SYSTEM_ROW = 44f
+        const val SYSTEM_ROW = 36f
         const val SYSTEM_PAD = 10f
         const val CLEAR_GAP = 12f
         /* Mirrors the top transition on #notifications-clear in pill.css. */
@@ -1414,6 +1690,11 @@ class MainBubble {
         private const val FLING_FRICTION = 1.5f
         private const val FLING_SHARE = 0.8f
         private const val SCROLL_GAIN = 1.2f
+        private const val RUBBER_REACH = 0.18f
+        private const val RUBBER_GIVE = 0.55f
+        private const val RUBBER_DAMPING = 0.82f
+        private const val RUBBER_STIFFNESS = 420f
+        private const val CENTRE_GLIDE = 380
         const val SYSTEM_FOOT = 28f
         const val OUTSIDE_LATCH = 120L
         const val DRAG_COMMIT = 10f
@@ -1449,4 +1730,4 @@ class MainBubble {
     }
 }
 
-private enum class ScrollMode { Undecided, Along, Across }
+private enum class ScrollMode { Undecided, Along, Across, Pull }

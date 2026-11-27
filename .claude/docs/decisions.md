@@ -96,9 +96,11 @@ inherited from the root, and motion that arrives slowly and diagonally and leave
 
 The panel is three screens — Settings (terminal green), Debug (amber) and System (electric blue) —
 changed only by the bottom nav buttons or the number row, never by a swipe: full-width sliders own
-the horizontal stroke. Debug carries the bubble status and one replay button per styled app, which
-re-sends that app's last real notification — image and all — because a made-up one never has the
-shape the real layout has to survive.
+the horizontal stroke. Debug carries the bubble status and a short set of staged states (`DebugStage`):
+Idle drops the staged mods, Clear empties everything the bubble can show (mods, trip, torch, Alert,
+menu, unread count, lock), Reset clears and then republishes what the phone really has, and Add mod /
+Remove mod step the bubble through one to four live mods. The per-app replay buttons, the touch trace,
+the colour channels and the walk-through are gone.
 Each screen owns its accent and its own diagonal slices, which slide in from the side it belongs to.
 
 Every surface is a WebView so the identity is one implementation, not several:

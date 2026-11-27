@@ -302,23 +302,6 @@
     gap: 0.45rem;
   }
 
-  .accent {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    width: fit-content;
-    margin: -2.4rem 0.35rem 1.1rem auto;
-    padding: 0.3rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    corner-shape: squircle;
-    background: var(--panel-solid);
-    font-family: "Mono", monospace;
-    font-size: 0.6rem;
-    letter-spacing: 0.12rem;
-  }
-  .accent .value { color: var(--text-bright); font-variant-numeric: tabular-nums; }
-
   .field {
     display: flex;
     flex-direction: column;
@@ -367,16 +350,6 @@
   }
 
 
-  #accent-picker {
-    width: 2rem;
-    height: 2rem;
-    flex: none;
-    padding: 0;
-    border: 1px solid var(--border-control);
-    border-radius: 14px;
-    corner-shape: squircle;
-    background: transparent;
-  }
   .field-buttons .step-row button {
     min-width: 2.3rem;
     padding: 0.38rem 0.5rem;
@@ -527,6 +500,7 @@
 
 <style>
   .swipe-strip {
+    position: relative;
     display: flex;
     gap: 0.5rem;
     overflow-x: auto;
@@ -553,32 +527,98 @@
     border-color: var(--section-color);
     background: var(--raised);
   }
-  .icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
-  .icon-choice {
-    display: grid;
-    justify-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.3rem;
-    background: var(--sunken);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  .font-head {
+    width: 100%;
+    margin: 0;
+    padding: 0.2rem 0;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    text-align: left;
+    transition: none;
   }
-  .icon-choice[aria-pressed="true"] {
-    color: var(--text-bright);
-    border-color: var(--section-color);
-    background: var(--raised);
-  }
-  .icon-tile {
-    width: 4.2rem;
-    height: 4.2rem;
-    border-radius: 22%;
+  .font-head:active { transform: none; }
+  .font-head .value {
+    min-width: 0;
     overflow: hidden;
-    background: #181818;
-    box-shadow: inset 0 0 0 1px var(--border-strong);
+    white-space: nowrap;
+    text-transform: none;
+    letter-spacing: 0.04rem;
+    font-size: 0.72rem;
+    mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
   }
-  .icon-tile img { display: block; width: 150%; height: 150%; margin: -25% 0 0 -25%; }
+  .font-row .field-head { margin-bottom: 0; }
+  .font-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.32s var(--ease-enter);
+  }
+  .font-row.open .font-body { grid-template-rows: 1fr; }
+  .font-body > div {
+    min-height: 0;
+    overflow: hidden;
+    margin: 0 -1rem;
+    padding: 0 1rem;
+  }
+  .font-row.open .font-body > div { padding-top: 0.3rem; }
+
+  .color-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.32s var(--ease-enter);
+  }
+  .color-field.open .color-body { grid-template-rows: 1fr; }
+  .color-body > div { min-height: 0; overflow: hidden; }
+  .color-wheel {
+    position: relative;
+    width: min(100%, 13rem);
+    aspect-ratio: 1;
+    margin: 0.5rem auto 0.7rem;
+    border-radius: 50%;
+    touch-action: none;
+  }
+  .color-wheel-hues,
+  .color-wheel-whites {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+  }
+  .color-wheel-marker {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 2.5px rgba(0, 0, 0, 0.6);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .color-row { display: flex; gap: 0.6rem; margin-bottom: 0.4rem; }
+  .color-swatch {
+    flex: none;
+    padding: 0;
+    transition: transform 0.26s var(--ease-enter);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 12px;
+    corner-shape: squircle;
+    border: 1px solid var(--border-strong);
+  }
+  .color-hex {
+    flex: 1;
+    min-width: 0;
+    height: 2.5rem;
+    padding: 0 0.75rem;
+    background: var(--sunken-deep);
+    border: 1px solid var(--border-control);
+    border-radius: 14px;
+    corner-shape: squircle;
+    outline: none;
+    font: 0.85rem "Mono", monospace;
+    color: var(--text-bright);
+    caret-color: var(--section-color);
+    text-transform: uppercase;
+  }
   .field > div + .swipe-strip { margin-top: 0.35rem; }
   .field > div > .swipe-strip .swipe-chip { padding: 0.4rem 0.75rem; font-size: 0.78rem; }
 
@@ -641,8 +681,6 @@
   <h1 class="stagger"><span class="reveal"><span class="reveal-text">Dynamic Bubble</span><span class="reveal-bar"></span></span></h1>
   <span class="kicker stagger">Appearance</span>
 
-  <div id="accent" class="accent"></div>
-
   <div id="fields"></div>
 
 </section>
@@ -667,12 +705,6 @@
     </div>
   </section>
 
-  <section class="module stagger">
-    <span class="module-label">Every state</span>
-    <div class="actions">
-      <button class="wide" onclick="Panel.stageSequence()">Walk every state</button>
-    </div>
-  </section>
 
   
 
@@ -680,15 +712,6 @@
 
   <div id="debug-fields"></div>
 
-  <section class="module stagger">
-    <span class="module-label">Touch</span>
-    <pre class="note" id="trace">—</pre>
-  </section>
-
-  <section class="module stagger">
-    <span class="module-label">Replay</span>
-    <div class="actions" id="replays"></div>
-  </section>
 </section>
 
 <nav>
@@ -750,62 +773,37 @@
   const FONT_SIZE_RANGE = { min: 50, max: 200, step: 5 };
 
   const FIELDS = [
+    { group: 'Colour', key: 'accentColor', colorWheel: true },
+
     { group: 'Axis', key: 'horizontalOffsetDp', name: 'X-Position', min: -200, max: 200 },
     { group: 'Axis', key: 'verticalOffsetDp',   name: 'Y-Position', min: 0,    max: 200 },
     { group: 'Axis', key: 'widthDp',    name: 'Width',     min: 0, max: 400 },
     { group: 'Axis', key: 'heightDp',   name: 'Height',    min: 0, max: 120 },
-    { group: 'Axis', key: 'modWidthDp', name: 'Mod-Width', min: 0, max: 160 },
 
     { group: 'Behaviour', key: 'blurRadius',      name: 'Bubble-Blur',   min: 0, max: 60 },
     { group: 'Behaviour', key: 'backgroundAlpha', name: 'Alpha',         min: 0, max: 100 },
-    { group: 'Behaviour', key: 'gooStrength',     name: 'Goo-Merge',     min: 0, max: 200 },
-    { group: 'Behaviour', key: 'edgeMerge', name: 'Wet-Edges', min: 0, max: 1,
-      labels: ['Off', 'On'] },
-    { group: 'Behaviour', key: 'labelSweep', name: 'Label reveal', min: 0, max: 1,
-      labels: ['Type', 'Sweep'] },
     { group: 'Behaviour', key: 'scrimBlurRadius', name: 'Dashboard-Blur', min: 0, max: 150 },
-    { group: 'Behaviour', key: 'barLocked', name: 'Shade', min: 0, max: 1,
-      labels: ['Off', 'On'] },
 
     { group: 'Alerts', key: 'notificationIdentity', name: 'App identity', min: 0, max: 2,
       labels: ['Icon', 'Name', 'Both'] },
     { group: 'Alerts', key: 'alertDwellTenths', name: 'Alert stands for', min: 5, max: 200, step: 5,
       read: tenths => (tenths / 10).toFixed(1) + 's' },
-    { group: 'Alerts', key: 'notificationsRise', name: 'Notifications position', min: 0, max: 100,
-      read: rise => rise === 0 ? 'Bottom' : rise === 100 ? 'Top' : rise + '%' },
     { group: 'Alerts', key: 'lockNotes', name: 'Lock screen notifications', min: 0, max: 1,
       labels: ['Off', 'On'] },
-    { group: 'Alerts', key: 'lockNotesHome', name: 'Lock notifications on unlock', min: 0, max: 1,
-      labels: ['Vanish', 'Fly to bubble'] },
-    { group: 'Alerts', key: 'alertZoneGlow', name: 'Pull zone glow', min: 0, max: 100, step: 5,
-      read: glow => glow === 0 ? 'Off' : glow + '%' },
-    { group: 'Alerts', key: 'notificationsClearCorner', name: 'Delete all position', min: 0, max: 1,
-      labels: ['Under menu', 'Bottom right'] },
 
     { group: 'Other', key: 'quickDividers', name: 'Dashboard dividers', min: 0, max: 1,
-      labels: ['Off', 'On'] },
-    { group: 'Other', key: 'dashAlertsDisabled', name: 'Disable Alerts in Dashboard', min: 0, max: 1,
-      labels: ['Off', 'On'] },
-    { group: 'Other', key: 'fastDashboard', name: 'Fast Dashboard', min: 0, max: 1,
       labels: ['Off', 'On'] },
     { group: 'Other', key: 'sidePills', name: 'Clock and status pills', min: 0, max: 1,
       labels: ['Off', 'On'] },
     { group: 'Other', key: 'sidePillsSize', name: 'Clock and status size without pills', min: 80, max: 160, step: 5,
       read: size => size + '%' },
-    { group: 'Other', key: 'statusBatteryPercent', name: 'Status battery %', min: 0, max: 1,
-      labels: ['Hidden', 'Shown'] },
-    { group: 'Other', key: 'statusBatteryPercentLight', name: 'Status battery % colour', min: 0, max: 1,
-      labels: ['Black', 'White'] },
-    { group: 'Other', key: 'statusBatteryIcons', name: 'Status battery style', min: 0, max: 1,
-      labels: ['Fill', 'Icon'] },
-    { group: 'Other', key: 'lockOffsetDp', name: 'Bubble X', min: -150, max: 150 },
+    { group: 'Other', key: 'statusBatteryWhite', name: 'Status battery colour', min: 0, max: 1,
+      labels: ['Colour', 'White'] },
 
     // Mirrors DATE_FORMATS in js/clock.js, in the same order, each written as it reads on 28 September 2026.
     { group: 'Clock', key: 'dateFormat', name: 'Date format', min: 0, max: 14, strip: true,
       labels: ['Mo, 28.9.', '28.9.', '28.09.', '28.09.26', '28.09.2026', '28/09/26', '28/09/2026', '28-09-26', '28-09-2026',
         '28 Sep', '28 Sep 2026', '28. September 2026', 'Mo, 28.09.26', 'Mo 28 Sep', 'Montag, 28.9.'] },
-
-    { group: 'Icon', key: 'appIcon', name: 'App icon', iconChoice: true },
 
     { group: 'Font Settings', key: 'fontClock', sizeKey: 'fontSizeClock', name: 'Clock', fontFamily: true },
     { group: 'Font Settings', key: 'fontMain', sizeKey: 'fontSizeMain', name: 'Main', fontFamily: true },
@@ -818,48 +816,38 @@
     { group: 'Font Settings', key: 'fontNotificationHeading', sizeKey: 'fontSizeNotificationHeading', name: 'Notification Heading', fontFamily: true },
     { group: 'Font Settings', key: 'fontNotificationContent', sizeKey: 'fontSizeNotificationContent', name: 'Notification Content', fontFamily: true },
 
+    // Mirrors StatusIcon in StatusBubble.kt: one size per icon the status bubble draws.
+    { group: 'Status Icons', key: 'iconSizeUsb', name: 'USB', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+    { group: 'Status Icons', key: 'iconSizeHotspot', name: 'Hotspot', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+    { group: 'Status Icons', key: 'iconSizeBluetooth', name: 'Bluetooth', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+    { group: 'Status Icons', key: 'iconSizeZen', name: 'Focus mode', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+    { group: 'Status Icons', key: 'iconSizeWifi', name: 'Wifi', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+    { group: 'Status Icons', key: 'iconSizeEthernet', name: 'Ethernet', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+    { group: 'Status Icons', key: 'iconSizeMobile', name: 'Mobile data', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+    { group: 'Status Icons', key: 'iconSizeBattery', name: 'Battery', min: 50, max: 200, step: 5,
+      read: size => size + '%' },
+
     { group: 'Zones', screen: 'debug', key: 'alertZoneShown', name: 'Alert pull zone', min: 0, max: 1,
       labels: ['Hidden', 'Shown'] },
-    { group: 'Channels', screen: 'debug', key: 'red',   name: 'Red',   min: 0, max: 255 },
-    { group: 'Channels', screen: 'debug', key: 'green', name: 'Green', min: 0, max: 255 },
-    { group: 'Channels', screen: 'debug', key: 'blue',  name: 'Blue',  min: 0, max: 255 },
   ];
 
-  // Mirrors ICON_ALIASES in MainActivity.kt and the activity-alias entries in AndroidManifest.xml, in the same order; each name is also the file under assets/icons/.
-  const ICONS = ['Idle', 'Media', 'Clock', 'Call', 'Overflow', 'Satellite'];
-
   const STATES = [
-    { group: 'Base', states: [['idle', 'Idle'], ['clear', 'Clear'], ['locked', 'Lock screen']] },
+    { group: 'Base', states: [['idle', 'Idle'], ['clear', 'Clear'], ['reset', 'Reset']] },
     { group: 'Mods', states: [
-      ['media', 'Media'], ['media-paused', 'Media paused'],
-      ['timer', 'Timer'], ['timer-paused', 'Timer paused'],
-      ['call', 'Call'], ['call-phone', 'Call, phone'],
+      ['media', 'Media'], ['timer', 'Timer'], ['call', 'Call'],
       ['recording', 'Recording'], ['download', 'Download'], ['upload', 'Upload'],
-      ['download-media', 'Download over media'], ['upload-timer', 'Upload over timer'],
-      ['download-cancel', 'Download cancelled', true],
-      ['media-timer', 'Two mods'], ['media-timer-call', 'Three mods'],
+      ['remove-mod', 'Remove mod'], ['add-mod', 'Add mod'],
     ] },
     { group: 'Alerts', states: [
-      ['alert', 'Alert'], ['alert-image', 'Alert, photo'],
-      ['alert-over-mod', 'Alert over a mod', true],
+      ['alert', 'Alert'],
       ['alert-stacking', 'Two from one sender', true],
-      ['alert-marked', 'Alert with date and money', true],
-    ] },
-    { group: 'Satellites', states: [
-      ['torch', 'Torch on'], ['torch-off', 'Torch off'],
-      ['battery-charging', 'Charging'], ['battery-low', 'Battery low'],
-      ['battery-critical', 'Battery critical', true],
-      ['connectivity', 'Wifi'],
-      ['connectivity-bluetooth', 'Bluetooth, with charge', true],
-      ['connectivity-hotspot', 'Hotspot on mobile', true],
-      ['call-volume', 'Call volume bar', true],
-      ['call-volume-off', 'Call volume bar off', true],
-    ] },
-    { group: 'Transitions', states: [
-      ['mod-closing', 'A mod closing, one left', true],
-      ['satellite-closing', 'A satellite closing', true],
-      ['mod-to-idle', 'Last mod to idle', true],
-      ['now-flight', 'Now, out and home', true],
     ] },
   ];
 
@@ -939,7 +927,6 @@
   }
 
   function buildFields(preferences, defaults) {
-    buildAccent(document.getElementById('accent'), preferences, defaults);
     const modules = new Map();
     for (const field of FIELDS) {
       const root = document.getElementById(field.screen === 'debug' ? 'debug-fields' : 'fields');
@@ -957,8 +944,8 @@
         root.appendChild(module);
         modules.set(field.group, container);
       }
-      if (field.iconChoice) {
-        buildIconChoice(container, field, preferences);
+      if (field.colorWheel) {
+        buildColorWheel(container, preferences, defaults);
         continue;
       }
       if (field.fontFamily) {
@@ -1005,32 +992,6 @@
 
 
 
-
-  function buildIconChoice(container, field, preferences) {
-    const grid = document.createElement('div');
-    grid.className = 'icon-grid';
-    const buttons = ICONS.map((name, index) => {
-      const button = document.createElement('button');
-      button.className = 'icon-choice';
-      const tile = document.createElement('span');
-      tile.className = 'icon-tile';
-      const image = document.createElement('img');
-      image.src = 'icons/icon_' + name.toLowerCase() + '.png';
-      tile.appendChild(image);
-      const label = document.createElement('span');
-      label.textContent = name;
-      button.append(tile, label);
-      button.addEventListener('click', () => {
-        buttons.forEach((other, otherIndex) => other.setAttribute('aria-pressed', String(otherIndex === index)));
-        Panel.setAppIcon(index);
-        Panel.triggerHaptic();
-      });
-      grid.appendChild(button);
-      return button;
-    });
-    buttons[preferences[field.key]].setAttribute('aria-pressed', 'true');
-    container.appendChild(grid);
-  }
 
   function buildChoice(container, field, preferences, defaults) {
     const wrapper = document.createElement('div');
@@ -1100,11 +1061,18 @@
     });
 
     let settling = false;
-    // A user-driven pick fires onPick; laying out the strip at its starting index must not — that index is already what the preference holds.
+    let selected = -1;
+    // Centring the strip scrolls it, and that scroll re-picked the centred chip, so opening a font reset its weight to the family's first; only a different chip is a pick.
     function select(index, fire) {
+      if (index === selected) return;
+      selected = index;
       chips.forEach((chip, chipIndex) => chip.classList.toggle('current', chipIndex === index));
       if (fire) onPick(index);
     }
+    const centre = () => {
+      const chip = chips[selected];
+      if (chip) strip.scrollLeft = chip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2;
+    };
 
     strip.addEventListener('scroll', () => {
       if (settling) return;
@@ -1125,9 +1093,9 @@
     });
 
     select(startIndex, false);
-    requestAnimationFrame(() => chips[startIndex]?.scrollIntoView({ inline: 'center', block: 'nearest' }));
+    requestAnimationFrame(centre);
 
-    return { strip, jumpTo: index => { select(index, true); chips[index]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } };
+    return { strip, centre, jumpTo: index => { select(index, true); chips[index]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } };
   }
 
   // Fifteen answers split into buttons are fifteen slivers nobody can read, so a setting with more answers than a row holds is swiped through instead.
@@ -1145,51 +1113,56 @@
     container.appendChild(wrapper);
   }
 
-  // A family (Mono, Clash Display, General Sans, …) is picked first, and only a family with more than one weight gets a second strip to pick the weight from.
+  // Ten faces each open at once were several viewports of strips, so every face is a row that names its family, weight and size, and only the one tapped opens.
   function buildFontChoice(container, field, preferences, defaults) {
     const wrapper = document.createElement('div');
-    wrapper.className = 'field';
+    wrapper.className = 'field font-row';
 
-    const head = document.createElement('div');
-    head.className = 'field-head';
+    const head = document.createElement('button');
+    head.className = 'field-head font-head';
     const name = document.createElement('span');
     name.textContent = field.name;
     const value = document.createElement('span');
     value.className = 'value';
     head.append(name, value);
 
-    const variantHolder = document.createElement('div');
+    const body = document.createElement('div');
+    body.className = 'font-body';
+    const inner = document.createElement('div');
+    body.appendChild(inner);
 
-    let variantControl = null;
-    const setValueLabel = index => {
-      const family = FONT_FAMILIES[familyOfIndex(index)];
-      const variant = family.variants[index - family.start];
-      value.textContent = family.variants.length > 1 ? `${family.name} · ${variant}` : family.name;
+    const variantHolder = document.createElement('div');
+    let faceIndex = preferences[field.key];
+    let sizePercent = preferences[field.sizeKey];
+    const paintValue = () => {
+      const family = FONT_FAMILIES[familyOfIndex(faceIndex)];
+      const variant = family.variants[faceIndex - family.start];
+      value.textContent = (family.variants.length > 1 ? `${family.name} · ${variant}` : family.name) + ` · ${sizePercent}%`;
+      value.style.fontFamily = FONT_STACKS[faceIndex];
     };
 
     const commit = index => {
-      setValueLabel(index);
-      if (field.cssVar) document.documentElement.style.setProperty(field.cssVar, FONT_STACKS[index]);
+      faceIndex = index;
+      paintValue();
       Panel.setPreference(field.key, index);
     };
 
+    let variantControl = null;
     function showVariants(familyIndex, selectIndex) {
       variantHolder.replaceChildren();
       variantControl = null;
       const family = FONT_FAMILIES[familyIndex];
       if (family.variants.length <= 1) return;
-      const built = buildSwipeStrip(
+      variantControl = buildSwipeStrip(
         family.variants,
         selectIndex - family.start,
         variantIndex => commit(family.start + variantIndex),
         (chip, variantIndex) => { chip.style.fontFamily = FONT_STACKS[family.start + variantIndex]; }
       );
-      variantControl = built;
-      variantHolder.appendChild(built.strip);
+      variantHolder.appendChild(variantControl.strip);
     }
 
-    const startIndex = preferences[field.key];
-    const startFamily = familyOfIndex(startIndex);
+    const startFamily = familyOfIndex(faceIndex);
     const familyControl = buildSwipeStrip(
       FONT_FAMILIES.map(family => family.name),
       startFamily,
@@ -1200,11 +1173,14 @@
       },
       (chip, familyIndex) => { chip.style.fontFamily = FONT_STACKS[FONT_FAMILIES[familyIndex].start]; }
     );
-    showVariants(startFamily, startIndex);
-    setValueLabel(startIndex);
-    if (field.cssVar) document.documentElement.style.setProperty(field.cssVar, FONT_STACKS[startIndex]);
+    showVariants(startFamily, faceIndex);
 
-    name.addEventListener('dblclick', () => {
+    const sizeControl = buildSlider(FONT_SIZE_RANGE, sizePercent, defaults[field.sizeKey], percent => {
+      sizePercent = percent;
+      paintValue();
+      Panel.setPreference(field.sizeKey, percent);
+    });
+    sizeControl.buttons.querySelector('.reset-mini').addEventListener('click', () => {
       const defaultIndex = defaults[field.key];
       const defaultFamily = familyOfIndex(defaultIndex);
       familyControl.jumpTo(defaultFamily);
@@ -1212,56 +1188,171 @@
       commit(defaultIndex);
     });
 
-    const sizeHead = document.createElement('div');
-    sizeHead.className = 'field-head';
-    const sizeName = document.createElement('span');
-    sizeName.textContent = 'Size';
-    const sizeValue = document.createElement('span');
-    sizeValue.className = 'value';
-    sizeHead.append(sizeName, sizeValue);
-
-    const sizeControl = buildSlider(FONT_SIZE_RANGE, preferences[field.sizeKey], defaults[field.sizeKey], percent => {
-      sizeValue.textContent = percent + '%';
-      if (field.sizeCssVar) document.documentElement.style.setProperty(field.sizeCssVar, percent / 100);
-      Panel.setPreference(field.sizeKey, percent);
+    head.addEventListener('click', () => {
+      const isOpening = !wrapper.classList.contains('open');
+      for (const other of container.querySelectorAll('.font-row.open')) other.classList.remove('open');
+      wrapper.classList.toggle('open', isOpening);
+      if (isOpening) {
+        familyControl.centre();
+        variantControl?.centre();
+      }
+      Panel.triggerHaptic();
     });
-    sizeName.addEventListener('dblclick', () => sizeControl.apply(defaults[field.sizeKey]));
 
-    wrapper.append(head, familyControl.strip, variantHolder, sizeHead, sizeControl.slider, sizeControl.buttons);
+    paintValue();
+    inner.append(familyControl.strip, variantHolder, sizeControl.slider, sizeControl.buttons);
+    wrapper.append(head, body);
     container.appendChild(wrapper);
   }
 
-
-
-
-
-
-  function buildAccent(wrapper, preferences, defaults) {
-    const value = document.createElement('span');
-    value.className = 'value';
-
-    const picker = document.createElement('input');
-    picker.type = 'color';
-    picker.id = 'accent-picker';
-    wrapper.append(picker, value);
-
-    const screen = document.querySelector('.screen[data-screen="dashboard"]');
-    const apply = number => {
-      const hex = '#' + (number & 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
-      picker.value = hex;
-      value.textContent = hex;
-      screen.dataset.accent = hex;
-      if (screen.classList.contains('active')) {
-        document.documentElement.style.setProperty('--section-color', hex);
-      }
-      Panel.setPreference('accentColor', number & 0xFFFFFF);
-    };
-    apply(preferences.accentColor);
-    picker.addEventListener('input', () => apply(parseInt(picker.value.slice(1), 16)));
+  function hexOf(number) {
+    return '#' + (number & 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
+  }
+  function hsvFromHex(hex) {
+    const number = parseInt(hex.slice(1), 16);
+    const red = (number >> 16 & 255) / 255;
+    const green = (number >> 8 & 255) / 255;
+    const blue = (number & 255) / 255;
+    const maximum = Math.max(red, green, blue);
+    const chroma = maximum - Math.min(red, green, blue);
+    let hue = 0;
+    if (chroma > 0) {
+      if (maximum === red) hue = 60 * (((green - blue) / chroma) % 6);
+      else if (maximum === green) hue = 60 * ((blue - red) / chroma + 2);
+      else hue = 60 * ((red - green) / chroma + 4);
+    }
+    return { hue: (hue + 360) % 360, saturation: maximum === 0 ? 0 : chroma / maximum, value: maximum };
+  }
+  function hexFromHsv({ hue, saturation, value }) {
+    const chroma = value * saturation;
+    const sector = (hue / 60) % 6;
+    const second = chroma * (1 - Math.abs((sector % 2) - 1));
+    const rgb = sector < 1 ? [chroma, second, 0] : sector < 2 ? [second, chroma, 0] : sector < 3 ? [0, chroma, second]
+      : sector < 4 ? [0, second, chroma] : sector < 5 ? [second, 0, chroma] : [chroma, 0, second];
+    return '#' + rgb.map(channel => Math.round((channel + value - chroma) * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
   }
 
-  
-  
+  // V/AS's colour panel as VADOS-NOTES and VADOS-SHELL draw it: a hue and saturation wheel, a brightness slider under it, and the swatch beside its hex.
+  function buildColorWheel(container, preferences, defaults) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field color-field';
+
+    const wheel = document.createElement('div');
+    wheel.className = 'color-wheel';
+    const hues = document.createElement('span');
+    hues.className = 'color-wheel-hues';
+    const whites = document.createElement('span');
+    whites.className = 'color-wheel-whites';
+    const marker = document.createElement('span');
+    marker.className = 'color-wheel-marker';
+    wheel.append(hues, whites, marker);
+
+    const row = document.createElement('div');
+    row.className = 'color-row';
+    const swatch = document.createElement('button');
+    swatch.className = 'color-swatch';
+    const hexInput = document.createElement('input');
+    hexInput.className = 'color-hex';
+    hexInput.spellcheck = false;
+    hexInput.maxLength = 7;
+    row.append(swatch, hexInput);
+
+    const screen = document.querySelector('.screen[data-screen="dashboard"]');
+    const defaultHex = hexOf(defaults.accentColor);
+    let hsv = hsvFromHex(hexOf(preferences.accentColor));
+    let isSyncing = true;
+
+    const render = () => {
+      const stops = [];
+      for (let degrees = 0; degrees <= 360; degrees += 30) stops.push(hexFromHsv({ hue: degrees % 360, saturation: 1, value: hsv.value }));
+      hues.style.background = `conic-gradient(from 90deg, ${stops.join(', ')})`;
+      const grey = hexFromHsv({ hue: 0, saturation: 0, value: hsv.value });
+      whites.style.background = `radial-gradient(circle closest-side, ${grey}, ${grey}00)`;
+      const radians = hsv.hue * Math.PI / 180;
+      marker.style.left = (50 + Math.cos(radians) * hsv.saturation * 50) + '%';
+      marker.style.top = (50 + Math.sin(radians) * hsv.saturation * 50) + '%';
+      const hex = hexFromHsv(hsv);
+      marker.style.background = hex;
+      swatch.style.background = hex;
+      if (document.activeElement !== hexInput) hexInput.value = hex;
+      return hex;
+    };
+    const commit = () => {
+      const hex = render();
+      screen.dataset.accent = hex;
+      if (screen.classList.contains('active')) document.documentElement.style.setProperty('--section-color', hex);
+      Panel.setPreference('accentColor', parseInt(hex.slice(1), 16));
+    };
+
+    const valueControl = buildSlider({ min: 0, max: 100 }, Math.round(hsv.value * 100), Math.round(hsvFromHex(defaultHex).value * 100), percent => {
+      if (isSyncing) return;
+      hsv = { ...hsv, value: percent / 100 };
+      commit();
+    });
+    const syncValue = () => {
+      isSyncing = true;
+      valueControl.apply(Math.round(hsv.value * 100));
+      isSyncing = false;
+    };
+    valueControl.buttons.querySelector('.reset-mini').addEventListener('click', () => {
+      hsv = hsvFromHex(defaultHex);
+      syncValue();
+      commit();
+    });
+
+    let isDragging = false;
+    const pick = event => {
+      const box = wheel.getBoundingClientRect();
+      const x = event.clientX - box.left - box.width / 2;
+      const y = event.clientY - box.top - box.height / 2;
+      hsv = { ...hsv, hue: (Math.atan2(y, x) * 180 / Math.PI + 360) % 360, saturation: Math.min(1, Math.hypot(x, y) / (box.width / 2)) };
+      if (hsv.value < 0.05) {
+        hsv.value = 1;
+        syncValue();
+      }
+      commit();
+    };
+    wheel.addEventListener('pointerdown', event => {
+      wheel.setPointerCapture(event.pointerId);
+      isDragging = true;
+      pick(event);
+      Panel.triggerHaptic();
+    });
+    wheel.addEventListener('pointermove', event => { if (isDragging) pick(event); });
+    const release = () => {
+      if (isDragging) Panel.triggerHaptic();
+      isDragging = false;
+    };
+    wheel.addEventListener('pointerup', release);
+    wheel.addEventListener('pointercancel', release);
+
+    hexInput.addEventListener('input', () => {
+      let candidate = hexInput.value.trim().toUpperCase();
+      if (!candidate.startsWith('#')) candidate = '#' + candidate;
+      if (!/^#[0-9A-F]{6}$/.test(candidate)) return;
+      hsv = hsvFromHex(candidate);
+      syncValue();
+      commit();
+    });
+    hexInput.addEventListener('blur', render);
+
+    isSyncing = false;
+    screen.dataset.accent = render();
+
+    valueControl.buttons.querySelector('.step-row').remove();
+    const body = document.createElement('div');
+    body.className = 'color-body';
+    const inner = document.createElement('div');
+    inner.appendChild(wheel);
+    body.appendChild(inner);
+    swatch.addEventListener('click', () => {
+      wrapper.classList.toggle('open');
+      Panel.triggerHaptic();
+    });
+
+    wrapper.append(row, body, valueControl.slider, valueControl.buttons);
+    container.appendChild(wrapper);
+  }
 
   function paintStatus(id, isGranted, grantedWord, missingWord) {
     const element = document.getElementById(id);
@@ -1327,20 +1418,6 @@
 
 
 
-  function buildReplays() {
-    const container = document.getElementById('replays');
-    for (const style of JSON.parse(Panel.readAppStyles())) {
-      const button = document.createElement('button');
-      button.textContent = style.label;
-      button.style.borderColor = style.accent;
-      button.style.color = style.accent;
-      button.addEventListener('click', () => {
-        Panel.replay(style.key);
-        Panel.triggerHaptic();
-      });
-      container.appendChild(button);
-    }
-  }
 
   
   
@@ -1464,7 +1541,6 @@
   buildGroupNav();
   applyGroupFilter();
   buildStates();
-  buildReplays();
   window.onStateChanged(initialState);
   document.documentElement.style.setProperty('--section-color', screens[0].dataset.accent);
   screens[0].classList.add('active');
@@ -1477,8 +1553,4 @@
   
   
   
-  const trace = document.getElementById('trace');
-  setInterval(() => {
-    trace.textContent = Panel.readTrace();
-  }, 400);
 </script>

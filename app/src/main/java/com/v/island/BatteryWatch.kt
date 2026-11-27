@@ -32,8 +32,8 @@ object BatteryWatch {
 
     private var lastRemainingMinutes = -1
 
-    // Samsung's charge counter moves in whole steps of 4015 µAh, one per 0.1% of the fuel gauge, so this is what the counter reads at 100%.
-    private const val FULL_MICRO_AMP_HOURS = 4_015_000.0
+    // The counter was read as 4015 µAh per 0.1%, so the reading ran ahead of or behind the level the system shows by up to a whole percent; the level steps over when the counter crosses about 40010 µAh per percent, and the reading is held inside the level's own percent besides.
+    private const val FULL_MICRO_AMP_HOURS = 4_001_000.0
 
     private const val COUNTER_STEP_MICRO_AMP_HOURS = 4_015.0
 
@@ -170,7 +170,7 @@ object BatteryWatch {
             microAmps < 0 -> minOf(shownMicroAmpHours, settled)
             else -> settled
         }
-        return (shownMicroAmpHours * 100 / FULL_MICRO_AMP_HOURS).coerceIn(0.0, 100.0)
+        return (shownMicroAmpHours * 100 / FULL_MICRO_AMP_HOURS).coerceIn(percent.toDouble(), minOf(100.0, percent + 0.99))
     }
 
     private fun event(state: String, percent: Int): JSONObject =

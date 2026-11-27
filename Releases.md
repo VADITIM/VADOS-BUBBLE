@@ -2,6 +2,10 @@
 
 What changed in each feature version. Planned work is in `.claude/docs/roadmap.md`. Patch versions (x.x.1, x.x.2 …) are fixes and small adjustments; they are folded into the feature version they belong to. `RELEASE_NOTES.md` holds only the text of the latest release.
 
+## 0.8: Compose (0.8.0)
+
+- **Native rebuild:** the bubble, Dashboard, Notifications menu, player and mods now run in Jetpack Compose instead of the WebView canvas; `compose` is the main branch. Notifications groups drag open with stacked layers, Dashboard sliders merge into a screen-centred hold, connection buttons rotate-pop, the clock's seconds are tightened, Main covers the punch hole while it bounces home, and the player's timeline wipes in beside a popping equalizer.
+
 ## 0.7: One UI 9 (0.7.0 – 0.7.2)
 
 - **One UI 9 fixes:** the hotspot button works again (One UI 9 silently ignores Samsung's own hotspot call from shell, so the AOSP tethering fallback now runs when the hotspot does not move); the fullscreen bottom-right Dashboard corner is gone; the Notifications menu closes on a tap above it, cannot be reopened by the tap or swipe that closed it, and takes taps while it is still opening; its rows arrive like SHELL's (staggered cards, spinning round icons, the app name swept in, the message typed). The title line is typed too, and the list runs 15% faster, messages type faster, highlights grow with their text, and the screen recorder closes the Dashboard.

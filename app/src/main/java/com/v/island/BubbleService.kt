@@ -44,7 +44,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         private const val SYSTEM_WAKE_MILLIS = 1_500L
         private const val DARK_BRIGHTNESS = 0.07f
         private const val TAP_MILLIS = 40L
-        private const val SHADE_STRIP = 48
         private const val ROTATION_SETTLE = 600L
         private val LANDSCAPE_REGIONS = setOf(Region.Dashboard, Region.Clock, Region.Status)
         private const val TOGGLE_SETTLE_MILLIS = 2_500L
@@ -85,12 +84,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             if (instance == null) return@post
             if (Island.bubble.size == com.v.island.bubble.Size.Notifications) Island.bubble.toClosed()
             else Island.bubble.openNotifications()
-        }
-
-        fun trace(): String {
-            val service = instance ?: return "the bubble is not running"
-            val hotspot = SystemToggles.hotspotRefusal.takeIf { it.isNotEmpty() }?.let { "\nhotspot refused:\n$it" }.orEmpty()
-            return service.lastTouch + hotspot
         }
 
         fun isDarkArrival(): Boolean = instance?.isDarkArrival() == true
@@ -162,7 +155,31 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             Island.post { Island.status.announce(event) }
         }
 
-        fun stageLock(locked: Boolean) = Island.post { Island.isLocked = locked }
+        fun clearStage() = Island.post {
+            if (instance == null) return@post
+            Island.trip = null
+            Island.torch = null
+            Island.unread = 0
+            Island.isLocked = false
+            Island.status.retireAnnouncement()
+            Island.liftScreenDark()
+            Island.bubble.onModsChanged()
+            Island.bubble.toClosed()
+        }
+
+        fun republishReal() {
+            val service = instance ?: return
+            MediaControl.republish()
+            IslandNotificationListener.publishTimer()
+            IslandNotificationListener.publishTrip()
+            IslandNotificationListener.publishCall()
+            IslandNotificationListener.publishNowMods()
+            deliverTorch(TorchWatch.state())
+            Island.post {
+                Island.unread = IslandNotificationListener.count()
+                Island.isLocked = service.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+            }
+        }
 
         fun deliverNowMods(mods: JSONObject) {
             val recording = Payloads.recording(mods.optJSONObject("recording"))
@@ -254,8 +271,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private val owner = OverlayOwner()
     private val paneRadius = IntArray(BLUR_PANES) { -1 }
     private val paneCorner = FloatArray(BLUR_PANES) { -1f }
-    private var shadeGuard: View? = null
-    private var shadeGuardParams: WindowManager.LayoutParams? = null
     private var isFullScreen = false
     private var isLandscape = false
     private var isLandscapeStage = false
@@ -266,7 +281,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private var outsideReportedAt = -1L
     private var isUserPresent = false
     private var screenOnAt = 0L
-    private var lastTouch = ""
     private val appliedLayouts = HashMap<View, WindowManager.LayoutParams>()
     private var isPaneSyncQueued = false
     private val togglesWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
@@ -336,9 +350,8 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         }
         stage.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         windowManager.addView(stage, canvasParams)
-        proxies = listOf(Region.Shield, Region.Dashboard, Region.Now, Region.Clear, Region.System, Region.Torch, Region.TorchOff, Region.Main, Region.Status, Region.Clock, Region.Alert).associateWith { Proxy(it) }
+        proxies = listOf(Region.Shield, Region.Dashboard, Region.Now, Region.Clear, Region.System, Region.Torch, Region.TorchOff, Region.Main, Region.Menu, Region.Status, Region.Clock, Region.Alert).associateWith { Proxy(it) }
         proxies.values.forEach { windowManager.addView(it.view, it.params) }
-        applyBarLock()
         instance = this
 
         Island.scope.launch {
@@ -443,7 +456,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             Island.onDashboardLeft = {}
             Island.stop()
             proxies.values.forEach { runCatching { windowManager.removeView(it.view) } }
-            shadeGuard?.let { runCatching { windowManager.removeView(it) } }
             runCatching { windowManager.removeView(stage) }
             owner.stop()
         }
@@ -459,7 +471,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
         paneRadius.fill(-1)
         if (scrimRadius != -1) scrimRadius = 0
         requestPaneSync()
-        applyBarLock()
     }
 
     private fun readScreen() {
@@ -516,44 +527,6 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             proxy.placed?.let { proxy.params.flags = proxyFlags(proxy.region) }
             relayout(proxy.view, proxy.params)
         }
-        shadeGuardParams?.let { guardParams ->
-            guardParams.flags = if (isHidden) BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else BASE_FLAGS
-            relayout(shadeGuard, guardParams)
-        }
-    }
-
-    private fun applyBarLock() {
-        val isWanted = Preferences.get(preferences, Preferences.BAR_LOCKED) == 1
-        if (isWanted == (shadeGuard != null)) return
-        if (!isWanted) {
-            runCatching { windowManager.removeView(shadeGuard) }
-            shadeGuard?.let { appliedLayouts.remove(it) }
-            shadeGuard = null
-            shadeGuardParams = null
-            return
-        }
-        val guard = object : View(this) {
-            override fun onTouchEvent(event: MotionEvent): Boolean = true
-        }
-        val guardParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT, dp(SHADE_STRIP),
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, BASE_FLAGS, PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            windowAnimations = 0
-            setCanPlayMoveAnimation(false)
-        }
-        runCatching { windowManager.addView(guard, guardParams) }
-        shadeGuard = guard
-        shadeGuardParams = guardParams
-        proxies.values.forEach { proxy ->
-            runCatching {
-                windowManager.removeView(proxy.view)
-                windowManager.addView(proxy.view, proxy.params)
-            }
-            appliedLayouts.remove(proxy.view)
-        }
     }
 
     private fun relayout(view: View?, layout: WindowManager.LayoutParams) {
@@ -580,8 +553,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
             Island.onTouch(isDown = false, isCancel = action == MotionEvent.ACTION_CANCEL)
         }
         if (action != MotionEvent.ACTION_MOVE) {
-            lastTouch = "$region proxy heard ${MotionEvent.actionToString(action)} at ${(event.rawX / Island.density).toInt()}, ${(event.rawY / Island.density).toInt()}"
-            android.util.Log.d("IslandBubble", "probe $lastTouch")
+            android.util.Log.d("IslandBubble", "probe $region proxy heard ${MotionEvent.actionToString(action)} at ${(event.rawX / Island.density).toInt()}, ${(event.rawY / Island.density).toInt()}")
         }
         val forwarded = MotionEvent.obtain(event)
         forwarded.setLocation(event.rawX - canvasParams.x, event.rawY - canvasParams.y)
@@ -602,7 +574,7 @@ class BubbleService : AccessibilityService(), SharedPreferences.OnSharedPreferen
     private fun syncPanes() {
         if (isHidden()) return
         syncScrim()
-        val shapes: List<BlobShape> = Island.liquid.shapes()
+        val shapes: List<BlobShape> = Island.liquid.shapes() + Island.glass.values.mapNotNull { it() }.filter { it.opacity > 0.01f && it.rect.width > 0.5f && it.rect.height > 0.5f }
         val radius = Island.appearance.blurRadius
         blurPanes.forEachIndexed { index, pane ->
             val shape = shapes.getOrNull(index)

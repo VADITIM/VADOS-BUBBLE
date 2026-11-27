@@ -3,7 +3,6 @@ package com.v.island
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -24,11 +23,6 @@ import org.json.JSONObject
 
 
 class MainActivity : Activity() {
-
-    companion object {
-        // Mirrors the activity-alias names in AndroidManifest.xml and ICONS in panel.html, in the same order.
-        private val ICON_ALIASES = listOf("IconIdle", "IconMedia", "IconClock", "IconCall", "IconOverflow", "IconSatellite")
-    }
 
     private val preferences by lazy { Preferences.of(this) }
     private lateinit var webView: WebView
@@ -90,15 +84,10 @@ class MainActivity : Activity() {
         .put("shizuku", ShizukuShell.isRunning() && ShizukuShell.hasPermission())
         .put("wirelessAdb", WirelessAdb.isPaired(this))
         .put("statusBar", StatusBarPolicy.read())
-        .put("preferences", Preferences.asJson(preferences).put("appIcon", currentIconIndex()))
+        .put("preferences", Preferences.asJson(preferences))
         .put("defaults", JSONObject(Preferences.defaults as Map<*, *>))
 
     
-    private fun iconComponent(index: Int) = ComponentName(this, "$packageName.${ICON_ALIASES[index]}")
-
-    private fun currentIconIndex(): Int = ICON_ALIASES.indices.firstOrNull {
-        packageManager.getComponentEnabledSetting(iconComponent(it)) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-    } ?: 0
 
     private fun hasAccessibilityAccess(): Boolean {
         val enabled = Settings.Secure.getString(contentResolver, "enabled_accessibility_services")
@@ -139,18 +128,6 @@ class MainActivity : Activity() {
     )
 
     
-    private fun standInFor(style: AppStyles.Style) = JSONObject()
-        .put("key", "stand-in:${style.key}")
-        .put("app", style.key)
-        .put("appName", style.label)
-        .put("accent", style.accent)
-        .put("package", style.packageName)
-        .put("title", "Testeingang")
-        .put("text", "No real notification from ${style.label} yet")
-        .put("iconBase64", JSONObject.NULL)
-        .put("imageBase64", JSONObject.NULL)
-        .put("mediaState", JSONObject.NULL)
-
     private fun testPayload() = JSONObject()
         .put("key", "test")
         .put("app", "generic")
@@ -296,36 +273,17 @@ class MainActivity : Activity() {
 
 
 
-        @JavascriptInterface
-        fun replay(styleKey: String) = runOnUiThread {
-            val style = AppStyles.byKey(styleKey) ?: return@runOnUiThread
-            pushToIsland(NotificationLog.lastOf(styleKey) ?: standInFor(style))
-        }
 
         
         @JavascriptInterface
         fun stage(name: String) = runOnUiThread { DebugStage.run(name) }
 
         
-        @JavascriptInterface
-        fun stageSequence() = runOnUiThread { DebugStage.sequence() }
 
         
-        @JavascriptInterface
-        fun readTrace(): String = BubbleService.trace()
 
         @JavascriptInterface
         fun setPreference(key: String, value: Int) = Preferences.set(preferences, key, value)
-
-        // Enabling before disabling keeps a launcher entry standing the whole time, so the home screen never loses the app between the two calls.
-        @JavascriptInterface
-        fun setAppIcon(index: Int) = runOnUiThread {
-            val chosen = index.coerceIn(ICON_ALIASES.indices)
-            packageManager.setComponentEnabledSetting(iconComponent(chosen), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
-            ICON_ALIASES.indices.filter { it != chosen }.forEach {
-                packageManager.setComponentEnabledSetting(iconComponent(it), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
-            }
-        }
 
         
         @JavascriptInterface

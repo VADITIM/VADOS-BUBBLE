@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import com.v.island.Preferences
 import com.v.island.vas.Curves
 import com.v.island.vas.Durations
 import com.v.island.vas.Haptic
@@ -20,14 +21,30 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 
+// Mirrors the Status Icons sliders in panel.html: each icon is sized by its own preference.
+enum class StatusIcon(val sizeKey: String) {
+    Usb(Preferences.ICON_SIZE_USB),
+    Hotspot(Preferences.ICON_SIZE_HOTSPOT),
+    Bluetooth(Preferences.ICON_SIZE_BLUETOOTH),
+    Zen(Preferences.ICON_SIZE_ZEN),
+    Wifi(Preferences.ICON_SIZE_WIFI),
+    Ethernet(Preferences.ICON_SIZE_ETHERNET),
+    Mobile(Preferences.ICON_SIZE_MOBILE),
+    Battery(Preferences.ICON_SIZE_BATTERY),
+}
+
 sealed interface StatusSlot {
     val name: String
+    val icon: StatusIcon
 
-    data class Mark(override val name: String, val glyph: Glyph, val tint: Color = Color.White) : StatusSlot
-    data class Reading(override val name: String, val text: String) : StatusSlot
-    data class Paired(override val name: String, val charge: Int) : StatusSlot
-    data class Battery(override val name: String, val charge: Charge) : StatusSlot
-    data class Announce(override val name: String, val event: BatteryEvent) : StatusSlot
+    data class Mark(override val name: String, override val icon: StatusIcon, val glyph: Glyph, val tint: Color = Color.White) : StatusSlot
+    data class Reading(override val name: String, override val icon: StatusIcon, val text: String) : StatusSlot
+    data class Paired(override val name: String, val charge: Int) : StatusSlot {
+        override val icon get() = StatusIcon.Bluetooth
+    }
+    data class Battery(override val name: String, val charge: Charge, val announcing: BatteryEvent?) : StatusSlot {
+        override val icon get() = StatusIcon.Battery
+    }
 }
 
 @Stable
@@ -76,25 +93,26 @@ class StatusBubble {
     }
 
     fun slots(): List<StatusSlot> {
-        val event = announcing
-        if (event != null) return listOf(StatusSlot.Announce("announce", event))
         val attached = Island.connectivity
         val shown = mutableListOf<StatusSlot>()
-        if (attached?.isUsb == true) shown += StatusSlot.Mark("usb", Glyphs.usb)
+        if (attached?.isUsb == true) shown += StatusSlot.Mark("usb", StatusIcon.Usb, Glyphs.usb)
         when (modus()) {
-            "hotspot" -> shown += StatusSlot.Mark("modus", Glyphs.hotspot)
+            "hotspot" -> shown += StatusSlot.Mark("modus", StatusIcon.Hotspot, Glyphs.hotspot)
             "bluetooth" -> {
                 val charge = attached?.paired?.charge ?: -1
-                shown += if (charge >= 0) StatusSlot.Paired("modus", charge) else StatusSlot.Mark("modus", Glyphs.bluetooth)
+                shown += if (charge >= 0) StatusSlot.Paired("modus", charge) else StatusSlot.Mark("modus", StatusIcon.Bluetooth, Glyphs.bluetooth)
             }
-            "zen" -> shown += StatusSlot.Mark("modus", zenGlyph(attached!!))
+            "zen" -> shown += StatusSlot.Mark("modus", StatusIcon.Zen, zenGlyph(attached!!))
         }
         when (attached?.link) {
-            "wifi" -> shown += StatusSlot.Mark("link", wifiGlyph(attached))
-            "ethernet" -> shown += StatusSlot.Mark("link", Glyphs.ethernet)
-            "mobile" -> shown += if (attached.generation.isNotEmpty()) StatusSlot.Reading("link", attached.generation) else StatusSlot.Mark("link", Glyphs.mobile)
+            "wifi" -> shown += StatusSlot.Mark("link", StatusIcon.Wifi, wifiGlyph(attached))
+            "ethernet" -> shown += StatusSlot.Mark("link", StatusIcon.Ethernet, Glyphs.ethernet)
+            "mobile" -> shown += if (attached.generation.isNotEmpty()) StatusSlot.Reading("link", StatusIcon.Mobile, attached.generation) else StatusSlot.Mark("link", StatusIcon.Mobile, Glyphs.mobile)
         }
-        Island.charge?.let { shown += StatusSlot.Battery("battery", it) }
+        val event = announcing
+        val charge = Island.charge ?: if (event != null) Charge(50, 50.0, event == BatteryEvent.Plugged, 0) else null
+        // The announcement replaced the whole row with one slot, so every reading left and came back around it; it is drawn by the battery slot alone now.
+        charge?.let { shown += StatusSlot.Battery("battery", it, event) }
         return shown
     }
 

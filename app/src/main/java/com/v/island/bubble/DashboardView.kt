@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -54,6 +53,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
@@ -95,7 +95,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-private class PanelGeometry(screenWidth: Float, screenHeight: Float, nowTall: Float) {
+private class PanelGeometry(screenWidth: Float, val screenHeight: Float, nowTall: Float) {
     val left = Dashboard.MARGIN
     val top = Dashboard.CORNER_INSET + Dashboard.CORNER_TALL + Dashboard.QUICK_CLEARANCE
     val width = screenWidth - Dashboard.MARGIN * 2f
@@ -140,7 +140,6 @@ private class PopRoll {
     val throwEase: Easing = CubicBezierEasing(0.3f, 1.1f + Random.nextFloat() * 0.35f, 0.6f, 1f)
     val throwMilliseconds = (Dashboard.POP * (0.8f + Random.nextFloat() * 0.2f)).roundToInt()
     val jitter = Random.nextInt(Dashboard.JITTER + 1)
-    val fastAt = Random.nextInt(Dashboard.FAST_SPREAD + 1)
 }
 
 @Composable
@@ -154,18 +153,12 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
     val pull = (fromCentre * Dashboard.PULL + side * Dashboard.PULL_FLOOR) * if (kind == PopKind.Knob) roll.strength else 1f
     val progress = remember { Animatable(0f) }
     var isLeaving by remember { mutableStateOf(false) }
-    val isFast = Island.appearance.isFastDashboard
     val shownTurn = remember { floatArrayOf(0f, 0f) }
     LaunchedEffect(generation) {
         if (dashboard.isOpen) {
             shownTurn[1] = if (progress.value > 0.001f) shownTurn[0] + 360f else 0f
             isLeaving = false
             progress.snapTo(0f)
-            if (isFast) {
-                delay(roll.fastAt.toLong())
-                progress.animateTo(1f, tween(FAST_DROP, easing = LinearOutSlowInEasing))
-                return@LaunchedEffect
-            }
             val jitter = if (kind == PopKind.Turning) roll.jitter else 0
             delay((rank * Dashboard.STAGGER + jitter).toLong())
             if (kind == PopKind.Top) {
@@ -176,6 +169,10 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
         } else {
             shownTurn[1] = shownTurn[0] - (1f - progress.value) * 180f
             isLeaving = true
+            if (kind == PopKind.Top) {
+                progress.animateTo(0f, tween(TOP_LEAVE, easing = Curves.leave))
+                return@LaunchedEffect
+            }
             delay(((Dashboard.RANK_STEPS - rank) * Dashboard.DROP_STAGGER).toLong())
             progress.animateTo(0f, tween(Dashboard.COLLAPSE, easing = Curves.leave))
         }
@@ -196,19 +193,19 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
     return graphicsLayer {
         val value = progress.value
         val soloValue = solo.value
-        if (isFast && !isLeaving) {
-            translationY = -FAST_LIFT * (1f - value) * density
-            alpha = if (value > 0f) soloValue else 0f
-            scaleX = soloValue
-            scaleY = soloValue
-            return@graphicsLayer
-        }
         val rest = 1f - value
         // The battery and stats were thrown in from past the screen top with an overshoot, so they flew over the clock and each other; they slide in from past the screen top without overshoot, already near full size.
         if (kind == PopKind.Top && !isLeaving) {
             alpha = (value * TOP_FADE_SHARE).coerceIn(0f, 1f) * soloValue
             translationY = -(centre + TOP_DROP) * rest * density
             scaleX = (TOP_SCALE + (1f - TOP_SCALE) * value) * soloValue
+            scaleY = scaleX
+            return@graphicsLayer
+        }
+        if (kind == PopKind.Top) {
+            alpha = (value * TOP_FADE_SHARE).coerceIn(0f, 1f)
+            translationY = -(centre + TOP_DROP) * rest * density
+            scaleX = TOP_SCALE + (1f - TOP_SCALE) * value
             scaleY = scaleX
             return@graphicsLayer
         }
@@ -220,12 +217,12 @@ private fun Modifier.pop(dashboard: Dashboard, centre: Float, panelTall: Float, 
             // Leaving switched the spin to a new formula from zero, so a half-entered or overshot control snapped back to its original rotation; the turn it had is carried into the exit.
             rotationZ = if (turnsIn) rest * 180f + shownTurn[1] else 0f
             shownTurn[0] = rotationZ
-            translationY = rest * pull * 0.6f * density
+            translationY = if (kind == PopKind.Turning) 0f else rest * pull * 0.6f * density
         } else {
             alpha = soloValue
             rotationZ = if (turnsIn) rest * -360f + shownTurn[1] * rest else 0f
             shownTurn[0] = rotationZ
-            translationY = rest * (if (kind == PopKind.Level) -pull else pull) * density
+            translationY = if (kind == PopKind.Turning) 0f else rest * (if (kind == PopKind.Level) -pull else pull) * density
         }
     }
 }
@@ -624,77 +621,108 @@ private fun BatteryBubble(dashboard: Dashboard, geometry: PanelGeometry, appeara
     val percent = charge?.percent ?: -1
     val isPlugged = charge?.isPlugged == true
     val colour = animateColorAsState(if (charge == null) Palette.textFaint else StatusBubble.chargeColour(charge), tween(500), label = "charge")
-    val outline = animateColorAsState(if (isPlugged) colour.value else Color.Transparent, tween(500), label = "outline")
+    val border = animateColorAsState(if (isPlugged) StatusBubble.CHARGING_COLOUR else StatusBubble.CHARGING_COLOUR.copy(alpha = 0f), tween(500), label = "border")
     val isSaving = dashboard.toggles.switches["saver"] == true
     val isLow = !isPlugged && percent in 0..BATTERY_CRITICAL
     val edge = animateColorAsState(
         when {
             isLow -> BATTERY_LOW_EDGE
             isSaving -> Palette.toggles.getValue("saver")
-            else -> colour.value
+            isPlugged -> StatusBubble.CHARGING_COLOUR
+            else -> Color.White
         },
         tween(500),
         label = "edge",
     )
     val share = (percent.coerceAtLeast(0)) / 100f
+    val boltPop = animateFloatAsState(if (isPlugged) 1f else 0f, BOLT_POP, label = "bolt")
+    var timeWide by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val isTimed = isPlugged && (charge?.remainingMinutes ?: -1) >= 0
     Row(
         modifier
             .pop(dashboard, geometry.vitalsCentre, geometry.height, PopKind.Top)
             .control(dashboard, "battery", 0.97f, onHold = { dashboard.openSettings("battery") }) { dashboard.openSettings("battery") },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val cellShape = SquircleShape(22.dp)
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .clip(cellShape)
-                .background(BATTERY_WELL)
-                // The border was stroked along the clipped squircle, so half its width fell outside the clip and the corners thinned out; it is drawn inset by half its width on a squircle shrunk by the same amount.
-                .drawWithContent {
-                    drawContent()
-                    val width = 2.dp.toPx()
-                    val ring = RING_SHAPE.createOutline(androidx.compose.ui.geometry.Size(size.width - width, size.height - width), layoutDirection, this)
-                    translate(width / 2f, width / 2f) { drawOutline(ring, outline.value, style = Stroke(width)) }
-                },
-        ) {
-            Canvas(Modifier.fillMaxSize()) {
-                val inset = 6.dp.toPx()
-                val wide = max(0f, (size.width - 4.dp.toPx()) * share - 8.dp.toPx())
-                if (wide > 0f) {
-                    val outline = FILL_SHAPE.createOutline(androidx.compose.ui.geometry.Size(wide, size.height - inset * 2f), layoutDirection, this)
-                    translate(inset, inset) { drawOutline(outline, colour.value) }
+        Box(Modifier.weight(1f).fillMaxHeight().graphicsLayer(compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen)) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .padding(vertical = BOLT_OVERHANG.dp)
+                    .drawWithContent {
+                        val outline = BATTERY_OUTLINE.dp.toPx()
+                        val well = CELL_SHAPE.createOutline(size, layoutDirection, this)
+                        drawOutline(well, BATTERY_WELL)
+                        val wide = batteryFillWide(size.width, share, this)
+                        if (wide > 0f) {
+                            val inset = batteryInset(this)
+                            val fill = FILL_SHAPE.createOutline(androidx.compose.ui.geometry.Size(wide, size.height - inset * 2f), layoutDirection, this)
+                            translate(inset, inset) { drawOutline(fill, colour.value) }
+                        }
+                        drawContent()
+                        // The ring was stroked along the cell's own outline, so half its width fell outside it and the corners thinned out; it is drawn inset by half its width on a squircle shrunk by the same amount.
+                        val ring = RING_SHAPE.createOutline(androidx.compose.ui.geometry.Size(size.width - outline, size.height - outline), layoutDirection, this)
+                        translate(outline / 2f, outline / 2f) { drawOutline(ring, border.value, style = Stroke(outline)) }
+                    },
+            ) {
+                if (isPlugged && dashboard.isOpen) ChargeBubbles(share)
+                BatteryInk(dashboard, appearance, share, Color.White, isOverFill = false) { timeWide = it }
+                BatteryInk(dashboard, appearance, share, Color.Black, isOverFill = true) {}
+            }
+            if (boltPop.value > 0.01f) {
+                Canvas(Modifier.matchParentSize()) {
+                    val boltWide = BOLT_WIDE.dp.toPx()
+                    val left = size.width - (if (isTimed) (TIME_RIGHT + BOLT_GAP).dp.toPx() + timeWide else BOLT_RIGHT.dp.toPx()) - boltWide
+                    val bolt = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(left + boltWide * 0.70f, 0f)
+                        lineTo(left + boltWide * 0.04f, size.height * 0.58f)
+                        lineTo(left + boltWide * 0.46f, size.height * 0.56f)
+                        lineTo(left + boltWide * 0.30f, size.height)
+                        lineTo(left + boltWide * 0.96f, size.height * 0.42f)
+                        lineTo(left + boltWide * 0.54f, size.height * 0.44f)
+                        close()
+                    }
+                    scale(boltPop.value, Offset(left + boltWide / 2f, size.height / 2f)) {
+                        drawPath(bolt, Color.Black, style = Stroke(4.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round), blendMode = androidx.compose.ui.graphics.BlendMode.Clear)
+                        drawPath(bolt, Color.White)
+                    }
                 }
             }
-            if (isPlugged && dashboard.isOpen) ChargeBubbles(share)
-            BatteryInk(dashboard, appearance, share, Color.White, isOverFill = false)
-            BatteryInk(dashboard, appearance, share, Color.Black, isOverFill = true)
         }
         Box(
             Modifier
-                .padding(start = 5.dp)
-                .width(20.dp)
-                .fillMaxHeight(0.58f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(BATTERY_WELL)
-                .border(2.dp, outline.value, RoundedCornerShape(8.dp))
-                .padding(3.dp)
-                .background(edge.value, RoundedCornerShape(4.dp)),
+                .padding(start = 3.dp)
+                .width(5.dp)
+                .fillMaxHeight(0.3f)
+                .background(edge.value, RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)),
         )
     }
 }
 
+private fun batteryInset(density: androidx.compose.ui.unit.Density) = with(density) { (BATTERY_OUTLINE + 3f).dp.toPx() }
+
+private fun batteryFillWide(width: Float, share: Float, density: androidx.compose.ui.unit.Density) = max(0f, (width - batteryInset(density) * 2f) * share)
+
+private val CELL_SHAPE = SquircleShape(30.dp)
+private val MERGE_EASE = CubicBezierEasing(0.2f, 1f, 0.35f, 1f)
 /* Mirrors #battery-fill in pill.css: the fill is a squircle like its cell, and a circular 17dp corner read rounder than the WebView's. */
-private val FILL_SHAPE = SquircleShape(17.dp)
-private val RING_SHAPE = SquircleShape(21.dp)
+private val FILL_SHAPE = SquircleShape(25.dp)
+private val RING_SHAPE = SquircleShape(29.dp)
+private const val BATTERY_OUTLINE = 2f
+private const val BOLT_OVERHANG = 4f
+private const val BOLT_WIDE = 44f
+private const val BOLT_RIGHT = 12f
+private const val TIME_RIGHT = 12f
+private const val BOLT_GAP = 6f
+private const val READING_LEFT = 14f
 
 @Composable
 private fun BoxScope.ChargeBubbles(share: Float) {
     val transition = rememberInfiniteTransition(label = "bubbles")
     val time = transition.animateFloat(0f, CHARGE_LOOP, infiniteRepeatable(tween(CHARGE_LOOP.toInt(), easing = LinearEasing), RepeatMode.Restart), label = "time")
     Canvas(Modifier.matchParentSize()) {
-        val inset = 6.dp.toPx()
-        val wide = max(0f, (size.width - 4.dp.toPx()) * share - 8.dp.toPx())
+        val inset = batteryInset(this)
+        val wide = batteryFillWide(size.width, share, this)
         if (wide <= 0f) return@Canvas
         val tall = size.height - inset * 2f
         clipRect(inset, inset, inset + wide, inset + tall) {
@@ -719,24 +747,24 @@ private fun BoxScope.ChargeBubbles(share: Float) {
 }
 
 @Composable
-private fun BoxScope.BatteryInk(dashboard: Dashboard, appearance: Appearance, share: Float, colour: Color, isOverFill: Boolean) {
+private fun BoxScope.BatteryInk(dashboard: Dashboard, appearance: Appearance, share: Float, colour: Color, isOverFill: Boolean, onTimeWide: (Float) -> Unit) {
     val charge = Island.charge
     val exact = dashboard.exactCharge.takeIf { it >= 0 } ?: charge?.exact ?: -1.0
     Box(
         Modifier.matchParentSize().drawWithContent {
-            val edge = max(0f, 2.dp.toPx() + (size.width - 4.dp.toPx()) * share - 4.dp.toPx())
+            val edge = batteryInset(this) + batteryFillWide(size.width, share, this)
             if (isOverFill) clipRect(right = edge) { this@drawWithContent.drawContent() }
             else clipRect(left = edge) { this@drawWithContent.drawContent() }
         },
         contentAlignment = Alignment.Center,
     ) {
         if (charge == null || charge.percent < 0) {
-            BasicText("--", style = type(1.75f, colour, appearance.batteryFont, appearance.batteryScale, weight = FontWeight.SemiBold, lineHeight = 1f))
+            BasicText("--", Modifier.align(Alignment.CenterStart).padding(start = READING_LEFT.dp), style = type(1.75f, colour, appearance.batteryFont, appearance.batteryScale, weight = FontWeight.SemiBold, lineHeight = 1f))
         } else {
             val reading = String.format(java.util.Locale.ROOT, "%.2f", exact)
             val whole = reading.substringBefore('.')
             val hundredths = reading.substringAfter('.')
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.align(Alignment.CenterStart).padding(start = READING_LEFT.dp), verticalAlignment = Alignment.CenterVertically) {
                 BasicText(whole, style = type(1.75f, colour, appearance.batteryFont, appearance.batteryScale, weight = FontWeight.SemiBold, lineHeight = 1f))
                 Column(Modifier.padding(start = 1.7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     val side = type(0.875f, colour, appearance.batteryFont, appearance.batteryScale, weight = FontWeight.SemiBold, lineHeight = 1f)
@@ -746,11 +774,18 @@ private fun BoxScope.BatteryInk(dashboard: Dashboard, appearance: Appearance, sh
             }
         }
         if (charge?.isPlugged == true && charge.remainingMinutes >= 0) {
-            BasicText(
-                remainingCharge(charge.remainingMinutes),
-                Modifier.align(Alignment.BottomEnd).padding(end = 9.dp, bottom = 3.dp),
-                style = type(0.48f, colour, appearance.batteryFont, appearance.batteryScale, lineHeight = 1f),
+            val remaining = remainingCharge(charge.remainingMinutes)
+            val style = type(0.48f, colour, appearance.batteryFont, appearance.batteryScale, lineHeight = 1f)
+            val wide = rememberTextMeasurer().measure(remaining, style).size.width
+            // ScrambleText fills the width it is given, so the time sat at the far left and its measured width pushed the bolt out of the cell; it is given exactly its own line's width.
+            ScrambleText(
+                remaining,
+                style,
+                0,
+                Modifier.align(Alignment.BottomEnd).padding(end = TIME_RIGHT.dp, bottom = 5.dp).width(with(LocalDensity.current) { wide.toDp() }),
+                Alignment.End,
             )
+            SideEffect { onTimeWide(wide.toFloat()) }
         }
     }
 }
@@ -881,7 +916,7 @@ private fun UsbBubble(dashboard: Dashboard, geometry: PanelGeometry, appearance:
 @Composable
 private fun SystemSection(dashboard: Dashboard, geometry: PanelGeometry, appearance: Appearance) {
     val lift = animateFloatAsState(
-        if (dashboard.isSoloOut) geometry.height / 2f - geometry.levelsCentre else 0f,
+        if (dashboard.isSoloOut) geometry.screenHeight / 2f - geometry.top - geometry.levelsCentre else 0f,
         tween(Dashboard.SOLO_TRAVEL, easing = Curves.split),
         label = "soloLift",
     )
@@ -971,8 +1006,8 @@ private fun ModeButton(dashboard: Dashboard, name: String, centre: Float, geomet
     val isAvailable = dashboard.isAvailable(name)
     val reading = ringReading(dashboard, name)
     val isSearching = reading.isNotEmpty() && reading == WAITING[name]
-    val colour = animateColorAsState(if (isOn) accent else Palette.textMuted, tween(200), label = "mode")
-    val ringColour = animateColorAsState(if (isOn) lerp(Palette.textBody, accent, 0.7f) else Palette.textFaint, tween(200), label = "ring")
+    val colour = animateColorAsState(if (isOn) appearance.accent else Palette.textMuted, tween(200), label = "mode")
+    val ringColour = animateColorAsState(if (isOn) accent else Palette.textFaint, tween(200), label = "ring")
     val turn = rememberTurn(dashboard, name, isOn)
     Box(
         Modifier
@@ -1175,7 +1210,8 @@ private fun Levels(dashboard: Dashboard, geometry: PanelGeometry) {
     }
     LEVELS.forEach { name ->
         val frame = levelFrame(name, isCall, held)
-        val spec = tween<Float>(Dashboard.SOLO_TRAVEL, easing = Curves.split)
+        // The far bar grew into the held one's box on the overshooting split curve, so it bounced past the box before it was cut; it arrives on the same curve without the overshoot.
+        val spec = tween<Float>(Dashboard.SOLO_TRAVEL, easing = if (held != null && held != name) MERGE_EASE else Curves.split)
         val left = animateFloatAsState(frame.left, spec, label = "left")
         val top = animateFloatAsState(frame.top, spec, label = "top")
         val right = animateFloatAsState(frame.right, spec, label = "right")
@@ -1488,8 +1524,8 @@ private const val CHARGE_LOOP = 1_000_000f
 
 private val LEVELS = listOf("brightness", "volume", "callVolume")
 private val WAITING = mapOf("bluetooth" to "nothing paired", "wifi" to "not connected", "hotspot" to "nobody joined", "mobile" to "standby")
-private val HOLD_WORDS = Regex("pause|pausieren|anhalten|resume|fortsetzen|weiter", RegexOption.IGNORE_CASE)
-private val STOP_WORDS = Regex("cancel|abbrechen|abbruch|stop|stopp|beenden", RegexOption.IGNORE_CASE)
+private val HOLD_WORDS = MainBubble.TRANSFER_HOLD_WORDS
+private val STOP_WORDS = MainBubble.TRANSFER_STOP_WORDS
 
 private val SCRIM = Color(6, 6, 8).copy(alpha = 0.42f)
 private val BATTERY_WELL = Color(10, 9, 13).copy(alpha = 0.85f)
@@ -1508,9 +1544,8 @@ private val POWER_RED = Color(0xFFE5342B)
 /* Mirrors BATTERY_CRITICAL in the retired js/status.js. */
 private const val BATTERY_CRITICAL = 19
 private const val FROST_STEPS = 12
-private const val FAST_DROP = 220
-private const val FAST_LIFT = 14f
-private const val TOP_FADE = 480
+private const val TOP_FADE = 300
+private const val TOP_LEAVE = 240
 private const val TOP_DROP = 160f
 private const val TOP_SCALE = 0.7f
 private const val TOP_FADE_SHARE = 3f
@@ -1520,7 +1555,7 @@ private const val SOLO_SWELL = 300
 private const val SOLO_SWELL_STEP = 16L
 private const val STATS_SHARE = 0.27f
 private const val TOGGLE_SHARE = 0.275f
-private const val SYSTEM_RAISE = 4f
+private const val SYSTEM_RAISE = -8f
 private const val SYSTEM_RAISE_SHARE = 0.05f
 private const val STATS_DROP = 4f
 private const val STATS_INSET = 10f

@@ -294,7 +294,6 @@ class Dashboard {
         const val PULL_FLOOR = 56f
         const val JITTER = 50
         const val DROP_STAGGER = 20
-        const val FAST_SPREAD = 300
         const val ENTER_SPAN = RANK_STEPS * STAGGER + JITTER + POP
         const val DROPPED = RANK_STEPS * DROP_STAGGER + 180
         const val COLLAPSE = 95

@@ -40,9 +40,6 @@ object NotificationLog {
     fun all(): JSONArray = JSONArray().apply { entries.forEach { put(it.payload) } }
 
     
-    fun lastOf(styleKey: String): JSONObject? =
-        entries.firstOrNull { it.payload.optString("app") == styleKey }?.payload
-
     fun open(key: String, context: Context, options: Bundle): Boolean {
         val intent = entries.firstOrNull { it.key == key }?.intent ?: return false
         return runCatching { intent.send(context, 0, null, null, null, null, options) }.isSuccess

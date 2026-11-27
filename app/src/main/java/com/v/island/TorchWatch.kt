@@ -111,7 +111,7 @@ object TorchWatch {
     }
 
     
-    private fun state(): JSONObject? {
+    fun state(): JSONObject? {
         if (!isOn) return null
         return JSONObject()
             

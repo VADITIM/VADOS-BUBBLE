@@ -42,6 +42,8 @@ fun IslandStage() {
                 SystemPill(Island.bubble)
                 ClearButton(Island.bubble)
                 MainBubbleView(Island.bubble)
+                NotificationsMenu(Island.bubble)
+                NotificationsHoming(Island.bubble)
                 TorchView(Island.bubble)
                 TorchOffView(Island.bubble)
                 DarkAlertView()

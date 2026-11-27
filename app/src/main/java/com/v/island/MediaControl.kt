@@ -113,6 +113,12 @@ object MediaControl {
             .onFailure { android.util.Log.w("IslandBubble", "no media sessions", it) }
     }
 
+    fun republish() {
+        publishedState = null
+        artSent = null
+        refresh()
+    }
+
     fun stop() {
         controllers.forEach { it.unregisterCallback(controllerCallback) }
         controllers = emptyList()
